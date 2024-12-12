@@ -1,6 +1,6 @@
 import "../styles/auth.css";
-
 import { useForm } from "../../../hooks";
+
 
 
 const loginFormFields = {
@@ -12,13 +12,14 @@ export const LoginPage = () => {
 
   const { loginUser, loginPassword, onInputChange } = useForm(loginFormFields);
 
-  const loginSubmit = (e) => {
+  const loginSubmit = (e: any) => {
     e.preventDefault();
     console.log('loginSubmit');
     console.log(`loginUser: ${loginUser} loginPassword: ${loginPassword}`);
     
     // startLogin({ email: loginEmail, password: loginPassword });
   }
+
 
   return (
     <div className="login-container">

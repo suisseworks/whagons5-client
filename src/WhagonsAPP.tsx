@@ -4,7 +4,7 @@ import { Provider } from 'react-redux'
 
 import { AppRouter } from './router/AppRouter'
 import { store, persistor } from './store'
-import { PersistGate } from 'redux-persist/integration/react'
+import { PersistGate } from 'redux-persist/integration/react' 
 
 
 export const WhagonsAPP = () => {

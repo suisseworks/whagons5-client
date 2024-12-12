@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from 'redux-persist';
 
 
-import { persistedAuthReducer } from "./index";
+import { persistedAuthReducer } from "./auth/authSlice";
 
 
 const store = configureStore({
