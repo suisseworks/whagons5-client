@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router";
-import { useAuthStore } from "../features/auth/hooks/useAuthStore";
+import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
 
 interface PrivateRouteProps {
   children: ReactNode;
@@ -9,5 +9,5 @@ interface PrivateRouteProps {
 export const PrivateRoute = ({ children }: PrivateRouteProps) => {
   const { status } = useAuthStore();
 
-  return status === "authenticated" ? <>{children}</> : <Navigate to="/auth/login" replace />;
+  return status === "authenticated" ? <>{children}</> : <Navigate to="/login" replace />;
 };

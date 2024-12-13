@@ -1,23 +1,27 @@
-import { Navigate, Route, Routes } from "react-router"
+import { Route, Routes } from "react-router"
+
+import { PrivateRoute, PublicRoute } from './guard';
 import { LoginPage } from "../features/auth";
-import { DashBoardTicket } from "../features/tasks";
-import { PrivateRoute } from "./PrivateRoute";
+import { HomeRoutes } from "./HomeRouter";
 
 export const AppRouter = () => {
 
-    const authStatus = 'not-authenticated';
 
     return (
         <Routes>
-            <Route path="/auth/*" element={<LoginPage/>}></Route>
+            <Route path="login/*" element={
+                <PublicRoute> 
+                    <Routes>
+                        <Route path="/*" element={<LoginPage />} />
+                    </Routes>
+                </PublicRoute>
+            } />
 
-            <Route path="/tasks" element={
+            <Route path="/*" element={
                 <PrivateRoute>
-                    <DashBoardTicket />
+                    <HomeRoutes />
                 </PrivateRoute>
             } />
-            
-            <Route path="/*" element={<Navigate to='/auth/login' />} />
         </Routes>
     )
 }
