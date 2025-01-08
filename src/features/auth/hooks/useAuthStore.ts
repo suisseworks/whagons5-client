@@ -2,6 +2,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { checking, OnLoadingError, onLogin, type RootState } from "../../../store";
 import { authService } from "../services/authService";
 import { useNavigate } from "react-router";
+import { al } from "react-router/dist/development/fog-of-war-DU_DzpDb";
 
 export const useAuthStore = () => {
 
@@ -28,6 +29,7 @@ export const useAuthStore = () => {
         } catch (error) {
             
             dispatch( OnLoadingError("Credenciales incorrectas") );
+            alert('Credenciales incorrectas');
         }
     }
 
