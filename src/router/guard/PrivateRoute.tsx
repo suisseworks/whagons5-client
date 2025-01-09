@@ -9,5 +9,9 @@ interface PrivateRouteProps {
 export const PrivateRoute = ({ children }: PrivateRouteProps) => {
   const { status } = useAuthStore();
 
-  return status === "authenticated" ? <>{children}</> : <Navigate to="/login" replace />;
+  //forsando login por ahora 
+  return <>{children}</>
+  
+  // return status === "authenticated" ? <>{children}</> : <Navigate to="/login" replace />;
+  
 };

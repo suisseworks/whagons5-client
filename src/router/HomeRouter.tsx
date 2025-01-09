@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router'
 
 import { DashBoardTicket } from '../features/tasks'
 import { DashboardWorkplan } from '../features/workplan';
-import MainLayout from '../layouts/MainLayout/pages/MainLayout'
+import MainLayout from '../layouts/MainLayout'
 
 export const HomeRoutes = () => {
     return (
