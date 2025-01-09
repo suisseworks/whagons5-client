@@ -27,7 +27,6 @@
   }
   
   .sidebar-nav a {
-    color: #ecf0f1;
     text-decoration: none;
     font-size: 16px;
     transition: color 0.3s;
@@ -36,4 +35,12 @@
   .sidebar-nav a:hover {
     color: #3498db;
   }
-  
+
+  .nav-inactive {
+    color: #ecf0f1; 
+    font-weight: bold;
+  }
+  .nav-active {
+    color: #1abc9c; 
+    font-weight: bold;
+  }

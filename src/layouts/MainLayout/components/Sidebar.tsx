@@ -1,3 +1,4 @@
+import { NavLink } from "react-router";
 import "../styles/Sidebar.css";
 
 
@@ -6,10 +7,22 @@ export const Sidebar = () => {
     <aside className="sidebar">
       <nav className="sidebar-nav">
         <ul>
-          <li><a href="#">Home</a></li>
-          <li><a href="#">About</a></li>
-          <li><a href="#">Services</a></li>
-          <li><a href="#">Contact</a></li>
+          <li>
+            <NavLink
+              to="/tasks"
+              className={({ isActive }) => (isActive ? "nav-active" : "nav-inactive")}
+            >
+              Tasks
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/workplan"
+              className={({ isActive }) => (isActive ? "nav-active" : "nav-inactive")}
+            >
+              workplan
+            </NavLink>
+          </li>
         </ul>
       </nav>
     </aside>
