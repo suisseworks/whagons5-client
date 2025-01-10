@@ -1,27 +1,39 @@
-import { Route, Routes } from "react-router"
+import { Route, Routes } from 'react-router';
 
 import { PrivateRoute, PublicRoute } from './guard';
-import { LoginPage } from "../features/auth";
-import { HomeRoutes } from "./HomeRouter";
+// import { LoginPage } from '../features/auth';
+import { HomeRoutes } from './HomeRouter';
+import SignIn from '../pages/Authentication/SignIn';
+import SignUp from '../pages/Authentication/SignUp';
 
 export const AppRouter = () => {
+  return (
+    <Routes>
+      <Route
+        path="/auth/signin"
+        element={
+          <PublicRoute>
+            <SignIn />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/auth/signup"
+        element={
+          <PublicRoute>
+            <SignUp />
+          </PublicRoute>
+        }
+      />
 
-
-    return (
-        <Routes>
-            <Route path="login/*" element={
-                <PublicRoute> 
-                    <Routes>
-                        <Route path="/*" element={<LoginPage />} />
-                    </Routes>
-                </PublicRoute>
-            } />
-
-            <Route path="/*" element={
-                <PrivateRoute>
-                    <HomeRoutes />
-                </PrivateRoute>
-            } />
-        </Routes>
-    )
-}
+      <Route
+        path="/*"
+        element={
+          <PrivateRoute>
+            <HomeRoutes />
+          </PrivateRoute>
+        }
+      />
+    </Routes>
+  );
+};

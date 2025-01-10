@@ -1,17 +1,27 @@
-import { ReactNode } from "react";
-import { Navigate } from "react-router";
-import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
+// src/components/ProtectedRoute.tsx
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext'
 
-interface PrivateRouteProps {
-  children: ReactNode;
+interface ProtectedRouteProps {
+  children: React.ReactNode;
 }
 
-export const PrivateRoute = ({ children }: PrivateRouteProps) => {
-  const { status } = useAuthStore();
+export const PrivateRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { user, loading } = useAuth();
 
-  //forsando login por ahora 
-  return <>{children}</>
-  
-  // return status === "authenticated" ? <>{children}</> : <Navigate to="/login" replace />;
-  
+  // Show a loading indicator while checking auth state
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  // If user is not logged in, redirect to login page
+  if (!user) {
+    return <Navigate to="/auth/signin" />;
+  }
+
+  // If logged in, show the dashboard (or whatever content is wrapped)
+  return <>{children}</>;
 };
+
+export default PrivateRoute;

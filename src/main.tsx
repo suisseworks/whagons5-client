@@ -1,11 +1,14 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import './index.css'
-import { BrowserRouter } from 'react-router'
-import { WhagonsAPP } from './WhagonsAPP'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import { BrowserRouter } from 'react-router';
+import { WhagonsAPP } from './WhagonsAPP';
+import { AuthProvider } from './context/AuthContext';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <WhagonsAPP/>
+    <AuthProvider>
+      <WhagonsAPP />
+    </AuthProvider>
   </React.StrictMode>,
-)
+);

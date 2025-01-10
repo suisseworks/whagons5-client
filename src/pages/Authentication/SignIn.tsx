@@ -4,6 +4,9 @@ import LogoDark from '../../images/logo/logo-dark.svg';
 import Logo from '../../images/logo/logo.svg';
 import { signInWithGoogle, signUpWithEmail } from './auth';
 
+
+const API_URL = "http://127.0.0.1:8000/api";
+
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
@@ -25,21 +28,59 @@ const SignIn: React.FC = () => {
 
   const handleGoogleSignin = async () => {
     try {
-      await signInWithGoogle();
-      navigate("/")
-      //re-route to confirm email screen then login from email
+      const userCredential = await signInWithGoogle();
+      const user = userCredential.user;
+
+      // Get the ID token
+      const idToken = await user.getIdToken();
+
+      // Send the ID token to your backend (using fetch or axios)
+      const response = await fetch(`${API_URL}/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (response.ok) {
+        console.log('Successfully logged in and sent idToken to backend');
+      } else {
+        console.error('Login failed');
+      }
     } catch (error) {
       console.error(error);
     }
+    navigate('/');
+    //re-route to confirm email screen then login from email
   };
 
   const handleEmailSignin = async () => {
     try {
-      if (!await checkPassword()) {
+      if (!(await checkPassword())) {
         return;
       }
-      await signUpWithEmail(email, password);
-      navigate("/")
+      const userCredential = await signUpWithEmail(email, password);
+      const user = userCredential.user;
+
+      // Get the ID token
+      const idToken = await user.getIdToken();
+
+      // Send the ID token to your backend (using fetch or axios)
+      const response = await fetch(`${API_URL}/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (response.ok) {
+        console.log('Successfully logged in and sent idToken to backend');
+      } else {
+        console.error('Login failed');
+      }
+      navigate('/');
       //re-route to dashboard
     } catch (error) {
       console.error(error);
@@ -266,7 +307,9 @@ const SignIn: React.FC = () => {
 
               <div className="mb-5">
                 <input
-                  onClick={() => {handleEmailSignin();}}
+                  onClick={() => {
+                    handleEmailSignin();
+                  }}
                   type="submit"
                   value="Sign In"
                   className="w-full cursor-pointer rounded-lg border border-primary bg-primary p-4 text-white transition hover:bg-opacity-90"
