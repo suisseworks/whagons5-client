@@ -5,7 +5,7 @@ import Logo from '../../images/logo/logo.svg';
 import { signInWithGoogle, signUpWithEmail } from './auth';
 
 
-const API_URL = "http://127.0.0.1:8000/api";
+const API_URL = "https://localhost:8001/api";
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -34,12 +34,15 @@ const SignIn: React.FC = () => {
       // Get the ID token
       const idToken = await user.getIdToken();
 
+      console.log("id token", idToken);
+
       // Send the ID token to your backend (using fetch or axios)
       const response = await fetch(`${API_URL}/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ idToken }),
       });
 
