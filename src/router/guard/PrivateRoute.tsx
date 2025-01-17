@@ -12,6 +12,6 @@ export const PrivateRoute = ({ children }: PrivateRouteProps) => {
   //forsando login por ahora 
   return <>{children}</>
   
-  // return status === "authenticated" ? <>{children}</> : <Navigate to="/login" replace />;
+  return status === "authenticated" ? <>{children}</> : <Navigate to="/login" replace />;
   
 };
