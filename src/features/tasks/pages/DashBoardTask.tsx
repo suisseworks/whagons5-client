@@ -1,3 +1,4 @@
+import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 
 export const DashBoardTicket = () => {
@@ -11,32 +12,32 @@ export const DashBoardTicket = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(
-          'https://localhost:8001/api/protected', 
+        const response = await axios.get(
+          'http://localhost:8000/api/protected',
           {
-            credentials : 'include',
-          }
-          );
-        const result = await response.json();
-        setData(result);  // Set the fetched data into state
+            withCredentials: true,
+          },
+        );
+        setData(response.data); // Set the fetched data into state
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
-        setLoading(false);  // Set loading to false after the fetch completes
+        setLoading(false); // Set loading to false after the fetch completes
       }
     };
 
     fetchData();
-  }, []);  // Empty dependency array ensures it runs only once when the component mounts
+  }, []); // Empty dependency array ensures it runs only once when the component mounts
 
   if (loading) {
-    return <div>Loading...</div>;  // Show loading message while fetching data
+    return <div>Loading...</div>; // Show loading message while fetching data
   }
 
   return (
     <div>
       <h1>DashBoardTicket</h1>
-      <pre>{JSON.stringify(data, null, 2)}</pre> {/* Display the fetched data */}
+      <pre>{JSON.stringify(data, null, 2)}</pre>{' '}
+      {/* Display the fetched data */}
     </div>
   );
 };

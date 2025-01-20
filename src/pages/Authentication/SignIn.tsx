@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import LogoDark from '../../images/logo/logo-dark.svg';
 import Logo from '../../images/logo/logo.svg';
 import { signInWithGoogle, signUpWithEmail } from './auth';
+import axios from 'axios';
 
-
-const API_URL = "https://localhost:8001/api";
+// const API_URL = "https://localhost:8001/api";
+const API_URL = 'http://localhost:8000/api';
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -34,23 +35,25 @@ const SignIn: React.FC = () => {
       // Get the ID token
       const idToken = await user.getIdToken();
 
-      console.log("id token", idToken);
+      console.log('id token', idToken);
 
       // Send the ID token to your backend (using fetch or axios)
-      const response = await fetch(`${API_URL}/session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await axios.post(
+        `${API_URL}/session`,
+        { idToken },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true,
         },
-        credentials: 'include',
-        body: JSON.stringify({ idToken }),
-      });
+      );
 
-      if (response.ok) {
-        console.log('Successfully logged in and sent idToken to backend');
-      } else {
-        console.error('Login failed');
-      }
+      // if (response.ok) {
+      //   console.log('Successfully logged in and sent idToken to backend');
+      // } else {
+      //   console.error('Login failed');
+      // }
     } catch (error) {
       console.error(error);
     }
