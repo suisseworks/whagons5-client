@@ -1,20 +1,25 @@
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router';
 
-import { DashBoardTicket } from '../features/tasks'
+import { DashBoardTicket } from '../features/tasks';
 import { DashboardWorkplan } from '../features/workplan';
-import MainLayout from '../layouts/MainLayout'
+import MainLayout from '../layouts/MainLayout';
+import { useParams } from 'react-router';
+import Dashboard from '../components/Dashboard';
 
 export const HomeRoutes = () => {
-    return (
-        <>
-            <MainLayout>
-                <Routes>
-                    <Route path="/tasks" element={<DashBoardTicket />} />
-                    <Route path="/workplan" element={<DashboardWorkplan />} />
+  const { uuid } = useParams<{ uuid: string }>();
 
-                    <Route path="/" element={<Navigate to='tasks' />} />
-                </Routes>
-            </MainLayout>
-        </>
-    )
-}
+  return (
+    <>
+      <MainLayout>
+        <Routes>
+          <Route path="/tasks" element={<DashBoardTicket />} />
+          <Route path="/workplan" element={<DashboardWorkplan />} />
+
+          <Route path="/" element={<Navigate to="tasks" />} />
+          <Route path="/dashboard/:uuid" element={<Dashboard />} />
+        </Routes>
+      </MainLayout>
+    </>
+  );
+};
