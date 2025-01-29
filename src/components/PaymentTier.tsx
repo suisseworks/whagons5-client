@@ -4,13 +4,27 @@ interface PaymentTierProps {
   name: string;
   price: number;
   features: string[];
+  popular?: boolean;
+  billingCycle: 'monthly' | 'yearly';
 }
 
-const PaymentTier: React.FC<PaymentTierProps> = ({ name, price, features }) => {
+const PaymentTier: React.FC<PaymentTierProps> = ({ name, price, features, popular, billingCycle }) => {
   return (
-    <div className="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-8 flex-1 transition-transform hover:-translate-y-2 flex flex-col">
+    <div className={`bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-8 flex-1 transition-transform hover:-translate-y-2 flex flex-col relative ${
+      popular ? 'ring-2 ring-green-400' : ''
+    }`}>
+      {popular && (
+        <span className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-400 text-white px-4 py-1 rounded-full text-sm font-semibold">
+          Most Popular
+        </span>
+      )}
       <h2 className="text-2xl font-bold text-white mb-4">{name}</h2>
-      <p className="text-4xl font-bold text-white mb-6">${price.toFixed(2)} <span className="text-lg font-normal">/ month</span></p>
+      <p className="text-4xl font-bold text-white mb-6">
+        ${price.toFixed(2)} 
+        <span className="text-lg font-normal">
+          / {billingCycle === 'monthly' ? 'month' : 'year'}
+        </span>
+      </p>
       <ul className="mb-8 flex-grow">
         {features.map((feature, index) => (
           <li key={index} className="text-gray-200 mb-2 flex items-start">
