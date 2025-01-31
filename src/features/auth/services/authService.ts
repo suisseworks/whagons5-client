@@ -15,9 +15,17 @@ interface LoginData {
 
 export const authService = {
   login: async (data: LoginData): Promise<LoginResponse> => {
+
+    const { username, password } = data;
+    const loginCredentials = {
+      email: username,
+      password: password,
+    };
+
     try {
-      const response = await whagonsApi.post<LoginResponse>("/login", data);
-      return response.data;
+      const response = await whagonsApi.post("/login", loginCredentials);
+      
+      return response.data.data;
     } catch (error) {
       throw error;
     }
