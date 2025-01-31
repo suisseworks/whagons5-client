@@ -1,4 +1,4 @@
-import whagonsApi from "../../../api/whagonsApi";
+import whagonsApi, { whagonsWeb } from "../../../api/whagonsApi";
 
 interface LoginResponse {
   token: string;
@@ -34,6 +34,16 @@ export const authService = {
   logout: async (): Promise<void> => {
     try {
       await whagonsApi.post("/auth/logout");
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getSession: async (): Promise<boolean> => {
+
+    try {
+      const response = await whagonsWeb.get("/sanctum/csrf-cookie");
+      return response.status === 204;
     } catch (error) {
       throw error;
     }
