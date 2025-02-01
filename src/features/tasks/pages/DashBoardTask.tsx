@@ -1,5 +1,6 @@
 import axios from 'axios';
 import React, { useState, useEffect } from 'react';
+import TankStack from '../../../components/Tables/TankStack';
 
 export const DashBoardTicket = () => {
   // State to store the fetched data
@@ -35,9 +36,10 @@ export const DashBoardTicket = () => {
 
   return (
     <div>
-      <h1>DashBoardTicket</h1>
-      <pre>{JSON.stringify(data, null, 2)}</pre>{' '}
+      {/* <h1>DashBoardTicket</h1> */}
+      {/* <pre>{JSON.stringify(data, null, 2)}</pre>{' '} */}
       {/* Display the fetched data */}
+      <TankStack/>
     </div>
   );
 };
