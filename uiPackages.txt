@@ -1,0 +1,18 @@
+
+
+https://ui.shadcn.com/
+
+
+
+
+https://ark-ui.com/react/docs/components/tour
+
+
+//framework agnostic tailwinds
+https://flowbite.com/docs/getting-started/solid-js/
+
+
+
+
+
+
