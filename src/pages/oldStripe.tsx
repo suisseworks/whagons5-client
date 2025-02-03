@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
-import { loadStripe } from '@stripe/stripe-js';
+// import { loadStripe } from '@stripe/stripe-js';
 
 // const stripePromise = loadStripe("pk_test_c2ltcGxlLWR1Y2stNTcuY2xlcmsuYWNjb3VudHMuZGV2JA");
 
