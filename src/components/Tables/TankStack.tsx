@@ -60,7 +60,7 @@ const generateData = (count: number): Person[] => {
     const city = cities[Math.floor(Math.random() * cities.length)];
     const domain = domains[Math.floor(Math.random() * domains.length)];
     const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${Math.floor(
-      Math.random() * 999
+      Math.random() * 10000
     )}@${domain}`;
 
     return {
