@@ -161,7 +161,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                       fill=""
                     />
                   </svg>
-                  Calendar
+                  Workplan
                 </NavLink>
               </li> */}
               {/* <!-- Menu Item Calendar --> */}
