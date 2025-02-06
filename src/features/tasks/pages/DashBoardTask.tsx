@@ -1,6 +1,7 @@
 import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import TankStack from '../../../components/Tables/TankStack';
+import AGGrid from '../../../components/Tables/AGChart';
 
 export const DashBoardTicket = () => {
   // State to store the fetched data
@@ -35,11 +36,11 @@ export const DashBoardTicket = () => {
   }
 
   return (
-    <div>
+    <div className='h-full w-full'>
       {/* <h1>DashBoardTicket</h1> */}
       {/* <pre>{JSON.stringify(data, null, 2)}</pre>{' '} */}
       {/* Display the fetched data */}
-      <TankStack/>
+      <AGGrid/>
     </div>
   );
 };
