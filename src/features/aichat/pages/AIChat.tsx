@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import ReactMarkdown from 'react-markdown';
 1;
-import { Send } from 'lucide-react';
+import { Ghost, Send } from 'lucide-react';
 import { Message } from '../models/models';
 
 interface ChatMessage {
@@ -148,7 +148,7 @@ function AIChat() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-auto">
+    <div className="flex max-h-full h-full w-full bg-white overflow-auto">
       <div className="flex-1 flex flex-col mr-[28px] ">
         {/* Header */}
         <header className="fixed top-0 bg-white pb-5 pt-1 pl-2 justify-left align-top w-full z-10">
@@ -157,7 +157,7 @@ function AIChat() {
 
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col mx-0 sm:mx-0 md:mx-[5%] lg:mx-[20%]">
-          <div className="flex-1 p-4 space-y-4 max-sm:mt-[25%] max-md:mt-[10%] max-lg:mt-[10%] mt-[10%]">
+          <div className="flex-1 p-4 space-y-4 max-sm:mt-[25%] max-md:mt-[10%] max-lg:mt-[10%] mt-[10%] ">
             {messages.map((message, index) => (
               <Card
                 key={index}
@@ -201,7 +201,9 @@ function AIChat() {
                   placeholder="Type your message here..."
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 />
-                <Button onClick={handleSend}>
+                <Button onClick={handleSend}
+                    variant="outline"
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
