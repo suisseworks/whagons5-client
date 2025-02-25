@@ -38,12 +38,13 @@ function AIChat() {
   const [input, setInput] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [collection, setCollection] = useState<string>('');
-  const [chatId, setChatId] = useState<string>('');
+  const [chatId, setChatId] = useState<string>('123456');
+  const user_id = "gabriel"
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const selectedChat: string = "stuff";
+  const selectedChat: string = 'stuff';
 
-  const scrollToBottom = () => {
+  const scrollToBottom = async () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -51,28 +52,11 @@ function AIChat() {
     scrollToBottom();
   }, [messages]);
 
-//   //when chats load set messages
-//   useEffect(() => {
-//     let chat = chats.find((chat) => chat.chat_id === selectedChat);
-//     setCollection(chat?.collection || '');
-//     setChatId(chat?.chat_id || '');
-//     console.log('Selected Chat');
-//     console.log(chat);
-//     if (chat) {
-//       console.log('Selected Chat');
-//       console.log(chat);
-//       console.log(chat.chat_history.store[selectedChat]);
-//       if (!chat.chat_history.store[selectedChat]) {
-//         chat.chat_history.store[selectedChat] = [];
-//       }
-//       let chat_history = chat.chat_history.store[selectedChat];
-//       //remove system messages
-//       chat_history = chat_history.filter(
-//         (message) => message.role !== 'system',
-//       );
-//       setMessages(chat_history);
-//     }
-//   }, [selectedChat]);
+  //   //when chats load set messages
+  useEffect(() => {
+    // load messages based on chat_id 123 and user_id random
+    fetchMessageHistory();
+  }, []);
 
   const handleSend = async () => {
     if (gettingResponse) return;
@@ -87,11 +71,11 @@ function AIChat() {
       setInput('');
 
       messages.push(newMessage);
+      await scrollToBottom();
 
       const url = new URL('http://127.0.0.1:8000/chat');
-      url.searchParams.append('collection', collection);
       url.searchParams.append('chat_id', chatId);
-      url.searchParams.append('user_id', "stuff");
+      url.searchParams.append('user_id', user_id);
       url.searchParams.append('message', input);
 
       try {
@@ -118,21 +102,69 @@ function AIChat() {
           content: '',
         };
         messages.push(assistantMessage);
+        let buffer = '';
 
-        // Read the stream
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
+        try {
+          // Added a try...finally block
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); //Keep incomplete line
+
+            for (const line of lines) {
+              if (line.trim() !== '') {
+                //Skip empty lines
+                try {
+                  const parsedObject = JSON.parse(line);
+                  console.log(line)
+                  console.log('Parsed JSON object', parsedObject.content);
+
+                  // Access content correctly (adjust if your structure is different)
+                  (assistantMessage.content as String) = parsedObject.content;
+                  const updatedMessages = [...messages];
+                  updatedMessages[updatedMessages.length - 1] =
+                    assistantMessage;
+                  setMessages(updatedMessages);
+                } catch (error) {
+                  if (error instanceof SyntaxError) {
+                    console.log(
+                      'Waiting for more data. Partial chunk received.',
+                    );
+                  } else {
+                    console.error('Error parsing JSON:', error);
+                  }
+                }
+              }
+            }
           }
-          let stringChunk = decoder.decode(value, { stream: true });
-          console.log('Received chunk:', stringChunk);
-          (assistantMessage.content as String) += stringChunk;
-
-          const updatedMessages = [...messages];
-
-          updatedMessages[updatedMessages.length - 1] = assistantMessage;
-          setMessages(updatedMessages);
+        } finally {
+          // Ensure the reader is always released, even if an error occurs.
+          reader.releaseLock();
+        }
+        //Handle any remaining data.
+        if (buffer.trim() !== '') {
+          try {
+            const parsedObject = JSON.parse(buffer);
+            console.log('Received and parsed:', parsedObject);
+            if (
+              parsedObject &&
+              parsedObject.parts &&
+              Array.isArray(parsedObject.parts) &&
+              parsedObject.parts[0] &&
+              parsedObject.parts[0].content
+            ) {
+              assistantMessage.content += parsedObject.parts[0].content; // Append, don't overwrite
+            }
+            const updatedMessages = [...messages, newMessage, assistantMessage];
+            setMessages(updatedMessages);
+          } catch (error) {
+            console.error('Error parsing JSON line:', error, 'Line:', buffer);
+          }
         }
       } catch (error) {
         console.error('Error sending messages:', error);
@@ -145,6 +177,30 @@ function AIChat() {
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const fetchMessageHistory = async () => {
+    const url = new URL('http://127.0.0.1:8000/chat/history');
+    url.searchParams.append('chat_id', chatId);
+    url.searchParams.append('user_id', user_id);
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(data);
+      setMessages(data.chat_history);
+    } catch (error) {
+      console.error('Failed to fetch chat history:', error);
+    }
   };
 
   return (
@@ -161,13 +217,13 @@ function AIChat() {
             {messages.map((message, index) => (
               <Card
                 key={index}
-                className={`p-4 max-w-[80%] ${
+                className={` ${
                   message.role === 'user' ? 'ml-auto bg-blue-100' : 'bg-white'
                 }`}
               >
-                <div className="flex items-start">
+                <div className="flex flex-col items-start">
                   {message.role === 'assistant' && (
-                    <Avatar className="mr-4">
+                    <Avatar className="absolute m-2">
                       <AvatarImage
                         src="/placeholder.svg?height=40&width=40"
                         alt="AI"
@@ -175,7 +231,14 @@ function AIChat() {
                       <AvatarFallback>AI</AvatarFallback>
                     </Avatar>
                   )}
-                  <div>
+                  <div
+                    className="p-4 "
+                    // style={{
+                    //   display: 'flex',
+                    //   justifyContent:
+                    //     message.role === 'user' ? 'flex-end' : 'flex-start',
+                    // }}
+                  >
                     {message.role === 'user'
                       ? (message.content as string)
                       : message.role === 'assistant' && (
@@ -201,9 +264,7 @@ function AIChat() {
                   placeholder="Type your message here..."
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 />
-                <Button onClick={handleSend}
-                    variant="outline"
-                >
+                <Button onClick={handleSend} variant="outline">
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
