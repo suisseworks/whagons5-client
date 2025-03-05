@@ -119,7 +119,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   }`}
                 >
                   <svg
-                    width="18"
+                    width="24"
                     height="24"
                     viewBox="2 0 20 24"
                     fill="none"
@@ -138,6 +138,37 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                 </NavLink>
               </li>
               {/* <!-- Menu Item Stripe --> */}
+
+              {/* <!-- Menu Item AI-Chat --> */}
+              <li>
+                <NavLink
+                  to="/ai-chat"
+                  className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                    pathname.includes('ai-chat') && 'bg-graydark dark:bg-meta-4'
+                  }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    className="icon icon-tabler icons-tabler-outline icon-tabler-message-chatbot"
+                  >
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z" />
+                    <path d="M9.5 9h.01" />
+                    <path d="M14.5 9h.01" />
+                    <path d="M9.5 13a3.5 3.5 0 0 0 5 0" />
+                  </svg>
+                  AI-Chat
+                </NavLink>
+              </li>
+              {/* <!-- Menu Item AI-Chat --> */}
 
               {/* <!-- Menu Item Calendar --> */}
               {/* <li>

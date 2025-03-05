@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 1;
 import { Ghost, Send } from 'lucide-react';
 import { Message } from '../models/models';
+import "./index.css";
 
 interface ChatMessage {
   role: string;
@@ -218,10 +219,16 @@ function AIChat() {
               <Card
                 key={index}
                 className={` ${
-                  message.role === 'user' ? 'ml-auto bg-blue-100' : 'bg-white'
+                  message.role === 'user' ? 'ml-auto bg-blue-100' : 
+                  message.role === 'assistant' ? 'bg-white' :
+                  'hidden'
                 }`}
               >
-                <div className="flex flex-col items-start">
+                <div className={`flex flex-col items-start ${
+                     message.role === 'user' ? '' : 
+                     message.role === 'assistant' ? '' :
+                     'hidden'
+                  }`}>
                   {message.role === 'assistant' && (
                     <Avatar className="absolute m-2">
                       <AvatarImage
