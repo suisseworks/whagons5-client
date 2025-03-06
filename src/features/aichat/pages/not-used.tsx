@@ -11,7 +11,8 @@ import { Ghost, Send } from 'lucide-react';
 import { Message } from '../models/models';
 
 import Prism from 'prismjs';
-import './prism.css';
+// import './prism.css';
+// import './prism-dark.css'
 import './index.css';
 
 const loadLanguages = async (languages: string[]) => {

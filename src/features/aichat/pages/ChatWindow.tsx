@@ -9,11 +9,16 @@ import ReactMarkdown from 'react-markdown';
 // import './ChatWindow.css';
 import WaveIcon from './WaveIcon';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
 import Prism from 'prismjs';
-import './prism.css';
+// import './prism.css';
+// import './prism-dark.css';
 import './index.css';
 import { Message } from '../models/models';
+import { exportGeneratedCSS } from 'darkreader';
+import useColorMode from '@/hooks/useColorMode';
 
 // type Message = {
 //   text: string;
@@ -60,6 +65,7 @@ interface Props {
 loadLanguages(['python']);
 
 function ChatWindow() {
+  const [colorMode, setColorMode] = useColorMode();
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');
@@ -72,12 +78,58 @@ function ChatWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // useEffect(() => {
+  //   // Function to load the appropriate CSS based on the user's color scheme
+  //   const loadThemeCSS = () => {
+  //     // Determine the user's color scheme preference
+  //     const isDarkMode = window.matchMedia(
+  //       '(prefers-color-scheme: dark)',
+  //     ).matches;
+
+  //     // Dynamically import the corresponding CSS file
+  //     if (isDarkMode) {
+  //       import('./prism-dark.css');
+  //     } else {
+  //       import('./prism.css');
+  //     }
+  //   };
+
+  //   // Load the theme CSS on component mount
+  //   loadThemeCSS();
+
+  //   // Add event listener to detect changes in color scheme preference
+  //   const mediaQueryList = window.matchMedia('(prefers-color-scheme: dark)');
+  //   const handleChange = () => {
+  //     loadThemeCSS();
+  //   };
+  //   mediaQueryList.addEventListener('change', handleChange);
+
+  //   // Cleanup the event listener on component unmount
+  //   return () => {
+  //     mediaQueryList.removeEventListener('change', handleChange);
+  //   };
+  // }, []);
+
   useEffect(scrollToBottom, [messages]);
 
   useEffect(() => {
     scrollToBottom();
     Prism.highlightAll();
   }, [messages]);
+
+  useEffect(() => {
+    console.log(colorMode);
+    // const targetElement = document.querySelector('.dark-mode-target');
+    if (colorMode == 'dark') {
+      // DarkReader.enable({
+      //   brightness: 100,
+      //   contrast: 90,
+      //   sepia: 10
+      // });
+    } else {
+      // DarkReader.disable()
+    }
+  }, [colorMode]);
 
   // useLayoutEffect(() => {
   //   scrollToBottom();
@@ -265,13 +317,13 @@ function ChatWindow() {
                   {message.role === 'user'
                     ? (message.content as string)
                     : message.role === 'assistant' && (
-                          <ReactMarkdown
-                            components={{
-                              pre: CustomPre,
-                            }}
-                          >
-                            {message.content as string}
-                          </ReactMarkdown>
+                        <ReactMarkdown
+                          components={{
+                            pre: CustomPre,
+                          }}
+                          children={message.content as string}
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                        />
                       )}
                 </div>
               ))}
@@ -327,10 +379,10 @@ function CustomPre({ children }: any) {
   };
 
   return (
-    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4 ">
+    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4 dark:bg-gray-800 dark:border-gray-600">
       <button
         onClick={handleCopy}
-        className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1"
+        className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1 dark:text-gray-400 dark:hover:text-gray-200"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -349,12 +401,12 @@ function CustomPre({ children }: any) {
           <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
         </svg>
         <span
-          className={`transition-all duration-200 ${copied ? 'text-sm' : 'text-xs'}`}
+          className={`transition-all duration-200 ${copied ? 'text-sm' : 'text-xs'} dark:text-gray-400`}
         >
           {copied ? 'Copied!' : 'Copy'}
         </span>
       </button>
-      <pre className="overflow-x-auto">{children}</pre>
+      <pre className="overflow-x-auto dark:text-gray-100">{children}</pre>
     </div>
   );
 }
