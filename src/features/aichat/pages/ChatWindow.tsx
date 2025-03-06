@@ -1,18 +1,24 @@
-'use client';
-
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  FormEvent,
+  useLayoutEffect,
+} from 'react';
 import ReactMarkdown from 'react-markdown';
-
-import { Ghost, Send } from 'lucide-react';
-import { Message } from '../models/models';
+// import './ChatWindow.css';
+import WaveIcon from './WaveIcon';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 import Prism from 'prismjs';
 import './prism.css';
 import './index.css';
+import { Message } from '../models/models';
+
+// type Message = {
+//   text: string;
+//   sender: 'user' | 'ai';
+// };
 
 const loadLanguages = async (languages: string[]) => {
   try {
@@ -28,10 +34,6 @@ const loadLanguages = async (languages: string[]) => {
     console.error('Error loading languages:', error);
   }
 };
-
-loadLanguages(['python', 'haml']);
-
-// No need to dynamically load languages anymore, just call this function
 
 interface ChatMessage {
   role: string;
@@ -55,37 +57,32 @@ interface Props {
   selectedChat: string;
 }
 
-function AIChat() {
+loadLanguages(['python']);
+
+function ChatWindow() {
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [collection, setCollection] = useState<string>('');
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [chatId, setChatId] = useState<string>('123456');
   const user_id = 'gabriel';
 
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const selectedChat: string = 'stuff';
-
-  const scrollToBottom = async () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // useEffect(() => {
-  //   import('prismjs/components/prism-python').then(() => {
-  //     Prism.highlightAll();
-  //   });
-  // }, []);
+  useEffect(scrollToBottom, [messages]);
 
   useEffect(() => {
     scrollToBottom();
     Prism.highlightAll();
   }, [messages]);
 
-  useLayoutEffect(() => {
-    scrollToBottom();
-    Prism.highlightAll();
-  }, [messages]);
+  // useLayoutEffect(() => {
+  //   scrollToBottom();
+  //   Prism.highlightAll();
+  // }, [messages]);
 
   //   //when chats load set messages
   useEffect(() => {
@@ -100,10 +97,9 @@ function AIChat() {
     })();
   }, []);
 
-  const handleSend = async () => {
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
     if (gettingResponse) return;
-    setGettingResponse(true);
-    if (input.trim() === '') return;
 
     if (input.trim()) {
       const newMessage: Message = {
@@ -114,7 +110,7 @@ function AIChat() {
       setInput('');
 
       messages.push(newMessage);
-      await scrollToBottom();
+      scrollToBottom();
 
       const url = new URL('http://127.0.0.1:8000/chat');
       url.searchParams.append('chat_id', chatId);
@@ -218,10 +214,6 @@ function AIChat() {
     }
   };
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   const fetchMessageHistory = async () => {
     const url = new URL('http://127.0.0.1:8000/chat/history');
     url.searchParams.append('chat_id', chatId);
@@ -246,57 +238,33 @@ function AIChat() {
     }
   };
 
-  return (
-    <div className="flex max-h-full h-full w-full bg-white overflow-auto">
-      <div className="flex-1 flex flex-col mr-[28px] ">
-        {/* Header */}
-        <header className="fixed top-0 bg-white pb-5 pt-1 pl-2 justify-left align-top w-full z-10">
-          <h1 className="text-xl font-semibold">Compass</h1>
-        </header>
+  const handleFileAttachment = () => {
+    console.log('File attachment initiated');
+  };
 
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col mx-0 sm:mx-0 md:mx-[5%] lg:mx-[20%]">
-          <div className="flex-1 p-4 space-y-4 max-sm:mt-[25%] max-md:mt-[10%] max-lg:mt-[10%] mt-[10%] messages language-markdown">
-            {messages.map((message, index) => (
-              <Card
-                key={index}
-                className={` ${
-                  message.role === 'user'
-                    ? 'ml-auto bg-blue-100'
-                    : message.role === 'assistant'
-                      ? 'bg-white'
-                      : 'hidden'
-                }`}
-              >
-                <div
-                  className={`flex flex-col items-start ${
-                    message.role === 'user'
-                      ? ''
-                      : message.role === 'assistant'
-                        ? ''
-                        : 'hidden'
-                  }`}
-                >
-                  {message.role === 'assistant' && (
-                    <Avatar className="absolute m-2">
-                      <AvatarImage
-                        src="/placeholder.svg?height=40&width=40"
-                        alt="AI"
-                      />
-                      <AvatarFallback>AI</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div
-                    className="p-4 "
-                    // style={{
-                    //   display: 'flex',
-                    //   justifyContent:
-                    //     message.role === 'user' ? 'flex-end' : 'flex-start',
-                    // }}
-                  >
-                    {message.role === 'user'
-                      ? (message.content as string)
-                      : message.role === 'assistant' && (
+  const toggleListening = () => {
+    if (input.trim() === '') {
+      setIsListening(!isListening);
+    } else {
+      handleSubmit({ preventDefault: () => {} } as FormEvent); // Mock event object
+    }
+  };
+
+  return (
+    <div className="Chat-Container">
+      <h1>AI Chat Window</h1>
+      <div className="chat-window">
+        {isListening ? (
+          // <AudioCircle onClose={() => setIsListening(false)} />
+          <></>
+        ) : (
+          <>
+            <div className="chat-messages">
+              {messages.map((message, index) => (
+                <div key={index} className={`message ${message.role}`}>
+                  {message.role === 'user'
+                    ? (message.content as string)
+                    : message.role === 'assistant' && (
                           <ReactMarkdown
                             components={{
                               pre: CustomPre,
@@ -304,40 +272,47 @@ function AIChat() {
                           >
                             {message.content as string}
                           </ReactMarkdown>
-                        )}
-                  </div>
+                      )}
                 </div>
-              </Card>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-          {/*Input area **/}
-          {selectedChat != '' ? (
-            <div className="sticky bottom-0 left-0 right-0 p-4 border-t bg-white">
-              <div className="flex space-x-2">
-                <Input
-                  value={input}
-                  onInput={(e) =>
-                    setInput((e.target as HTMLInputElement).value)
-                  }
-                  placeholder="Type your message here..."
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                />
-                <Button onClick={handleSend} variant="outline">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+              ))}
+              <div ref={messagesEndRef} />
             </div>
-          ) : (
-            <div></div>
-          )}
-        </div>
+            <form onSubmit={handleSubmit} className="chat-input">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your message..."
+              />
+              <div className="button-container">
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={handleFileAttachment}
+                >
+                  <i className="fas fa-paperclip"></i>
+                </button>
+                <button
+                  type="button"
+                  className="icon-button main-action"
+                  onClick={toggleListening}
+                >
+                  {input.trim() === '' ? (
+                    <WaveIcon />
+                  ) : (
+                    <i className="fas fa-paper-plane"></i>
+                  )}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-export default AIChat;
+export default ChatWindow;
 
 function CustomPre({ children }: any) {
   const [copied, setCopied] = useState(false);
@@ -352,7 +327,7 @@ function CustomPre({ children }: any) {
   };
 
   return (
-    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4">
+    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4 ">
       <button
         onClick={handleCopy}
         className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1"
