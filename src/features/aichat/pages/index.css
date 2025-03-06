@@ -6,6 +6,7 @@
 :root {
   --primary-color: #333;
   --secondary-color: #666;
+  --code-highlight: #d4d4d4;
   --background-color: #f5f5f5;
   --text-color: #333;
   --input-bg: #fff;
@@ -121,7 +122,8 @@ pre[class*=language-] {
 /* Dark mode variables */
 body.dark {
   --primary-color: #e1e1e1;
-  --secondary-color: #a0a0a0;
+  --secondary-color: #919191;
+  --code-highlight: #3a4b5f;
   --background-color: #1a222c;
   --text-color: #f0f0f0;
   --input-bg: #27384c;
@@ -244,6 +246,14 @@ body.dark .token.entity {
   background-color: var(--background-color);
   max-width: 95%;
 }
+@media (max-width: 768px) {
+  .chat-window {
+    max-width: 100%;
+    border-radius: 0px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
 
 .chat-messages {
   flex-grow: 1;
@@ -254,6 +264,12 @@ body.dark .token.entity {
   flex-direction: column;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+}
+@media (max-width: 768px) {
+  .chat-messages {
+    padding-left: 7%;
+    padding-right: 7%;
+  }
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -296,8 +312,11 @@ body.dark .token.entity {
   color: var(--text-color);
   width: 100% !important;
 }
-.message.assistant code {
-  font-style: italic;
+.message.assistant code:not(pre code) {
+  /* Your styles here */
+  background-color: var(--code-highlight);
+  border-radius: 5px;
+  padding: 0.2rem;
 }
 .message.assistant ol {
   list-style-type: decimal;
@@ -335,9 +354,43 @@ body.dark .token.entity {
 .message.assistant ul ul ul {
   list-style-type: square;
 }
-
-pre code {
-  font-style: normal !important;
+@media (max-width: 768px) {
+  .message.assistant ol {
+    list-style-type: decimal;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    padding: 0.5rem;
+  }
+  .message.assistant ol li {
+    padding: 0.5rem;
+  }
+  .message.assistant ol ol {
+    list-style-type: lower-alpha;
+  }
+  .message.assistant ol ol li {
+    padding: 0.5rem;
+  }
+  .message.assistant ol ol ol {
+    list-style-type: lower-roman;
+  }
+  .message.assistant ol ol ol li {
+    padding: 0.5rem;
+  }
+  .message.assistant ul {
+    list-style-type: disc;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    padding: 0.5rem;
+  }
+  .message.assistant ul li {
+    padding: 0.5rem;
+  }
+  .message.assistant ul ul {
+    list-style-type: circle;
+  }
+  .message.assistant ul ul ul {
+    list-style-type: square;
+  }
 }
 
 .message.assistant p:first-child {
@@ -423,6 +476,11 @@ pre code {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+@media (max-width: 768px) {
+  .Chat-Container {
+    padding: 0;
+  }
 }
 .Chat-Container h1 {
   text-align: center;

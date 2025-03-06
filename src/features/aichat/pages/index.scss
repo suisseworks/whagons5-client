@@ -7,6 +7,7 @@
 :root {
   --primary-color: #333;
   --secondary-color: #666;
+  --code-highlight: #d4d4d4;
   --background-color: #f5f5f5;
   --text-color: #333;
   --input-bg: #fff;
@@ -24,7 +25,8 @@ code[class*=language-],pre[class*=language-]{color:#000;background:0 0;text-shad
 /* Dark mode variables */
 body.dark {
   --primary-color: #e1e1e1;
-  --secondary-color: #a0a0a0;
+  --secondary-color: #919191;
+  --code-highlight: #3a4b5f;
   --background-color: #1a222c;
   --text-color: #f0f0f0;
   --input-bg: #27384c;
@@ -146,6 +148,13 @@ https://prismjs.com/download.html#themes=prism-okaidia&languages=markup+css+clik
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   background-color: var(--background-color);
   max-width: 95%;
+
+  @media (max-width: 768px) {
+    max-width: 100%;
+    border-radius: 0px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
 }
 
 .chat-messages {
@@ -157,6 +166,11 @@ https://prismjs.com/download.html#themes=prism-okaidia&languages=markup+css+clik
   flex-direction: column;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+
+  @media (max-width: 768px) {
+    padding-left: 7%;
+    padding-right: 7%;
+  }
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -203,8 +217,11 @@ https://prismjs.com/download.html#themes=prism-okaidia&languages=markup+css+clik
   // align-self: flex-start;
   color: var(--text-color);
   width: 100% !important;
-  code {
-    font-style: italic;
+  code:not(pre code) {
+    /* Your styles here */
+    background-color: var(--code-highlight);
+    border-radius: 5px;
+    padding: .2rem;
   }
   //ordered lists should have numbers
   ol {
@@ -244,13 +261,49 @@ https://prismjs.com/download.html#themes=prism-okaidia&languages=markup+css+clik
       }
     }
   }
-}
 
-pre {
-  code {
-    font-style: normal !important;
+  @media (max-width: 768px) {
+    ol {
+      list-style-type: decimal;
+      margin-left: 0.5rem;
+      padding-left: 0.5rem;
+      padding: 0.5rem;
+      li {
+        padding: 0.5rem;
+      }
+      ol {
+        list-style-type: lower-alpha;
+        li {
+          padding: 0.5rem;
+        }
+        ol {
+          list-style-type: lower-roman;
+          li {
+            padding: 0.5rem;
+          }
+        }
+      }
+    }
+  
+    ul {
+      list-style-type: disc;
+      margin-left: 0.5rem;
+      padding-left: 0.5rem;
+      padding: 0.5rem;
+      li {
+        padding: 0.5rem;
+      }
+      ul {
+        list-style-type: circle;
+        ul {
+          list-style-type: square;
+        }
+      }
+    }
   }
 }
+
+
 
 .message.assistant p:first-child {
   margin-top: 0;
@@ -337,6 +390,10 @@ pre {
   display: flex;
   flex-direction: column;
   align-items: center;
+
+  @media (max-width: 768px) {
+    padding: 0;
+  }
 
   h1 {
     text-align: center;

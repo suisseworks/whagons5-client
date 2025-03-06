@@ -6,7 +6,6 @@ import MainLayout from '../layouts/MainLayout';
 import { useParams } from 'react-router';
 import Dashboard from '../components/Dashboard';
 import Stripe from '../pages/Stripe';
-import AIChat from '@/features/aichat/pages/AIChat';
 import ChatWindow from '@/features/aichat/pages/ChatWindow';
 
 

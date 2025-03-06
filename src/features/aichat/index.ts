@@ -1,1 +1,1 @@
-export * from './pages/AIChat';
+export * from './pages/ChatWindow';
