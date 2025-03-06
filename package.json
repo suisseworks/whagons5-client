@@ -23,6 +23,7 @@
     "jsvectormap": "^1.5.3",
     "lucide-react": "^0.475.0",
     "match-sorter": "^6.3.1",
+    "prismjs": "^1.29.0",
     "react": "^18.2.0",
     "react-apexcharts": "^1.4.1",
     "react-dom": "^18.2.0",
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
+    "@types/prismjs": "^1.26.5",
     "@types/react": "^18.0.26",
     "@types/react-dom": "^18.0.9",
     "@types/react-router-dom": "^5.3.3",

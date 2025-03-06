@@ -1,15 +1,37 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import ReactMarkdown from 'react-markdown';
-1;
+
 import { Ghost, Send } from 'lucide-react';
 import { Message } from '../models/models';
-import "./index.css";
+
+import Prism from 'prismjs';
+import './prism.css';
+import './index.css';
+
+const loadLanguages = async (languages: string[]) => {
+  try {
+    // Dynamically import each language component
+    await Promise.all(
+      languages.map(
+        (language) => import(`prismjs/components/prism-${language}`),
+      ),
+    );
+    console.log('Languages loaded');
+    Prism.highlightAll(); // Reapply syntax highlighting
+  } catch (error) {
+    console.error('Error loading languages:', error);
+  }
+};
+
+loadLanguages(['python', 'haml']);
+
+// No need to dynamically load languages anymore, just call this function
 
 interface ChatMessage {
   role: string;
@@ -40,7 +62,7 @@ function AIChat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [collection, setCollection] = useState<string>('');
   const [chatId, setChatId] = useState<string>('123456');
-  const user_id = "gabriel"
+  const user_id = 'gabriel';
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const selectedChat: string = 'stuff';
@@ -49,14 +71,33 @@ function AIChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // useEffect(() => {
+  //   import('prismjs/components/prism-python').then(() => {
+  //     Prism.highlightAll();
+  //   });
+  // }, []);
+
   useEffect(() => {
     scrollToBottom();
+    Prism.highlightAll();
+  }, [messages]);
+
+  useLayoutEffect(() => {
+    scrollToBottom();
+    Prism.highlightAll();
   }, [messages]);
 
   //   //when chats load set messages
   useEffect(() => {
     // load messages based on chat_id 123 and user_id random
-    fetchMessageHistory();
+    (async () => {
+      await fetchMessageHistory();
+
+      // Wait 500ms
+      // await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      Prism.highlightAll();
+    })();
   }, []);
 
   const handleSend = async () => {
@@ -122,7 +163,7 @@ function AIChat() {
                 //Skip empty lines
                 try {
                   const parsedObject = JSON.parse(line);
-                  console.log(line)
+                  console.log(line);
                   console.log('Parsed JSON object', parsedObject.content);
 
                   // Access content correctly (adjust if your structure is different)
@@ -214,21 +255,27 @@ function AIChat() {
 
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col mx-0 sm:mx-0 md:mx-[5%] lg:mx-[20%]">
-          <div className="flex-1 p-4 space-y-4 max-sm:mt-[25%] max-md:mt-[10%] max-lg:mt-[10%] mt-[10%] ">
+          <div className="flex-1 p-4 space-y-4 max-sm:mt-[25%] max-md:mt-[10%] max-lg:mt-[10%] mt-[10%] messages language-markdown">
             {messages.map((message, index) => (
               <Card
                 key={index}
                 className={` ${
-                  message.role === 'user' ? 'ml-auto bg-blue-100' : 
-                  message.role === 'assistant' ? 'bg-white' :
-                  'hidden'
+                  message.role === 'user'
+                    ? 'ml-auto bg-blue-100'
+                    : message.role === 'assistant'
+                      ? 'bg-white'
+                      : 'hidden'
                 }`}
               >
-                <div className={`flex flex-col items-start ${
-                     message.role === 'user' ? '' : 
-                     message.role === 'assistant' ? '' :
-                     'hidden'
-                  }`}>
+                <div
+                  className={`flex flex-col items-start ${
+                    message.role === 'user'
+                      ? ''
+                      : message.role === 'assistant'
+                        ? ''
+                        : 'hidden'
+                  }`}
+                >
                   {message.role === 'assistant' && (
                     <Avatar className="absolute m-2">
                       <AvatarImage
@@ -249,7 +296,11 @@ function AIChat() {
                     {message.role === 'user'
                       ? (message.content as string)
                       : message.role === 'assistant' && (
-                          <ReactMarkdown>
+                          <ReactMarkdown
+                            components={{
+                              pre: CustomPre,
+                            }}
+                          >
                             {message.content as string}
                           </ReactMarkdown>
                         )}
@@ -286,3 +337,48 @@ function AIChat() {
 }
 
 export default AIChat;
+
+function CustomPre({ children }: any) {
+  const [copied, setCopied] = useState(false);
+
+  // Extract code content (children will be the <code> block)
+  const codeContent = children?.props?.children?.toString() || '';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4">
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`icon icon-tabler icons-tabler-outline icon-tabler-copy transition-all duration-200 ${copied ? 'scale-75' : 'scale-100'}`}
+        >
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z" />
+          <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
+        </svg>
+        <span
+          className={`transition-all duration-200 ${copied ? 'text-sm' : 'text-xs'}`}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </span>
+      </button>
+      <pre className="overflow-x-auto">{children}</pre>
+    </div>
+  );
+}
