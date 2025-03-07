@@ -1,44 +1,113 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  FormEvent,
-  useLayoutEffect,
-} from 'react';
+import React, { useState, useRef, useEffect, FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
-// import './ChatWindow.css';
 import WaveIcon from './WaveIcon';
-import '@fortawesome/fontawesome-free/css/all.min.css';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
 import Prism from 'prismjs';
-// import './prism.css';
-// import './prism-dark.css';
+// import 'prismjs/components/prism-python'
 import './index.css';
 import { Message } from '../models/models';
-import { exportGeneratedCSS } from 'darkreader';
 import useColorMode from '@/hooks/useColorMode';
 
-// type Message = {
-//   text: string;
-//   sender: 'user' | 'ai';
-// };
+const HOST = import.meta.env.VITE_CHAT_HOST;
 
-const loadLanguages = async (languages: string[]) => {
+// Client-side language registry
+const loadedLanguages: { [key: string]: boolean } = {
+  markup: true,     // HTML, XML, SVG, MathML...
+  HTML: true,
+  XML: true,
+  SVG: true,
+  MathML: true,
+  SSML: true,
+  Atom: true,
+  RSS: true,
+  css: true,
+  'c-like': true,
+  javascript: true,  // IMPORTANT: Use 'javascript' not 'js'
+};
+
+// Function to dynamically fetch and load a language
+const loadLanguage = async (language: string) => {
+  if (loadedLanguages[language]) {
+    return; // Already loaded
+  }
+
   try {
-    // Dynamically import each language component
-    await Promise.all(
-      languages.map(
-        (language) => import(`prismjs/components/prism-${language}`),
-      ),
-    );
-    console.log('Languages loaded');
-    Prism.highlightAll(); // Reapply syntax highlighting
+    const response = await fetch(`${HOST}/api/prism-language?name=${language}`);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch language "${language}": ${response.status}`,
+      );
+    }
+    const scriptText = await response.text();
+
+    console.log("Script: ", language)
+    // console.log(scriptText);
+
+    // Execute the script.  Important: This is where the Prism component is registered.
+    eval(scriptText); // VERY CAREFUL.  See security notes below.
+
+    loadedLanguages[language] = true;
+    console.log(`Language "${language}" loaded successfully.`);
+    Prism.highlightAll();
   } catch (error) {
-    console.error('Error loading languages:', error);
+    console.error(`Error loading language "${language}":`, error);
+    // Consider a fallback (e.g., plain text highlighting)
   }
 };
+
+function CustomPre({ children }: any) {
+  const [copied, setCopied] = useState(false);
+  const codeContent = children?.props?.children?.toString() || '';
+  const language = children?.props?.className?.replace('language-', '') || '';
+
+  useEffect(() => {
+    console.log(language, " detected")
+    if (language && !loadedLanguages[language]) {
+      loadLanguage(language); // Load the language if it's not already loaded.
+    }
+  }, [language]);
+
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4 dark:bg-gray-800 dark:border-gray-600">
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1 dark:text-gray-400 dark:hover:text-gray-200"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`icon icon-tabler icons-tabler-outline icon-tabler-copy transition-all duration-200 ${copied ? 'scale-75' : 'scale-100'}`}
+        >
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z" />
+          <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
+        </svg>
+        <span
+          className={`transition-all duration-200 ${copied ? 'text-sm' : 'text-xs'} dark:text-gray-400`}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </span>
+      </button>
+      <pre className="overflow-x-auto dark:text-gray-100">{children}</pre>
+    </div>
+  );
+}
 
 interface ChatMessage {
   role: string;
@@ -62,8 +131,6 @@ interface Props {
   selectedChat: string;
 }
 
-loadLanguages(['python']);
-
 function ChatWindow() {
   const [colorMode, setColorMode] = useColorMode();
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
@@ -78,38 +145,6 @@ function ChatWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // useEffect(() => {
-  //   // Function to load the appropriate CSS based on the user's color scheme
-  //   const loadThemeCSS = () => {
-  //     // Determine the user's color scheme preference
-  //     const isDarkMode = window.matchMedia(
-  //       '(prefers-color-scheme: dark)',
-  //     ).matches;
-
-  //     // Dynamically import the corresponding CSS file
-  //     if (isDarkMode) {
-  //       import('./prism-dark.css');
-  //     } else {
-  //       import('./prism.css');
-  //     }
-  //   };
-
-  //   // Load the theme CSS on component mount
-  //   loadThemeCSS();
-
-  //   // Add event listener to detect changes in color scheme preference
-  //   const mediaQueryList = window.matchMedia('(prefers-color-scheme: dark)');
-  //   const handleChange = () => {
-  //     loadThemeCSS();
-  //   };
-  //   mediaQueryList.addEventListener('change', handleChange);
-
-  //   // Cleanup the event listener on component unmount
-  //   return () => {
-  //     mediaQueryList.removeEventListener('change', handleChange);
-  //   };
-  // }, []);
-
   useEffect(scrollToBottom, [messages]);
 
   useEffect(() => {
@@ -117,33 +152,11 @@ function ChatWindow() {
     Prism.highlightAll();
   }, [messages]);
 
-  useEffect(() => {
-    console.log(colorMode);
-    // const targetElement = document.querySelector('.dark-mode-target');
-    if (colorMode == 'dark') {
-      // DarkReader.enable({
-      //   brightness: 100,
-      //   contrast: 90,
-      //   sepia: 10
-      // });
-    } else {
-      // DarkReader.disable()
-    }
-  }, [colorMode]);
-
-  // useLayoutEffect(() => {
-  //   scrollToBottom();
-  //   Prism.highlightAll();
-  // }, [messages]);
-
   //   //when chats load set messages
   useEffect(() => {
     // load messages based on chat_id 123 and user_id random
     (async () => {
       await fetchMessageHistory();
-
-      // Wait 500ms
-      // await new Promise((resolve) => setTimeout(resolve, 1000));
 
       Prism.highlightAll();
     })();
@@ -164,7 +177,7 @@ function ChatWindow() {
       messages.push(newMessage);
       scrollToBottom();
 
-      const url = new URL('http://127.0.0.1:8000/chat');
+      const url = new URL(`${HOST}/chat`);
       url.searchParams.append('chat_id', chatId);
       url.searchParams.append('user_id', user_id);
       url.searchParams.append('message', input);
@@ -212,8 +225,8 @@ function ChatWindow() {
                 //Skip empty lines
                 try {
                   const parsedObject = JSON.parse(line);
-                  console.log(line);
-                  console.log('Parsed JSON object', parsedObject.content);
+                  // console.log(line);
+                  // console.log('Parsed JSON object', parsedObject.content);
 
                   // Access content correctly (adjust if your structure is different)
                   (assistantMessage.content as String) = parsedObject.content;
@@ -241,7 +254,7 @@ function ChatWindow() {
         if (buffer.trim() !== '') {
           try {
             const parsedObject = JSON.parse(buffer);
-            console.log('Received and parsed:', parsedObject);
+            // console.log('Received and parsed:', parsedObject);
             if (
               parsedObject &&
               parsedObject.parts &&
@@ -260,14 +273,14 @@ function ChatWindow() {
       } catch (error) {
         console.error('Error sending messages:', error);
       }
-      console.log(messages);
+      // console.log(messages);
 
       setGettingResponse(false);
     }
   };
 
   const fetchMessageHistory = async () => {
-    const url = new URL('http://127.0.0.1:8000/chat/history');
+    const url = new URL(`${HOST}/chat/history`);
     url.searchParams.append('chat_id', chatId);
     url.searchParams.append('user_id', user_id);
     try {
@@ -283,7 +296,7 @@ function ChatWindow() {
       }
 
       const data = await response.json();
-      console.log(data);
+      // console.log(data);
       setMessages(data.chat_history);
     } catch (error) {
       console.error('Failed to fetch chat history:', error);
@@ -366,47 +379,47 @@ function ChatWindow() {
 
 export default ChatWindow;
 
-function CustomPre({ children }: any) {
-  const [copied, setCopied] = useState(false);
+// function CustomPre({ children }: any) {
+//   const [copied, setCopied] = useState(false);
 
-  // Extract code content (children will be the <code> block)
-  const codeContent = children?.props?.children?.toString() || '';
+//   // Extract code content (children will be the <code> block)
+//   const codeContent = children?.props?.children?.toString() || '';
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+//   const handleCopy = () => {
+//     navigator.clipboard.writeText(codeContent);
+//     setCopied(true);
+//     setTimeout(() => setCopied(false), 2000);
+//   };
 
-  return (
-    <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4 dark:bg-gray-800 dark:border-gray-600">
-      <button
-        onClick={handleCopy}
-        className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1 dark:text-gray-400 dark:hover:text-gray-200"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`icon icon-tabler icons-tabler-outline icon-tabler-copy transition-all duration-200 ${copied ? 'scale-75' : 'scale-100'}`}
-        >
-          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-          <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z" />
-          <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
-        </svg>
-        <span
-          className={`transition-all duration-200 ${copied ? 'text-sm' : 'text-xs'} dark:text-gray-400`}
-        >
-          {copied ? 'Copied!' : 'Copy'}
-        </span>
-      </button>
-      <pre className="overflow-x-auto dark:text-gray-100">{children}</pre>
-    </div>
-  );
-}
+//   return (
+//     <div className="relative bg-gray-100 border border-gray-300 rounded-lg my-4 dark:bg-gray-800 dark:border-gray-600">
+//       <button
+//         onClick={handleCopy}
+//         className="absolute top-2 right-2 text-gray-600 text-xs p-2 rounded hover:text-gray-800 transition flex items-center gap-1 dark:text-gray-400 dark:hover:text-gray-200"
+//       >
+//         <svg
+//           xmlns="http://www.w3.org/2000/svg"
+//           width="18"
+//           height="18"
+//           viewBox="0 0 24 24"
+//           fill="none"
+//           stroke="currentColor"
+//           strokeWidth="2"
+//           strokeLinecap="round"
+//           strokeLinejoin="round"
+//           className={`icon icon-tabler icons-tabler-outline icon-tabler-copy transition-all duration-200 ${copied ? 'scale-75' : 'scale-100'}`}
+//         >
+//           <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+//           <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z" />
+//           <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
+//         </svg>
+//         <span
+//           className={`transition-all duration-200 ${copied ? 'text-sm' : 'text-xs'} dark:text-gray-400`}
+//         >
+//           {copied ? 'Copied!' : 'Copy'}
+//         </span>
+//       </button>
+//       <pre className="overflow-x-auto dark:text-gray-100">{children}</pre>
+//     </div>
+//   );
+// }

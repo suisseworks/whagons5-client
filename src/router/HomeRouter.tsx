@@ -19,8 +19,7 @@ export const HomeRoutes = () => {
           <Route path="/tasks" element={<DashBoardTicket />} />
           <Route path="/workplan" element={<DashboardWorkplan />} />
           <Route path="/stripe" element={<Stripe />} />
-          <Route path="/ai-chat" element={<ChatWindow
-          />} />
+          <Route path="/ai-chat" element={<ChatWindow/>} />
 
           <Route path="/" element={<Navigate to="tasks" />} />
           <Route path="/dashboard/:uuid" element={<Dashboard />} />
