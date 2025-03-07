@@ -9,7 +9,9 @@ import Prism from 'prismjs';
 import './index.css';
 import { Message } from '../models/models';
 import useColorMode from '@/hooks/useColorMode';
+import componentsJson from './components.json';
 
+const components = componentsJson as any;
 const HOST = import.meta.env.VITE_CHAT_HOST;
 
 // Client-side language registry
@@ -27,13 +29,30 @@ const loadedLanguages: { [key: string]: boolean } = {
   javascript: true,  // IMPORTANT: Use 'javascript' not 'js'
 };
 
-// Function to dynamically fetch and load a language
 const loadLanguage = async (language: string) => {
   if (loadedLanguages[language]) {
     return; // Already loaded
   }
 
   try {
+    const languageData = components.languages[language];
+
+    if (!languageData) {
+      console.warn(`Language "${language}" not found in components.json.`);
+      return;
+    }
+
+    // Load required languages recursively BEFORE loading the target language
+    if (languageData.require) {
+      const requirements = Array.isArray(languageData.require)
+        ? languageData.require
+        : [languageData.require];
+
+      for (const requirement of requirements) {
+        await loadLanguage(requirement);
+      }
+    }
+
     const response = await fetch(`${HOST}/api/prism-language?name=${language}`);
     if (!response.ok) {
       throw new Error(
@@ -42,14 +61,14 @@ const loadLanguage = async (language: string) => {
     }
     const scriptText = await response.text();
 
-    console.log("Script: ", language)
+    // console.log("Script: ", language)
     // console.log(scriptText);
 
     // Execute the script.  Important: This is where the Prism component is registered.
     eval(scriptText); // VERY CAREFUL.  See security notes below.
 
     loadedLanguages[language] = true;
-    console.log(`Language "${language}" loaded successfully.`);
+    // console.log(`Language "${language}" loaded successfully.`);
     Prism.highlightAll();
   } catch (error) {
     console.error(`Error loading language "${language}":`, error);
@@ -63,7 +82,7 @@ function CustomPre({ children }: any) {
   const language = children?.props?.className?.replace('language-', '') || '';
 
   useEffect(() => {
-    console.log(language, " detected")
+    // console.log(language, " detected")
     if (language && !loadedLanguages[language]) {
       loadLanguage(language); // Load the language if it's not already loaded.
     }
