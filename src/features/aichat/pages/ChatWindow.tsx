@@ -8,8 +8,8 @@ import Prism from 'prismjs';
 // import 'prismjs/components/prism-python'
 import './index.css';
 import { Message } from '../models/models';
-import useColorMode from '@/hooks/useColorMode';
 import componentsJson from './components.json';
+import { useTheme } from '@/hooks/theme-provider';
 
 const components = componentsJson as any;
 const HOST = import.meta.env.VITE_CHAT_HOST;
@@ -151,7 +151,7 @@ interface Props {
 }
 
 function ChatWindow() {
-  const [colorMode, setColorMode] = useColorMode();
+  const { setTheme } = useTheme()
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>('');

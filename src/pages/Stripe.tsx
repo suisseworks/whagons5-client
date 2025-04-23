@@ -1,6 +1,7 @@
 
-import PaymentTier from '../components/PaymentTier'
-import BillingToggle from '../components/BillingToggle'
+
+import BillingToggle from '@/components/BillingToggle'
+import PaymentTier from '@/components/PaymentTier'
 import { useState } from 'react'
 
 const tiers = [

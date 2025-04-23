@@ -1,13 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import { WhagonsAPP } from './WhagonsAPP';
+import App from './App';
 import { AuthProvider } from './context/AuthContext';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AuthProvider>
-      <WhagonsAPP />
+      <App />
     </AuthProvider>
   </React.StrictMode>,
 );
