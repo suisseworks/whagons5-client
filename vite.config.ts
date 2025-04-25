@@ -7,7 +7,7 @@ import path from 'path';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   preview: {
-    allowedHosts: ['whagons5.gabrielmalek.com'],
+    allowedHosts: ['whagons5.gabrielmalek.com', 'whagons-client.whagons.com'],
   },
   resolve: {
     alias: {
