@@ -21,6 +21,8 @@ export const useAuthStore = () => {
             localStorage.setItem('token-init-date', String(new Date().getTime()));
             localStorage.setItem('user', JSON.stringify(user));
 
+            await authService.getSession();
+
             dispatch( onLogin(user) );
             
             // to do navigate to home

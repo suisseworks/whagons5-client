@@ -1,22 +1,29 @@
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router';
 
-import { DashBoardTicket } from '../features/tasks'
+import { DashBoardTask } from '../features/tasks';
 import { DashboardWorkplan } from '../features/workplan';
-import MainLayout from '../layouts/MainLayout'
-import SignIn from '../pages/Authentication/SignIn';
+import MainLayout from '../layouts/MainLayout';
+import { useParams } from 'react-router';
+import Stripe from '../pages/Stripe';
+import ChatWindow from '../features/aichat/pages/ChatWindow';
+
+
 
 export const HomeRoutes = () => {
-    return (
-        <>
-            <MainLayout>
-                <Routes>
-                    <Route path="/tasks" element={<DashBoardTicket />} />
-                    <Route path="/workplan" element={<DashboardWorkplan />} />
-                    <Route path="/SignIn" element={<SignIn />} />
+  const { uuid } = useParams<{ uuid: string }>();
 
-                    <Route path="/" element={<Navigate to='tasks' />} />
-                </Routes>
-            </MainLayout>
-        </>
-    )
-}
+  return (
+    <>
+      <MainLayout>
+        <Routes>
+          <Route path="/tasks" element={<DashBoardTask />} />
+          <Route path="/workplan" element={<DashboardWorkplan />} />
+          <Route path="/stripe" element={<Stripe />} />
+          <Route path="/ai-chat" element={<ChatWindow/>} />
+
+          <Route path="/" element={<Navigate to="tasks" />} />
+        </Routes>
+      </MainLayout>
+    </>
+  );
+};

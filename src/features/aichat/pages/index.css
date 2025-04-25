@@ -1,0 +1,424 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+:root {
+  --primary-color: #333;
+  --secondary-color: #666;
+  --code-highlight: #d4d4d4;
+  --background-color: #f5f5f5;
+  --text-color: #333;
+  --input-bg: #fff;
+  --message-user-bg: #e1e1e1;
+  --scrollbar-bg: #f1f1f1;
+  --scrollbar-thumb: #888;
+  --scrollbar-thumb-hover: #555;
+}
+
+.Chat-Container code[class*=language-], .Chat-Container pre[class*=language-] {
+  color: #000;
+  background: 0 0;
+  text-shadow: 0 1px #fff;
+  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+  font-size: 1em;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  line-height: 1.5;
+  -moz-tab-size: 4;
+  -o-tab-size: 4;
+  tab-size: 4;
+  -webkit-hyphens: none;
+  -moz-hyphens: none;
+  -ms-hyphens: none;
+  hyphens: none;
+}
+.Chat-Container code[class*=language-] ::-moz-selection, .Chat-Container code[class*=language-]::-moz-selection, .Chat-Container pre[class*=language-] ::-moz-selection, .Chat-Container pre[class*=language-]::-moz-selection {
+  text-shadow: none;
+  background: #b3d4fc;
+}
+.Chat-Container code[class*=language-] ::selection, .Chat-Container code[class*=language-]::selection, .Chat-Container pre[class*=language-] ::selection, .Chat-Container pre[class*=language-]::selection {
+  text-shadow: none;
+  background: #b3d4fc;
+}
+@media print {
+  .Chat-Container code[class*=language-], .Chat-Container pre[class*=language-] {
+    text-shadow: none;
+  }
+}
+.Chat-Container pre[class*=language-] {
+  padding: 1em;
+  margin: 0.5em 0;
+  overflow: auto;
+}
+.Chat-Container :not(pre) > code[class*=language-], .Chat-Container pre[class*=language-] {
+  background: #f5f2f0;
+}
+.Chat-Container :not(pre) > code[class*=language-] {
+  padding: 0.1em;
+  border-radius: 0.3em;
+  white-space: normal;
+}
+.Chat-Container .token.cdata, .Chat-Container .token.comment, .Chat-Container .token.doctype, .Chat-Container .token.prolog {
+  color: #708090;
+}
+.Chat-Container .token.punctuation {
+  color: #999;
+}
+.Chat-Container .token.namespace {
+  opacity: 0.7;
+}
+.Chat-Container .token.boolean, .Chat-Container .token.constant, .Chat-Container .token.deleted, .Chat-Container .token.number, .Chat-Container .token.property, .Chat-Container .token.symbol, .Chat-Container .token.tag {
+  color: #905;
+}
+.Chat-Container .token.attr-name, .Chat-Container .token.builtin, .Chat-Container .token.char, .Chat-Container .token.inserted, .Chat-Container .token.selector, .Chat-Container .token.string {
+  color: #690;
+}
+.Chat-Container .language-css .token.string, .Chat-Container .style .token.string, .Chat-Container .token.entity, .Chat-Container .token.operator, .Chat-Container .token.url {
+  color: #9a6e3a;
+  background: hsla(0, 0%, 100%, 0.5);
+}
+.Chat-Container .token.atrule, .Chat-Container .token.attr-value, .Chat-Container .token.keyword {
+  color: #07a;
+}
+.Chat-Container .token.class-name, .Chat-Container .token.function {
+  color: #dd4a68;
+}
+.Chat-Container .token.important, .Chat-Container .token.regex, .Chat-Container .token.variable {
+  color: #e90;
+}
+.Chat-Container .token.bold, .Chat-Container .token.important {
+  font-weight: 700;
+}
+.Chat-Container .token.italic {
+  font-style: italic;
+}
+.Chat-Container .token.entity {
+  cursor: help;
+}
+
+.Chat-Container .hidden {
+  display: none;
+}
+.Chat-Container .chat-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  background-color: var(--background-color);
+  max-width: 95%;
+}
+@media (max-width: 768px) {
+  .Chat-Container .chat-window {
+    max-width: 100%;
+    border-radius: 0px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+.Chat-Container .chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-left: 10%;
+  padding-right: 10%;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+}
+@media (max-width: 768px) {
+  .Chat-Container .chat-messages {
+    padding-left: 7%;
+    padding-right: 7%;
+  }
+}
+.Chat-Container .chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+.Chat-Container .chat-messages::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+.Chat-Container .chat-messages::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+.Chat-Container .chat-messages::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+.Chat-Container .message {
+  margin-bottom: 15px;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  font-weight: 400;
+}
+.Chat-Container .message p {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+.Chat-Container .message.user {
+  align-self: flex-end;
+  background-color: var(--message-user-bg);
+  color: var(--text-color);
+  padding: 10px 15px;
+  border-radius: 18px;
+}
+.Chat-Container .message.assistant {
+  color: var(--text-color);
+  width: 100% !important;
+}
+.Chat-Container .message.assistant code:not(pre code) {
+  /* Your styles here */
+  background-color: var(--code-highlight);
+  border-radius: 5px;
+  padding: 0.2rem;
+}
+.Chat-Container .message.assistant ol {
+  list-style-type: decimal;
+  margin-left: 1.5em;
+  padding-left: 1em;
+  padding: 1rem;
+}
+.Chat-Container .message.assistant ol li {
+  padding: 0.5rem;
+}
+.Chat-Container .message.assistant ol ol {
+  list-style-type: lower-alpha;
+}
+.Chat-Container .message.assistant ol ol li {
+  padding: 0.5rem;
+}
+.Chat-Container .message.assistant ol ol ol {
+  list-style-type: lower-roman;
+}
+.Chat-Container .message.assistant ol ol ol li {
+  padding: 0.5rem;
+}
+.Chat-Container .message.assistant ul {
+  list-style-type: disc;
+  margin-left: 1.5em;
+  padding-left: 1em;
+  padding: 1rem;
+}
+.Chat-Container .message.assistant ul li {
+  padding: 0.5rem;
+}
+.Chat-Container .message.assistant ul ul {
+  list-style-type: circle;
+}
+.Chat-Container .message.assistant ul ul ul {
+  list-style-type: square;
+}
+@media (max-width: 768px) {
+  .Chat-Container .message.assistant ol {
+    list-style-type: decimal;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    padding: 0.5rem;
+  }
+  .Chat-Container .message.assistant ol li {
+    padding: 0.5rem;
+  }
+  .Chat-Container .message.assistant ol ol {
+    list-style-type: lower-alpha;
+  }
+  .Chat-Container .message.assistant ol ol li {
+    padding: 0.5rem;
+  }
+  .Chat-Container .message.assistant ol ol ol {
+    list-style-type: lower-roman;
+  }
+  .Chat-Container .message.assistant ol ol ol li {
+    padding: 0.5rem;
+  }
+  .Chat-Container .message.assistant ul {
+    list-style-type: disc;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    padding: 0.5rem;
+  }
+  .Chat-Container .message.assistant ul li {
+    padding: 0.5rem;
+  }
+  .Chat-Container .message.assistant ul ul {
+    list-style-type: circle;
+  }
+  .Chat-Container .message.assistant ul ul ul {
+    list-style-type: square;
+  }
+}
+.Chat-Container .message.assistant p:first-child {
+  margin-top: 0;
+}
+.Chat-Container .message.assistant p:last-child {
+  margin-bottom: 0;
+}
+.Chat-Container .chat-messages {
+  font-size: medium !important;
+  font-family: "Inter", sans-serif;
+}
+.Chat-Container .chat-messages pre {
+  margin: 0px !important;
+  border-radius: 0.5rem;
+}
+.Chat-Container .chat-input {
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  background-color: var(--input-bg);
+  border-top: 1px solid #e0e0e0;
+  height: 100px;
+}
+.Chat-Container .chat-input input {
+  flex-grow: 1;
+  padding: 10px 15px;
+  border: none;
+  font-size: 16px;
+  outline: none;
+  background-color: transparent;
+  color: var(--text-color);
+  margin-bottom: 5px;
+}
+.Chat-Container .button-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+.Chat-Container .icon-button {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--secondary-color);
+  padding: 5px 10px;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.Chat-Container .icon-button:hover {
+  color: var(--primary-color);
+}
+.Chat-Container .icon-button:focus {
+  outline: none;
+}
+.Chat-Container .icon-button svg {
+  width: 1em;
+  height: 1em;
+}
+.Chat-Container .main-action {
+  margin-left: 10px;
+}
+
+.Chat-Container {
+  background-color: var(--background-color);
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+@media (max-width: 768px) {
+  .Chat-Container {
+    padding: 0;
+  }
+}
+.Chat-Container h1 {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+/* Dark mode vari1ables */
+body.dark {
+  --primary-color: #e1e1e1;
+  --secondary-color: #919191;
+  --code-highlight: #3a4b5f;
+  --background-color: #1a222c;
+  --text-color: #f0f0f0;
+  --input-bg: #27384c;
+  --message-user-bg: #3a3a3a;
+  --scrollbar-bg: #2a2a2a;
+  --scrollbar-thumb: #555;
+  --scrollbar-thumb-hover: #777;
+  --code-bg: #2d2d2d;
+  --border-color: #444;
+}
+body.dark .Chat-Container code[class*=language-], body.dark .Chat-Container pre[class*=language-] {
+  color: #f8f8f2;
+  background: 0 0;
+  text-shadow: 0 1px rgba(0, 0, 0, 0.3);
+  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
+  font-size: 1em;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  word-wrap: normal;
+  line-height: 1.5;
+  -moz-tab-size: 4;
+  -o-tab-size: 4;
+  tab-size: 4;
+  -webkit-hyphens: none;
+  -moz-hyphens: none;
+  -ms-hyphens: none;
+  hyphens: none;
+}
+body.dark .Chat-Container pre[class*=language-] {
+  padding: 1em;
+  margin: 0.5em 0;
+  overflow: auto;
+  border-radius: 0.3em;
+}
+body.dark .Chat-Container :not(pre) > code[class*=language-], body.dark .Chat-Container pre[class*=language-] {
+  background: #272822;
+}
+body.dark .Chat-Container :not(pre) > code[class*=language-] {
+  padding: 0.1em;
+  border-radius: 0.3em;
+  white-space: normal;
+}
+body.dark .Chat-Container .token.cdata, body.dark .Chat-Container .token.comment, body.dark .Chat-Container .token.doctype, body.dark .Chat-Container .token.prolog {
+  color: #8292a2;
+}
+body.dark .Chat-Container .token.punctuation {
+  color: #f8f8f2;
+}
+body.dark .Chat-Container .token.namespace {
+  opacity: 0.7;
+}
+body.dark .Chat-Container .token.constant, body.dark .Chat-Container .token.deleted, body.dark .Chat-Container .token.property, body.dark .Chat-Container .token.symbol, body.dark .Chat-Container .token.tag {
+  color: #f92672;
+}
+body.dark .Chat-Container .token.boolean, body.dark .Chat-Container .token.number {
+  color: #ae81ff;
+}
+body.dark .Chat-Container .token.attr-name, body.dark .Chat-Container .token.builtin, body.dark .Chat-Container .token.char, body.dark .Chat-Container .token.inserted, body.dark .Chat-Container .token.selector, body.dark .Chat-Container .token.string {
+  color: #a6e22e;
+}
+body.dark .Chat-Container .language-css .token.string, body.dark .Chat-Container .style .token.string, body.dark .Chat-Container .token.entity, body.dark .Chat-Container .token.operator, body.dark .Chat-Container .token.url, body.dark .Chat-Container .token.variable {
+  color: #f8f8f2;
+}
+body.dark .Chat-Container .token.atrule, body.dark .Chat-Container .token.attr-value, body.dark .Chat-Container .token.class-name, body.dark .Chat-Container .token.function {
+  color: #e6db74;
+}
+body.dark .Chat-Container .token.keyword {
+  color: #66d9ef;
+}
+body.dark .Chat-Container .token.important, body.dark .Chat-Container .token.regex {
+  color: #fd971f;
+}
+body.dark .Chat-Container .token.bold, body.dark .Chat-Container .token.important {
+  font-weight: 700;
+}
+body.dark .Chat-Container .token.italic {
+  font-style: italic;
+}
+body.dark .Chat-Container .token.entity {
+  cursor: help;
+}/*# sourceMappingURL=index.css.map */

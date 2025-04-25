@@ -4,11 +4,22 @@ import { getEnvVariables } from "../helpers";
 const { VITE_API_URL } = getEnvVariables();
 
 
-const whagonsApi = axios.create({
+const api = axios.create({
     baseURL: VITE_API_URL,
+    withCredentials: true,
+    withXSRFToken : true,
     headers: {
         "Content-type": "application/json"
     },
 });
 
-export default whagonsApi;
+const web = axios.create({
+    baseURL: VITE_API_URL.replace('/api', '/'),
+    withCredentials: true,
+    withXSRFToken : true,
+    headers: {},
+});
+
+export default api;
+
+export { web };
