@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import WhagonsTitle from '@/assets/WhagonsTitle';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -83,13 +84,10 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 p-3">
-          <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center text-white">
-            W
-          </div>
-          {state === 'expanded' && (
-            <span className="font-semibold">Whagons</span>
-          )}
+        <div
+        className='flex justify-center items-center pt-3 pr-3'
+        >
+          <WhagonsTitle />
         </div>
       </SidebarHeader>
       <SidebarContent>
