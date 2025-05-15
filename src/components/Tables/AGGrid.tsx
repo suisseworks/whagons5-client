@@ -1,8 +1,13 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { Input } from '../ui/input';
+import { fetchTasks } from '@/store/reducers/tasksSlice';
+import { useDispatch } from 'react-redux';
+import { RootState } from '@/store';
+import { useSelector } from 'react-redux';
+import { Task } from '@/store/reducers/tasksSlice';
 // main.tsx or root file
 
 // Register all Community features
@@ -19,25 +24,36 @@ const initialData = [
 ];
 
 function AGGrid() {
-  const [originalRowData] = useState(initialData); // Store original data
-  const [rowData, setRowData] = useState(initialData); // Data displayed in the grid
+  const dispatch = useDispatch();
+  const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const [rowData, setRowData] = useState(tasks);
 
   // Explicitly define column types
   const [colDefs] = useState<ColDef[]>([
-    { field: 'make' },
-    { field: 'model' },
-    { field: 'price', filter: 'agNumberColumnFilter' },
-    { field: 'electric', filter: 'agBooleanColumnFilter' },
+    { field: 'id' },
+    { field: 'name' },
+    { field: 'workspace_id' },
+    { field: 'template_id' },
+    { field: 'spot_id' },
+    { field: 'team_id' },
+    { field: 'status_id' },
+    { field: 'response_date' },
+    { field: 'resolution_date' },
+    { field: 'work_duration' },
+    { field: 'pause_duration' },
   ]);
-
+  useEffect(() => {
+    dispatch(fetchTasks() as any);
+    console.log(tasks)
+  }, [dispatch]);
 
   const handleSearch = (value: string) => {
     const lowerCaseValue = value.toLowerCase();
     if (lowerCaseValue === '') {
-      setRowData(originalRowData); // Reset to original data if search is empty
+      setRowData(tasks); // Reset to original data if search is empty
     } else {
       // Filter original data based on substring match in any string field
-      const filteredData = originalRowData.filter((row) => {
+      const filteredData = tasks.filter((row) => {
         return Object.values(row).some((field) =>
           typeof field === 'string' && field.toLowerCase().includes(lowerCaseValue) ||
           typeof field === 'number' && field.toString().includes(lowerCaseValue) // Also check numbers as strings

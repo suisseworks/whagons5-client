@@ -14,23 +14,16 @@ let stuff = {
 console.log(stuff);
 
 const api = axios.create({
-    baseURL: VITE_API_URL,
-    withCredentials: true,
-    withXSRFToken : true,
+    baseURL: `http://${VITE_API_URL}/api`,
     headers: {
-        "Content-type": "application/json",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
     },
-});
-
-const web = axios.create({
-    baseURL: VITE_API_URL.replace('/api', '/'),
-    withCredentials: true,
-    withXSRFToken : true,
-    headers: {},
+    withCredentials: false,
 });
 
 
 
 export default api;
 
-export { web, api};
+export {api};
