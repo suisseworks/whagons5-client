@@ -4,9 +4,18 @@ import { AppRouter } from './router/AppRouter'
 
 import { PersistGate } from 'redux-persist/integration/react' 
 import { persistor, store } from './store';
+import { useEffect } from 'react';
 
 
 export const App = () => {
+
+
+    // useEffect(() => {
+      
+
+
+    // }, []);
+
     return (
         <BrowserRouter>
             <Provider store={store}>

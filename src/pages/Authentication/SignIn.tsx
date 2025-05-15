@@ -4,6 +4,7 @@ import LogoDark from '../../images/logo/logo-dark.svg';
 import Logo from '../../images/logo/logo.svg';
 import { signInWithGoogle, signUpWithEmail } from './auth';
 import axios from 'axios';
+import { api } from '@/api';
 
 // const API_URL = "https://localhost:8001/api";
 const API_URL = 'http://localhost:8000/api';
@@ -38,8 +39,8 @@ const SignIn: React.FC = () => {
       console.log('id token', idToken);
 
       // Send the ID token to your backend (using fetch or axios)
-      const response = await axios.post(
-        `${API_URL}/session`,
+      const response = await api.post(
+        `/session`,
         { idToken },
         {
           headers: {

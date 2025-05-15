@@ -49,9 +49,7 @@ export function AppSidebar() {
   const [workspaceDescription, setWorkspaceDescription] = useState('');
 
   const dispatch = useDispatch<AppDispatch>();
-  const { value: workspaces } = useSelector(
-    (state: RootState) => state.workspaces
-  );
+  const { value: workspaces } = useSelector((state: RootState) => state.workspaces);
   const { addWorkspace } = workspacesSlice.actions;
 
   const handleAddWorkspace = () => {

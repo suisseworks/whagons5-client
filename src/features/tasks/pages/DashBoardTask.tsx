@@ -1,6 +1,9 @@
 import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import AGGrid from '@/components/Tables/AGGrid';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ClipboardList } from 'lucide-react';
+import api from '@/api/whagonsApi';
 
 export const DashBoardTask = () => {
   // State to store the fetched data
@@ -13,7 +16,7 @@ export const DashBoardTask = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           'http://localhost:8000/api/protected',
           {
             withCredentials: true,
@@ -35,6 +38,28 @@ export const DashBoardTask = () => {
   }
 
   return (
-      <AGGrid/>
+    <Tabs defaultValue="grid" className="w-full h-full">
+      <TabsList
+        className='w-50 h-15'
+      >
+        <TabsTrigger value="grid">
+          <ClipboardList />
+          Tasks
+        </TabsTrigger>
+        <TabsTrigger value="list">
+          Other
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent
+        className='h-full'
+        value="grid">
+        <AGGrid />
+      </TabsContent>
+      <TabsContent value="list">
+        <div>What's good?</div>
+      </TabsContent>
+    </Tabs>
+
+
   );
 };

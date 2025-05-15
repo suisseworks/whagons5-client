@@ -1,4 +1,4 @@
- @import "tailwindcss";
+@import "tailwindcss";
 
 /* #root, body, html, .flex, .flex-1, .h-full {
   height: 100%;
@@ -201,4 +201,35 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.ag-theme-quartz {
+  --ag-background-color: var(--color-background);
+  --ag-foreground-color: var(--color-foreground);
+  --ag-header-background-color: var(--color-card);
+  --ag-header-foreground-color: var(--color-card-foreground);
+  --ag-odd-row-background-color: var(--color-muted);
+  --ag-row-border-color: var(--color-border);
+  --ag-selected-row-background-color: oklch(from var(--color-accent) l c h / 0.15); /* Semi-transparent accent */
+  --ag-range-selection-border-color: var(--color-accent);
+  --ag-input-focus-border-color: var(--color-ring);
+  --ag-border-color: var(--color-border);
+  --ag-secondary-border-color: var(--color-border);
+  --ag-accent-color: var(--color-primary);
+  --ag-icon-color: var(--color-foreground);
+  --ag-header-cell-hover-background-color: var(--color-secondary);
+  --ag-row-hover-color: var(--color-secondary);
+  --ag-column-hover-color: var(--color-secondary);
+  --ag-input-disabled-background-color: oklch(from var(--color-background) l calc(l + 0.02) c h); /* Slightly lighter background */
+  --ag-font-family: inherit; /* Use app's font */
+  --ag-font-size: inherit; /* Use app's font size */
+  --ag-grid-size: var(--radius-sm); /* Controls spacing/padding, link to radius */
+  --ag-border-radius: var(--radius-md);
+}
+
+.ag-theme-quartz-dark {
+  /* Reuse most light theme mappings, but reference .dark variables implicitly via CSS cascade */
+  /* Variables unique to dark theme or needing specific override */
+  --ag-selected-row-background-color: oklch(from var(--color-accent) l c h / 0.2); /* Slightly more opaque for dark */
+  --ag-input-disabled-background-color: oklch(from var(--color-background) l calc(l - 0.02) c h); /* Slightly darker background */
 }
