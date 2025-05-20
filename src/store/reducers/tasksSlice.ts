@@ -29,7 +29,7 @@ export const fetchTasks = createAsyncThunk('tasks/fetchTasks', async () => {
         const response = await api.get('/tasks',
             {
                 params: {
-                workspaceId: '20'
+                workspace_id: '10'
             }
         }
     )
@@ -65,8 +65,10 @@ export const tasksSlice = createSlice({
             state.loading = false
             console.log(action.payload)
             //we merge new tasks with existing tasks filtering out repeated ids
-            const newTasks = action.payload.data.filter((task: Task) => !state.value.some((t: Task) => t.id === task.id))
-            state.value = [...state.value, ...newTasks]
+            // const newTasks = action.payload.data.filter((task: Task) => !state.value.some((t: Task) => t.id === task.id))
+            // state.value = [...state.value, ...newTasks]
+
+            state.value = action.payload.data
         })
         .addCase(fetchTasks.rejected, (state, action) => {
             state.loading = false

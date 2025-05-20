@@ -5,12 +5,13 @@ import { getAuth } from "firebase/auth";
 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAYFaubF7EcvI2x9Mm5ypedw3JlzA8kH9A",
-  authDomain: "whagons5.firebaseapp.com",
-  projectId: "whagons5",
-  storageBucket: "whagons5.firebasestorage.app",
-  messagingSenderId: "333755572903",
-  appId: "1:333755572903:web:abc24649ac86d892d53182",
+  apiKey: "AIzaSyDQ1MTE2dIHtGIzN6CQas-nPwhjJiVZKcs",
+  authDomain: "whagons-demo.firebaseapp.com",
+  projectId: "whagons-demo",
+  storageBucket: "whagons-demo.firebasestorage.app",
+  messagingSenderId: "881494607876",
+  appId: "1:881494607876:web:fc1bc9094b43f4f9b98d51",
+  measurementId: "G-PSVYP02YGW"
 };
 
 // Initialize Firebase

@@ -13,15 +13,6 @@ import { Task } from '@/store/reducers/tasksSlice';
 // Register all Community features
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-const initialData = [
-  { make: 'Tesla', model: 'Model Y', price: 64950, electric: true },
-  { make: 'Ford', model: 'F-Series', price: 33850, electric: false },
-  { make: 'Toyota', model: 'Corolla', price: 29600, electric: false },
-  { make: 'Audi', model: 'A4', price: 49600, electric: false },
-  { make: 'BMW', model: '320', price: 32000, electric: false },
-  { make: 'Mercedes', model: 'C-Class', price: 45600, electric: false },
-  { make: 'Volkswagen', model: 'Golf', price: 29600, electric: false },
-];
 
 function AGGrid() {
   const dispatch = useDispatch();
@@ -42,6 +33,8 @@ function AGGrid() {
     { field: 'work_duration' },
     { field: 'pause_duration' },
   ]);
+
+
   useEffect(() => {
     dispatch(fetchTasks() as any);
     console.log(tasks)

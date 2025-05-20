@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import LogoDark from '../../images/logo/logo-dark.svg';
 import Logo from '../../images/logo/logo.svg';
-import { signInWithGoogle, signUpWithEmail } from './auth';
+import { signInWithGoogle, signInWithEmail } from './auth';
 import axios from 'axios';
-import { api } from '@/api';
+import { api, web } from '@/api';
 
-// const API_URL = "https://localhost:8001/api";
-const API_URL = 'http://localhost:8000/api';
+
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -20,12 +19,37 @@ const SignIn: React.FC = () => {
     if (!regex.test(password)) {
       //toast error
       alert(
-        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number',
+        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
       );
       return false;
     }
 
     return true;
+  }
+
+  async function backendLogin(idToken: string) {
+
+    try { 
+      await web.get('/sanctum/csrf-cookie')
+    } catch (error) {
+      console.error(error);
+    }
+
+    console.log('idToken', idToken);
+
+    const response = await web.post(`/login`,
+      {
+        "token": idToken
+      },
+    );
+
+    if (response.status === 200) {
+      console.log('Successfully logged in and sent idToken to backend');
+    } else {
+      console.error('Login failed');
+    }
+
+    console.log(response);
   }
 
   const handleGoogleSignin = async () => {
@@ -36,25 +60,7 @@ const SignIn: React.FC = () => {
       // Get the ID token
       const idToken = await user.getIdToken();
 
-      console.log('id token', idToken);
-
-      // Send the ID token to your backend (using fetch or axios)
-      const response = await api.post(
-        `/session`,
-        { idToken },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          withCredentials: true,
-        },
-      );
-
-      // if (response.ok) {
-      //   console.log('Successfully logged in and sent idToken to backend');
-      // } else {
-      //   console.error('Login failed');
-      // }
+      backendLogin(idToken);
     } catch (error) {
       console.error(error);
     }
@@ -67,28 +73,14 @@ const SignIn: React.FC = () => {
       if (!(await checkPassword())) {
         return;
       }
-      const userCredential = await signUpWithEmail(email, password);
+      const userCredential = await signInWithEmail(email, password);
       const user = userCredential.user;
 
       // Get the ID token
       const idToken = await user.getIdToken();
 
-      // Send the ID token to your backend (using fetch or axios)
-      const response = await fetch(`${API_URL}/session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (response.ok) {
-        console.log('Successfully logged in and sent idToken to backend');
-      } else {
-        console.error('Login failed');
-      }
+      backendLogin(idToken);
       navigate('/');
-      //re-route to dashboard
     } catch (error) {
       console.error(error);
     }

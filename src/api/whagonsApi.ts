@@ -6,12 +6,11 @@ const { VITE_API_URL } = getEnvVariables();
 
 const token = await auth.currentUser?.getIdToken();
 
-let stuff = {
-    "token": token
-}
+
+console.log(token);
 
 
-console.log(stuff);
+axios.defaults.headers.post['Access-Control-Allow-Origin'] = '*';
 
 const api = axios.create({
     baseURL: `http://${VITE_API_URL}/api`,
@@ -19,11 +18,24 @@ const api = axios.create({
         "Content-Type": "application/json",
         "Accept": "application/json",
     },
-    withCredentials: false,
+    withXSRFToken: true,
 });
+
+
+const web = axios.create({
+    baseURL: `http://${VITE_API_URL}/`,
+    headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    },
+    withXSRFToken: true,
+    withCredentials: true,
+})
+
+
 
 
 
 export default api;
 
-export {api};
+export {api, web};

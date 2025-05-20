@@ -1,7 +1,11 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger, useSidebar } from "./ui/sidebar";
+import { signOut } from "@firebase/auth";
+import { logout } from "@/pages/Authentication/auth";
 
 function Header() {
+
+
     return ( 
         <header className="sticky top-0 z-10 bg-background border-b">
             <div className="flex items-center justify-between h-14 px-4">
@@ -11,7 +15,11 @@ function Header() {
                 </div>
                 <div className="flex items-center gap-4">
                     {/* Navigation or user menu items would go here */}
-                    <Avatar>
+                    <Avatar
+                        onClick={() => {
+                            logout()
+                        }}
+                    >
                         <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
                         <AvatarFallback>CN</AvatarFallback>
                     </Avatar>
