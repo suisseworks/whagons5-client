@@ -29,7 +29,7 @@ export const fetchTasks = createAsyncThunk('tasks/fetchTasks', async () => {
         const response = await api.get('/tasks',
             {
                 params: {
-                workspace_id: '10'
+                workspace_id: '1'
             }
         }
     )
