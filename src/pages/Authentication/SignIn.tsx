@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import LogoDark from '../../images/logo/logo-dark.svg';
 import Logo from '../../images/logo/logo.svg';
 import { signInWithGoogle, signInWithEmail } from './auth';
-import axios from 'axios';
-import { api, web } from '@/api';
+import { api, updateAuthToken } from '@/api';
+
 
 
 
@@ -28,28 +28,27 @@ const SignIn: React.FC = () => {
   }
 
   async function backendLogin(idToken: string) {
+    try {
+      console.log('idToken', idToken);
 
-    try { 
-      await web.get('/sanctum/csrf-cookie')
+      const response = await api.post(`/login`,
+        {
+          "token": idToken
+        },
+      );
+
+      if (response.status === 200) {
+        console.log('Successfully logged in and sent idToken to backend');
+        updateAuthToken(response.data.token);
+        return true;
+      } else {
+        console.error('Login failed');
+        return false;
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Login error:', error);
+      return false;
     }
-
-    console.log('idToken', idToken);
-
-    const response = await web.post(`/login`,
-      {
-        "token": idToken
-      },
-    );
-
-    if (response.status === 200) {
-      console.log('Successfully logged in and sent idToken to backend');
-    } else {
-      console.error('Login failed');
-    }
-
-    console.log(response);
   }
 
   const handleGoogleSignin = async () => {
@@ -60,12 +59,17 @@ const SignIn: React.FC = () => {
       // Get the ID token
       const idToken = await user.getIdToken();
 
-      backendLogin(idToken);
+      const loginSuccess = await backendLogin(idToken);
+      if (loginSuccess) {
+        navigate('/');
+      } else {
+        // Handle login failure - you might want to show an error message to the user
+        alert('Login failed. Please try again.');
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Google sign-in error:', error);
+      alert('Google sign-in failed. Please try again.');
     }
-    navigate('/');
-    //re-route to confirm email screen then login from email
   };
 
   const handleEmailSignin = async () => {
@@ -79,10 +83,16 @@ const SignIn: React.FC = () => {
       // Get the ID token
       const idToken = await user.getIdToken();
 
-      backendLogin(idToken);
-      navigate('/');
+      const loginSuccess = await backendLogin(idToken);
+      if (loginSuccess) {
+        navigate('/');
+      } else {
+        // Handle login failure - you might want to show an error message to the user
+        alert('Login failed. Please try again.');
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Email sign-in error:', error);
+      alert('Email sign-in failed. Please try again.');
     }
   };
 
@@ -357,7 +367,7 @@ const SignIn: React.FC = () => {
 
               <div className="mt-6 text-center">
                 <p>
-                  Don’t have any account?{' '}
+                  Don't have any account?{' '}
                   <Link to="/auth/signup" className="text-primary">
                     Sign Up
                   </Link>
