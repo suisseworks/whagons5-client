@@ -2,8 +2,10 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { signOut } from "@firebase/auth";
 import { logout } from "@/pages/Authentication/auth";
+import { auth } from "@/firebase/firebaseConfig";
 
 function Header() {
+    const user = auth.currentUser;
 
 
     return ( 
@@ -20,7 +22,7 @@ function Header() {
                             logout()
                         }}
                     >
-                        <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                        <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || ''} />
                         <AvatarFallback>CN</AvatarFallback>
                     </Avatar>
                 </div>
