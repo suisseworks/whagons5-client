@@ -4,6 +4,7 @@ import AGGrid from '@/components/Tables/AGGrid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList } from 'lucide-react';
 import api from '@/api/whagonsApi';
+import GridExample from '@/components/Tables/AGGridExample';
 
 export const DashBoardTask = () => {
   // State to store the fetched data
@@ -53,7 +54,8 @@ export const DashBoardTask = () => {
       <TabsContent
         className='h-full'
         value="grid">
-        <AGGrid />
+        {/* <AGGrid /> */}
+        <GridExample />
       </TabsContent>
       <TabsContent value="list">
         <div>What's good?</div>
