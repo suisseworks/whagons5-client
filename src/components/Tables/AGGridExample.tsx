@@ -1,15 +1,23 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
-import { ModuleRegistry, InfiniteRowModelModule } from 'ag-grid-community';
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { api } from "@/api";
 
-ModuleRegistry.registerModules([InfiniteRowModelModule]);
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 const GridExample = () => {
     const containerStyle = useMemo(() => ({ width: "100%", height: "100%" }), []);
     const gridStyle = useMemo(() => ({ height: "100%", width: "100%" }), []);
+
+    // Cache for storing fetched row data
+    const rowCache = useRef(new Map<string, { rows: any[], rowCount: number }>());
+
+    // Generate cache key based on request parameters
+    const getCacheKey = useCallback((params: any) => {
+        return `${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(params.sortModel || [])}`;
+    }, []);
 
     const [columnDefs, setColumnDefs] = useState([
         // this row shows the row index, doesn't use any data from the row
@@ -47,36 +55,56 @@ const GridExample = () => {
         };
     }, []);
 
+    // Memoized getRows function
+    const getRows = useCallback(async (params: any) => {
+        const cacheKey = getCacheKey(params);
+        
+        // Check if data is already cached
+        if (rowCache.current.has(cacheKey)) {
+            console.log(`Cache hit for range ${params.startRow} to ${params.endRow}`);
+            const cachedData = rowCache.current.get(cacheKey)!;
+            params.successCallback(cachedData.rows, cachedData.rowCount);
+            return;
+        }
+
+        console.log(params)
+        console.log(
+            "asking for " + params.startRow + " to " + params.endRow,
+        );
+        
+        try {
+            const res = await api.get("/tasks", {
+                params: params
+            });
+
+            if (res.data.rowCount === 0 || res.data.rows.length === 0) {
+                console.log("params", params.startRow);
+                // Cache empty result
+                rowCache.current.set(cacheKey, { rows: [], rowCount: params.startRow });
+                params.successCallback([], params.startRow);
+            } else {
+                // Cache successful result
+                rowCache.current.set(cacheKey, { rows: res.data.rows, rowCount: -1 });
+                params.successCallback(res.data.rows, -1);
+            }
+        } catch (error) {
+            console.log(error);
+            params.failCallback();
+        }
+    }, [getCacheKey]);
+
     const onGridReady = useCallback((params: any) => {
         const dataSource = {
             rowCount: undefined,
-            getRows: async (params: any) => {
-                console.log(params)
-                console.log(
-                    "asking for " + params.startRow + " to " + params.endRow,
-                );
-                try {
-                    const res = await api.get("/tasks",
-                        {
-                            params: params
-                        }
-                    )
-
-                    if (res.data.rowCount === 0 || res.data.rows.length === 0) {
-
-                        // params.successCallback([], -1);
-                    } else {
-                        params.successCallback(res.data.rows, -1);
-                    }
-                } catch (error) {
-                    console.log(error)
-                }
-
-
-
-            },
+            getRows,
         };
         params.api.setGridOption("datasource", dataSource);
+    }, [getRows]);
+
+    // Function to clear cache (useful for refreshing data)
+    const clearCache = useCallback(() => {
+        rowCache.current.clear();
+        console.log("Row cache cleared");
     }, []);
 
     return (
@@ -85,9 +113,9 @@ const GridExample = () => {
                 <AgGridReact
                     columnDefs={columnDefs}
                     defaultColDef={defaultColDef}
-                    rowBuffer={0}
+                    rowBuffer={50}
                     rowModelType={"infinite"}
-                    cacheBlockSize={100}
+                    cacheBlockSize={500}
                     cacheOverflowSize={2}
                     maxConcurrentDatasourceRequests={1}
                     infiniteInitialRowCount={100}

@@ -3,9 +3,14 @@ import { SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { signOut } from "@firebase/auth";
 import { logout } from "@/pages/Authentication/auth";
 import { auth } from "@/firebase/firebaseConfig";
+import { useEffect } from "react";
 
 function Header() {
     const user = auth.currentUser;
+
+    useEffect(() => {
+        console.log(user?.photoURL)
+    }, [user])
 
 
     return ( 

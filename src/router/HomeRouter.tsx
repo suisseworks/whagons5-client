@@ -10,7 +10,6 @@ import ChatWindow from '../features/aichat/pages/ChatWindow';
 
 
 export const HomeRoutes = () => {
-  const { uuid } = useParams<{ uuid: string }>();
 
   return (
     <>
