@@ -2,42 +2,34 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
-import { AllCommunityModule, ModuleRegistry, ValidationModule } from "ag-grid-community";
-import { InfiniteRowModelModule } from "ag-grid-community";
+import { ModuleRegistry, InfiniteRowModelModule } from 'ag-grid-community';
 import { api } from "@/api";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/store";
-ModuleRegistry.registerModules([
-    InfiniteRowModelModule,
-    AllCommunityModule,
-    ...(process.env.NODE_ENV !== "production" ? [ValidationModule] : []),
-]);
 
-
-
+ModuleRegistry.registerModules([InfiniteRowModelModule]);
 
 const GridExample = () => {
     const containerStyle = useMemo(() => ({ width: "100%", height: "100%" }), []);
     const gridStyle = useMemo(() => ({ height: "100%", width: "100%" }), []);
-
 
     const [columnDefs, setColumnDefs] = useState([
         // this row shows the row index, doesn't use any data from the row
         {
             field: "id",
             //add loader
-            cellRenderer: (params: any) => {
-                if (params.value !== undefined) {
-                    return params.value;
-                } else {
-                    return <img src="https://www.ag-grid.com/example-assets/loading.gif" />;
-                }
-            },
+            // cellRenderer: (params: any) => {
+            //     if (params.value !== undefined) {
+            //         return params.value;
+            //     } else {
+            //         return <img src="https://www.ag-grid.com/example-assets/loading.gif" />;
+            //     }
+            // },
             maxWidth: 100,
             sortable: true,
         },
         { field: "name", minWidth: 150, sortable: true, filter: true },
-        { field: "workspace_id", sortable: true, filter: true },
+        {
+            field: "workspace_id", sortable: true,
+        },
         { field: "template_id", minWidth: 150, sortable: true, filter: true },
         { field: "spot_id", sortable: true, filter: true },
         { field: "team_id", minWidth: 150, sortable: true, filter: true },
@@ -63,8 +55,6 @@ const GridExample = () => {
                 console.log(
                     "asking for " + params.startRow + " to " + params.endRow,
                 );
-                // At this point in your code, you would call the server.
-                // To make the demo look real, wait for 500ms before returning
                 try {
                     const res = await api.get("/tasks",
                         {
@@ -72,22 +62,25 @@ const GridExample = () => {
                         }
                     )
 
-                    params.successCallback(res.data.rows, -1);
+                    if (res.data.rowCount === 0 || res.data.rows.length === 0) {
+
+                        // params.successCallback([], -1);
+                    } else {
+                        params.successCallback(res.data.rows, -1);
+                    }
                 } catch (error) {
                     console.log(error)
                 }
 
-                console.log("here")
 
 
             },
         };
         params.api.setGridOption("datasource", dataSource);
-        // });
     }, []);
 
     return (
-        <div style={containerStyle}>
+        <div style={containerStyle} className="ag-theme-quartz h-full w-full">
             <div style={gridStyle}>
                 <AgGridReact
                     columnDefs={columnDefs}
@@ -97,9 +90,11 @@ const GridExample = () => {
                     cacheBlockSize={100}
                     cacheOverflowSize={2}
                     maxConcurrentDatasourceRequests={1}
-                    infiniteInitialRowCount={1000}
+                    infiniteInitialRowCount={100}
                     maxBlocksInCache={10}
                     onGridReady={onGridReady}
+                    animateRows={true}
+                    getRowId={(params: any) => String(params.data.id)}
                 />
             </div>
         </div>

@@ -20,6 +20,7 @@ import {
   User,
   Users,
   Plus,
+  ChevronDown,
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -38,6 +39,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import WhagonsTitle from '@/assets/WhagonsTitle';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -79,115 +86,72 @@ export function AppSidebar() {
     setIsModalOpen(false);
   };
 
+  useEffect(() => {
+    console.log(workspaces);
+  }, [workspaces]);
+
   return (
     <Sidebar>
       <SidebarHeader>
         <div
-        className='flex justify-center items-center pt-3 pr-3'
+          className='flex justify-center items-center pt-3 pr-3'
         >
           <WhagonsTitle />
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          {/* Workspaces Group */}
-          <SidebarGroupLabel className="text-sm font-normal flex justify-between items-center pr-4">
-            <span>Workspaces</span>
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <Plus size={16} />
-                  <span className="sr-only">Add Workspace</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Workspace</DialogTitle>
-                  <DialogDescription>
-                    Enter the details for your new workspace. Click save when
-                    you're done.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">
-                      Name
-                    </Label>
-                    <Input
-                      id="name"
-                      value={workspaceName}
-                      onChange={(e) => setWorkspaceName(e.target.value)}
-                      className="col-span-3"
-                      placeholder="e.g., Project Phoenix"
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="description" className="text-right">
-                      Description
-                    </Label>
-                    <Input
-                      id="description"
-                      value={workspaceDescription}
-                      onChange={(e) => setWorkspaceDescription(e.target.value)}
-                      className="col-span-3"
-                      placeholder="e.g., For managing project tasks"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
+          <Collapsible defaultOpen className="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild className='text-sm font-normal'>
+                <div className="flex items-center justify-between w-full pr-4 cursor-pointer select-none">
+                  <button
                     type="button"
-                    variant="outline"
-                    onClick={() => setIsModalOpen(false)}
+                    className="flex items-center justify-between flex-1  bg-transparent border-0 outline-none focus:ring-0 cursor-pointer p-0 pr-1"
+                    onClick={e => {
+                      // Only trigger CollapsibleTrigger if not clicking the plus
+                      const plus = e.currentTarget.parentElement?.querySelector('.plus-btn');
+                      if (plus && plus.contains(e.target as Node)) return;
+                      // Find and click the CollapsibleTrigger
+                      const trigger = e.currentTarget.parentElement?.querySelector('.collapsible-trigger');
+                      if (trigger) (trigger as HTMLElement).click();
+                    }}
                   >
-                    Cancel
-                  </Button>
-                  <Button type="submit" onClick={handleAddWorkspace}>
-                    Save Workspace
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="font-sm text-gray-700">
-              {workspaces.map((workspace: Workspace) => (
-                <SidebarMenuItem key={workspace.id} className="pt-1 pb-1">
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={workspace.name}
-                    isActive={pathname === workspace.path}
-                    className="h-10"
+                    Workspaces
+                    <CollapsibleTrigger asChild>
+                      <span className="collapsible-trigger flex items-center ml-1 p-0 bg-transparent border-0 outline-none focus:ring-0">
+                        <ChevronDown className="transition-transform group-data-[state=open]/collapsible:rotate-180 w-4 h-4" />
+                      </span>
+                    </CollapsibleTrigger>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 p-0 plus-btn"
+                    onClick={() => setIsModalOpen(true)}
                   >
-                    <Link to={workspace.path}>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="icon icon-tabler icons-tabler-outline icon-tabler-brand-pnpm"
-                      >
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path d="M3 17h4v4h-4z" />
-                        <path d="M10 17h4v4h-4z" />
-                        <path d="M17 17h4v4h-4z" />
-                        <path d="M17 10h4v4h-4z" />
-                        <path d="M17 3h4v4h-4z" />
-                        <path d="M10 10h4v4h-4z" />
-                        <path d="M10 3h4v4h-4z" />
-                        <path d="M3 3h4v4h-4z" />
-                      </svg>
-                      <span>{workspace.name}</span>
+                    <Plus size={16} />
+                    <span className="sr-only">Add Workspace</span>
+                  </Button>
+                </div>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  {workspaces.map((workspace) => (
+                    <Link
+                      key={workspace.id}
+                      to={workspace.path}
+                      className="block px-4 py-2 rounded hover:bg-sidebar-accent"
+                    >
+                      {workspace.name}
                     </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+                  ))}
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+          <SidebarGroupContent>
+            {/* Other content can go here if needed */}
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarSeparator />
