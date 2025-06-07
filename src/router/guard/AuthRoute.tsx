@@ -2,7 +2,6 @@ import { ReactNode, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '@/api';
-import { User } from '@/types/user';
 
 interface AuthRouteProps {
   children: ReactNode;

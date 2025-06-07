@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { signUpWithEmail, signInWithGoogle, logout } from './auth';
-import { signOut } from '@firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { api, updateAuthToken } from '@/api';
 import { InitializationStage } from '@/types/user';
