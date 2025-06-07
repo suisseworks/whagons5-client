@@ -1,6 +1,5 @@
-import axios from 'axios';
-import React, { useState, useEffect } from 'react';
-import AGGrid from '@/components/Tables/AGGrid';
+
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList } from 'lucide-react';
 import api from '@/api/whagonsApi';

@@ -4,6 +4,7 @@ import { signInWithGoogle, signInWithEmail, linkGoogleProvider, logout } from '.
 import { api, updateAuthToken } from '@/api';
 import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
+import { InitializationStage } from '@/types/user';
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -37,6 +38,14 @@ const SignIn: React.FC = () => {
       if (response.status === 200) {
         console.log('Successfully logged in and sent idToken to backend');
         updateAuthToken(response.data.token);
+        
+        // Check initialization stage and redirect accordingly
+        const user = response.data.user;
+        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
+          navigate('/onboarding');
+        } else {
+          navigate('/');
+        }
         return true;
       } else {
         console.error('Login failed');
@@ -54,9 +63,7 @@ const SignIn: React.FC = () => {
       const user = userCredential.user;
       const idToken = await user.getIdToken();
       const loginSuccess = await backendLogin(idToken);
-      if (loginSuccess) {
-        navigate('/');
-      } else {
+      if (!loginSuccess) {
         alert('Login failed. Please try again.');
       }
     } catch (error: any) {
@@ -90,9 +97,7 @@ const SignIn: React.FC = () => {
       const idToken = await user.getIdToken();
 
       const loginSuccess = await backendLogin(idToken);
-      if (loginSuccess) {
-        navigate('/');
-      } else {
+      if (!loginSuccess) {
         // Handle login failure - you might want to show an error message to the user
         alert('Login failed. Please try again.');
       }
@@ -113,9 +118,7 @@ const SignIn: React.FC = () => {
         await linkGoogleProvider(credential);
         const idToken = await userCredential.user.getIdToken();
         const loginSuccess = await backendLogin(idToken);
-        if (loginSuccess) {
-          navigate('/');
-        } else {
+        if (!loginSuccess) {
           alert('Failed to link Google account. Please try again.');
         }
       }

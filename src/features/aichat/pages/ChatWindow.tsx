@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect, FormEvent } from 'react';
-import ReactMarkdown from 'react-markdown';
+import React, { useState, useRef, useEffect, FormEvent, Suspense } from 'react';
 import WaveIcon from './WaveIcon';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -149,6 +148,9 @@ interface Props {
   chats: Chat[];
   selectedChat: string;
 }
+
+// Lazy load ReactMarkdown
+const ReactMarkdown = React.lazy(() => import('react-markdown'));
 
 function ChatWindow() {
   const { setTheme } = useTheme()
@@ -349,13 +351,15 @@ function ChatWindow() {
                   {message.role === 'user'
                     ? (message.content as string)
                     : message.role === 'assistant' && (
-                        <ReactMarkdown
-                          components={{
-                            pre: CustomPre,
-                          }}
-                          children={message.content as string}
-                          remarkPlugins={[remarkGfm, remarkBreaks]}
-                        />
+                        <Suspense fallback={<div className="markdown-loading">Loading...</div>}>
+                          <ReactMarkdown
+                            components={{
+                              pre: CustomPre,
+                            }}
+                            children={message.content as string}
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
+                          />
+                        </Suspense>
                       )}
                 </div>
               ))}

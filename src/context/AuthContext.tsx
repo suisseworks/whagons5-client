@@ -18,18 +18,25 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  console.log('AuthProvider - Component mounted');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    console.log('AuthProvider - Setting up auth state listener');
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log('AuthProvider - Auth state changed:', currentUser);
       setUser(currentUser);
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup the listener when the component unmounts
+    return () => {
+      console.log('AuthProvider - Cleaning up auth state listener');
+      unsubscribe();
+    };
   }, []);
 
+  console.log('AuthProvider - Rendering with state:', { user, loading });
   return (
     <AuthContext.Provider value={{ user, loading }}>
       {children}

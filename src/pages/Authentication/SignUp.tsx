@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { signUpWithEmail, signInWithGoogle, logout } from './auth';
 import { signOut } from '@firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
+import { api, updateAuthToken } from '@/api';
+import { InitializationStage } from '@/types/user';
 
 const SignUp: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -31,12 +33,52 @@ const SignUp: React.FC = () => {
     return true;
   }
 
+  async function backendLogin(idToken: string) {
+    try {
+      console.log('idToken', idToken);
+
+      const response = await api.post(`/login`,
+        {
+          "token": idToken
+        },
+      );
+
+      if (response.status === 200) {
+        console.log('Successfully logged in and sent idToken to backend');
+        updateAuthToken(response.data.token);
+        
+        // Check initialization stage and redirect accordingly
+        const user = response.data.user;
+        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
+          navigate('/onboarding');
+          console.log('redirecting to onboarding');
+        } else {
+          console.log('redirecting to home', user, user.initialization_stage);
+          navigate('/');
+        }
+        return true;
+      } else {
+        console.error('Login failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
+  }
+
   const handleGoogleSignUp = async () => {
     try {
-      await signInWithGoogle();
-      navigate('/');
+      const userCredential = await signInWithGoogle();
+      const user = userCredential.user;
+      const idToken = await user.getIdToken();
+      const loginSuccess = await backendLogin(idToken);
+      if (!loginSuccess) {
+        alert('Signup failed. Please try again.');
+      }
     } catch (error) {
       console.error(error);
+      alert('Google signup failed. Please try again.');
     }
   };
 
@@ -329,7 +371,7 @@ const SignUp: React.FC = () => {
                   >
                     <g clipPath="url(#clip0_191_13499)">
                       <path
-                        d="M19.999 10.2217C20.0111 9.53428 19.9387 8.84788 19.7834 8.17737H10.2031V11.8884H15.8266C15.7201 12.5391 15.4804 13.162 15.1219 13.7195C14.7634 14.2771 14.2935 14.7578 13.7405 15.1328L13.7209 15.2571L16.7502 17.5568L16.96 17.5774C18.8873 15.8329 19.9986 13.2661 19.9986 10.2217"
+                        d="M19.999 10.2217C20.0111 9.53428 19.9387 8.84788 19.7834 8.17737H10.2031V11.8884H15.8266C15.7201 12.5391 15.4804 13.162 15.1219 13.7195C14.7634 14.2771 14.2935 14.7578 14.5685 14.7578L14.5489 14.8821L17.5782 17.1818L17.7882 17.2024C19.7155 15.4579 20.8268 13.0307 20.8268 10.2217"
                         fill="#4285F4"
                       />
                       <path
