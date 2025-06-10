@@ -1,5 +1,5 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { SidebarTrigger, useSidebar } from "./ui/sidebar";
+import { SidebarTrigger } from "./ui/sidebar";
 import { logout } from "@/pages/Authentication/auth";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
