@@ -6,6 +6,7 @@ import MainLayout from '../layouts/MainLayout';
 import { useParams } from 'react-router';
 import Stripe from '../pages/Stripe';
 import ChatWindow from '../features/aichat/pages/ChatWindow';
+import Profile from '@/pages/Profile';
 
 
 
@@ -19,6 +20,7 @@ export const HomeRoutes = () => {
           <Route path="/workplan" element={<DashboardWorkplan />} />
           <Route path="/stripe" element={<Stripe />} />
           <Route path="/ai-chat" element={<ChatWindow/>} />
+          <Route path="/profile" element={<Profile />} />
 
           <Route path="/" element={<Navigate to="tasks" />} />
         </Routes>

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { api } from '@/api';
+import { useSidebar } from '@/components/ui/sidebar';
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
@@ -26,6 +27,8 @@ const GridExample = () => {
   const containerStyle = useMemo(() => ({ width: '100%', height: '100%' }), []);
   const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
   const [modulesLoaded, setModulesLoaded] = useState(false);
+  const gridRef = useRef<any>(null);
+  const { state } = useSidebar();
 
   // Load modules on component mount
   useEffect(() => {
@@ -35,6 +38,36 @@ const GridExample = () => {
       })
       .catch(console.error);
   }, []);
+
+  // Handle smooth resizing when sidebar state changes
+  // const handleResize = useCallback(() => {
+  //   if (gridRef.current?.api) {
+  //     // run in a loop for 160ms
+  //     for (let i = 0; i < 160; i++) {
+  //       setTimeout(() => {
+  //         console.log('resizing');
+  //         gridRef.current?.api?.sizeColumnsToFit();
+  //       }, 1);
+  //     }
+  //   }
+  // }, []);
+
+  // // Trigger resize when sidebar state changes
+  // useEffect(() => {
+  //   handleResize();
+  // }, [state, handleResize]);
+
+  // Also handle window resize events
+  // useEffect(() => {
+  //   const handleWindowResize = () => {
+  //     if (gridRef.current?.api) {
+  //       gridRef.current.api.sizeColumnsToFit();
+  //     }
+  //   };
+
+  //   window.addEventListener('resize', handleWindowResize);
+  //   return () => window.removeEventListener('resize', handleWindowResize);
+  // }, []);
 
   // Cache for storing fetched row data
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
@@ -59,27 +92,26 @@ const GridExample = () => {
         }
       },
       maxWidth: 100,
-      sortable: true,
     },
-    { field: 'name', minWidth: 150, sortable: true, filter: true },
+    { field: 'name' },
     {
       field: 'workspace_id',
       sortable: true,
     },
-    { field: 'template_id', minWidth: 150, sortable: true, filter: true },
-    { field: 'spot_id', sortable: true, filter: true },
-    { field: 'team_id', minWidth: 150, sortable: true, filter: true },
-    { field: 'status_id', minWidth: 150, sortable: true, filter: true },
-    { field: 'response_date', sortable: true, filter: true },
-    { field: 'resolution_date', sortable: true, filter: true },
-    { field: 'work_duration', sortable: true, filter: true },
-    { field: 'pause_duration', sortable: true, filter: true },
+    { field: 'template_id' },
+    { field: 'spot_id' },
+    { field: 'team_id' },
+    { field: 'status_id' },
+    { field: 'response_date' },
+    { field: 'resolution_date' },
+    { field: 'work_duration' },
+    { field: 'pause_duration' },
   ]);
   const defaultColDef = useMemo(() => {
     return {
-      flex: 1,
       minWidth: 100,
-      sortable: false,
+      sortable: true,
+      filter: true,
     };
   }, []);
 
@@ -133,6 +165,11 @@ const GridExample = () => {
         getRows,
       };
       params.api.setGridOption('datasource', dataSource);
+      
+      // Ensure columns fit when grid is first ready
+      if (params.api) {
+        params.api.sizeColumnsToFit();
+      }
     },
     [getRows]
   );
@@ -157,6 +194,7 @@ const GridExample = () => {
       <div style={gridStyle}>
         <Suspense fallback={<div>Loading AgGridReact...</div>}>
           <AgGridReact
+            ref={gridRef}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             rowBuffer={50}
@@ -169,6 +207,7 @@ const GridExample = () => {
             onGridReady={onGridReady}
             animateRows={true}
             getRowId={(params: any) => String(params.data.id)}
+            suppressColumnVirtualisation={true}
           />
         </Suspense>
       </div>

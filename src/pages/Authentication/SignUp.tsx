@@ -97,21 +97,19 @@ const SignUp: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
-      {/* <Breadcrumb pageName="Sign Up" /> */}
-
-      <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 bg-background">
+      <div className="rounded-lg border border-border bg-card shadow-lg dark:shadow-xl max-w-6xl w-full">
         <div className="flex flex-wrap items-center">
           <div className="hidden w-full xl:block xl:w-1/2">
-            <div className="py-17.5 px-26 text-center">
-              <Link className="mb-5.5 inline-block" to="/">
+            <div className="py-16 px-12 text-center">
+              <Link className="mb-8 inline-block" to="/">
                 <WhagonsTitle />
               </Link>
-              <p className="2xl:px-20">
+              <p className="text-muted-foreground 2xl:px-20">
                 Welcome to Whagons - Your workspace management platform.
               </p>
 
-              <span className="mt-15 inline-block">
+              <span className="mt-8 inline-block">
                 <svg
                   width="350"
                   height="350"
@@ -236,15 +234,15 @@ const SignUp: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full border-stroke dark:border-strokedark xl:w-1/2 xl:border-l-2">
-            <div className="w-full p-4 sm:p-12.5 xl:p-17.5">
-              <span className="mb-1.5 block font-medium">Start for free</span>
-              <h2 className="mb-9 text-2xl font-bold text-black dark:text-white sm:text-title-xl2">
+          <div className="w-full border-l border-border xl:w-1/2">
+            <div className="w-full p-8 sm:p-12 xl:p-16">
+              <span className="mb-2 block font-medium text-muted-foreground">Start for free</span>
+              <h2 className="mb-9 text-2xl font-bold text-foreground sm:text-3xl">
                 Sign Up to Whagons
               </h2>
 
               <div className="mb-4">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
+                <label className="mb-2.5 block font-medium text-foreground">
                   Email
                 </label>
                 <div className="relative">
@@ -252,10 +250,10 @@ const SignUp: React.FC = () => {
                     type="email"
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -276,7 +274,7 @@ const SignUp: React.FC = () => {
               </div>
 
               <div className="mb-4">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
+                <label className="mb-2.5 block font-medium text-foreground">
                   Password
                 </label>
                 <div className="relative">
@@ -284,10 +282,10 @@ const SignUp: React.FC = () => {
                     type="password"
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -312,18 +310,18 @@ const SignUp: React.FC = () => {
               </div>
 
               <div className="mb-6">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
-                  Re-type Password
+                <label className="mb-2.5 block font-medium text-foreground">
+                  Confirm Password
                 </label>
                 <div className="relative">
                   <input
-                    onChange={(e) => setConfirmPassword(e.target.value)}
                     type="password"
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter your password"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -348,17 +346,17 @@ const SignUp: React.FC = () => {
               </div>
 
               <div className="mb-5">
-                <input
-                  onClick={() => handleEmailSignUp()}
-                  type="submit"
-                  value="Create account"
-                  className="w-full cursor-pointer rounded-lg border border-primary bg-primary p-4 text-white transition hover:bg-opacity-90"
-                />
+                <button
+                  onClick={handleEmailSignUp}
+                  className="w-full cursor-pointer rounded-lg border border-primary bg-primary py-4 px-4 text-primary-foreground font-medium transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  Create account
+                </button>
               </div>
 
               <button
-                className="flex w-full items-center justify-center gap-3.5 rounded-lg border border-stroke bg-gray p-4 hover:bg-opacity-50 dark:border-strokedark dark:bg-meta-4 dark:hover:bg-opacity-50"
-                onClick={() => handleGoogleSignUp()}
+                className="flex w-full items-center justify-center gap-3.5 rounded-lg border border-border bg-secondary py-4 px-4 text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onClick={handleGoogleSignUp}
               >
                 <span>
                   <svg
@@ -397,9 +395,9 @@ const SignUp: React.FC = () => {
               </button>
 
               <div className="mt-6 text-center">
-                <p>
+                <p className="text-muted-foreground">
                   Already have an account?{' '}
-                  <Link to="/auth/signin" className="text-primary">
+                  <Link to="/auth/signin" className="text-primary hover:text-primary/80 font-medium">
                     Sign in
                   </Link>
                 </p>

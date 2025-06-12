@@ -9,7 +9,7 @@ import { ThemeProvider } from '@/hooks/theme-provider';
 import React, { ReactNode, useEffect, useState } from 'react';
 
 // Define sidebar width constants to keep them in sync
-const CUSTOM_SIDEBAR_WIDTH = 18;
+const CUSTOM_SIDEBAR_WIDTH = 15;
 const CUSTOM_SIDEBAR_WIDTH_MOBILE = CUSTOM_SIDEBAR_WIDTH;
 
 const MainContent = ({ children }: { children: ReactNode }) => {
@@ -19,7 +19,7 @@ const MainContent = ({ children }: { children: ReactNode }) => {
       className="flex-1 flex flex-col h-full overflow-auto"
       style={{ 
         // Match the margin to the custom sidebar width
-        transition: 'margin-left 0.2s linear',
+        transition: 'margin-left 0.15s ease-out',
         height: '100%'
       }}
     >

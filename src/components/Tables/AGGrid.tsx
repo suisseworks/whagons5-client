@@ -1,6 +1,6 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { Input } from '../ui/input';
 import { fetchTasks } from '@/store/reducers/tasksSlice';
@@ -8,6 +8,7 @@ import { useDispatch } from 'react-redux';
 import { RootState } from '@/store';
 import { useSelector } from 'react-redux';
 import { Task } from '@/store/reducers/tasksSlice';
+import { useSidebar } from '@/components/ui/sidebar';
 // main.tsx or root file
 
 // Register all Community features
@@ -18,6 +19,8 @@ function AGGrid() {
   const dispatch = useDispatch();
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const [rowData, setRowData] = useState(tasks);
+  const gridRef = useRef<AgGridReact>(null);
+  const { state } = useSidebar();
 
   // Explicitly define column types
   const [colDefs] = useState<ColDef[]>([
@@ -34,11 +37,37 @@ function AGGrid() {
     { field: 'pause_duration' },
   ]);
 
+  // Handle smooth resizing when sidebar state changes
+  const handleResize = useCallback(() => {
+    if (gridRef.current?.api) {
+      // Small delay to allow sidebar animation to complete
+      setTimeout(() => {
+        gridRef.current?.api?.sizeColumnsToFit();
+      }, 160); // Slightly longer than the 150ms sidebar animation
+    }
+  }, []);
 
   useEffect(() => {
     dispatch(fetchTasks() as any);
     console.log(tasks)
   }, [dispatch]);
+
+  // Trigger resize when sidebar state changes
+  useEffect(() => {
+    handleResize();
+  }, [state, handleResize]);
+
+  // Also handle window resize events
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (gridRef.current?.api) {
+        gridRef.current.api.sizeColumnsToFit();
+      }
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, []);
 
   const handleSearch = (value: string) => {
     const lowerCaseValue = value.toLowerCase();
@@ -56,6 +85,13 @@ function AGGrid() {
     }
   };
 
+  const onGridReady = useCallback(() => {
+    // Ensure columns fit when grid is first ready
+    if (gridRef.current?.api) {
+      gridRef.current.api.sizeColumnsToFit();
+    }
+  }, []);
+
   return (
     <div className='ag-theme-quartz h-full w-full'>
       <Input
@@ -66,8 +102,12 @@ function AGGrid() {
         }}
       />
       <AgGridReact
+        ref={gridRef}
         rowData={rowData}
         columnDefs={colDefs}
+        onGridReady={onGridReady}
+        suppressColumnVirtualisation={true}
+        animateRows={true}
       />
     </div>
   );

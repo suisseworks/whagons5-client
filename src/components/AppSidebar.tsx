@@ -14,8 +14,6 @@ import {
 } from '@/components/ui/sidebar';
 import { Workspace, workspacesSlice } from '@/store/reducers/workspacesSlice';
 import {
-  Home,
-  LayoutDashboard,
   Settings,
   User,
   Users,
@@ -27,24 +25,13 @@ import { Link, useLocation } from 'react-router-dom';
 import { AppDispatch, RootState } from '@/store';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import WhagonsTitle from '@/assets/WhagonsTitle';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+import WhagonsCheck from '@/assets/WhagonsCheck';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -96,7 +83,10 @@ export function AppSidebar() {
         <div
           className='flex justify-center items-center pt-3 pr-3'
         >
-          <WhagonsTitle />
+          <WhagonsCheck width={45} height={21} color="#27C1A7" />
+          <div className='text-xl pl-2 font-semibold text-[#27C1A7]' style={{ fontFamily: 'Montserrat' }}>
+            Whagons
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -120,7 +110,7 @@ export function AppSidebar() {
                     Workspaces
                     <CollapsibleTrigger asChild>
                       <span className="collapsible-trigger flex items-center ml-1 p-0 bg-transparent border-0 outline-none focus:ring-0">
-                        <ChevronDown className="transition-transform group-data-[state=open]/collapsible:rotate-180 w-4 h-4" />
+                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4" />
                       </span>
                     </CollapsibleTrigger>
                   </button>
@@ -160,7 +150,7 @@ export function AppSidebar() {
             Management
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="text-gray-700">
+            <SidebarMenu>
               <SidebarMenuItem className="pt-1 pb-1">
                 <SidebarMenuButton
                   asChild
@@ -171,19 +161,6 @@ export function AppSidebar() {
                   <Link to="/users">
                     <Users size={20} className="w-5! h-5!" />
                     <span>Users</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem className="pt-1 pb-1">
-                <SidebarMenuButton
-                  asChild
-                  tooltip="Profile"
-                  isActive={pathname === '/profile'}
-                  className="h-10"
-                >
-                  <Link to="/profile">
-                    <User size={20} className="w-5! h-5!" />
-                    <span>Profile</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
