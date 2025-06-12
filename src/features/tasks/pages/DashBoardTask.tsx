@@ -1,16 +1,18 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList } from 'lucide-react';
 import api from '@/api/whagonsApi';
 import GridExample from '@/components/Tables/AGGridExample';
 
 export const DashBoardTask = () => {
+  const [activeTab, setActiveTab] = useState('grid');
   // State to store the fetched data
   const [data, setData] = useState(null);
 
   // State to handle loading state
   const [loading, setLoading] = useState(true);
+
+  const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
 
   // Fetch data on component mount
   useEffect(() => {
@@ -38,7 +40,7 @@ export const DashBoardTask = () => {
   }
 
   return (
-    <Tabs defaultValue="grid" className="w-full h-full">
+    <Tabs defaultValue="grid" className="w-full h-full" onValueChange={setActiveTab} value={activeTab}>
       <TabsList
         className='w-50 h-15'
       >
@@ -51,10 +53,12 @@ export const DashBoardTask = () => {
         </TabsTrigger>
       </TabsList>
       <TabsContent
+        forceMount
         className='h-full'
-        value="grid">
-        {/* <AGGrid /> */}
-        <GridExample />
+        value="grid"
+        style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
+      >
+        <GridExample rowCache={rowCache} />
       </TabsContent>
       <TabsContent value="list">
         <div>What's good?</div>

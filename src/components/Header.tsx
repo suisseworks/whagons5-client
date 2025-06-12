@@ -34,6 +34,13 @@ function Header() {
     const [imageError, setImageError] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
+    useEffect(() => {
+        setUserData(null);
+        setImageUrl('');
+        setImageError(false);
+        setIsLoading(false);
+    }, [firebaseUser?.uid]);
+
     // Fetch user data from API
     const fetchUserData = useCallback(async () => {
         if (!firebaseUser) return;
@@ -143,16 +150,6 @@ function Header() {
         }
     }, [firebaseUser, fetchUserData]);
 
-    // Set up polling to check for profile updates
-    useEffect(() => {
-        if (!firebaseUser) return;
-
-        const interval = setInterval(() => {
-            fetchUserData();
-        }, 30000); // Check every 30 seconds
-
-        return () => clearInterval(interval);
-    }, [firebaseUser, fetchUserData]);
 
     // Listen for storage events to update when profile is changed in another tab
     useEffect(() => {

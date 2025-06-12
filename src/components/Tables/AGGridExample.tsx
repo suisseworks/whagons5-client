@@ -23,7 +23,7 @@ const loadRequiredModules = async () => {
   ]);
 };
 
-const GridExample = () => {
+const GridExample = ({ rowCache }: { rowCache: React.MutableRefObject<Map<string, { rows: any[]; rowCount: number }>> }) => {
   const containerStyle = useMemo(() => ({ width: '100%', height: '100%' }), []);
   const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
   const [modulesLoaded, setModulesLoaded] = useState(false);
@@ -39,38 +39,11 @@ const GridExample = () => {
       .catch(console.error);
   }, []);
 
-  // Handle smooth resizing when sidebar state changes
-  // const handleResize = useCallback(() => {
-  //   if (gridRef.current?.api) {
-  //     // run in a loop for 160ms
-  //     for (let i = 0; i < 160; i++) {
-  //       setTimeout(() => {
-  //         console.log('resizing');
-  //         gridRef.current?.api?.sizeColumnsToFit();
-  //       }, 1);
-  //     }
-  //   }
-  // }, []);
 
-  // // Trigger resize when sidebar state changes
-  // useEffect(() => {
-  //   handleResize();
-  // }, [state, handleResize]);
 
-  // Also handle window resize events
-  // useEffect(() => {
-  //   const handleWindowResize = () => {
-  //     if (gridRef.current?.api) {
-  //       gridRef.current.api.sizeColumnsToFit();
-  //     }
-  //   };
-
-  //   window.addEventListener('resize', handleWindowResize);
-  //   return () => window.removeEventListener('resize', handleWindowResize);
-  // }, []);
 
   // Cache for storing fetched row data
-  const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
+  // const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
 
   // Generate cache key based on request parameters
   const getCacheKey = useCallback((params: any) => {
@@ -165,10 +138,7 @@ const GridExample = () => {
       };
       params.api.setGridOption('datasource', dataSource);
       
-      // Ensure columns fit when grid is first ready
-      if (params.api) {
-        params.api.sizeColumnsToFit();
-      }
+  
     },
     [getRows]
   );
