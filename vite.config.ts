@@ -17,7 +17,7 @@ export default defineConfig({
     }),
   ],
   preview: {
-    allowedHosts: ['whagons5.gabrielmalek.com'],
+    allowedHosts: ['whagons5.whagons.com'],
   },
   resolve: {
     alias: {
