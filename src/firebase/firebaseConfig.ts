@@ -10,9 +10,7 @@ const firebaseConfig = {
   projectId: "whagons5",
   storageBucket: "whagons5.firebasestorage.app",
   messagingSenderId: "333755572903",
-  appId: "1:333755572903:web:abc24649ac86d892d53182",
-
-  measurementId: "G-PSVYP02YGW"
+  appId: "1:333755572903:web:abc24649ac86d892d53182"
 };
 
 // Initialize Firebase

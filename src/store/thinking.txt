@@ -1,0 +1,27 @@
+So.
+
+Redux keeps global state and persistas that state in IndexDB.
+
+How do we want this to work. 
+Long term the table recieves update from a websockets connection.
+
+Short term table must display sort, search, filter, etc correctly over the entire database.
+
+We only fetch a few items at a time, but we keep local state, escentially filtering, sorting, searching all trigger instant response.
+At the same time the should trigger a fetch request over the needed data and then merge all the missing id's into the existing redux state.
+
+Long term we would only merge changes maybe??
+
+Ether way default fetch is 15. Let's make this work without websockets first, since the least we depend on ws probably the better. 
+
+Okay. So for now we can do an instant sort but then we re-update state asynchronously from fetch request. 
+
+Where does the fetch happen?
+
+Okay let's go over workflow. 
+
+I input a search term/filter. This changes the state via createEffect. However this filters, and searches over entire redux state not just what's on the table.
+There is also an async call happening that updates the state later. This call must have filter params. So where does this logic go, we don't want this in the table element.
+
+Do we want a redux middleware?
+

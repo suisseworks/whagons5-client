@@ -6,8 +6,12 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   UserCredential,
-  signOut
+  signOut,
+  linkWithCredential,
+  sendEmailVerification
 } from 'firebase/auth';
+
+const googleProvider = new GoogleAuthProvider();
 
 
 // Google Sign-In
@@ -23,30 +27,43 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
   }
 };
 
-// Email Sign-In
-export const signInWithEmail = async (
-  email: string,
-  password: string
-): Promise<UserCredential> => {
+// Sign in with email and password, check verification status
+export const signInWithEmail = async (email: string, password: string) => {
   try {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return result;
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    if (!user.emailVerified) {
+      throw new Error('Please verify your email before logging in.');
+    }
+    return userCredential;
   } catch (error) {
-    console.error('Email Sign-In Error:', error);
     throw error;
   }
 };
 
-// Email Sign-Up
-export const signUpWithEmail = async (
-  email: string,
-  password: string
-): Promise<UserCredential> => {
+// Sign up with email and password, and send verification email
+export const signUpWithEmail = async (email: string, password: string) => {
   try {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    return result;
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    await sendEmailVerification(user);
+    return userCredential;
   } catch (error) {
-    console.error('Email Sign-Up Error:', error);
+    throw error;
+  }
+};
+
+// Link Google provider to an existing user
+export const linkGoogleProvider = async (credential: any) => {
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      await linkWithCredential(user, credential);
+      console.log('Google provider linked successfully');
+    } else {
+      throw new Error('No user is currently signed in');
+    }
+  } catch (error) {
     throw error;
   }
 };

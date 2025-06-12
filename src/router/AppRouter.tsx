@@ -1,10 +1,11 @@
-import { Route, Routes } from 'react-router';
+import { Route, Routes } from 'react-router-dom';
 
-import { PrivateRoute, PublicRoute } from './guard';
+import { PrivateRoute, PublicRoute, AuthRoute } from './guard';
 // import { LoginPage } from '../features/auth';
 import { HomeRoutes } from './HomeRouter';
 import SignIn from '../pages/Authentication/SignIn';
 import SignUp from '../pages/Authentication/SignUp';
+import OnboardingRoute from './OnboardingRoute';
 
 export const AppRouter = () => {
   return (
@@ -23,6 +24,15 @@ export const AppRouter = () => {
           <PublicRoute>
             <SignUp />
           </PublicRoute>
+        }
+      />
+
+      <Route
+        path="/onboarding"
+        element={
+          <AuthRoute>
+            <OnboardingRoute />
+          </AuthRoute>
         }
       />
 

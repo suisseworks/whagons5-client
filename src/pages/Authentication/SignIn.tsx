@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import LogoDark from '../../images/logo/logo-dark.svg';
-import Logo from '../../images/logo/logo.svg';
-import { signInWithGoogle, signUpWithEmail } from './auth';
-import axios from 'axios';
-
-// const API_URL = "https://localhost:8001/api";
-const API_URL = 'http://localhost:8000/api';
+import { signInWithGoogle, signInWithEmail, linkGoogleProvider, logout } from './auth';
+import { api, updateAuthToken } from '@/api';
+import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
+import WhagonsTitle from '@/assets/WhagonsTitle';
+import { InitializationStage } from '@/types/user';
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -19,7 +17,7 @@ const SignIn: React.FC = () => {
     if (!regex.test(password)) {
       //toast error
       alert(
-        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number',
+        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
       );
       return false;
     }
@@ -27,38 +25,64 @@ const SignIn: React.FC = () => {
     return true;
   }
 
+  async function backendLogin(idToken: string) {
+    try {
+      console.log('idToken', idToken);
+
+      const response = await api.post(`/login`,
+        {
+          "token": idToken
+        },
+      );
+
+      if (response.status === 200) {
+        console.log('Successfully logged in and sent idToken to backend');
+        updateAuthToken(response.data.token);
+        
+        // Check initialization stage and redirect accordingly
+        const user = response.data.user;
+        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
+          navigate('/onboarding');
+        } else {
+          navigate('/');
+        }
+        return true;
+      } else {
+        console.error('Login failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
+  }
+
   const handleGoogleSignin = async () => {
     try {
       const userCredential = await signInWithGoogle();
       const user = userCredential.user;
-
-      // Get the ID token
       const idToken = await user.getIdToken();
-
-      console.log('id token', idToken);
-
-      // Send the ID token to your backend (using fetch or axios)
-      const response = await axios.post(
-        `${API_URL}/session`,
-        { idToken },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          withCredentials: true,
-        },
-      );
-
-      // if (response.ok) {
-      //   console.log('Successfully logged in and sent idToken to backend');
-      // } else {
-      //   console.error('Login failed');
-      // }
-    } catch (error) {
-      console.error(error);
+      const loginSuccess = await backendLogin(idToken);
+      if (!loginSuccess) {
+        alert('Login failed. Please try again.');
+      }
+    } catch (error: any) {
+      const authError = error as AuthError;
+      if (authError.code === AuthErrorCodes.CREDENTIAL_ALREADY_IN_USE || authError.code === 'auth/account-exists-with-different-credential') {
+        // An account with this email exists with a different provider
+        const email = authError.customData?.email;
+        if (email) {
+          alert('An account with this email already exists. Please sign in with your email and password first, then link your Google account.');
+          // Optionally, prompt the user to sign in with email/password and then link Google
+          navigate('/auth/signin', { state: { email, linkGoogle: true } });
+        } else {
+          alert('Google sign-in failed. Please try again.');
+        }
+      } else {
+        console.error('Google sign-in error:', error);
+        alert('Google sign-in failed. Please try again.');
+      }
     }
-    navigate('/');
-    //re-route to confirm email screen then login from email
   };
 
   const handleEmailSignin = async () => {
@@ -66,52 +90,68 @@ const SignIn: React.FC = () => {
       if (!(await checkPassword())) {
         return;
       }
-      const userCredential = await signUpWithEmail(email, password);
+      const userCredential = await signInWithEmail(email, password);
       const user = userCredential.user;
 
       // Get the ID token
       const idToken = await user.getIdToken();
 
-      // Send the ID token to your backend (using fetch or axios)
-      const response = await fetch(`${API_URL}/session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (response.ok) {
-        console.log('Successfully logged in and sent idToken to backend');
-      } else {
-        console.error('Login failed');
+      const loginSuccess = await backendLogin(idToken);
+      if (!loginSuccess) {
+        // Handle login failure - you might want to show an error message to the user
+        alert('Login failed. Please try again.');
       }
-      navigate('/');
-      //re-route to dashboard
     } catch (error) {
-      console.error(error);
+      console.error('Email sign-in error:', error);
+      alert('Email sign-in failed. Please try again.');
+      await logout();
+      navigate('/auth/signin');
     }
   };
 
+  // Handle linking Google account after email sign-in (if redirected from Google sign-in)
+  const handleGoogleLink = async () => {
+    try {
+      const userCredential = await signInWithGoogle();
+      const credential = GoogleAuthProvider.credentialFromResult(userCredential);
+      if (credential) {
+        await linkGoogleProvider(credential);
+        const idToken = await userCredential.user.getIdToken();
+        const loginSuccess = await backendLogin(idToken);
+        if (!loginSuccess) {
+          alert('Failed to link Google account. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Google linking error:', error);
+      alert('Failed to link Google account. Please try again.');
+    }
+  };
+
+
+  useEffect(() => {
+    const { linkGoogle } = (navigate as any).location?.state || {};
+    if (linkGoogle) {
+      handleGoogleLink();
+    }
+  }, [navigate]);
+
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-      {/* <Breadcrumb pageName="Sign In" /> */}
-      <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+    <div className="flex items-center justify-center min-h-screen px-4 py-6 sm:px-6 lg:px-8 bg-background">
+      <div className="rounded-lg border border-border bg-card shadow-lg dark:shadow-xl max-w-6xl w-full">
         <div className="flex flex-wrap items-center">
           <div className="hidden w-full xl:block xl:w-1/2">
-            <div className="py-17.5 px-26 text-center">
-              <Link className="mb-5.5 inline-block" to="/">
-                <img className="hidden dark:block" src={Logo} alt="Logo" />
-                <img className="dark:hidden" src={LogoDark} alt="Logo" />
+            <div className="py-16 px-12 text-center">
+              <Link className="mb-8 inline-block" to="/">
+                <WhagonsTitle />
               </Link>
 
-              <p className="2xl:px-20">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                suspendisse.
+              <p className="text-muted-foreground 2xl:px-20">
+                Welcome to Whagons - Your workspace management platform.
               </p>
 
-              <span className="mt-15 inline-block">
-                <svg
+              <span className="mt-8 inline-block">
+              <svg
                   width="350"
                   height="350"
                   viewBox="0 0 350 350"
@@ -144,7 +184,7 @@ const SignIn: React.FC = () => {
                   />
                   <path
                     d="M170.862 133.966C177.192 133.966 182.325 128.838 182.325 122.512C182.325 116.186 177.192 111.057 170.862 111.057C164.531 111.057 159.398 116.186 159.398 122.512C159.398 128.838 164.531 133.966 170.862 133.966Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M190.017 158.289H123.208C122.572 158.288 121.962 158.035 121.512 157.586C121.062 157.137 120.809 156.527 120.809 155.892V89.1315C120.809 88.496 121.062 87.8866 121.512 87.4372C121.962 86.9878 122.572 86.735 123.208 86.7343H190.017C190.653 86.735 191.263 86.9878 191.713 87.4372C192.163 87.8866 192.416 88.496 192.416 89.1315V155.892C192.416 156.527 192.163 157.137 191.713 157.586C191.263 158.035 190.653 158.288 190.017 158.289ZM123.208 87.6937C122.826 87.6941 122.46 87.8457 122.19 88.1154C121.92 88.385 121.769 88.7507 121.768 89.132V155.892C121.769 156.274 121.92 156.639 122.19 156.909C122.46 157.178 122.826 157.33 123.208 157.33H190.017C190.399 157.33 190.765 157.178 191.035 156.909C191.304 156.639 191.456 156.274 191.457 155.892V89.132C191.456 88.7507 191.304 88.385 191.035 88.1154C190.765 87.8457 190.399 87.6941 190.017 87.6937H123.208Z"
@@ -156,7 +196,7 @@ const SignIn: React.FC = () => {
                   />
                   <path
                     d="M105.705 203.477C107.492 203.477 108.941 202.029 108.941 200.243C108.941 198.457 107.492 197.01 105.705 197.01C103.918 197.01 102.469 198.457 102.469 200.243C102.469 202.029 103.918 203.477 105.705 203.477Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M204.934 241.797H102.469V242.757H204.934V241.797Z"
@@ -164,27 +204,27 @@ const SignIn: React.FC = () => {
                   />
                   <path
                     d="M105.705 235.811C107.492 235.811 108.941 234.363 108.941 232.577C108.941 230.791 107.492 229.344 105.705 229.344C103.918 229.344 102.469 230.791 102.469 232.577C102.469 234.363 103.918 235.811 105.705 235.811Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M203.062 278.617H170.68C170.121 278.617 169.584 278.394 169.189 277.999C168.793 277.604 168.571 277.068 168.57 276.509V265.168C168.571 264.609 168.793 264.073 169.189 263.678C169.584 263.283 170.121 263.06 170.68 263.06H203.062C203.621 263.06 204.158 263.283 204.553 263.678C204.949 264.073 205.171 264.609 205.172 265.168V276.509C205.171 277.068 204.949 277.604 204.553 277.999C204.158 278.394 203.621 278.617 203.062 278.617Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M116.263 203.477C118.05 203.477 119.499 202.029 119.499 200.243C119.499 198.457 118.05 197.01 116.263 197.01C114.476 197.01 113.027 198.457 113.027 200.243C113.027 202.029 114.476 203.477 116.263 203.477Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M126.818 203.477C128.605 203.477 130.054 202.029 130.054 200.243C130.054 198.457 128.605 197.01 126.818 197.01C125.031 197.01 123.582 198.457 123.582 200.243C123.582 202.029 125.031 203.477 126.818 203.477Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M116.263 235.811C118.05 235.811 119.499 234.363 119.499 232.577C119.499 230.791 118.05 229.344 116.263 229.344C114.476 229.344 113.027 230.791 113.027 232.577C113.027 234.363 114.476 235.811 116.263 235.811Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M126.818 235.811C128.605 235.811 130.054 234.363 130.054 232.577C130.054 230.791 128.605 229.344 126.818 229.344C125.031 229.344 123.582 230.791 123.582 232.577C123.582 234.363 125.031 235.811 126.818 235.811Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M264.742 229.309C264.972 229.414 265.193 229.537 265.404 229.678L286.432 220.709L287.183 215.174L295.585 215.123L295.089 227.818L267.334 235.153C267.275 235.345 267.205 235.535 267.124 235.719C266.722 236.574 266.077 237.292 265.269 237.783C264.46 238.273 263.525 238.514 262.58 238.475C261.636 238.436 260.723 238.119 259.958 237.563C259.193 237.008 258.61 236.239 258.28 235.353C257.951 234.467 257.892 233.504 258.108 232.584C258.325 231.664 258.809 230.829 259.5 230.183C260.19 229.538 261.056 229.11 261.989 228.955C262.922 228.799 263.879 228.922 264.742 229.309Z"
@@ -216,7 +256,7 @@ const SignIn: React.FC = () => {
                   />
                   <path
                     d="M292.933 196.201C290.924 197.395 289.721 199.588 289.031 201.821C287.754 205.953 286.985 210.226 286.741 214.545L286.012 227.475L276.984 261.755C284.809 268.37 289.322 266.867 299.855 261.455C310.387 256.044 311.591 263.26 311.591 263.26L313.697 234.092L316.706 202.219C316.031 201.407 315.266 200.672 314.427 200.03C311.645 197.868 308.409 196.366 304.962 195.636C301.516 194.906 297.948 194.967 294.528 195.815L292.933 196.201Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M290.001 236.232C290.244 236.324 290.479 236.434 290.704 236.562L311.497 226.163L311.842 220.529L320.419 219.938L320.878 232.781L293.092 241.963C292.865 242.935 292.347 243.816 291.608 244.487C290.868 245.158 289.941 245.588 288.951 245.72C287.96 245.852 286.953 245.68 286.063 245.226C285.173 244.772 284.442 244.058 283.968 243.179C283.494 242.301 283.299 241.298 283.409 240.306C283.519 239.313 283.928 238.378 284.583 237.624C285.238 236.869 286.107 236.332 287.075 236.084C288.043 235.835 289.063 235.887 290.001 236.232Z"
@@ -224,7 +264,7 @@ const SignIn: React.FC = () => {
                   />
                   <path
                     d="M316.556 202.365C321.672 204.17 322.573 223.716 322.573 223.716C316.554 220.409 309.332 225.821 309.332 225.821C309.332 225.821 307.827 220.709 306.022 214.094C305.477 212.233 305.412 210.265 305.832 208.372C306.253 206.479 307.147 204.724 308.429 203.269C308.429 203.269 311.44 200.56 316.556 202.365Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M310.566 183.213C309.132 182.066 307.174 184.151 307.174 184.151L306.026 173.828C306.026 173.828 298.853 174.687 294.261 173.542C289.67 172.396 288.953 177.7 288.953 177.7C288.716 175.557 288.668 173.399 288.81 171.248C289.096 168.667 292.827 166.087 299.427 164.366C306.026 162.646 309.47 170.101 309.47 170.101C314.061 172.395 312.001 184.36 310.566 183.213Z"
@@ -235,16 +275,15 @@ const SignIn: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full border-stroke dark:border-strokedark xl:w-1/2 xl:border-l-2">
-            <div className="w-full p-4 sm:p-12.5 xl:p-17.5">
-              <span className="mb-1.5 block font-medium">Start for free</span>
-              <h2 className="mb-9 text-2xl font-bold text-black dark:text-white sm:text-title-xl2">
-                Sign In to TailAdmin
+          <div className="w-full border-l border-border xl:w-1/2">
+            <div className="w-full p-8 sm:p-12 xl:p-16">
+              <span className="mb-2 block font-medium text-muted-foreground">Start for free</span>
+              <h2 className="mb-9 text-2xl font-bold text-foreground sm:text-3xl">
+                Sign In to Whagons
               </h2>
 
-              {/* <form> */}
               <div className="mb-4">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
+                <label className="mb-2.5 block font-medium text-foreground">
                   Email
                 </label>
                 <div className="relative">
@@ -252,10 +291,10 @@ const SignIn: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     type="email"
                     placeholder="Enter your email"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -276,7 +315,7 @@ const SignIn: React.FC = () => {
               </div>
 
               <div className="mb-6">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
+                <label className="mb-2.5 block font-medium text-foreground">
                   Password
                 </label>
                 <div className="relative">
@@ -284,10 +323,10 @@ const SignIn: React.FC = () => {
                     type="password"
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="6+ Characters, 1 Capital letter"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -312,19 +351,17 @@ const SignIn: React.FC = () => {
               </div>
 
               <div className="mb-5">
-                <input
-                  onClick={() => {
-                    handleEmailSignin();
-                  }}
-                  type="submit"
-                  value="Sign In"
-                  className="w-full cursor-pointer rounded-lg border border-primary bg-primary p-4 text-white transition hover:bg-opacity-90"
-                />
+                <button
+                  onClick={handleEmailSignin}
+                  className="w-full cursor-pointer rounded-lg border border-primary bg-primary py-4 px-4 text-primary-foreground font-medium transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  Sign In
+                </button>
               </div>
 
               <button
-                className="flex w-full items-center justify-center gap-3.5 rounded-lg border border-stroke bg-gray p-4 hover:bg-opacity-50 dark:border-strokedark dark:bg-meta-4 dark:hover:bg-opacity-50"
-                onClick={() => handleGoogleSignin()}
+                className="flex w-full items-center justify-center gap-3.5 rounded-lg border border-border bg-secondary py-4 px-4 text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onClick={handleGoogleSignin}
               >
                 <span>
                   <svg
@@ -363,14 +400,13 @@ const SignIn: React.FC = () => {
               </button>
 
               <div className="mt-6 text-center">
-                <p>
-                  Don’t have any account?{' '}
-                  <Link to="/auth/signup" className="text-primary">
+                <p className="text-muted-foreground">
+                  Don't have any account?{' '}
+                  <Link to="/auth/signup" className="text-primary hover:text-primary/80 font-medium">
                     Sign Up
                   </Link>
                 </p>
               </div>
-              {/* </form> */}
             </div>
           </div>
         </div>

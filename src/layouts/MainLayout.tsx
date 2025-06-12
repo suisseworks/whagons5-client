@@ -1,40 +1,54 @@
-import React, { useState, ReactNode } from 'react';
-import Header from '../components/Header/index';
-import Sidebar from '../components/Sidebar/index';
+import { AppSidebar } from '@/components/AppSidebar';
+import Header from '@/components/Header';
+import {
+  SidebarProvider,
+  SidebarRail,
+  useSidebar
+} from '@/components/ui/sidebar';
+import { ThemeProvider } from '@/hooks/theme-provider';
+import React, { ReactNode, useEffect, useState } from 'react';
 
-const DefaultLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+// Define sidebar width constants to keep them in sync
+const CUSTOM_SIDEBAR_WIDTH = 15;
+const CUSTOM_SIDEBAR_WIDTH_MOBILE = CUSTOM_SIDEBAR_WIDTH;
 
+const MainContent = ({ children }: { children: ReactNode }) => {
+  
   return (
-    <div className="dark:bg-boxdark-2 dark:text-bodydark">
-      {/* <!-- ===== Page Wrapper Start ===== --> */}
-      <div className="flex h-screen overflow-hidden">
-        {/* <!-- ===== Sidebar Start ===== --> */}
-        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        {/* <!-- ===== Sidebar End ===== --> */}
-
-        {/* <!-- ===== Content Area Start ===== --> */}
-        <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-          {/* <!-- ===== Header Start ===== --> */}
-          <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-          {/* <!-- ===== Header End ===== --> */}
-
-          {/* <!-- ===== Main Content Start ===== --> */}
-          <main>
-            <div 
-            // className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 flex items-center justify-center"
-            className='h-full w-full'
-            >
-              {children}
-            </div>
-          </main>
-          {/* <!-- ===== Main Content End ===== --> */}
-        </div>
-        {/* <!-- ===== Content Area End ===== --> */}
+    <main 
+      className="flex-1 flex flex-col h-full overflow-auto"
+      style={{ 
+        // Match the margin to the custom sidebar width
+        transition: 'margin-left 0.15s ease-out',
+        height: '100%'
+      }}
+    >
+      <Header />
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
+          {children}
       </div>
-      {/* <!-- ===== Page Wrapper End ===== --> */}
-    </div>
+    </main>
   );
 };
 
-export default DefaultLayout;
+const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return (
+    <ThemeProvider>
+      <SidebarProvider 
+      defaultOpen={true}
+      style={{
+        "--sidebar-width": `${CUSTOM_SIDEBAR_WIDTH}rem`,
+        "--sidebar-width-mobile": `${CUSTOM_SIDEBAR_WIDTH_MOBILE}rem`,
+      } as React.CSSProperties}
+      >
+        <div className="flex h-screen w-full overflow-hidden bg-background">
+          <AppSidebar />
+          <SidebarRail />
+          <MainContent>{children}</MainContent>
+        </div>
+      </SidebarProvider>
+    </ThemeProvider>
+  );
+};
+
+export default MainLayout;

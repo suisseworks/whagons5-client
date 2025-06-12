@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import LogoDark from '../../images/logo/logo-dark.svg';
-import Logo from '../../images/logo/logo.svg';
 import { useState } from 'react';
-import { signUpWithEmail, signInWithGoogle } from './auth';
+import { signUpWithEmail, signInWithGoogle, logout } from './auth';
+import WhagonsTitle from '@/assets/WhagonsTitle';
+import { api, updateAuthToken } from '@/api';
+import { InitializationStage } from '@/types/user';
 
 const SignUp: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -31,12 +32,52 @@ const SignUp: React.FC = () => {
     return true;
   }
 
+  async function backendLogin(idToken: string) {
+    try {
+      console.log('idToken', idToken);
+
+      const response = await api.post(`/login`,
+        {
+          "token": idToken
+        },
+      );
+
+      if (response.status === 200) {
+        console.log('Successfully logged in and sent idToken to backend');
+        updateAuthToken(response.data.token);
+        
+        // Check initialization stage and redirect accordingly
+        const user = response.data.user;
+        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
+          navigate('/onboarding');
+          console.log('redirecting to onboarding');
+        } else {
+          console.log('redirecting to home', user, user.initialization_stage);
+          navigate('/');
+        }
+        return true;
+      } else {
+        console.error('Login failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
+  }
+
   const handleGoogleSignUp = async () => {
     try {
-      await signInWithGoogle();
-      navigate('/');
+      const userCredential = await signInWithGoogle();
+      const user = userCredential.user;
+      const idToken = await user.getIdToken();
+      const loginSuccess = await backendLogin(idToken);
+      if (!loginSuccess) {
+        alert('Signup failed. Please try again.');
+      }
     } catch (error) {
       console.error(error);
+      alert('Google signup failed. Please try again.');
     }
   };
 
@@ -46,31 +87,29 @@ const SignUp: React.FC = () => {
         return;
       }
       await signUpWithEmail(email, password);
-      navigate('/');
-      //re-route to dashboard
+      // Sign the user out immediately after signup to prevent auto-login
+      await logout();
+      alert('A verification email has been sent to your email address. Please verify your email before logging in.');
+      navigate('/auth/signin'); // Redirect to sign-in page
     } catch (error) {
-      console.error(error);
+      alert('Email sign-up failed: ' + (error as Error).message);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
-      {/* <Breadcrumb pageName="Sign Up" /> */}
-
-      <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 bg-background">
+      <div className="rounded-lg border border-border bg-card shadow-lg dark:shadow-xl max-w-6xl w-full">
         <div className="flex flex-wrap items-center">
           <div className="hidden w-full xl:block xl:w-1/2">
-            <div className="py-17.5 px-26 text-center">
-              <Link className="mb-5.5 inline-block" to="/">
-                <img className="hidden dark:block" src={Logo} alt="Logo" />
-                <img className="dark:hidden" src={LogoDark} alt="Logo" />
+            <div className="py-16 px-12 text-center">
+              <Link className="mb-8 inline-block" to="/">
+                <WhagonsTitle />
               </Link>
-              <p className="2xl:px-20">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                suspendisse.
+              <p className="text-muted-foreground 2xl:px-20">
+                Welcome to Whagons - Your workspace management platform.
               </p>
 
-              <span className="mt-15 inline-block">
+              <span className="mt-8 inline-block">
                 <svg
                   width="350"
                   height="350"
@@ -104,7 +143,7 @@ const SignUp: React.FC = () => {
                   />
                   <path
                     d="M170.862 133.966C177.192 133.966 182.325 128.838 182.325 122.512C182.325 116.186 177.192 111.057 170.862 111.057C164.531 111.057 159.398 116.186 159.398 122.512C159.398 128.838 164.531 133.966 170.862 133.966Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M190.017 158.289H123.208C122.572 158.288 121.962 158.035 121.512 157.586C121.062 157.137 120.809 156.527 120.809 155.892V89.1315C120.809 88.496 121.062 87.8866 121.512 87.4372C121.962 86.9878 122.572 86.735 123.208 86.7343H190.017C190.653 86.735 191.263 86.9878 191.713 87.4372C192.163 87.8866 192.416 88.496 192.416 89.1315V155.892C192.416 156.527 192.163 157.137 191.713 157.586C191.263 158.035 190.653 158.288 190.017 158.289ZM123.208 87.6937C122.826 87.6941 122.46 87.8457 122.19 88.1154C121.92 88.385 121.769 88.7507 121.768 89.132V155.892C121.769 156.274 121.92 156.639 122.19 156.909C122.46 157.178 122.826 157.33 123.208 157.33H190.017C190.399 157.33 190.765 157.178 191.035 156.909C191.304 156.639 191.456 156.274 191.457 155.892V89.132C191.456 88.7507 191.304 88.385 191.035 88.1154C190.765 87.8457 190.399 87.6941 190.017 87.6937H123.208Z"
@@ -116,7 +155,7 @@ const SignUp: React.FC = () => {
                   />
                   <path
                     d="M105.705 203.477C107.492 203.477 108.941 202.029 108.941 200.243C108.941 198.457 107.492 197.01 105.705 197.01C103.918 197.01 102.469 198.457 102.469 200.243C102.469 202.029 103.918 203.477 105.705 203.477Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M204.934 241.797H102.469V242.757H204.934V241.797Z"
@@ -124,27 +163,27 @@ const SignUp: React.FC = () => {
                   />
                   <path
                     d="M105.705 235.811C107.492 235.811 108.941 234.363 108.941 232.577C108.941 230.791 107.492 229.344 105.705 229.344C103.918 229.344 102.469 230.791 102.469 232.577C102.469 234.363 103.918 235.811 105.705 235.811Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M203.062 278.617H170.68C170.121 278.617 169.584 278.394 169.189 277.999C168.793 277.604 168.571 277.068 168.57 276.509V265.168C168.571 264.609 168.793 264.073 169.189 263.678C169.584 263.283 170.121 263.06 170.68 263.06H203.062C203.621 263.06 204.158 263.283 204.553 263.678C204.949 264.073 205.171 264.609 205.172 265.168V276.509C205.171 277.068 204.949 277.604 204.553 277.999C204.158 278.394 203.621 278.617 203.062 278.617Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M116.263 203.477C118.05 203.477 119.499 202.029 119.499 200.243C119.499 198.457 118.05 197.01 116.263 197.01C114.476 197.01 113.027 198.457 113.027 200.243C113.027 202.029 114.476 203.477 116.263 203.477Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M126.818 203.477C128.605 203.477 130.054 202.029 130.054 200.243C130.054 198.457 128.605 197.01 126.818 197.01C125.031 197.01 123.582 198.457 123.582 200.243C123.582 202.029 125.031 203.477 126.818 203.477Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M116.263 235.811C118.05 235.811 119.499 234.363 119.499 232.577C119.499 230.791 118.05 229.344 116.263 229.344C114.476 229.344 113.027 230.791 113.027 232.577C113.027 234.363 114.476 235.811 116.263 235.811Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M126.818 235.811C128.605 235.811 130.054 234.363 130.054 232.577C130.054 230.791 128.605 229.344 126.818 229.344C125.031 229.344 123.582 230.791 123.582 232.577C123.582 234.363 125.031 235.811 126.818 235.811Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M264.742 229.309C264.972 229.414 265.193 229.537 265.404 229.678L286.432 220.709L287.183 215.174L295.585 215.123L295.089 227.818L267.334 235.153C267.275 235.345 267.205 235.535 267.124 235.719C266.722 236.574 266.077 237.292 265.269 237.783C264.46 238.273 263.525 238.514 262.58 238.475C261.636 238.436 260.723 238.119 259.958 237.563C259.193 237.008 258.61 236.239 258.28 235.353C257.951 234.467 257.892 233.504 258.108 232.584C258.325 231.664 258.809 230.829 259.5 230.183C260.19 229.538 261.056 229.11 261.989 228.955C262.922 228.799 263.879 228.922 264.742 229.309Z"
@@ -176,7 +215,7 @@ const SignUp: React.FC = () => {
                   />
                   <path
                     d="M292.933 196.201C290.924 197.395 289.721 199.588 289.031 201.821C287.754 205.953 286.985 210.226 286.741 214.545L286.012 227.475L276.984 261.755C284.809 268.37 289.322 266.867 299.855 261.455C310.387 256.044 311.591 263.26 311.591 263.26L313.697 234.092L316.706 202.219C316.031 201.407 315.266 200.672 314.427 200.03C311.645 197.868 308.409 196.366 304.962 195.636C301.516 194.906 297.948 194.967 294.528 195.815L292.933 196.201Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M290.001 236.232C290.244 236.324 290.479 236.434 290.704 236.562L311.497 226.163L311.842 220.529L320.419 219.938L320.878 232.781L293.092 241.963C292.865 242.935 292.347 243.816 291.608 244.487C290.868 245.158 289.941 245.588 288.951 245.72C287.96 245.852 286.953 245.68 286.063 245.226C285.173 244.772 284.442 244.058 283.968 243.179C283.494 242.301 283.299 241.298 283.409 240.306C283.519 239.313 283.928 238.378 284.583 237.624C285.238 236.869 286.107 236.332 287.075 236.084C288.043 235.835 289.063 235.887 290.001 236.232Z"
@@ -184,7 +223,7 @@ const SignUp: React.FC = () => {
                   />
                   <path
                     d="M316.556 202.365C321.672 204.17 322.573 223.716 322.573 223.716C316.554 220.409 309.332 225.821 309.332 225.821C309.332 225.821 307.827 220.709 306.022 214.094C305.477 212.233 305.412 210.265 305.832 208.372C306.253 206.479 307.147 204.724 308.429 203.269C308.429 203.269 311.44 200.56 316.556 202.365Z"
-                    fill="#3056D3"
+                    fill="#4DACA8"
                   />
                   <path
                     d="M310.566 183.213C309.132 182.066 307.174 184.151 307.174 184.151L306.026 173.828C306.026 173.828 298.853 174.687 294.261 173.542C289.67 172.396 288.953 177.7 288.953 177.7C288.716 175.557 288.668 173.399 288.81 171.248C289.096 168.667 292.827 166.087 299.427 164.366C306.026 162.646 309.47 170.101 309.47 170.101C314.061 172.395 312.001 184.36 310.566 183.213Z"
@@ -195,51 +234,15 @@ const SignUp: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full border-stroke dark:border-strokedark xl:w-1/2 xl:border-l-2">
-            <div className="w-full p-4 sm:p-12.5 xl:p-17.5">
-              <span className="mb-1.5 block font-medium">Start for free</span>
-              <h2 className="mb-9 text-2xl font-bold text-black dark:text-white sm:text-title-xl2">
-                Sign Up to TailAdmin
+          <div className="w-full border-l border-border xl:w-1/2">
+            <div className="w-full p-8 sm:p-12 xl:p-16">
+              <span className="mb-2 block font-medium text-muted-foreground">Start for free</span>
+              <h2 className="mb-9 text-2xl font-bold text-foreground sm:text-3xl">
+                Sign Up to Whagons
               </h2>
 
-              {/* <form> */}
-              {/* <div className="mb-4">
-                  <label className="mb-2.5 block font-medium text-black dark:text-white">
-                    Name
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Enter your full name"
-                      className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-                    />
-
-                    <span className="absolute right-4 top-4">
-                      <svg
-                        className="fill-current"
-                        width="22"
-                        height="22"
-                        viewBox="0 0 22 22"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g opacity="0.5">
-                          <path
-                            d="M11.0008 9.52185C13.5445 9.52185 15.607 7.5281 15.607 5.0531C15.607 2.5781 13.5445 0.584351 11.0008 0.584351C8.45703 0.584351 6.39453 2.5781 6.39453 5.0531C6.39453 7.5281 8.45703 9.52185 11.0008 9.52185ZM11.0008 2.1656C12.6852 2.1656 14.0602 3.47185 14.0602 5.08748C14.0602 6.7031 12.6852 8.00935 11.0008 8.00935C9.31641 8.00935 7.94141 6.7031 7.94141 5.08748C7.94141 3.47185 9.31641 2.1656 11.0008 2.1656Z"
-                            fill=""
-                          />
-                          <path
-                            d="M13.2352 11.0687H8.76641C5.08828 11.0687 2.09766 14.0937 2.09766 17.7719V20.625C2.09766 21.0375 2.44141 21.4156 2.88828 21.4156C3.33516 21.4156 3.67891 21.0719 3.67891 20.625V17.7719C3.67891 14.9531 5.98203 12.6156 8.83516 12.6156H13.2695C16.0883 12.6156 18.4258 14.9187 18.4258 17.7719V20.625C18.4258 21.0375 18.7695 21.4156 19.2164 21.4156C19.6633 21.4156 20.007 21.0719 20.007 20.625V17.7719C19.9039 14.0937 16.9133 11.0687 13.2352 11.0687Z"
-                            fill=""
-                          />
-                        </g>
-                      </svg>
-                    </span>
-                  </div>
-                </div> */}
-
               <div className="mb-4">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
+                <label className="mb-2.5 block font-medium text-foreground">
                   Email
                 </label>
                 <div className="relative">
@@ -247,10 +250,10 @@ const SignUp: React.FC = () => {
                     type="email"
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -271,7 +274,7 @@ const SignUp: React.FC = () => {
               </div>
 
               <div className="mb-4">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
+                <label className="mb-2.5 block font-medium text-foreground">
                   Password
                 </label>
                 <div className="relative">
@@ -279,10 +282,10 @@ const SignUp: React.FC = () => {
                     type="password"
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -307,18 +310,18 @@ const SignUp: React.FC = () => {
               </div>
 
               <div className="mb-6">
-                <label className="mb-2.5 block font-medium text-black dark:text-white">
-                  Re-type Password
+                <label className="mb-2.5 block font-medium text-foreground">
+                  Confirm Password
                 </label>
                 <div className="relative">
                   <input
-                    onChange={(e) => setConfirmPassword(e.target.value)}
                     type="password"
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter your password"
-                    className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-6 pr-10 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                    className="w-full rounded-lg border border-input bg-background py-4 pl-6 pr-10 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-colors"
                   />
 
-                  <span className="absolute right-4 top-4">
+                  <span className="absolute right-4 top-4 text-muted-foreground">
                     <svg
                       className="fill-current"
                       width="22"
@@ -343,17 +346,17 @@ const SignUp: React.FC = () => {
               </div>
 
               <div className="mb-5">
-                <input
-                  onClick={() => handleEmailSignUp()}
-                  type="submit"
-                  value="Create account"
-                  className="w-full cursor-pointer rounded-lg border border-primary bg-primary p-4 text-white transition hover:bg-opacity-90"
-                />
+                <button
+                  onClick={handleEmailSignUp}
+                  className="w-full cursor-pointer rounded-lg border border-primary bg-primary py-4 px-4 text-primary-foreground font-medium transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  Create account
+                </button>
               </div>
 
               <button
-                className="flex w-full items-center justify-center gap-3.5 rounded-lg border border-stroke bg-gray p-4 hover:bg-opacity-50 dark:border-strokedark dark:bg-meta-4 dark:hover:bg-opacity-50"
-                onClick={() => handleGoogleSignUp()}
+                className="flex w-full items-center justify-center gap-3.5 rounded-lg border border-border bg-secondary py-4 px-4 text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onClick={handleGoogleSignUp}
               >
                 <span>
                   <svg
@@ -365,7 +368,7 @@ const SignUp: React.FC = () => {
                   >
                     <g clipPath="url(#clip0_191_13499)">
                       <path
-                        d="M19.999 10.2217C20.0111 9.53428 19.9387 8.84788 19.7834 8.17737H10.2031V11.8884H15.8266C15.7201 12.5391 15.4804 13.162 15.1219 13.7195C14.7634 14.2771 14.2935 14.7578 13.7405 15.1328L13.7209 15.2571L16.7502 17.5568L16.96 17.5774C18.8873 15.8329 19.9986 13.2661 19.9986 10.2217"
+                        d="M19.999 10.2217C20.0111 9.53428 19.9387 8.84788 19.7834 8.17737H10.2031V11.8884H15.8266C15.7201 12.5391 15.4804 13.162 15.1219 13.7195C14.7634 14.2771 14.2935 14.7578 14.5685 14.7578L14.5489 14.8821L17.5782 17.1818L17.7882 17.2024C19.7155 15.4579 20.8268 13.0307 20.8268 10.2217"
                         fill="#4285F4"
                       />
                       <path
@@ -392,14 +395,13 @@ const SignUp: React.FC = () => {
               </button>
 
               <div className="mt-6 text-center">
-                <p>
+                <p className="text-muted-foreground">
                   Already have an account?{' '}
-                  <Link to="/auth/signin" className="text-primary">
+                  <Link to="/auth/signin" className="text-primary hover:text-primary/80 font-medium">
                     Sign in
                   </Link>
                 </p>
               </div>
-              {/* </form> */}
             </div>
           </div>
         </div>

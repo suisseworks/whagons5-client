@@ -1,19 +1,24 @@
-import axios from 'axios';
-import React, { useState, useEffect } from 'react';
-import TankStack from '../../../components/Tables/TankStack';
+import { useState, useEffect, useRef } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ClipboardList } from 'lucide-react';
+import api from '@/api/whagonsApi';
+import GridExample from '@/components/Tables/AGGridExample';
 
-export const DashBoardTicket = () => {
+export const DashBoardTask = () => {
+  const [activeTab, setActiveTab] = useState('grid');
   // State to store the fetched data
   const [data, setData] = useState(null);
 
   // State to handle loading state
   const [loading, setLoading] = useState(true);
 
+  const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
+
   // Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           'http://localhost:8000/api/protected',
           {
             withCredentials: true,
@@ -35,11 +40,31 @@ export const DashBoardTicket = () => {
   }
 
   return (
-    <div>
-      {/* <h1>DashBoardTicket</h1> */}
-      {/* <pre>{JSON.stringify(data, null, 2)}</pre>{' '} */}
-      {/* Display the fetched data */}
-      <TankStack/>
-    </div>
+    <Tabs defaultValue="grid" className="w-full h-full" onValueChange={setActiveTab} value={activeTab}>
+      <TabsList
+        className='w-50 h-15'
+      >
+        <TabsTrigger value="grid">
+          <ClipboardList />
+          Tasks
+        </TabsTrigger>
+        <TabsTrigger value="list">
+          Other
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent
+        forceMount
+        className='h-full'
+        value="grid"
+        style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
+      >
+        <GridExample rowCache={rowCache} />
+      </TabsContent>
+      <TabsContent value="list">
+        <div>What's good?</div>
+      </TabsContent>
+    </Tabs>
+
+
   );
 };
