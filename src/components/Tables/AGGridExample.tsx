@@ -100,7 +100,6 @@ const GridExample = () => {
     },
     { field: 'template_id' },
     { field: 'spot_id' },
-    { field: 'team_id' },
     { field: 'status_id' },
     { field: 'response_date' },
     { field: 'resolution_date' },

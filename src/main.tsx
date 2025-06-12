@@ -7,7 +7,7 @@ import { ThemeProvider } from './hooks/theme-provider';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
-    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
       <AuthProvider>
         <App />
       </AuthProvider>

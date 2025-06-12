@@ -20,7 +20,6 @@ function Profile() {
     const [saving, setSaving] = useState(false);
     const [editForm, setEditForm] = useState({
         name: '',
-        team_name: '',
         url_picture: ''
     });
     const [previewImage, setPreviewImage] = useState<string>('');
@@ -37,7 +36,6 @@ function Profile() {
                 setUserData(user);
                 setEditForm({
                     name: user.name || '',
-                    team_name: user.team_name || '',
                     url_picture: user.url_picture || ''
                 });
                 setPreviewImage(user.url_picture || '');
@@ -115,7 +113,6 @@ function Profile() {
         if (userData) {
             setEditForm({
                 name: userData.name || '',
-                team_name: userData.team_name || '',
                 url_picture: userData.url_picture || ''
             });
             setPreviewImage(userData.url_picture || '');
@@ -219,7 +216,7 @@ function Profile() {
                                     {userData.name || 'Unnamed User'}
                                 </h1>
                                 <p className="text-gray-600 dark:text-gray-400">
-                                    {userData.team_name || 'No team specified'}
+                                    {userData.organization_name || userData.email}
                                 </p>
                             </div>
                         </div>
@@ -267,16 +264,16 @@ function Profile() {
                             </div>
                         </div>
 
-                        {/* Team Name */}
+                        {/* Organization Name */}
                         <div className="space-y-2">
                             <div className="flex items-center space-x-2">
                                 <UserCheck className="w-4 h-4 text-gray-500" />
                                 <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Team Name
+                                    Organization
                                 </Label>
                             </div>
                             <div className="text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
-                                {userData.team_name || 'Not specified'}
+                                {userData.organization_name || 'Not specified'}
                             </div>
                         </div>
 
@@ -355,17 +352,6 @@ function Profile() {
                                 value={editForm.name}
                                 onChange={(e) => handleInputChange('name', e.target.value)}
                                 placeholder="Enter your full name"
-                            />
-                        </div>
-
-                        {/* Team Name Field */}
-                        <div className="space-y-2">
-                            <Label htmlFor="team_name">Team Name</Label>
-                            <Input
-                                id="team_name"
-                                value={editForm.team_name}
-                                onChange={(e) => handleInputChange('team_name', e.target.value)}
-                                placeholder="Enter your team or organization name"
                             />
                         </div>
 

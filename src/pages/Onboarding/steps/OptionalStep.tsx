@@ -4,7 +4,7 @@ import { OnboardingData } from '@/types/user';
 interface OptionalStepProps {
   data: OnboardingData;
   onUpdate: (data: Partial<OnboardingData>) => void;
-  onNext: () => void;
+  onNext: (data?: Partial<OnboardingData>) => void;
   onSkip: () => void;
   loading: boolean;
 }
@@ -66,8 +66,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, onS
   };
 
   const handleComplete = () => {
-    onUpdate({ url_picture: photoUrl });
-    onNext();
+    onNext({ url_picture: photoUrl });
   };
 
   return (

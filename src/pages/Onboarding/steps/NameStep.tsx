@@ -4,7 +4,7 @@ import { OnboardingData } from '@/types/user';
 interface NameStepProps {
   data: OnboardingData;
   onUpdate: (data: Partial<OnboardingData>) => void;
-  onNext: () => void;
+  onNext: (data?: Partial<OnboardingData>) => void;
   loading: boolean;
 }
 
@@ -26,8 +26,7 @@ const NameStep: React.FC<NameStepProps> = ({ data, onUpdate, onNext, loading }) 
     }
 
     setError('');
-    onUpdate({ name: name.trim() });
-    onNext();
+    onNext({ name: name.trim() });
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
