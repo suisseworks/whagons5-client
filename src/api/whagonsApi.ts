@@ -55,7 +55,7 @@ const deleteCookie = (name: string) => {
 
 // Create API instance without store dependency
 const api = axios.create({
-  baseURL: `http://${VITE_API_URL}/api`,
+  baseURL: `${VITE_API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -138,7 +138,7 @@ initializeAuth();
 axios.defaults.headers.post['Access-Control-Allow-Origin'] = '*';
 
 const web = axios.create({
-  baseURL: `http://${VITE_API_URL}/`,
+  baseURL: `${VITE_API_URL}/`,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
