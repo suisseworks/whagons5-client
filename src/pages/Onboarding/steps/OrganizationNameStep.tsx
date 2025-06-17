@@ -18,11 +18,20 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
   hasActiveSubscription = false 
 }) => {
   const [organizationName, setOrganizationName] = useState(data.organization_name || '');
-  const [finalTenantName, setFinalTenantName] = useState('');
+  const [finalTenantName, setFinalTenantName] = useState(data.tenant_domain_prefix || '');
   const [error, setError] = useState('');
+  
+  // Check if tenant is already set (organization is already created)
+  const isTenantSet = Boolean(data.tenant_domain_prefix);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // If tenant is already set, just proceed to next step
+    if (isTenantSet) {
+      onNext();
+      return;
+    }
     
     if (!organizationName.trim()) {
       setError('Please enter an organization name');
@@ -39,8 +48,8 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
       return;
     }
 
-    // Clean the organization name by replacing spaces with underscores
-    const cleanedOrgName = organizationName.trim().replace(/\s+/g, '_').toLowerCase();
+    // Clean the organization name by replacing spaces with hyphens
+    const cleanedOrgName = organizationName.trim().replace(/\s+/g, '-').toLowerCase();
 
     // Check if tenant exists (placeholder function)
     const tenantExists = await checkTenantExists(cleanedOrgName);
@@ -62,7 +71,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     setError('');
     onNext({ 
       organization_name: organizationName.trim(),
-      tenant_name: tenantToUse
+      tenant_domain_prefix: tenantToUse
     });
   };
 
@@ -71,10 +80,13 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     setOrganizationName(value);
     setError('');
     
+    // Don't update tenant preview if tenant is already set
+    if (isTenantSet) return;
+    
     // Preview the tenant name as user types
     if (value.trim()) {
-      // Replace spaces with underscores and convert to lowercase
-      const cleanedValue = value.trim().replace(/\s+/g, '_').toLowerCase();
+      // Replace spaces with hyphens and convert to lowercase
+      const cleanedValue = value.trim().replace(/\s+/g, '-').toLowerCase();
       const previewTenant = createTenantName(cleanedValue, hasActiveSubscription);
       setFinalTenantName(previewTenant);
     } else {
@@ -101,10 +113,13 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          What's your organization name?
+          {isTenantSet ? 'Your organization' : 'What\'s your organization name?'}
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
-          This will be used as your tenant identifier for the app. Choose a name that represents your organization.
+          {isTenantSet 
+            ? 'Your organization is already configured. You can proceed to the next step.'
+            : 'This will be used as your tenant identifier for the app. Choose a name that represents your organization.'
+          }
         </p>
       </div>
 
@@ -121,30 +136,33 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
             placeholder="Enter your organization name"
             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
               error ? 'border-red-500' : 'border-gray-300'
-            }`}
-            disabled={loading}
+            } ${isTenantSet ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed' : ''}`}
+            disabled={loading || isTenantSet}
+            readOnly={isTenantSet}
           />
           {error && (
             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {organizationName.length}/50 characters
-          </p>
+          {!isTenantSet && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {organizationName.length}/50 characters
+            </p>
+          )}
         </div>
 
         {/* Tenant Name Preview */}
-        {finalTenantName && (
+        {(finalTenantName || isTenantSet) && (
           <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Your tenant identifier will be:
+                  {isTenantSet ? 'Your tenant identifier:' : 'Your tenant identifier will be:'}
                 </p>
                 <p className="text-lg font-mono text-gray-900 dark:text-white mt-1">
                   {finalTenantName}
                 </p>
               </div>
-              {!hasActiveSubscription && finalTenantName.includes('_') && (
+              {!hasActiveSubscription && finalTenantName.includes('-') && !isTenantSet && (
                 <div className="flex-shrink-0 ml-4">
                   <button
                     type="button"
@@ -160,7 +178,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
               )}
             </div>
             
-            {!hasActiveSubscription && finalTenantName.includes('_') && (
+            {!hasActiveSubscription && finalTenantName.includes('-') && !isTenantSet && (
               <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <div className="flex">
                   <div className="flex-shrink-0">
@@ -214,7 +232,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
 
         <button
           type="submit"
-          disabled={loading || !organizationName.trim()}
+          disabled={loading || (!isTenantSet && !organizationName.trim())}
           className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
@@ -223,7 +241,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
               Saving...
             </div>
           ) : (
-            'Continue'
+            isTenantSet ? 'Continue' : 'Continue'
           )}
         </button>
       </form>

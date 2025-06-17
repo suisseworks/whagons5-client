@@ -22,5 +22,5 @@ export const createTenantName = (baseName: string, hasActiveSubscription: boolea
   }
   
   const suffix = generateTenantSuffix();
-  return `${baseName}_${suffix}`;
+  return `${baseName}-${suffix}`;
 }; 

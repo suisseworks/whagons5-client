@@ -72,6 +72,8 @@ export const linkGoogleProvider = async (credential: any) => {
 export const logout = async (): Promise<void> => {
     try {
       await signOut(auth);
+      //delete subdomain from local storage
+      localStorage.removeItem('whagons-subdomain');
       console.log('User logged out');
     } catch (error) {
       console.error('Logout Error:', error);

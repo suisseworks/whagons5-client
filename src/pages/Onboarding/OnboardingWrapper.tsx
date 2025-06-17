@@ -13,7 +13,6 @@ interface OnboardingWrapperProps {
 }
 
 const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
-  console.log('OnboardingWrapper - Received user:', user);
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
@@ -21,20 +20,20 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     name: user.name,
     team_name: user.team_name,
     organization_name: user.organization_name,
-    tenant_name: user.tenant_name,
+    tenant_domain_prefix: user.tenant_domain_prefix,
     url_picture: user.url_picture,
   });
   const [loading, setLoading] = useState<boolean>(false);
 
   // Determine starting step based on user's current state
   useEffect(() => {
-    console.log('OnboardingWrapper - useEffect - user:', user);
-    console.log('OnboardingWrapper - useEffect - initialization_stage:', user.initialization_stage);
-    if (user.initialization_stage === InitializationStage.HAS_NAME && user.name) {
-      console.log('OnboardingWrapper - Setting step to 1 (organization name)');
+    
+    // Handle initialization stage 2 - user has completed organization step, go to final step
+    if (user.initialization_stage === 2) {
+      setCurrentStep(2);
+    } else if (user.initialization_stage === InitializationStage.HAS_NAME && user.name) {
       setCurrentStep(1);
     } else if (user.initialization_stage === InitializationStage.NEEDS_ONBOARDING) {
-      console.log('OnboardingWrapper - Setting step to', user.email ? 0 : -1);
       setCurrentStep(user.email ? 0 : -1); // -1 for email verification if needed
     }
   }, [user]);
@@ -64,6 +63,29 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     }
   };
 
+  const createAndAssignTenant = async (organizationName: string, tenantDomainPrefix: string) => {
+    setLoading(true);
+    try {
+      const domain = `${tenantDomainPrefix}.${import.meta.env.VITE_DOMAIN}`;
+      const response = await api.post('/users/me/create-and-assign-tenant', {
+        name: organizationName,
+        domain: domain,
+        database: organizationName // name and database are usually the same
+      });
+      
+      if (response.status === 200) {
+        setLoading(false);
+        return true;
+      }
+      setLoading(false);
+      return false;
+    } catch (error) {
+      console.error('Failed to create and assign tenant:', error);
+      setLoading(false);
+      return false;
+    }
+  };
+
   const handleNextStep = async (stepData?: Partial<OnboardingData>) => {
     let success = false;
     
@@ -77,25 +99,40 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
 
     switch (currentStep) {
       case 0: // Name step
-        if (dataToUse.name) {
+        // Check if name has changed from the original user data
+        if (dataToUse.name && dataToUse.name !== user.name) {
           success = await updateUserProfile({ name: dataToUse.name }, InitializationStage.HAS_NAME);
           if (success) setCurrentStep(1);
+        } else if (dataToUse.name === user.name || user.name) {
+          // Name hasn't changed or user already has a name, just advance
+          setCurrentStep(1);
         }
         break;
       case 1: // Organization name step
-        if (dataToUse.organization_name) {
-          success = await updateUserProfile({ 
-            organization_name: dataToUse.organization_name,
-            tenant_name: dataToUse.tenant_name
-          });
+        // Check if organization is already set (tenant exists) or if data hasn't changed
+        if (user.tenant_domain_prefix) {
+          // Tenant already exists, just advance to next step
+          setCurrentStep(2);
+        } else if (dataToUse.organization_name && dataToUse.tenant_domain_prefix) {
+          // New organization data, create tenant
+          success = await createAndAssignTenant(
+            dataToUse.organization_name,
+            dataToUse.tenant_domain_prefix
+          );
           if (success) setCurrentStep(2);
         }
         break;
       case 2: // Optional step
-        success = await updateUserProfile(
-          { url_picture: dataToUse.url_picture },
-          InitializationStage.COMPLETED
-        );
+        // Check if profile picture has changed
+        if (dataToUse.url_picture !== user.url_picture) {
+          success = await updateUserProfile(
+            { url_picture: dataToUse.url_picture },
+            InitializationStage.COMPLETED
+          );
+        } else {
+          // No change in profile picture, just complete onboarding
+          success = await updateUserProfile({}, InitializationStage.COMPLETED);
+        }
         if (success) {
           navigate('/');
         }
@@ -123,10 +160,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   };
 
   const renderStep = () => {
-    console.log('OnboardingWrapper - renderStep - currentStep:', currentStep);
     switch (currentStep) {
       case 0:
-        console.log('OnboardingWrapper - Rendering NameStep');
         return (
           <NameStep
             data={onboardingData}
@@ -136,7 +171,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           />
         );
       case 1:
-        console.log('OnboardingWrapper - Rendering OrganizationNameStep');
         return (
           <OrganizationNameStep
             data={onboardingData}
@@ -147,7 +181,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           />
         );
       case 2:
-        console.log('OnboardingWrapper - Rendering OptionalStep');
         return (
           <OptionalStep
             data={onboardingData}
@@ -158,7 +191,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           />
         );
       default:
-        console.log('OnboardingWrapper - Rendering EmailVerificationStep');
         return (
           <EmailVerificationStep
             email={user.email}
@@ -168,7 +200,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     }
   };
 
-  console.log('OnboardingWrapper - Rendering main component');
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
       {/* Small logo in top left corner */}

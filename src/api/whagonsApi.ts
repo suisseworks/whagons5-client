@@ -2,10 +2,12 @@ import axios from 'axios';
 import { getEnvVariables } from '../helpers';
 import { auth } from '../firebase/firebaseConfig';
 
-const { VITE_API_URL } = getEnvVariables();
+const { VITE_API_URL, VITE_DEVELOPMENT} = getEnvVariables();
 
 // Simple obfuscation key (in production, this should be more secure)
 const OBFUSCATION_KEY = 'whagons-auth-key-2024';
+
+const PROTOCOL = VITE_DEVELOPMENT === 'true' ? 'http' : 'https';
 
 // Simple obfuscation functions
 const obfuscateToken = (token: string): string => {
@@ -53,9 +55,22 @@ const deleteCookie = (name: string) => {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 };
 
+const getSubdomain = () => {
+  //the default subdomain is nothing but once I can set it and get it from local storage
+  return localStorage.getItem('whagons-subdomain') || '';
+};
+
+const setSubdomain = (subdomain: string) => {
+  //add a dot at the end if missing
+  if (!subdomain.endsWith('.')) {
+    subdomain += '.';
+  }
+  localStorage.setItem('whagons-subdomain', subdomain);
+};
+
 // Create API instance without store dependency
 const api = axios.create({
-  baseURL: `${VITE_API_URL}/api`,
+  baseURL: `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -132,13 +147,17 @@ export const clearAuth = () => {
   deleteCookie('auth_token');
 };
 
+
+
 // Initialize auth on module load
 initializeAuth();
 
 axios.defaults.headers.post['Access-Control-Allow-Origin'] = '*';
 
+console.log("Thing", `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`, VITE_DEVELOPMENT)
+
 const web = axios.create({
-  baseURL: `${VITE_API_URL}/`,
+  baseURL: `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -149,8 +168,32 @@ const web = axios.create({
 
 // Add response interceptor
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Handle subdomain switching for 225 response code
+    if (response.status === 225) {
+      console.log("Data ", response.data);
+      try {
+        console.log("Data ", response.data);
+      //   // Extract new subdomain from response data
+        const tenant = response.data?.tenant;
+        const domain_prefix = tenant.split('.')[0];
+        setSubdomain(domain_prefix);
+        
+        // Update the api instance's baseURL to use the new subdomain
+        api.defaults.baseURL = `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/api`;
+        
+        //then retry login
+        refreshToken();
+      } catch (subdomainError) {
+        console.error('Subdomain switching failed:', subdomainError);
+        return Promise.reject(subdomainError);
+      }
+    }
+    
+    return response;
+  },
   async (error) => {
+    console.log('error', error);
     const originalRequest = error.config;
 
     if (
