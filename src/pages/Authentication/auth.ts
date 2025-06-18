@@ -10,6 +10,7 @@ import {
   linkWithCredential,
   sendEmailVerification
 } from 'firebase/auth';
+import { clearAuth } from '../../api/whagonsApi';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -71,9 +72,14 @@ export const linkGoogleProvider = async (credential: any) => {
 // Logout
 export const logout = async (): Promise<void> => {
     try {
+      // Clear auth tokens from both memory and storage before signing out
+      clearAuth();
+      
       await signOut(auth);
+      
       //delete subdomain from local storage
       localStorage.removeItem('whagons-subdomain');
+      
       console.log('User logged out');
     } catch (error) {
       console.error('Logout Error:', error);

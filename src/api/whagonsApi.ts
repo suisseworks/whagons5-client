@@ -55,6 +55,52 @@ const deleteCookie = (name: string) => {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 };
 
+// Enhanced token storage with Firebase UUID mapping
+const setTokenForUser = (token: string, firebaseUid: string) => {
+  const tokenData = {
+    token: obfuscateToken(token),
+    uid: firebaseUid,
+    timestamp: Date.now()
+  };
+  setCookie('auth_token', btoa(JSON.stringify(tokenData)), 30 / (24 * 60)); // 30 minutes in days
+};
+
+const getTokenForUser = (firebaseUid: string): string | null => {
+  const cookieValue = getCookie('auth_token');
+  if (!cookieValue) return null;
+  
+  try {
+    const tokenData = JSON.parse(atob(cookieValue));
+    // Validate that this token belongs to the current Firebase user
+    if (tokenData.uid !== firebaseUid) {
+      console.warn('Token belongs to different user, clearing token');
+      deleteCookie('auth_token');
+      return null;
+    }
+    
+    // Check if token is expired (30 minutes)
+    const expirationTime = tokenData.timestamp + (30 * 60 * 1000); // 30 minutes
+    if (Date.now() > expirationTime) {
+      console.log('Token expired, clearing token');
+      deleteCookie('auth_token');
+      return null;
+    }
+    
+    return deObfuscateToken(tokenData.token);
+  } catch (error) {
+    console.error('Failed to parse stored token data:', error);
+    deleteCookie('auth_token');
+    return null;
+  }
+};
+
+// Function to clear all stored tokens (for logout)
+const clearAllTokens = () => {
+  deleteCookie('auth_token');
+  // Also clear any legacy tokens that might exist
+  deleteCookie('auth_token_legacy');
+};
+
 const getSubdomain = () => {
   //the default subdomain is nothing but once I can set it and get it from local storage
   return localStorage.getItem('whagons-subdomain') || '';
@@ -82,15 +128,40 @@ const api = axios.create({
 // Function to update the auth token
 export const updateAuthToken = (token: string) => {
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  // Save token to cookie (expires in 30 minutes)
-  setCookie('auth_token', obfuscateToken(token), 30 / (24 * 60)); // 30 minutes in days
+  
+  // Get current Firebase user's UID for secure token storage
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    setTokenForUser(token, currentUser.uid);
+  } else {
+    console.warn('No Firebase user found when updating auth token');
+    // Fallback to old method for edge cases
+    setCookie('auth_token', obfuscateToken(token), 30 / (24 * 60));
+  }
 };
 
 // Function to check if we have a valid token in cookies
 const getStoredToken = (): string | null => {
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    return getTokenForUser(currentUser.uid);
+  }
+  
+  // Fallback to old method for edge cases (migration support)
   const obfuscatedToken = getCookie('auth_token');
   if (obfuscatedToken) {
-    return deObfuscateToken(obfuscatedToken);
+    try {
+      // Try to parse as new format first
+      const tokenData = JSON.parse(atob(obfuscatedToken));
+      if (tokenData.token && tokenData.uid) {
+        // This is new format but no current user, clear it
+        deleteCookie('auth_token');
+        return null;
+      }
+    } catch {
+      // This is old format, try to deobfuscate directly
+      return deObfuscateToken(obfuscatedToken);
+    }
   }
   return null;
 };
@@ -144,10 +215,8 @@ const refreshToken = async () => {
 // Function to clear auth state
 export const clearAuth = () => {
   delete api.defaults.headers.common['Authorization'];
-  deleteCookie('auth_token');
+  clearAllTokens();
 };
-
-
 
 // Initialize auth on module load
 initializeAuth();
