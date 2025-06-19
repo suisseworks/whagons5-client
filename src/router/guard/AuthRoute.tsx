@@ -1,39 +1,16 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '@/api';
 
 interface AuthRouteProps {
   children: ReactNode;
 }
 
 export const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
-  const { user: firebaseUser, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const { firebaseUser, loading: authLoading, userLoading } = useAuth();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (!firebaseUser) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        await api.get('/users/me');
-      } catch (err) {
-        console.error('Error fetching user data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (!authLoading) {
-      checkAuth();
-    }
-  }, [firebaseUser, authLoading]);
-
-  // Show loading while checking auth state
-  if (authLoading || loading) {
+  // Show loading while checking auth state or fetching user data
+  if (authLoading || userLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

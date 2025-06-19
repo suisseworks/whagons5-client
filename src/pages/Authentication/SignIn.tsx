@@ -48,7 +48,7 @@ const SignIn: React.FC = () => {
         }
         return true;
       } else {
-        console.error('Login failed');
+        console.error('Login failed with status:', response.status);
         return false;
       }
     } catch (error) {

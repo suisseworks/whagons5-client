@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/api';
-import { User } from '@/types/user';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck } from 'lucide-react';
 
 function Profile() {
-    const { user: firebaseUser } = useAuth();
-    const [userData, setUserData] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { user: userData, userLoading, refetchUser } = useAuth();
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -25,34 +22,16 @@ function Profile() {
     const [previewImage, setPreviewImage] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Fetch user data
-    const fetchUserData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await api.get('/users/me');
-            if (response.status === 200) {
-                const user = response.data.data || response.data;
-                setUserData(user);
-                setEditForm({
-                    name: user.name || '',
-                    url_picture: user.url_picture || ''
-                });
-                setPreviewImage(user.url_picture || '');
-            }
-        } catch (err) {
-            console.error('Error fetching user data:', err);
-            setError('Failed to load profile data');
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Initialize form when user data is available
     useEffect(() => {
-        if (firebaseUser) {
-            fetchUserData();
+        if (userData) {
+            setEditForm({
+                name: userData.name || '',
+                url_picture: userData.url_picture || ''
+            });
+            setPreviewImage(userData.url_picture || '');
         }
-    }, [firebaseUser]);
+    }, [userData]);
 
     // Handle form input changes
     const handleInputChange = (field: string, value: string) => {
@@ -78,8 +57,8 @@ function Profile() {
             const response = await api.patch('/users/me', editForm);
             
             if (response.status === 200) {
-                // Refresh user data
-                await fetchUserData();
+                // Refresh user data through AuthContext
+                await refetchUser();
                 setIsEditing(false);
                 
                 // Clear image cache if URL changed to force header to reload image
@@ -141,7 +120,7 @@ function Profile() {
         return 'U';
     };
 
-    if (loading) {
+    if (userLoading) {
         return (
             <div className="container mx-auto p-6 max-w-4xl">
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -174,7 +153,10 @@ function Profile() {
                     </div>
                     <p className="text-red-700 dark:text-red-300 mt-2">{error}</p>
                     <Button 
-                        onClick={fetchUserData} 
+                        onClick={() => {
+                            setError(null);
+                            refetchUser();
+                        }} 
                         className="mt-4"
                         variant="outline"
                     >
