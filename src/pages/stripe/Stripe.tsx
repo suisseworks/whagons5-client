@@ -1,7 +1,5 @@
-
-
 import BillingToggle from '@/components/BillingToggle'
-import PaymentTier from '@/components/PaymentTier'
+import PaymentTier from '@/pages/stripe/components/PaymentTier'
 import { useState } from 'react'
 
 const tiers = [

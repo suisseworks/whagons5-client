@@ -1,9 +1,8 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "./ui/sidebar";
-import { logout } from "@/pages/Authentication/auth";
+import { logout } from "@/pages/authentication/auth";
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { User as UserType } from "@/types/user";
+import { useAuth } from "@/providers/AuthProvider";
 import {
     DropdownMenu,
     DropdownMenuContent,

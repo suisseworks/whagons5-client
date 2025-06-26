@@ -2,12 +2,11 @@ import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
-import { Input } from '../ui/input';
+import { Input } from '../../../components/ui/input';
 import { fetchTasks } from '@/store/reducers/tasksSlice';
 import { useDispatch } from 'react-redux';
 import { RootState } from '@/store';
 import { useSelector } from 'react-redux';
-import { Task } from '@/store/reducers/tasksSlice';
 import { useSidebar } from '@/components/ui/sidebar';
 // main.tsx or root file
 

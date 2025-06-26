@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { signUpWithEmail, signInWithGoogle, logout } from './auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
-import { api, updateAuthToken } from '@/api';
+import { api, updateAuthToken } from '@/api/whagonsApi';
 import { InitializationStage } from '@/types/user';
 
 const SignUp: React.FC = () => {

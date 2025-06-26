@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { api } from '@/api';
+import { api } from '@/api/whagonsApi';
 import { useSidebar } from '@/components/ui/sidebar';
 
 // Lazy load AgGridReact component

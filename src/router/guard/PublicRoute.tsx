@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 // import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../providers/AuthProvider';
 import { InitializationStage } from '@/types/user';
 
 interface PublicRouteProps {

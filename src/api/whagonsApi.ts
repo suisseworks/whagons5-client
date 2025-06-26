@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { getEnvVariables } from '../helpers';
-import { auth } from '../firebase/firebaseConfig';
+import { getEnvVariables } from '@/lib/getEnvVariables';
+import { auth } from '@/firebase/firebaseConfig';
 
 const { VITE_API_URL, VITE_DEVELOPMENT} = getEnvVariables();
 
@@ -110,8 +110,8 @@ const getSubdomain = () => {
 };
 
 const setSubdomain = (subdomain: string) => {
-  //add a dot at the end if missing
-  if (!subdomain.endsWith('.')) {
+  //add a dot at the end if missing, but only if subdomain is not empty
+  if (subdomain && !subdomain.endsWith('.')) {
     subdomain += '.';
   }
   localStorage.setItem('whagons-subdomain', subdomain);
@@ -286,6 +286,21 @@ api.interceptors.response.use(
   async (error) => {
     console.log('error interceptor triggered:', error.response?.status, error.config?.url);
     const originalRequest = error.config;
+
+    // Handle "User not found" error on login endpoint by clearing subdomain and retrying
+    if (error.response?.data?.error === "User not found. Please register first." && 
+        originalRequest.url === '/login' && 
+        !originalRequest._retryWithoutSubdomain) {
+      console.log('User not found error detected on login, clearing subdomain and retrying login');
+      setSubdomain('');
+      console.log('Subdomain cleared from localStorage, retrying login with empty subdomain');
+      
+      // Mark this request as retried to prevent infinite loops
+      originalRequest._retryWithoutSubdomain = true;
+      
+      // Retry the original request - the request interceptor will use the new empty subdomain
+      return api(originalRequest);
+    }
 
     if (
       error.response?.status === 401 &&

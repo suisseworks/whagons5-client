@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect, FormEvent, Suspense } from 'react';
-import WaveIcon from './WaveIcon';
+import WaveIcon from './components/WaveIcon';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
 import Prism from 'prismjs';
 // import 'prismjs/components/prism-python'
-import './index.css';
-import { Message } from '../models/models';
-import componentsJson from './components.json';
-import { useTheme } from '@/hooks/theme-provider';
+import './components/index.css';
+import { Message } from './models/models';
+import componentsJson from './components/components.json';
+import { useTheme } from '@/providers/ThemeProvider';
 
 const components = componentsJson as any;
 const HOST = import.meta.env.VITE_CHAT_HOST;

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/api';
+import { api } from '@/api/whagonsApi';
 import { User, OnboardingData, InitializationStage } from '@/types/user';
-import EmailVerificationStep from './steps/EmailVerificationStep';
-import NameStep from './steps/NameStep';
-import OrganizationNameStep from './steps/OrganizationNameStep';
-import OptionalStep from './steps/OptionalStep';
+import { useAuth } from '@/providers/AuthProvider';
+import EmailVerificationStep from '@/pages/onboarding/steps/EmailVerificationStep';
+import NameStep from '@/pages/onboarding/steps/NameStep';
+import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep';
+import OptionalStep from '@/pages/onboarding/steps/OptionalStep';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 
 interface OnboardingWrapperProps {
@@ -14,6 +15,7 @@ interface OnboardingWrapperProps {
 
 const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const navigate = useNavigate();
+  const { refetchUser } = useAuth();
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     email: user.email,
@@ -27,6 +29,11 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
 
   // Determine starting step based on user's current state
   useEffect(() => {
+    // If user has completed onboarding, navigate away immediately
+    if (user.initialization_stage === InitializationStage.COMPLETED) {
+      navigate('/');
+      return;
+    }
     
     // Handle initialization stage 2 - user has completed organization step, go to final step
     if (user.initialization_stage === 2) {
@@ -36,7 +43,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     } else if (user.initialization_stage === InitializationStage.NEEDS_ONBOARDING) {
       setCurrentStep(user.email ? 0 : -1); // -1 for email verification if needed
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const updateOnboardingData = (data: Partial<OnboardingData>) => {
     setOnboardingData(prev => ({ ...prev, ...data }));
@@ -70,7 +77,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       const response = await api.post('/users/me/create-and-assign-tenant', {
         name: organizationName,
         domain: domain,
-        database: organizationName // name and database are usually the same
+        database: organizationName.toLowerCase() // name and database are usually the same
       });
       
       if (response.status === 200) {
@@ -134,6 +141,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           success = await updateUserProfile({}, InitializationStage.COMPLETED);
         }
         if (success) {
+          // Refetch user data to ensure AuthProvider has the latest state
+          await refetchUser();
           navigate('/');
         }
         break;
@@ -147,6 +156,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       // Skipping optional step - complete onboarding
       const success = await updateUserProfile({}, InitializationStage.COMPLETED);
       if (success) {
+        // Refetch user data to ensure AuthProvider has the latest state
+        await refetchUser();
         navigate('/');
       }
     }

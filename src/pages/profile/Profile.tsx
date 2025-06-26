@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { api } from '@/api';
+import { useAuth } from '@/providers/AuthProvider';
+import { api } from '@/api/whagonsApi';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

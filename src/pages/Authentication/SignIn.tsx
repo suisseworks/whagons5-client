@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithGoogle, signInWithEmail, linkGoogleProvider, logout } from './auth';
-import { api, updateAuthToken } from '@/api';
+import { api, updateAuthToken } from '@/api/whagonsApi';
 import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { InitializationStage } from '@/types/user';

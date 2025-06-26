@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { OnboardingData } from '@/types/user';
-import { checkTenantExists, createTenantName } from '@/utils/tenant';
+import { checkTenantExists, createTenantName } from '@/lib/tenant';
 
 interface OrganizationNameStepProps {
   data: OnboardingData;

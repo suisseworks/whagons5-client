@@ -1,11 +1,11 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 
-import { DashBoardTask } from '../features/tasks';
-import { DashboardWorkplan } from '../features/workplan';
-import MainLayout from '../layouts/MainLayout';
-import Stripe from '../pages/Stripe';
-import ChatWindow from '../features/aichat/pages/ChatWindow';
-import Profile from '@/pages/Profile';
+import { DashBoardTask } from '@/pages/dashboard/DashBoardTask';
+import { DashboardWorkplan } from '@/pages/workplan';
+import MainLayout from '@/layouts/MainLayout';
+import Stripe from '@/pages/stripe/Stripe';
+import ChatWindow from '@/pages/aichat/ChatWindow';
+import Profile from '@/pages/profile/Profile';
 import { useMemo } from 'react';
 
 const pages = [

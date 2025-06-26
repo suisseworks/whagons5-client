@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { User, InitializationStage } from '@/types/user';
-import OnboardingWrapper from '@/pages/Onboarding/OnboardingWrapper';
+import { useAuth } from '@/providers/AuthProvider';
+import { InitializationStage } from '@/types/user';
+import OnboardingWrapper from '@/pages/onboarding/OnboardingWrapper';
 
 const OnboardingRoute: React.FC = () => {
   const { firebaseUser, user, loading: authLoading, userLoading } = useAuth();

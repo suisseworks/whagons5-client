@@ -5,7 +5,7 @@ import {
   SidebarRail,
   useSidebar
 } from '@/components/ui/sidebar';
-import { ThemeProvider } from '@/hooks/theme-provider';
+import { ThemeProvider } from '@/providers/ThemeProvider';
 import React, { ReactNode, useEffect, useState } from 'react';
 
 // Define sidebar width constants to keep them in sync
