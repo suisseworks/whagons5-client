@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { api } from '@/api/whagonsApi';
-import { useSidebar } from '@/components/ui/sidebar';
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
@@ -28,7 +27,6 @@ const GridExample = ({ rowCache }: { rowCache: React.MutableRefObject<Map<string
   const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
-  const { state } = useSidebar();
 
   // Load modules on component mount
   useEffect(() => {
@@ -52,7 +50,7 @@ const GridExample = ({ rowCache }: { rowCache: React.MutableRefObject<Map<string
     )}-${JSON.stringify(params.sortModel || [])}`;
   }, []);
 
-  const [columnDefs, setColumnDefs] = useState([
+  const [columnDefs] = useState([
     // this row shows the row index, doesn't use any data from the row
     {
       field: 'id',
@@ -137,17 +135,17 @@ const GridExample = ({ rowCache }: { rowCache: React.MutableRefObject<Map<string
         getRows,
       };
       params.api.setGridOption('datasource', dataSource);
-      
-  
+
+
     },
     [getRows]
   );
 
-  // Function to clear cache (useful for refreshing data)
-  const clearCache = useCallback(() => {
-    rowCache.current.clear();
-    console.log('Row cache cleared');
-  }, []);
+  // // Function to clear cache (useful for refreshing data)
+  // const clearCache = useCallback(() => {
+  //   rowCache.current.clear();
+  //   console.log('Row cache cleared');
+  // }, []);
 
   // Show loading spinner while modules are loading
   if (!modulesLoaded) {
