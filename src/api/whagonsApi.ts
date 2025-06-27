@@ -1,11 +1,13 @@
 import axios from 'axios';
-import { getEnvVariables } from '../helpers';
-import { auth } from '../firebase/firebaseConfig';
+import { getEnvVariables } from '@/lib/getEnvVariables';
+import { auth } from '@/firebase/firebaseConfig';
 
-const { VITE_API_URL } = getEnvVariables();
+const { VITE_API_URL, VITE_DEVELOPMENT} = getEnvVariables();
 
 // Simple obfuscation key (in production, this should be more secure)
 const OBFUSCATION_KEY = 'whagons-auth-key-2024';
+
+const PROTOCOL = VITE_DEVELOPMENT === 'true' ? 'http' : 'https';
 
 // Simple obfuscation functions
 const obfuscateToken = (token: string): string => {
@@ -39,7 +41,9 @@ const deObfuscateToken = (obfuscatedToken: string): string => {
 // Cookie utility functions
 const setCookie = (name: string, value: string, days: number = 7) => {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-  document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Strict; Secure`;
+  // Remove Secure flag in development since localhost doesn't use HTTPS
+  const secureFlag = VITE_DEVELOPMENT === 'true' ? '' : '; Secure';
+  document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Strict${secureFlag}`;
 };
 
 const getCookie = (name: string): string | null => {
@@ -53,9 +57,69 @@ const deleteCookie = (name: string) => {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 };
 
+// Enhanced token storage with Firebase UUID mapping
+const setTokenForUser = (token: string, firebaseUid: string) => {
+  const tokenData = {
+    token: obfuscateToken(token),
+    uid: firebaseUid,
+    timestamp: Date.now()
+  };
+  setCookie('auth_token', btoa(JSON.stringify(tokenData)), 30 / (24 * 60)); // 30 minutes in days
+};
+
+// Function to clear all stored tokens (for logout)
+const clearAllTokens = () => {
+  deleteCookie('auth_token');
+  // Also clear any legacy tokens that might exist
+  deleteCookie('auth_token_legacy');
+};
+
+// Export the getTokenForUser function for use in AuthContext
+export const getTokenForUser = (firebaseUid: string): string | null => {
+  const cookieValue = getCookie('auth_token');
+  if (!cookieValue) return null;
+  
+  try {
+    const tokenData = JSON.parse(atob(cookieValue));
+    // Validate that this token belongs to the current Firebase user
+    if (tokenData.uid !== firebaseUid) {
+      console.warn('Token belongs to different user, clearing token');
+      deleteCookie('auth_token');
+      return null;
+    }
+    
+    // Check if token is expired (30 minutes)
+    const expirationTime = tokenData.timestamp + (30 * 60 * 1000); // 30 minutes
+    if (Date.now() > expirationTime) {
+      console.log('Token expired, clearing token');
+      deleteCookie('auth_token');
+      return null;
+    }
+    
+    return deObfuscateToken(tokenData.token);
+  } catch (error) {
+    console.error('Failed to parse stored token data:', error);
+    deleteCookie('auth_token');
+    return null;
+  }
+};
+
+const getSubdomain = () => {
+  //the default subdomain is nothing but once I can set it and get it from local storage
+  return localStorage.getItem('whagons-subdomain') || '';
+};
+
+const setSubdomain = (subdomain: string) => {
+  //add a dot at the end if missing, but only if subdomain is not empty
+  if (subdomain && !subdomain.endsWith('.')) {
+    subdomain += '.';
+  }
+  localStorage.setItem('whagons-subdomain', subdomain);
+};
+
 // Create API instance without store dependency
 const api = axios.create({
-  baseURL: `${VITE_API_URL}/api`,
+  baseURL: `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -67,21 +131,47 @@ const api = axios.create({
 // Function to update the auth token
 export const updateAuthToken = (token: string) => {
   api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  // Save token to cookie (expires in 30 minutes)
-  setCookie('auth_token', obfuscateToken(token), 30 / (24 * 60)); // 30 minutes in days
+  
+  // Get current Firebase user's UID for secure token storage
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    setTokenForUser(token, currentUser.uid);
+  } else {
+    console.warn('No Firebase user found when updating auth token');
+    // Fallback to old method for edge cases
+    setCookie('auth_token', obfuscateToken(token), 30 / (24 * 60));
+  }
 };
 
 // Function to check if we have a valid token in cookies
 const getStoredToken = (): string | null => {
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    return getTokenForUser(currentUser.uid);
+  }
+  
+  // Fallback to old method for edge cases (migration support)
   const obfuscatedToken = getCookie('auth_token');
   if (obfuscatedToken) {
-    return deObfuscateToken(obfuscatedToken);
+    try {
+      // Try to parse as new format first
+      const tokenData = JSON.parse(atob(obfuscatedToken));
+      if (tokenData.token && tokenData.uid) {
+        // This is new format but no current user yet
+        // Don't clear the cookie - Firebase Auth might still be initializing
+        // Just return null and let AuthContext handle it when user is available
+        return null;
+      }
+    } catch {
+      // This is old format, try to deobfuscate directly
+      return deObfuscateToken(obfuscatedToken);
+    }
   }
   return null;
 };
 
 // Initialize API with stored token if available
-const initializeAuth = () => {
+export const initializeAuth = () => {
   const storedToken = getStoredToken();
   if (storedToken) {
     api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -129,7 +219,10 @@ const refreshToken = async () => {
 // Function to clear auth state
 export const clearAuth = () => {
   delete api.defaults.headers.common['Authorization'];
-  deleteCookie('auth_token');
+  clearAllTokens();
+  
+  // Reset API baseURL to default (no subdomain) to clear subdomain from memory
+  api.defaults.baseURL = `${PROTOCOL}://${VITE_API_URL}/api`;
 };
 
 // Initialize auth on module load
@@ -137,8 +230,10 @@ initializeAuth();
 
 axios.defaults.headers.post['Access-Control-Allow-Origin'] = '*';
 
+console.log("Thing", `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`, VITE_DEVELOPMENT)
+
 const web = axios.create({
-  baseURL: `${VITE_API_URL}/`,
+  baseURL: `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -147,11 +242,65 @@ const web = axios.create({
   withCredentials: true,
 });
 
+// Add request interceptor to ensure every request uses the current subdomain
+api.interceptors.request.use(
+  (config) => {
+    // Force every request to use the current subdomain from localStorage
+    const currentSubdomain = getSubdomain();
+    const correctBaseURL = `${PROTOCOL}://${currentSubdomain}${VITE_API_URL}/api`;
+    
+    console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
+    
+    // Override the baseURL for this specific request
+    config.baseURL = correctBaseURL;
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Add response interceptor
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Handle 225 responses for tenant switching
+    if (response.status === 225) {
+      console.log('225 response detected, switching tenant for:', response.config.url);
+      
+      // Extract new subdomain from response data
+      const tenant = response.data?.tenant;
+      const domain_prefix = tenant.split('.')[0];
+      console.log('Extracted domain_prefix:', domain_prefix);
+      
+      setSubdomain(domain_prefix);
+      console.log('Set subdomain in localStorage:', localStorage.getItem('whagons-subdomain'));
+      
+      console.log('Tenant switched to:', domain_prefix, 'Need to retry request...');
+      
+      // Retry the original request - the request interceptor will use the new subdomain
+      return api(response.config);
+    }
+    return response;
+  },
   async (error) => {
+    console.log('error interceptor triggered:', error.response?.status, error.config?.url);
     const originalRequest = error.config;
+
+    // Handle "User not found" error on login endpoint by clearing subdomain and retrying
+    if (error.response?.data?.error === "User not found. Please register first." && 
+        originalRequest.url === '/login' && 
+        !originalRequest._retryWithoutSubdomain) {
+      console.log('User not found error detected on login, clearing subdomain and retrying login');
+      setSubdomain('');
+      console.log('Subdomain cleared from localStorage, retrying login with empty subdomain');
+      
+      // Mark this request as retried to prevent infinite loops
+      originalRequest._retryWithoutSubdomain = true;
+      
+      // Retry the original request - the request interceptor will use the new empty subdomain
+      return api(originalRequest);
+    }
 
     if (
       error.response?.status === 401 &&
@@ -183,6 +332,10 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Remove the tenant switching tracking since we're using request interceptor approach
+export const isTenantSwitchingInProgress = () => false;
+export const waitForTenantSwitching = async () => Promise.resolve();
 
 export default api;
 

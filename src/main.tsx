@@ -2,8 +2,8 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import '@fortawesome/fontawesome-free/css/all.css';
 import App from './App';
-import { AuthProvider } from './context/AuthContext';
-import { ThemeProvider } from './hooks/theme-provider';
+import { AuthProvider } from './providers/AuthProvider';
+import { ThemeProvider } from './providers/ThemeProvider';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>

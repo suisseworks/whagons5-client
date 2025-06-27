@@ -1,10 +1,9 @@
 import { Route, Routes } from 'react-router-dom';
 
 import { PrivateRoute, PublicRoute, AuthRoute } from './guard';
-// import { LoginPage } from '../features/auth';
 import { HomeRoutes } from './HomeRouter';
-import SignIn from '../pages/Authentication/SignIn';
-import SignUp from '../pages/Authentication/SignUp';
+import SignIn from '@/pages/authentication/SignIn';
+import SignUp from '@/pages/authentication/SignUp';
 import OnboardingRoute from './OnboardingRoute';
 
 export const AppRouter = () => {

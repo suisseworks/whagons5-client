@@ -4,7 +4,7 @@ export interface User {
   name?: string;
   team_name?: string;
   organization_name?: string;
-  tenant_name?: string;
+  tenant_domain_prefix?: string;
   url_picture?: string;
   google_uuid?: string;
   email_verified_at?: string;
@@ -17,16 +17,17 @@ export interface User {
 }
 
 export interface OnboardingData {
-  email?: string;
+  email: string;
   name?: string;
   team_name?: string;
   organization_name?: string;
-  tenant_name?: string;
+  tenant_domain_prefix?: string;
   url_picture?: string;
 }
 
 export enum InitializationStage {
   NEEDS_ONBOARDING = 0,
   HAS_NAME = 1,
+  HAS_TENANT = 2,
   COMPLETED = -1
 } 

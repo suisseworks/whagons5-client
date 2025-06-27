@@ -1,10 +1,8 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "./ui/sidebar";
-import { logout } from "@/pages/Authentication/auth";
+import { logout } from "@/pages/authentication/auth";
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { api } from "@/api";
-import { User as UserType } from "@/types/user";
+import { useAuth } from "@/providers/AuthProvider";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,42 +25,11 @@ interface CachedAvatar {
 }
 
 function Header() {
-    const { user: firebaseUser } = useAuth();
+    const { firebaseUser, user, userLoading } = useAuth();
     const navigate = useNavigate();
-    const [userData, setUserData] = useState<UserType | null>(null);
     const [imageUrl, setImageUrl] = useState<string>('');
     const [imageError, setImageError] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        setUserData(null);
-        setImageUrl('');
-        setImageError(false);
-        setIsLoading(false);
-    }, [firebaseUser?.uid]);
-
-    // Fetch user data from API
-    const fetchUserData = useCallback(async () => {
-        if (!firebaseUser) return;
-        
-        try {
-            const response = await api.get('/users/me');
-            if (response.status === 200) {
-                const user = response.data.data || response.data;
-                setUserData(user);
-                
-                // Update avatar if URL changed
-                if (user.url_picture) {
-                    cacheImage(user.url_picture);
-                } else {
-                    setImageUrl('');
-                    setImageError(true);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching user data in header:', error);
-        }
-    }, [firebaseUser]);
 
     const getCachedAvatar = useCallback((userId: string): CachedAvatar | null => {
         try {
@@ -143,91 +110,98 @@ function Header() {
         }
     }, [firebaseUser?.uid, getCachedAvatar, setCachedAvatar]);
 
-    // Initial fetch when Firebase user is available
+    // Update avatar when user data changes
     useEffect(() => {
-        if (firebaseUser) {
-            fetchUserData();
-        }
-    }, [firebaseUser, fetchUserData]);
-
-
-    // Listen for storage events to update when profile is changed in another tab
-    useEffect(() => {
-        const handleStorageChange = (e: StorageEvent) => {
-            if (e.key === 'profile_updated') {
-                fetchUserData();
-                localStorage.removeItem('profile_updated');
+        if (user?.id) {
+            if (user.url_picture) {
+                cacheImage(user.url_picture);
+            } else {
+                setImageUrl('');
+                setImageError(true);
             }
-        };
-
-        const handleProfileUpdate = (e: CustomEvent) => {
-            // Clear image cache to force reload
-            if (firebaseUser?.uid) {
-                localStorage.removeItem(AVATAR_CACHE_KEY + firebaseUser.uid);
-                localStorage.removeItem(AVATAR_CACHE_TIMESTAMP_KEY + firebaseUser.uid);
-            }
-            
-            // Clear current image state to force reload
+        } else {
             setImageUrl('');
             setImageError(false);
-            
-            // Fetch updated user data
-            fetchUserData();
-        };
-
-        // Listen for same-tab profile updates
-        window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
-        // Listen for cross-tab profile updates
-        window.addEventListener('storage', handleStorageChange);
-        
-        return () => {
-            window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
-            window.removeEventListener('storage', handleStorageChange);
-        };
-    }, [fetchUserData, firebaseUser?.uid]);
+        }
+    }, [user, cacheImage]);
 
     const handleImageError = () => {
         setImageError(true);
     };
 
     const getInitials = () => {
-        if (userData?.name) {
-            return userData.name.split(' ').map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2);
+        if (user?.name) {
+            return user.name.split(' ').map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2);
         }
-        if (userData?.email) {
-            return userData.email.slice(0, 2).toUpperCase();
+        if (user?.email) {
+            return user.email.slice(0, 2).toUpperCase();
         }
         return 'U';
     };
 
-    return ( 
-        <header className="sticky top-0 z-10 bg-background border-b">
-            <div className="flex items-center justify-between h-14 px-4">
-                <div className="flex items-center">
-                    <SidebarTrigger className="mr-4" />
-                    <h1 className="font-medium">
-                        {userData?.name ? `Welcome, ${userData.name.split(' ')[0]}` : 'Whagons'}
-                    </h1>
+    const getDisplayName = () => {
+        return user?.name || user?.email || 'User';
+    };
+
+    if (!firebaseUser || userLoading) {
+        return (
+            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="flex items-center space-x-4 p-4">
+                    <SidebarTrigger />
+                    <div className="flex items-center space-x-2">
+                        <div className="animate-pulse bg-gray-300 rounded-full h-8 w-8"></div>
+                        <span className="text-sm text-muted-foreground">Loading...</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
+            </header>
+        );
+    }
+
+    if (!user) {
+        return (
+            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="flex items-center space-x-4 p-4">
+                    <SidebarTrigger />
+                    <div className="flex items-center space-x-2">
+                        <div className="bg-gray-300 rounded-full h-8 w-8"></div>
+                        <span className="text-sm text-muted-foreground">User not found</span>
+                    </div>
+                </div>
+            </header>
+        );
+    }
+
+    return (
+        <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center space-x-4">
+                    <SidebarTrigger />
+                </div>
+
+                <div className="flex items-center space-x-4">
                     <ModeToggle />
+                    
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                                <Avatar className="cursor-pointer">
+                            <button className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                                <Avatar className="h-8 w-8">
                                     {!imageError && imageUrl && !isLoading && (
                                         <AvatarImage 
                                             src={imageUrl} 
                                             onError={handleImageError}
-                                            alt={userData?.name || 'User avatar'}
+                                            alt={getDisplayName()}
                                         />
                                     )}
                                     <AvatarFallback>
                                         {isLoading ? '...' : getInitials()}
                                     </AvatarFallback>
                                 </Avatar>
+                                <span className="hidden sm:inline text-sm font-medium">
+                                    {getDisplayName()}
+                                </span>
                             </button>
                         </DropdownMenuTrigger>
+
                         <DropdownMenuContent align="end" className="w-30">
                             <DropdownMenuItem onClick={() => {
                                 console.log('Profile clicked');
