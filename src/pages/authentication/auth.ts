@@ -12,8 +12,6 @@ import {
 } from 'firebase/auth';
 import { clearAuth } from '../../api/whagonsApi';
 
-const googleProvider = new GoogleAuthProvider();
-
 
 // Google Sign-In
 export const signInWithGoogle = async (): Promise<UserCredential> => {
