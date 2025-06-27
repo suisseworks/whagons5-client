@@ -12,7 +12,6 @@ interface OrganizationNameStepProps {
 
 const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({ 
   data, 
-  onUpdate, 
   onNext, 
   loading,
   hasActiveSubscription = false 

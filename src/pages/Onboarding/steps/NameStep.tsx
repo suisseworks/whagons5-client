@@ -8,7 +8,7 @@ interface NameStepProps {
   loading: boolean;
 }
 
-const NameStep: React.FC<NameStepProps> = ({ data, onUpdate, onNext, loading }) => {
+const NameStep: React.FC<NameStepProps> = ({ data, onNext, loading }) => {
   const [name, setName] = useState(data.name || '');
   const [error, setError] = useState('');
 
