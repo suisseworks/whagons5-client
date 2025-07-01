@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList } from 'lucide-react';
-import GridExample from '@/pages/dashboard/components/AGGridExample';
+import GridExample from '@/pages/spaces/components/AGGridExample';
 
 export const DashBoardTask = () => {
   const [activeTab, setActiveTab] = useState('grid');

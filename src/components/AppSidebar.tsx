@@ -256,7 +256,7 @@ export function AppSidebar() {
                 
                 {/* Show workspace first letters when collapsed AND collapsible is open - DESKTOP ONLY */}
                 {isCollapsed && !isMobile && (
-                  <SidebarGroupContent className="pt-1">
+                  <SidebarGroupContent className="pt-2">
                     <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent/30">
                       {workspaces.map((workspace) => (
                         <Link

@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 
-import { DashBoardTask } from '@/pages/dashboard/DashBoardTask';
+import { DashBoardTask } from '@/pages/spaces/DashBoardTask';
 import { DashboardWorkplan } from '@/pages/workplan';
 import MainLayout from '@/layouts/MainLayout';
 import Stripe from '@/pages/stripe/Stripe';
