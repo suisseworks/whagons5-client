@@ -2,6 +2,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import Header from '@/components/Header';
 import {
   SidebarProvider,
+  SidebarInset,
   SidebarRail,
   useSidebar
 } from '@/components/ui/sidebar';
@@ -11,25 +12,7 @@ import React, { ReactNode, useEffect, useState } from 'react';
 // Define sidebar width constants to keep them in sync
 const CUSTOM_SIDEBAR_WIDTH = 15;
 const CUSTOM_SIDEBAR_WIDTH_MOBILE = CUSTOM_SIDEBAR_WIDTH;
-
-const MainContent = ({ children }: { children: ReactNode }) => {
-  
-  return (
-    <main 
-      className="flex-1 flex flex-col h-full overflow-auto"
-      style={{ 
-        // Match the margin to the custom sidebar width
-        transition: 'margin-left 0.15s ease-out',
-        height: '100%'
-      }}
-    >
-      <Header />
-      <div className="flex-1 p-4 md:p-6 overflow-auto">
-          {children}
-      </div>
-    </main>
-  );
-};
+const CUSTOM_SIDEBAR_WIDTH_ICON = 4; // Match the 4rem from AppSidebar
 
 const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
@@ -39,12 +22,18 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
       style={{
         "--sidebar-width": `${CUSTOM_SIDEBAR_WIDTH}rem`,
         "--sidebar-width-mobile": `${CUSTOM_SIDEBAR_WIDTH_MOBILE}rem`,
+        "--sidebar-width-icon": `${CUSTOM_SIDEBAR_WIDTH_ICON}rem`,
       } as React.CSSProperties}
       >
         <div className="flex h-screen w-full overflow-hidden bg-background">
           <AppSidebar />
           <SidebarRail />
-          <MainContent>{children}</MainContent>
+          <SidebarInset className="flex flex-col">
+            <Header />
+            <div className="flex-1 p-4 md:p-6 overflow-auto">
+              {children}
+            </div>
+          </SidebarInset>
         </div>
       </SidebarProvider>
     </ThemeProvider>
