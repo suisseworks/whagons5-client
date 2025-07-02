@@ -31,62 +31,75 @@ import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from "@/components/ui/collapsible";
+} from '@/components/ui/collapsible';
 import WhagonsCheck from '@/assets/WhagonsCheck';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
 
 // Global pinned state management
 let isPinnedGlobal = false;
 const pinnedStateCallbacks: ((pinned: boolean) => void)[] = [];
 
 export const setPinnedState = (pinned: boolean) => {
-    isPinnedGlobal = pinned;
-    pinnedStateCallbacks.forEach(callback => callback(pinned));
+  isPinnedGlobal = pinned;
+  pinnedStateCallbacks.forEach((callback) => callback(pinned));
 };
 
 export const getPinnedState = () => isPinnedGlobal;
 
 export const subscribeToPinnedState = (callback: (pinned: boolean) => void) => {
-    pinnedStateCallbacks.push(callback);
-    return () => {
-        const index = pinnedStateCallbacks.indexOf(callback);
-        if (index > -1) pinnedStateCallbacks.splice(index, 1);
-    };
+  pinnedStateCallbacks.push(callback);
+  return () => {
+    const index = pinnedStateCallbacks.indexOf(callback);
+    if (index > -1) pinnedStateCallbacks.splice(index, 1);
+  };
 };
 
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
-    const { toggleSidebar } = useSidebar();
-    const [isPinned, setIsPinned] = useState(isPinnedGlobal);
+  const { toggleSidebar } = useSidebar();
+  const [isPinned, setIsPinned] = useState(isPinnedGlobal);
 
-    useEffect(() => {
-        const unsubscribe = subscribeToPinnedState(setIsPinned);
-        return unsubscribe;
-    }, []);
+  useEffect(() => {
+    const unsubscribe = subscribeToPinnedState(setIsPinned);
+    return unsubscribe;
+  }, []);
 
-    const handleClick = () => {
-        const newPinned = !isPinned;
-        setPinnedState(newPinned);
-        // Don't auto-close when unpinning - let hover behavior handle it
-    };
+  const handleClick = () => {
+    const newPinned = !isPinned;
+    setPinnedState(newPinned);
+    // Don't auto-close when unpinning - let hover behavior handle it
+  };
 
-    return (
-        <Button
-            variant="ghost"
-            size="icon"
-            className={`size-7 ${className || ''}`}
-            onClick={handleClick}
-            title={isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
-        >
-            <div className="relative w-4 h-4 flex items-center justify-center">
-                {/* Circle */}
-                <div className="w-3 h-3 border-2 border-current rounded-full"></div>
-                {/* Dot when pinned */}
-                {isPinned && (
-                    <div className="absolute w-1.5 h-1.5 bg-current rounded-full"></div>
-                )}
-            </div>
-            <span className="sr-only">{isPinned ? "Unpin Sidebar" : "Pin Sidebar"}</span>
-        </Button>
-    );
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={`size-7 ${className || ''}`}
+      onClick={handleClick}
+      title={isPinned ? 'Unpin Sidebar' : 'Pin Sidebar'}
+    >
+      <div className="relative w-4 h-4 flex items-center justify-center">
+        {/* Circle */}
+        <div className="w-3 h-3 border-2 border-current rounded-full"></div>
+        {/* Dot when pinned */}
+        {isPinned && (
+          <div className="absolute w-1.5 h-1.5 bg-current rounded-full"></div>
+        )}
+      </div>
+      <span className="sr-only">
+        {isPinned ? 'Unpin Sidebar' : 'Pin Sidebar'}
+      </span>
+    </Button>
+  );
 };
 
 export function AppSidebar() {
@@ -101,7 +114,11 @@ export function AppSidebar() {
   const [isPinned, setIsPinned] = useState(getPinnedState());
 
   const dispatch = useDispatch<AppDispatch>();
-  const { value: workspaces } = useSelector((state: RootState) => state.workspaces);
+
+  const { value: workspaces } = useSelector(
+    (state: RootState) => state.workspaces
+  );
+
   const { addWorkspace } = workspacesSlice.actions;
 
   // Subscribe to pinned state changes
@@ -158,13 +175,12 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar 
+    <Sidebar
       collapsible="icon"
       className={`bg-sidebar border-r border-sidebar-border transition-all duration-300`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      
       <SidebarHeader
         className={`shadow-md bg-sidebar transition-all duration-300 ${
           isCollapsed ? 'px-1' : ''
@@ -176,9 +192,16 @@ export function AppSidebar() {
               isCollapsed ? 'justify-center' : 'justify-center'
             }`}
           >
-            <WhagonsCheck width={showExpandedContent ? 45 : 32} height={showExpandedContent ? 21 : 15} color="#27C1A7" />
+            <WhagonsCheck
+              width={showExpandedContent ? 45 : 32}
+              height={showExpandedContent ? 21 : 15}
+              color="#27C1A7"
+            />
             {showExpandedContent && (
-              <div className='text-xl pl-2 font-semibold text-[#27C1A7]' style={{ fontFamily: 'Montserrat' }}>
+              <div
+                className="text-xl pl-2 font-semibold text-[#27C1A7]"
+                style={{ fontFamily: 'Montserrat' }}
+              >
                 Whagons
               </div>
             )}
@@ -194,14 +217,19 @@ export function AppSidebar() {
           <Collapsible defaultOpen className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild className="text-sm font-normal">
-                <div className={`flex items-center w-full pr-3 transition-all duration-300 ${
-                  isCollapsed ? 'justify-center px-0' : 'justify-between'
-                }`}>
-                  <CollapsibleTrigger className={`flex items-center cursor-pointer hover:bg-sidebar-accent rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
-                    (isCollapsed && !isMobile) ? 'flex-col justify-center ml-0 px-2' : 'justify-start flex-1'
-                  }`}>
-                    
-                    {(isCollapsed && !isMobile) ? (
+                <div
+                  className={`flex items-center w-full pr-3 transition-all duration-300 ${
+                    isCollapsed ? 'justify-center px-0' : 'justify-between'
+                  }`}
+                >
+                  <CollapsibleTrigger
+                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
+                      isCollapsed && !isMobile
+                        ? 'flex-col justify-center ml-0 px-2'
+                        : 'justify-start flex-1'
+                    }`}
+                  >
+                    {isCollapsed && !isMobile ? (
                       <div className="flex flex-col items-center">
                         <Briefcase className="text-sidebar-foreground w-5 h-5 mb-1" />
                       </div>
@@ -215,29 +243,72 @@ export function AppSidebar() {
                       </>
                     )}
                   </CollapsibleTrigger>
-                  
+
                   {showExpandedContent && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 p-0 hover:bg-primary/10 text-primary hover:text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsModalOpen(true);
-                      }}
-                    >
-                      <Plus size={16} className="text-primary" />
-                      <span className="sr-only">Add Workspace</span>
-                    </Button>
+                    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <Plus size={16} />
+                          <span className="sr-only">Add Workspace</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Add New Workspace</DialogTitle>
+                          <DialogDescription>
+                            Enter the details for your new workspace. Click save
+                            when you're done.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                              Name
+                            </Label>
+                            <Input
+                              id="name"
+                              value={workspaceName}
+                              onChange={(e) => setWorkspaceName(e.target.value)}
+                              className="col-span-3"
+                              placeholder="e.g., Project Phoenix"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="description" className="text-right">
+                              Description
+                            </Label>
+                            <Input
+                              id="description"
+                              value={workspaceDescription}
+                              onChange={(e) =>
+                                setWorkspaceDescription(e.target.value)
+                              }
+                              className="col-span-3"
+                              placeholder="e.g., For managing project tasks"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsModalOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" onClick={handleAddWorkspace}>
+                            Save Workspace
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </div>
               </SidebarGroupLabel>
-              
+
               <CollapsibleContent>
                 {(!isCollapsed || isMobile) && (
-                  <SidebarGroupContent
-                    className="pt-2 pl-1"
-                  >
+                  <SidebarGroupContent className="pt-2 pl-1">
                     {workspaces.map((workspace) => (
                       <Link
                         key={workspace.id}
@@ -253,7 +324,7 @@ export function AppSidebar() {
                     ))}
                   </SidebarGroupContent>
                 )}
-                
+
                 {/* Show workspace first letters when collapsed AND collapsible is open - DESKTOP ONLY */}
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
@@ -283,7 +354,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      
+
       <SidebarFooter className="bg-sidebar border-t border-sidebar-border">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -291,9 +362,9 @@ export function AppSidebar() {
               <SidebarMenuItem className="pt-1 pb-1">
                 <SidebarMenuButton
                   asChild
-                  tooltip={isCollapsed && !isMobile ? "Settings" : undefined}
+                  tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
                   className={`rounded-md relative transition-colors ${
-                    (isCollapsed && !isMobile)
+                    isCollapsed && !isMobile
                       ? `h-10 flex justify-center items-center ${
                           pathname === '/settings'
                             ? 'bg-primary/10 text-primary border-2 border-primary'
@@ -306,7 +377,14 @@ export function AppSidebar() {
                         }`
                   }`}
                 >
-                  <Link to="/settings" className={(isCollapsed && !isMobile) ? 'flex justify-center items-center w-full' : ''}>
+                  <Link
+                    to="/settings"
+                    className={
+                      isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : ''
+                    }
+                  >
                     <Settings size={20} className="w-5! h-5! p-[1px]" />
                     {showExpandedContent && <span>Settings</span>}
                   </Link>
@@ -315,7 +393,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        
+
         {showExpandedContent && (
           <div className="px-2 py-1 text-xs text-muted-foreground">
             Version 5.0.0

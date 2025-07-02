@@ -1,19 +1,19 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 
 import { DashBoardTask } from '@/pages/spaces/DashBoardTask';
-import { DashboardWorkplan } from '@/pages/workplan';
 import MainLayout from '@/layouts/MainLayout';
 import Stripe from '@/pages/stripe/Stripe';
 import ChatWindow from '@/pages/aichat/ChatWindow';
 import Profile from '@/pages/profile/Profile';
 import { useMemo } from 'react';
+import Settings from '@/pages/settings/Settings';
 
 const pages = [
   { path: '/tasks', component: <DashBoardTask /> },
-  { path: '/workplan', component: <DashboardWorkplan /> },
   { path: '/stripe', component: <Stripe /> },
   { path: '/ai-chat', component: <ChatWindow /> },
   { path: '/profile', component: <Profile /> },
+  { path: '/settings', component: <Settings /> },
 ];
 
 function AllPages() {
