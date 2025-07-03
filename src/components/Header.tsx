@@ -1,5 +1,5 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { SidebarTrigger } from "./ui/sidebar";
+import { SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { logout } from "@/pages/authentication/auth";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/providers/AuthProvider";
@@ -26,6 +26,7 @@ interface CachedAvatar {
 
 function Header() {
     const { firebaseUser, user, userLoading } = useAuth();
+    const { isMobile } = useSidebar();
     const navigate = useNavigate();
     const [imageUrl, setImageUrl] = useState<string>('');
     const [imageError, setImageError] = useState(false);
@@ -147,7 +148,7 @@ function Header() {
         return (
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-4 p-4">
-                    <SidebarTrigger />
+                    {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="animate-pulse bg-gray-300 rounded-full h-8 w-8"></div>
                         <span className="text-sm text-muted-foreground">Loading...</span>
@@ -161,7 +162,7 @@ function Header() {
         return (
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-4 p-4">
-                    <SidebarTrigger />
+                    {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="bg-gray-300 rounded-full h-8 w-8"></div>
                         <span className="text-sm text-muted-foreground">User not found</span>
@@ -172,10 +173,14 @@ function Header() {
     }
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-1 shadow-md">
+            {isMobile && (
+                <SidebarTrigger className='absolute left-2 top-5 z-1000 text-primary' />
+            )}
+            
             <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center space-x-4">
-                    <SidebarTrigger />
+                    
                 </div>
 
                 <div className="flex items-center space-x-4">

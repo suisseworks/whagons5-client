@@ -1,3 +1,12 @@
+## 📝 Lista de Tareas Pendientes
+
+- [ ] Pantalla de create tareas
+- [ ] Pantalla de crear plantilla
+- [ ] Pantalla de crear categoria
+- [ ] Live icon search with font awesome
+- [*] Overhaul theme color and sidebar
+
+
 # Whagons V5 - Cliente React
 
 Una aplicación de gestión de tareas moderna construida con TypeScript, que incluye dashboard de tareas, planificación de trabajo y autenticación de usuarios.
