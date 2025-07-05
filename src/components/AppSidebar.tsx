@@ -44,6 +44,8 @@ import {
 } from './ui/dialog';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { iconService } from '@/database/iconService';
 
 // Global pinned state management
 let isPinnedGlobal = false;
@@ -112,6 +114,8 @@ export function AppSidebar() {
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
   const [isPinned, setIsPinned] = useState(getPinnedState());
+  const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
+  const [defaultIcon, setDefaultIcon] = useState<any>(null);
 
   const dispatch = useDispatch<AppDispatch>();
 
@@ -119,13 +123,60 @@ export function AppSidebar() {
     (state: RootState) => state.workspaces
   );
 
-  const { addWorkspace } = workspacesSlice.actions;
+  const { addWorkspace, migrateWorkspaces } = workspacesSlice.actions;
 
   // Subscribe to pinned state changes
   useEffect(() => {
     const unsubscribe = subscribeToPinnedState(setIsPinned);
     return unsubscribe;
   }, []);
+
+  // Load default icon
+  useEffect(() => {
+    const loadDefaultIcon = async () => {
+      try {
+        const icon = await iconService.getIcon('building');
+        setDefaultIcon(icon);
+      } catch (error) {
+        console.error('Error loading default icon:', error);
+      }
+    };
+    loadDefaultIcon();
+  }, []);
+
+  // Migrate existing workspaces to ensure they have icon and iconColor properties
+  useEffect(() => {
+    dispatch(migrateWorkspaces());
+  }, [dispatch, migrateWorkspaces]);
+
+  // Load workspace icons when workspaces change
+  useEffect(() => {
+    const loadWorkspaceIcons = async () => {
+      const iconNames = workspaces.map(workspace => workspace.icon).filter(Boolean);
+      if (iconNames.length > 0) {
+        try {
+          const icons = await iconService.loadIcons(iconNames);
+          setWorkspaceIcons(icons);
+        } catch (error) {
+          console.error('Error loading workspace icons:', error);
+        }
+      }
+    };
+
+    loadWorkspaceIcons();
+  }, [workspaces]);
+
+  // Preload common icons on component mount
+  useEffect(() => {
+    iconService.preloadCommonIcons();
+  }, []);
+
+  const getWorkspaceIcon = (iconName?: string) => {
+    if (!iconName || typeof iconName !== 'string') {
+      return defaultIcon;
+    }
+    return workspaceIcons[iconName] || defaultIcon;
+  };
 
   const handleAddWorkspace = () => {
     if (!workspaceName.trim() || !workspaceDescription.trim()) {
@@ -142,6 +193,8 @@ export function AppSidebar() {
       // Use a path structure like /workspace/:id for routing
       path: `/workspace/${newId}`,
       description: workspaceDescription,
+      icon: 'briefcase',
+      iconColor: '#374151',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -173,6 +226,11 @@ export function AppSidebar() {
       setOpen(false);
     }
   };
+
+  // Don't render icons until default icon is loaded
+  if (!defaultIcon) {
+    return null;
+  }
 
   return (
     <Sidebar
@@ -313,19 +371,24 @@ export function AppSidebar() {
                       <Link
                         key={workspace.id}
                         to={workspace.path}
-                        className={`block rounded-md relative transition-colors px-4 py-2 mx-2 ${
+                        className={`flex items-center space-x-2 rounded-md relative transition-colors px-4 py-2 mx-2 ${
                           pathname === workspace.path
                             ? 'bg-primary/10 text-primary border-l-4 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
                         }`}
                       >
-                        {workspace.name}
+                        <FontAwesomeIcon 
+                          icon={getWorkspaceIcon(workspace.icon)} 
+                          style={{ color: workspace.iconColor || '#374151' }}
+                          className="w-4 h-4"
+                        />
+                        <span>{workspace.name}</span>
                       </Link>
                     ))}
                   </SidebarGroupContent>
                 )}
 
-                {/* Show workspace first letters when collapsed AND collapsible is open - DESKTOP ONLY */}
+                {/* Show workspace icons when collapsed AND collapsible is open - DESKTOP ONLY */}
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
                     <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent/30">
@@ -340,7 +403,11 @@ export function AppSidebar() {
                           }`}
                           title={workspace.name}
                         >
-                          {workspace.name.charAt(0).toUpperCase()}
+                          <FontAwesomeIcon 
+                            icon={getWorkspaceIcon(workspace.icon)} 
+                            style={{ color: workspace.iconColor || '#374151' }}
+                            className="w-4 h-4"
+                          />
                         </Link>
                       ))}
                     </div>

@@ -1,19 +1,19 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 
-import { DashBoardTask } from '@/pages/spaces/DashBoardTask';
+import { Workspace } from '@/pages/spaces/Workspace';
 import MainLayout from '@/layouts/MainLayout';
 import Stripe from '@/pages/stripe/Stripe';
-import ChatWindow from '@/pages/aichat/ChatWindow';
+// import ChatWindow from '@/pages/aichat/ChatWindow';
 import Profile from '@/pages/profile/Profile';
 import { useMemo } from 'react';
 import Settings from '@/pages/settings/Settings';
 
 const pages = [
-  { path: '/tasks', component: <DashBoardTask /> },
+  // { path: '/tasks', component: <Workspace /> },
   { path: '/stripe', component: <Stripe /> },
-  { path: '/ai-chat', component: <ChatWindow /> },
+  // { path: '/ai-chat', component: <ChatWindow /> },
   { path: '/profile', component: <Profile /> },
-  { path: '/settings', component: <Settings /> },
+  // { path: '/settings', component: <Settings /> },
 ];
 
 function AllPages() {
@@ -35,7 +35,10 @@ export const HomeRoutes = () => {
       <MainLayout>
         <AllPages />
         <Routes>
-          <Route path="/" element={<Navigate to="/tasks" replace />} />
+          {/* <Route path="/" element={<Navigate to="/tasks" replace />} /> */}
+          <Route path="/tasks" element={<Workspace />} />
+          <Route path="/workspace/:id" element={<Workspace />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </MainLayout>
     </>
