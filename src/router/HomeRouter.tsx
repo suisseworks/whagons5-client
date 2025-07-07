@@ -7,6 +7,7 @@ import Stripe from '@/pages/stripe/Stripe';
 import Profile from '@/pages/profile/Profile';
 import { useMemo } from 'react';
 import Settings from '@/pages/settings/Settings';
+import Stuff from '@/pages/stuff/Stuff';
 
 const pages = [
   // { path: '/tasks', component: <Workspace /> },
@@ -39,6 +40,7 @@ export const HomeRoutes = () => {
           <Route path="/tasks" element={<Workspace />} />
           <Route path="/workspace/:id" element={<Workspace />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/stuff" element={<Stuff />} />
         </Routes>
       </MainLayout>
     </>
