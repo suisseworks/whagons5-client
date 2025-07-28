@@ -41,7 +41,7 @@ function CreationTab({
     {
       field: 'category',
       headerName: 'Category',
-      minWidth: 100,
+      minWidth: 180,
       flex: 1,
       cellRenderer: (params: any) => {
         if (params.value) {
@@ -184,7 +184,7 @@ function CreationTab({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full mb-5">
       {/* Header Card */}
       <Card className="flex-shrink-0">
         <CardHeader>
@@ -214,7 +214,7 @@ function CreationTab({
       </Card>
 
       {/* Standalone Table */}
-      <div className="flex-1 mt-4 min-h-0">
+      <div className="flex-1 mt-4 min-h-96">
         {!modulesLoaded ? (
           <div className="flex items-center justify-center h-64">
             <i className="fas fa-spinner fa-pulse fa-2x"></i>

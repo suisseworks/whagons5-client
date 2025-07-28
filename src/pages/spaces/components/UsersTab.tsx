@@ -230,39 +230,37 @@ function UsersTab({
         </CardHeader>
       </Card>
 
-      <Card className="flex-1 mt-4">
-        <CardContent className="p-0 h-full">
-          {!modulesLoaded ? (
-            <div className="flex items-center justify-center h-64">
-              <i className="fas fa-spinner fa-pulse fa-2x"></i>
+       <div className="flex-1 mt-4 min-h-0">
+        {!modulesLoaded ? (
+          <div className="flex items-center justify-center h-64">
+            <i className="fas fa-spinner fa-pulse fa-2x"></i>
+          </div>
+        ) : (
+          <div style={containerStyle} className="ag-theme-quartz h-full w-full">
+            <div style={gridStyle}>
+              <Suspense fallback={<div>Loading Users Table...</div>}>
+                <AgGridReact
+                  ref={gridRef}
+                  columnDefs={userColumnDefs}
+                  defaultColDef={defaultColDef}
+                  rowBuffer={50}
+                  rowModelType={'infinite'}
+                  cacheBlockSize={100}
+                  cacheOverflowSize={2}
+                  maxConcurrentDatasourceRequests={1}
+                  infiniteInitialRowCount={50}
+                  maxBlocksInCache={10}
+                  onGridReady={onGridReady}
+                  animateRows={true}
+                  getRowId={(params: any) => String(params.data.id)}
+                  suppressColumnVirtualisation={true}
+                  key={selectedTeamFilter || 'all'} // Force re-render when filter changes
+                />
+              </Suspense>
             </div>
-          ) : (
-            <div style={containerStyle} className="ag-theme-quartz h-full w-full">
-              <div style={gridStyle}>
-                <Suspense fallback={<div>Loading Users Table...</div>}>
-                  <AgGridReact
-                    ref={gridRef}
-                    columnDefs={userColumnDefs}
-                    defaultColDef={defaultColDef}
-                    rowBuffer={50}
-                    rowModelType={'infinite'}
-                    cacheBlockSize={100}
-                    cacheOverflowSize={2}
-                    maxConcurrentDatasourceRequests={1}
-                    infiniteInitialRowCount={50}
-                    maxBlocksInCache={10}
-                    onGridReady={onGridReady}
-                    animateRows={true}
-                    getRowId={(params: any) => String(params.data.id)}
-                    suppressColumnVirtualisation={true}
-                    key={selectedTeamFilter || 'all'} // Force re-render when filter changes
-                  />
-                </Suspense>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
