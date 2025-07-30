@@ -4,6 +4,10 @@ import { auth } from '../firebase/firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { api, getTokenForUser, initializeAuth } from '../api/whagonsApi';
 import { User } from '../types/user';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '../store/store';
+import { getWorkspacesFromIndexedDB } from '../store/reducers/workspacesSlice';
+import { getTeamsFromIndexedDB } from '../store/reducers/teamsSlice';
 
 // Define context types
 interface AuthContextType {
@@ -27,6 +31,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [userLoading, setUserLoading] = useState<boolean>(false);
+  const dispatch = useDispatch<AppDispatch>();
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) {
@@ -45,12 +50,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       }
 
-      console.log('AuthContext: Fetching user data...');
+      // console.log('AuthContext: Fetching user data...');
       const response = await api.get('/users/me');
       if (response.status === 200) {
         const userData = response.data.data || response.data;
         setUser(userData);
-        console.log('AuthContext: User data loaded successfully');
+        // console.log('AuthContext: User data loaded successfully');
+        
+        // Load workspaces and teams from IndexedDB after user is authenticated
+        dispatch(getWorkspacesFromIndexedDB());
+        dispatch(getTeamsFromIndexedDB());
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user data:', error);
@@ -68,7 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      console.log('AuthContext: Auth state changed:', currentUser?.uid);
+      // console.log('AuthContext: Auth state changed:', currentUser?.uid);
       setFirebaseUser(currentUser);
       
       if (currentUser) {

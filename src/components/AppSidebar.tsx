@@ -13,7 +13,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Workspace, workspacesSlice } from '@/store/reducers/workspacesSlice';
+import { workspacesSlice, addWorkspaceAsync, updateWorkspaceAsync, removeWorkspaceAsync } from '@/store/reducers/workspacesSlice';
+import { Workspace } from '@/store/Types';
 import {
   Settings,
   User,
@@ -26,6 +27,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { AppDispatch, RootState } from '@/store';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
@@ -118,12 +120,13 @@ export function AppSidebar() {
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
 
   const dispatch = useDispatch<AppDispatch>();
+  const { user } = useAuth();
 
   const { value: workspaces } = useSelector(
     (state: RootState) => state.workspaces
   );
 
-  const { addWorkspace, migrateWorkspaces } = workspacesSlice.actions;
+  const { clearError } = workspacesSlice.actions;
 
   // Subscribe to pinned state changes
   useEffect(() => {
@@ -144,10 +147,7 @@ export function AppSidebar() {
     loadDefaultIcon();
   }, []);
 
-  // Migrate existing workspaces to ensure they have icon and iconColor properties
-  useEffect(() => {
-    dispatch(migrateWorkspaces());
-  }, [dispatch, migrateWorkspaces]);
+
 
   // Load workspace icons when workspaces change
   useEffect(() => {
@@ -175,7 +175,21 @@ export function AppSidebar() {
     if (!iconName || typeof iconName !== 'string') {
       return defaultIcon;
     }
-    return workspaceIcons[iconName] || defaultIcon;
+    
+    // Parse FontAwesome class format to get the actual icon name
+    // This matches the parsing logic in iconService
+    let parsedIconName = iconName;
+    
+    // Handle FontAwesome class format (fas fa-icon-name, far fa-icon-name, etc.)
+    const faClassMatch = iconName.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
+    if (faClassMatch) {
+      parsedIconName = faClassMatch[2]; // Return just the icon name part
+    } else if (iconName.startsWith('fa-')) {
+      // Handle fa-prefix format (fa-icon-name -> icon-name)
+      parsedIconName = iconName.substring(3);
+    }
+    
+    return workspaceIcons[parsedIconName] || defaultIcon;
   };
 
   const handleAddWorkspace = () => {
@@ -186,20 +200,15 @@ export function AppSidebar() {
       return;
     }
 
-    const newId = crypto.randomUUID();
-    const newWorkspace: Workspace = {
-      id: newId,
+    // Create workspace data in the format expected by the API
+    const newWorkspaceData = {
       name: workspaceName,
-      // Use a path structure like /workspace/:id for routing
-      path: `/workspace/${newId}`,
       description: workspaceDescription,
-      icon: 'briefcase',
-      iconColor: '#374151',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      type: 'PROJECT',
+      created_by: user?.id ? parseInt(user.id) : 0
     };
 
-    dispatch(addWorkspace(newWorkspace));
+    dispatch(addWorkspaceAsync(newWorkspaceData as any));
 
     // Reset form and close modal
     setWorkspaceName('');
@@ -207,9 +216,6 @@ export function AppSidebar() {
     setIsModalOpen(false);
   };
 
-  useEffect(() => {
-    console.log(workspaces);
-  }, [workspaces]);
 
   // Determine if we should show expanded content
   const showExpandedContent = !isCollapsed || isMobile;
@@ -370,16 +376,16 @@ export function AppSidebar() {
                     {workspaces.map((workspace) => (
                       <Link
                         key={workspace.id}
-                        to={workspace.path}
+                        to={`/workspace/${workspace.id}`}
                         className={`flex items-center space-x-2 rounded-md relative transition-colors px-4 py-2 mx-2 ${
-                          pathname === workspace.path
+                          pathname === `/workspace/${workspace.id}`
                             ? 'bg-primary/10 text-primary border-l-4 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
                         }`}
                       >
                         <FontAwesomeIcon 
                           icon={getWorkspaceIcon(workspace.icon)} 
-                          style={{ color: workspace.iconColor || '#374151' }}
+                          style={{ color: workspace.color }}
                           className="w-4 h-4"
                         />
                         <span>{workspace.name}</span>
@@ -395,9 +401,9 @@ export function AppSidebar() {
                       {workspaces.map((workspace) => (
                         <Link
                           key={workspace.id}
-                          to={workspace.path}
+                          to={`/workspace/${workspace.id}`}
                           className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
-                            pathname === workspace.path
+                            pathname === `/workspace/${workspace.id}`
                               ? 'bg-primary/20 text-primary border border-primary/40'
                               : 'text-sidebar-foreground hover:bg-sidebar-accent'
                           }`}
@@ -405,7 +411,7 @@ export function AppSidebar() {
                         >
                           <FontAwesomeIcon 
                             icon={getWorkspaceIcon(workspace.icon)} 
-                            style={{ color: workspace.iconColor || '#374151' }}
+                            style={{ color: workspace.color }}
                             className="w-4 h-4"
                           />
                         </Link>

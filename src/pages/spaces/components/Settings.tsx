@@ -4,7 +4,7 @@ import { Users, Building, Eye, Filter } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useParams } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
-import { workspacesSlice } from "@/store/reducers/workspacesSlice";
+import { workspacesSlice, updateWorkspaceAsync } from "@/store/reducers/workspacesSlice";
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";
@@ -56,7 +56,7 @@ interface WorkspaceFilters {
 interface WorkspaceInfo {
   name: string;
   icon: string;
-  iconColor: string;
+  color: string;
   description: string;
 }
 
@@ -72,22 +72,31 @@ function Settings() {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const params = useParams<{ id: string }>();
-  const { updateWorkspace } = workspacesSlice.actions;
+  // Using async actions for workspace operations
 
   // Get current workspace from Redux store
   const { value: workspaces } = useSelector((state: RootState) => state.workspaces);
   
-  // Find workspace by ID from URL params or by path for legacy routes
+  // Find workspace by ID from URL params or fallback to first workspace
   const currentWorkspace = params.id 
-    ? workspaces.find(workspace => workspace.id === params.id)
-    : workspaces.find(workspace => workspace.path === location.pathname);
+    ? workspaces.find(workspace => workspace.id.toString() === params.id)
+    : workspaces.length > 0 ? workspaces[0] : null;
+
+  // Debug logging
+  console.log('Workspace matching debug:', {
+    paramsId: params.id,
+    workspacesLength: workspaces.length,
+    workspaceIds: workspaces.map(w => ({ id: w.id, name: w.name })),
+    currentWorkspace: currentWorkspace ? { id: currentWorkspace.id, name: currentWorkspace.name } : null,
+    pathname: location.pathname
+  });
 
   // Convert workspace to WorkspaceInfo format
   const workspaceInfo: WorkspaceInfo | null = currentWorkspace ? {
     name: currentWorkspace.name,
     icon: currentWorkspace.icon,
-    iconColor: currentWorkspace.iconColor,
-    description: currentWorkspace.description
+    color: currentWorkspace.color,
+    description: currentWorkspace.description || `Main workspace for ${currentWorkspace.name}`
   } : null;
 
   // Load modules on component mount
@@ -264,8 +273,11 @@ function Settings() {
       updatedAt: new Date().toISOString()
     };
     
-    dispatch(updateWorkspace(updatedWorkspace));
-  }, [currentWorkspace, dispatch, updateWorkspace]);
+          dispatch(updateWorkspaceAsync({ 
+        id: currentWorkspace.id, 
+        updates: updatedWorkspace 
+      }));
+    }, [currentWorkspace, dispatch]);
 
   return (
     <div className="h-full w-full p-4 flex flex-col">
@@ -293,6 +305,9 @@ function Settings() {
           <OverviewTab
             workspaceOverview={workspaceOverview}
             workspaceInfo={workspaceInfo}
+            workspaceId={currentWorkspace?.id || null}
+            workspaceTeams={currentWorkspace?.teams || null}
+            workspaceType={currentWorkspace?.type || null}
             loading={loading}
             onTeamClick={handleTeamClick}
             onUpdateWorkspace={handleUpdateWorkspace}

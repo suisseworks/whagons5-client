@@ -6,8 +6,26 @@ import { Label } from "@/components/ui/label";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 
-import { Users, Building, Tag, Edit, Check, X, ChevronDown } from "lucide-react";
+import { Users, Building, Tag, Edit, Check, X, ChevronDown, Trash2 } from "lucide-react";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { AppDispatch, RootState } from "@/store";
+import { removeWorkspaceAsync } from "@/store/reducers/workspacesSlice";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface TeamSharingInfo {
   id: string;
@@ -27,13 +45,16 @@ interface WorkspaceOverview {
 interface WorkspaceInfo {
   name: string;
   icon: string;
-  iconColor: string;
+  color: string;
   description: string;
 }
 
 interface OverviewTabProps {
   workspaceOverview: WorkspaceOverview | null;
   workspaceInfo: WorkspaceInfo | null;
+  workspaceId: number | null;
+  workspaceTeams: number[] | null;
+  workspaceType: string | null;
   loading: boolean;
   onTeamClick: (teamName: string) => void;
   onUpdateWorkspace: (updates: Partial<WorkspaceInfo>) => void;
@@ -60,18 +81,40 @@ const ICONS_PER_PAGE = 100;
 function OverviewTab({ 
   workspaceOverview, 
   workspaceInfo, 
+  workspaceId,
+  workspaceTeams,
+  workspaceType,
   loading, 
   onTeamClick,
   onUpdateWorkspace 
 }: OverviewTabProps) {
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+  
+  // Get teams from Redux store
+  const { value: allTeams } = useSelector((state: RootState) => state.teams);
+  
+  // Get teams for this workspace based on workspace.teams array
+  const workspaceTeamDetails = useMemo(() => {
+    if (!workspaceTeams || !allTeams.length) return [];
+    return workspaceTeams
+      .map(teamId => allTeams.find(team => team.id === teamId))
+      .filter((team): team is NonNullable<typeof team> => team !== undefined);
+  }, [workspaceTeams, allTeams]);
+
+  // Check if workspace is default (cannot be deleted)
+  const isDefaultWorkspace = workspaceType === "DEFAULT";
+  
   const [editingWorkspace, setEditingWorkspace] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [editingIcon, setEditingIcon] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [tempName, setTempName] = useState(workspaceInfo?.name || '');
   const [tempDescription, setTempDescription] = useState(workspaceInfo?.description || '');
   const [tempIcon, setTempIcon] = useState(workspaceInfo?.icon || '');
-  const [tempIconColor, setTempIconColor] = useState(workspaceInfo?.iconColor || '#374151');
+  const [tempIconColor, setTempIconColor] = useState(workspaceInfo?.color || '#374151');
   const [iconSearch, setIconSearch] = useState('');
   const [showIconDropdown, setShowIconDropdown] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -216,7 +259,7 @@ function OverviewTab({
   }, [tempDescription, handleUpdateWorkspace]);
 
   const handleSaveIcon = () => {
-    handleUpdateWorkspace({ icon: tempIcon, iconColor: tempIconColor });
+            handleUpdateWorkspace({ icon: tempIcon, color: tempIconColor });
     setEditingIcon(false);
     setShowIconDropdown(false);
     setShowColorPicker(false);
@@ -235,7 +278,7 @@ function OverviewTab({
 
   const handleCancelIcon = () => {
     setTempIcon(workspaceInfo?.icon || '');
-    setTempIconColor(workspaceInfo?.iconColor || '#374151');
+    setTempIconColor(workspaceInfo?.color || '#374151');
     setEditingIcon(false);
     setShowIconDropdown(false);
     setShowColorPicker(false);
@@ -255,7 +298,7 @@ function OverviewTab({
   const handleColorSelect = (color: string) => {
     setTempIconColor(color);
     setShowColorPicker(false);
-    handleUpdateWorkspace({ icon: tempIcon, iconColor: color });
+    handleUpdateWorkspace({ icon: tempIcon, color: color });
     setEditingIcon(false);
     setIconSearch('');
   };
@@ -318,9 +361,9 @@ function OverviewTab({
   // Update temp values when workspaceInfo changes
   useEffect(() => {
     setTempName(workspaceInfo?.name || '');
-    setTempDescription(workspaceInfo?.description || '');
+    setTempDescription(workspaceInfo?.description || '')
     setTempIcon(workspaceInfo?.icon || '');
-    setTempIconColor(workspaceInfo?.iconColor || '#374151');
+    setTempIconColor(workspaceInfo?.color || '#374151');
   }, [workspaceInfo]);
 
   // Handle click outside for name editing
@@ -361,6 +404,24 @@ function OverviewTab({
     };
   }, [editingDescription, handleSaveDescription]);
 
+  // Handle workspace deletion with confirmation
+  const handleDeleteWorkspace = useCallback(async () => {
+    if (!workspaceId) return;
+    
+    setIsDeleting(true);
+    try {
+      await dispatch(removeWorkspaceAsync(workspaceId)).unwrap();
+      setShowDeleteDialog(false);
+      // Navigate to home or workspace list after successful deletion
+      navigate('/tasks'); // or wherever you want to redirect after deletion
+    } catch (error) {
+      console.error('Failed to delete workspace:', error);
+      // Error is handled by the slice and will show in UI
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [workspaceId, dispatch, navigate]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -387,9 +448,10 @@ function OverviewTab({
       {/* Simplified Workspace Info Section */}
       <Card className="py-3">
         <CardContent className="py-3">
-          <div className="flex items-center space-x-4">
-            {/* Icon editing */}
-            <div className="relative group" ref={dropdownRef}>
+          <div className="flex items-center justify-between space-x-4">
+            <div className="flex items-center space-x-4 flex-1">
+              {/* Icon editing */}
+              <div className="relative group" ref={dropdownRef}>
               {editingIcon ? (
                 <div className="relative">
                   <div
@@ -587,14 +649,14 @@ function OverviewTab({
                   className="text-4xl cursor-pointer hover:bg-accent rounded-lg p-2 transition-colors"
                   onClick={() => {
                     setTempIcon(workspaceInfo?.icon || '');
-                    setTempIconColor(workspaceInfo?.iconColor || '#374151');
+                    setTempIconColor(workspaceInfo?.color || '#374151');
                     setEditingIcon(true);
                     setShowIconDropdown(true);
                   }}
                 >
                   <FontAwesomeIcon 
                     icon={currentIcon || defaultIcon} 
-                    style={{ color: workspaceInfo?.iconColor || '#374151' }}
+                    style={{ color: workspaceInfo?.color || '#374151' }}
                   />
                 </div>
               )}
@@ -689,6 +751,36 @@ function OverviewTab({
                 </p>
               )}
             </div>
+            </div>
+
+            {/* Delete Button */}
+            <div className="flex-shrink-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => !isDefaultWorkspace && setShowDeleteDialog(true)}
+                      disabled={isDefaultWorkspace}
+                      className={`h-10 w-10 p-0 ${
+                        isDefaultWorkspace 
+                          ? 'text-muted-foreground cursor-not-allowed' 
+                          : 'text-destructive hover:text-destructive hover:bg-destructive/10'
+                      }`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {isDefaultWorkspace 
+                      ? "Default workspaces cannot be deleted. They are removed when their category is deleted." 
+                      : "Delete Workspace"
+                    }
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -702,9 +794,9 @@ function OverviewTab({
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{workspaceOverview.total_users}</div>
+            <div className="text-2xl font-bold">{workspaceTeamDetails.length > 0 ? 'N/A' : '0'}</div>
             <p className="text-xs text-muted-foreground">
-              Across all teams
+              {workspaceTeamDetails.length > 0 ? 'User count not available' : 'No teams assigned'}
             </p>
           </CardContent>
         </Card>
@@ -716,7 +808,7 @@ function OverviewTab({
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{workspaceOverview.teams.length}</div>
+            <div className="text-2xl font-bold">{workspaceTeamDetails.length}</div>
             <p className="text-xs text-muted-foreground">
               Teams with access
             </p>
@@ -748,32 +840,55 @@ function OverviewTab({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {workspaceOverview.teams.map((team) => (
-              <div 
-                key={team.id} 
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
-                onClick={() => onTeamClick(team.name)}
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-medium">
-                    {team.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h4 className="font-medium">{team.name}</h4>
-                    <p className="text-sm text-muted-foreground">{team.organization_name}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className="text-sm font-medium">{team.user_count} users</p>
-                    <p className="text-xs text-muted-foreground">
-                      Shared on {new Date(team.shared_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Badge variant="secondary">{team.user_count} users</Badge>
-                </div>
+            {workspaceTeamDetails.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No teams assigned to this workspace
               </div>
-            ))}
+            ) : (
+              workspaceTeamDetails.map((team) => (
+                <div 
+                  key={team.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => onTeamClick(team.name)}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center font-medium text-white"
+                      style={{ backgroundColor: team.color || '#374151' }}
+                    >
+                      {team.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-medium">{team.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {team.description || 'No description'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">
+                        Created: {new Date(team.created_at).toLocaleDateString()}
+                      </p>
+                      {team.updated_at && (
+                        <p className="text-xs text-muted-foreground">
+                          Updated: {new Date(team.updated_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <Badge 
+                      variant="secondary" 
+                      style={{ 
+                        backgroundColor: team.color ? `${team.color}20` : undefined,
+                        color: team.color || undefined 
+                      }}
+                    >
+                      Team
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -796,6 +911,45 @@ function OverviewTab({
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Workspace</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{workspaceInfo?.name}"? This action cannot be undone.
+              All data associated with this workspace will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteWorkspace}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Workspace
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -249,7 +249,7 @@ api.interceptors.request.use(
     const currentSubdomain = getSubdomain();
     const correctBaseURL = `${PROTOCOL}://${currentSubdomain}${VITE_API_URL}/api`;
     
-    console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
+    // console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
     
     // Override the baseURL for this specific request
     config.baseURL = correctBaseURL;

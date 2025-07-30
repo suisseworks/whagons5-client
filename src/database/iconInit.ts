@@ -11,7 +11,7 @@ export async function initializeIcons(): Promise<void> {
     
     // Log cache statistics for debugging
     const stats = await iconService.getCacheStats();
-    console.log('Icon cache initialized:', stats);
+    // console.log('Icon cache initialized:', stats);
   } catch (error) {
     console.error('Error initializing icon cache:', error);
   }

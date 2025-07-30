@@ -41,6 +41,7 @@ export const HomeRoutes = () => {
           <Route path="/tasks" element={<Workspace />} />
           <Route path="/workspace/:id" element={<Workspace />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/workspace/:id" element={<Workspace />} /> 
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/settings/categories" element={<Categories />} /> 
         </Routes>

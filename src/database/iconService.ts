@@ -124,8 +124,14 @@ class IconService {
   private async loadIconFromFontAwesome(iconName: string): Promise<any> {
     try {
       // Convert iconName to the expected format (fa + PascalCase)
-      const faIconName =
-        'fa' + iconName.charAt(0).toUpperCase() + iconName.slice(1);
+      // For hyphenated names like "clock-seven", convert to "faClockSeven"
+      const toPascalCase = (str: string) => {
+        return str.split('-').map(part => 
+          part.charAt(0).toUpperCase() + part.slice(1)
+        ).join('');
+      };
+      
+      const faIconName = 'fa' + toPascalCase(iconName);
 
       // Dynamically import only the specific icon we need
       try {
@@ -142,15 +148,12 @@ class IconService {
           return icon;
         }
 
-        // If not found, try some common variations
+        // If not found, try some common variations for hyphenated names
         const variations = [
-          'fa' + iconName.charAt(0).toUpperCase() + iconName.slice(1),
-          'fa' +
-            iconName.charAt(0).toUpperCase() +
-            iconName.slice(1).replace(/([A-Z])/g, ''),
-          'fa' +
-            iconName.replace(/[-_]/g, '').charAt(0).toUpperCase() +
-            iconName.replace(/[-_]/g, '').slice(1),
+          faIconName, // faClockSeven
+          'fa' + iconName.charAt(0).toUpperCase() + iconName.slice(1), // faClockSeven (simple)
+          'fa' + iconName.replace(/[-_]/g, '').charAt(0).toUpperCase() + iconName.replace(/[-_]/g, '').slice(1), // faclockseven -> faClockSeven
+          'fa' + iconName.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(''), // fa + ClockSeven
         ];
 
         for (const variation of variations) {
@@ -172,9 +175,12 @@ class IconService {
    * Load multiple icons at once with caching
    */
   async loadIcons(iconNames: string[]): Promise<{ [key: string]: any }> {
-    const uniqueNames = [
-      ...new Set(iconNames.filter((name) => name && typeof name === 'string')),
-    ];
+    // Parse FontAwesome class formats first
+    const parsedNames = iconNames
+      .filter((name) => name && typeof name === 'string')
+      .map((name) => this.parseFontAwesomeIconName(name));
+      
+    const uniqueNames = [...new Set(parsedNames)];
 
     if (uniqueNames.length === 0) {
       return {};
@@ -261,7 +267,7 @@ class IconService {
       
       if (response.ok) {
         this.faMetadata = await response.json();
-        console.log('FontAwesome metadata loaded successfully');
+        // console.log('FontAwesome metadata loaded successfully');
       } else {
         console.warn('Could not load FontAwesome metadata, falling back to generated keywords');
       }
@@ -283,17 +289,51 @@ class IconService {
     if (this.faMetadata && this.faMetadata[iconName]?.search?.terms) {
       const officialTerms = this.faMetadata[iconName].search.terms;
       officialTerms.forEach(term => keywordSet.add(term));
-      console.log(`Using official keywords for ${iconName}:`, officialTerms);
+      // console.log(`Using official keywords for ${iconName}:`, officialTerms);
+      
+      // Even with official keywords, add some basic variations for better search
+      this.addBasicVariations(iconName, keywordSet);
       return Array.from(keywordSet);
     }
     
     // Fall back to generated keywords if official ones aren't available
-    console.log(`No official keywords found for ${iconName}, generating keywords`);
+    // console.log(`No official keywords found for ${iconName}, generating keywords`);
+    
+    this.addBasicVariations(iconName, keywordSet);
+    return Array.from(keywordSet);
+  }
+
+  private addBasicVariations(iconName: string, keywordSet: Set<string>): void {
+    // Add hyphen-separated parts (for names like "arrow-left")
+    if (iconName.includes('-')) {
+      iconName.split('-').forEach(part => {
+        if (part.length > 1) {
+          keywordSet.add(part);
+        }
+      });
+      // Also add the full hyphenated name
+      keywordSet.add(iconName);
+    }
+    
+    // Add underscore-separated parts
+    if (iconName.includes('_')) {
+      iconName.split('_').forEach(part => {
+        if (part.length > 1) {
+          keywordSet.add(part);
+        }
+      });
+    }
     
     // Add space-separated version (for camelCase names)
     const spaceVersion = iconName.replace(/([A-Z])/g, ' $1').toLowerCase();
     if (spaceVersion !== iconName) {
       keywordSet.add(spaceVersion);
+      // Add individual words from space-separated version
+      spaceVersion.split(' ').forEach(word => {
+        if (word.length > 1) {
+          keywordSet.add(word);
+        }
+      });
     }
     
     // Add hyphen-separated version (for camelCase names)
@@ -320,8 +360,6 @@ class IconService {
         keywordSet.add(variation);
       }
     });
-    
-    return Array.from(keywordSet);
   }
 
   /**
@@ -401,6 +439,29 @@ class IconService {
   }
 
   /**
+   * Parse FontAwesome class format (e.g., "fas fa-broom" -> "broom")
+   */
+  private parseFontAwesomeIconName(iconName: string): string {
+    if (!iconName || typeof iconName !== 'string') {
+      return '';
+    }
+
+    // Handle FontAwesome class format (fas fa-icon-name, far fa-icon-name, etc.)
+    const faClassMatch = iconName.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
+    if (faClassMatch) {
+      return faClassMatch[2]; // Return just the icon name part
+    }
+
+    // Handle fa-prefix format (fa-icon-name -> icon-name)
+    if (iconName.startsWith('fa-')) {
+      return iconName.substring(3);
+    }
+
+    // Return as-is if no special format detected
+    return iconName;
+  }
+
+  /**
    * Get icon by name with fallback to default
    */
   async getIcon(iconName?: string): Promise<any> {
@@ -408,7 +469,9 @@ class IconService {
       return this.defaultIcon;
     }
 
-    return this.loadIcon(iconName);
+    // Parse FontAwesome class format if needed
+    const parsedIconName = this.parseFontAwesomeIconName(iconName);
+    return this.loadIcon(parsedIconName);
   }
 
   /**
