@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { Workspace } from "../Types";
+import { Workspace } from "../types";
 import { WorkspaceCache } from "../indexedDB/WorkspaceCache";
 import api from "@/api/whagonsApi";
 

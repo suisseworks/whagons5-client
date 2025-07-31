@@ -73,6 +73,29 @@ export class DB {
     // Clear session storage for good measure
     sessionStorage.clear();
 
+    // Clear all cache initialization flags from localStorage
+    if (auth.currentUser?.uid) {
+      const userId = auth.currentUser.uid;
+      
+      // Clear workspace cache flags
+      localStorage.removeItem(`workspaceCacheInitialized-${userId}`);
+      localStorage.removeItem(`workspaceCacheLastUpdated-${userId}`);
+      
+      // Clear teams cache flags
+      localStorage.removeItem(`teamsCacheInitialized-${userId}`);
+      localStorage.removeItem(`teamsCacheLastUpdated-${userId}`);
+      
+      // Clear categories cache flags
+      localStorage.removeItem(`categoriesCacheInitialized-${userId}`);
+      localStorage.removeItem(`categoriesCacheLastUpdated-${userId}`);
+      
+      // Clear tasks cache flags
+      localStorage.removeItem(`tasksCacheInitialized-${userId}`);
+      localStorage.removeItem(`tasksCacheLastUpdated-${userId}`);
+      
+      console.log(`Cleared all cache flags for user ${userId}`);
+    }
+
     // First close our own connection to the database if it exists
     if (DB.inited && DB.db) {
       try {

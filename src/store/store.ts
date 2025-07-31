@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from 'redux-persist';
 import { workspacesSlice } from "./reducers/workspacesSlice";
 import { teamsSlice } from "./reducers/teamsSlice";
+import { categoriesSlice } from "./reducers/categoriesSlice";
 import createIdbStorage from '@piotr-cz/redux-persist-idb-storage'
 import { tasksSlice } from "./reducers/tasksSlice";
 
@@ -15,6 +16,7 @@ const persistedReducer = persistReducer(persistConfig,
     combineReducers({
         workspaces: workspacesSlice.reducer,
         teams: teamsSlice.reducer,
+        categories: categoriesSlice.reducer,
         tasks: tasksSlice.reducer
     })
 )

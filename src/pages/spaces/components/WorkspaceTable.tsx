@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { api } from '@/api/whagonsApi';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
@@ -22,7 +23,13 @@ const loadRequiredModules = async () => {
   ]);
 };
 
-const WorkspaceTable = ({ rowCache }: { rowCache: React.MutableRefObject<Map<string, { rows: any[]; rowCount: number }>> }) => {
+const WorkspaceTable = ({ 
+  rowCache, 
+  workspaceId 
+}: { 
+  rowCache: React.MutableRefObject<Map<string, { rows: any[]; rowCount: number }>>; 
+  workspaceId: string;
+}) => {
   const containerStyle = useMemo(() => ({ width: '100%', height: '100%' }), []);
   const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
   const [modulesLoaded, setModulesLoaded] = useState(false);
@@ -37,35 +44,37 @@ const WorkspaceTable = ({ rowCache }: { rowCache: React.MutableRefObject<Map<str
       .catch(console.error);
   }, []);
 
-  // Generate cache key based on request parameters
+  // Generate cache key based on request parameters including workspaceId
   const getCacheKey = useCallback((params: any) => {
-    return `${params.startRow}-${params.endRow}-${JSON.stringify(
+    return `${workspaceId}-${params.startRow}-${params.endRow}-${JSON.stringify(
       params.filterModel || {}
     )}-${JSON.stringify(params.sortModel || [])}`;
-  }, []);
+  }, [workspaceId]);
 
   const [columnDefs] = useState([
     // this row shows the row index, doesn't use any data from the row
-    {
-      field: 'id',
-      // add loader
-      cellRenderer: (params: any) => {
-        if (params.value !== undefined) {
-          return params.value;
-        } else {
-          return <i className="fas fa-spinner fa-pulse"></i>;
-        }
-      },
-      maxWidth: 100,
+    // {
+    //   field: 'id',
+    //   // add loader
+    //   cellRenderer: (params: any) => {
+    //     if (params.value !== undefined) {
+    //       return params.value;
+    //     } else {
+    //       return <i className="fas fa-spinner fa-pulse"></i>;
+    //     }
+    //   },
+    //   maxWidth: 100,
+    // },
+    { field: 'name',
+      flex: 1
     },
-    { field: 'name' },
     {
       field: 'workspace_id',
       sortable: true,
     },
-    { field: 'template_id' },
-    { field: 'spot_id' },
-    { field: 'status_id' },
+    // { field: 'template_id' },
+    // { field: 'spot_id' },
+    // { field: 'status_id' },
     { field: 'response_date' },
     { field: 'resolution_date' },
     { field: 'work_duration' },
@@ -79,7 +88,7 @@ const WorkspaceTable = ({ rowCache }: { rowCache: React.MutableRefObject<Map<str
     };
   }, []);
 
-  // Memoized getRows function
+  // Memoized getRows function - now uses local TasksCache instead of API
   const getRows = useCallback(
     async (params: any) => {
       const cacheKey = getCacheKey(params);
@@ -95,15 +104,24 @@ const WorkspaceTable = ({ rowCache }: { rowCache: React.MutableRefObject<Map<str
       }
 
       console.log(params);
-      console.log('asking for ' + params.startRow + ' to ' + params.endRow);
+      console.log('asking for ' + params.startRow + ' to ' + params.endRow + ' from local cache');
 
       try {
-        const res = await api.get('/tasks', {
-          params: params,
-        });
+        // Ensure TasksCache is initialized (only if not already initialized)
+        if (!TasksCache.initialized) {
+          await TasksCache.init();
+        }
 
-        if (res.data.rowCount === 0 || res.data.rows.length === 0) {
-          console.log('params', params.startRow);
+        // Use TasksCache.queryTasks instead of API call
+        const queryParams = {
+          ...params,
+          workspace_id: workspaceId, // Filter by workspace ID
+        };
+        
+        const result = await TasksCache.queryTasks(queryParams);
+
+        if (!result || result.rowCount === 0 || !result.rows || result.rows.length === 0) {
+          console.log('No tasks found for workspace', workspaceId);
           // Cache empty result
           rowCache.current.set(cacheKey, {
             rows: [],
@@ -111,19 +129,40 @@ const WorkspaceTable = ({ rowCache }: { rowCache: React.MutableRefObject<Map<str
           });
           params.successCallback([], params.startRow);
         } else {
-          // Use the actual row count from the API response to prevent infinite scrolling
-          const totalRowCount = res.data.rowCount || (params.startRow + res.data.rows.length);
+          // Use the actual row count from the local cache response
+          const totalRowCount = result.rowCount;
+          const rows = result.rows;
           
           // Cache successful result
-          rowCache.current.set(cacheKey, { rows: res.data.rows, rowCount: totalRowCount });
-          params.successCallback(res.data.rows, totalRowCount);
+          rowCache.current.set(cacheKey, { rows, rowCount: totalRowCount });
+          params.successCallback(rows, totalRowCount);
+          
+          console.log(`Loaded ${rows.length} tasks from local cache (${totalRowCount} total)`);
         }
       } catch (error) {
+        console.error('Error querying local tasks cache:', error);
         params.failCallback();
       }
     },
-    [getCacheKey]
+    [getCacheKey, workspaceId]
   );
+
+  // Clear cache and refresh grid when workspaceId changes
+  useEffect(() => {
+    if (gridRef.current?.api && modulesLoaded) {
+      console.log(`Workspace changed to ${workspaceId}, clearing cache and refreshing grid`);
+      
+      // Clear the cache for this workspace change
+      rowCache.current.clear();
+      
+      // Refresh datasource to trigger new data fetch
+      const dataSource = {
+        rowCount: undefined,
+        getRows,
+      };
+      gridRef.current.api.setGridOption('datasource', dataSource);
+    }
+  }, [workspaceId, getRows, modulesLoaded]);
 
   const onGridReady = useCallback(
     (params: any) => {

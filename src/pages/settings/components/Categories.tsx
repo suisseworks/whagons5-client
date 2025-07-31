@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
@@ -30,7 +31,10 @@ import {
   faLaptop,
   faBook
 } from "@fortawesome/free-solid-svg-icons";
-import { api } from '@/api/whagonsApi';
+import { RootState, AppDispatch } from "@/store/store";
+import { getCategoriesFromIndexedDB, addCategoryAsync } from "@/store/reducers/categoriesSlice";
+import { getTeamsFromIndexedDB } from "@/store/reducers/teamsSlice";
+import { Category } from "@/store/types";
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -140,12 +144,14 @@ const ActionsCellRenderer = (props: ICellRendererParams) => {
 
 function Categories() {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const gridRef = useRef<AgGridReact>(null);
   
-  const [categories, setCategories] = useState<any[]>([]);
-  const [rowData, setRowData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Redux state
+  const { value: categories, loading, error } = useSelector((state: RootState) => state.categories);
+  const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams);
+  
+  const [rowData, setRowData] = useState<Category[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -154,7 +160,9 @@ function Categories() {
     color: '#4ECDC4',
     icon: 'fas fa-tags',
     enabled: true,
-    team_id: ''
+    team_id: '',
+    workspace_id: 1, // You might want to get this from context or props
+    sla_id: 1 // You might want to get this from context or props
   });
 
   // Icon search states
@@ -174,10 +182,6 @@ function Categories() {
   const iconDropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Teams state
-  const [teams, setTeams] = useState<any[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
-
   // Column definitions for AG Grid (using useMemo to access teams state)
   const colDefs = useMemo<ColDef[]>(() => [
     { 
@@ -196,7 +200,7 @@ function Categories() {
     { 
       field: 'team_id', 
       headerName: 'Team',
-      width: 120,
+      width: 180,
       cellRenderer: (params: ICellRendererParams) => {
         const teamId = params.value;
         
@@ -238,64 +242,20 @@ function Categories() {
     }
   ], [teams]);
 
-  // Load categories from API
-  const loadCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const res = await api.get('/categories');
-      
-      if (res.data && Array.isArray(res.data)) {
-        setCategories(res.data);
-        setRowData(res.data);
-      } else {
-        // Handle case where API returns different structure
-        const categoriesData = res.data.categories || res.data.data || [];
-        setCategories(categoriesData);
-        setRowData(categoriesData);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      setError('Failed to load categories');
-      // Fallback to empty array
-      setCategories([]);
-      setRowData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Load categories on component mount
+  // Load categories from Redux store
   useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+    dispatch(getCategoriesFromIndexedDB());
+  }, [dispatch]);
 
-  // Load teams from API
-  const loadTeams = useCallback(async () => {
-    try {
-      setLoadingTeams(true);
-      const res = await api.get('/teams');
-      
-      if (res.data && Array.isArray(res.data)) {
-        setTeams(res.data);
-      } else {
-        // Handle case where API returns different structure
-        const teamsData = res.data.teams || res.data.data || [];
-        setTeams(teamsData);
-      }
-    } catch (error) {
-      console.error('Error loading teams:', error);
-      setTeams([]);
-    } finally {
-      setLoadingTeams(false);
-    }
-  }, []);
-
-  // Load teams on component mount
+  // Load teams from Redux store
   useEffect(() => {
-    loadTeams();
-  }, [loadTeams]);
+    dispatch(getTeamsFromIndexedDB());
+  }, [dispatch]);
+
+  // Update rowData when categories change
+  useEffect(() => {
+    setRowData(categories);
+  }, [categories]);
 
   // Load default icon and popular icons
   useEffect(() => {
@@ -407,47 +367,56 @@ function Categories() {
     return () => clearTimeout(debounceTimer);
   }, [iconSearch, popularIcons]);
 
-  // Create new category via API
+  // Create new category via Redux
   const createCategory = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
       
-      const res = await api.post('/categories', formData);
+      const categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'> = {
+        name: formData.name,
+        description: formData.description,
+        color: formData.color,
+        icon: formData.icon,
+        enabled: formData.enabled,
+        team_id: formData.team_id ? parseInt(formData.team_id) : 0,
+        workspace_id: formData.workspace_id,
+        sla_id: formData.sla_id,
+        deleted_at: null
+      };
       
-      if (res.data) {
-        // Refresh the categories list
-        await loadCategories();
-        // Reset form and close dialog
-        setFormData({
-          name: '',
-          description: '',
-          color: '#4ECDC4',
-          icon: 'fas fa-tags',
-          enabled: true,
-          team_id: ''
-        });
-        setIsCreateDialogOpen(false);
-      }
+      await dispatch(addCategoryAsync(categoryData)).unwrap();
+      
+      // Reset form and close dialog
+      setFormData({
+        name: '',
+        description: '',
+        color: '#4ECDC4',
+        icon: 'fas fa-tags',
+        enabled: true,
+        team_id: '',
+        workspace_id: 1,
+        sla_id: 1
+      });
+      setIsCreateDialogOpen(false);
     } catch (error) {
       console.error('Error creating category:', error);
-      setError('Failed to create category');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleAddCategory = () => {
-    // Reset form data and clear errors when opening dialog
+    // Reset form data when opening dialog
     setFormData({
       name: '',
       description: '',
       color: '#4ECDC4',
       icon: 'fas fa-tags',
       enabled: true,
-      team_id: ''
+      team_id: '',
+      workspace_id: 1,
+      sla_id: 1
     });
-    setError(null);
     // Reset icon search state
     setIconSearch('');
     setShowIconDropdown(false);
@@ -613,7 +582,7 @@ function Categories() {
         <Separator />
         <div className="flex flex-col items-center justify-center h-64 space-y-4">
           <p className="text-destructive">{error}</p>
-          <Button onClick={loadCategories} variant="outline">
+          <Button onClick={() => dispatch(getCategoriesFromIndexedDB())} variant="outline">
             Try Again
           </Button>
         </div>

@@ -758,19 +758,21 @@ function OverviewTab({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => !isDefaultWorkspace && setShowDeleteDialog(true)}
-                      disabled={isDefaultWorkspace}
-                      className={`h-10 w-10 p-0 ${
-                        isDefaultWorkspace 
-                          ? 'text-muted-foreground cursor-not-allowed' 
-                          : 'text-destructive hover:text-destructive hover:bg-destructive/10'
-                      }`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <span className="inline-block">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => !isDefaultWorkspace && setShowDeleteDialog(true)}
+                        disabled={isDefaultWorkspace}
+                        className={`h-10 w-10 p-0 ${
+                          isDefaultWorkspace 
+                            ? 'text-muted-foreground cursor-not-allowed' 
+                            : 'text-destructive hover:text-destructive hover:bg-destructive/10'
+                        }`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     {isDefaultWorkspace 

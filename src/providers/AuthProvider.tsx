@@ -8,6 +8,8 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
 import { getWorkspacesFromIndexedDB } from '../store/reducers/workspacesSlice';
 import { getTeamsFromIndexedDB } from '../store/reducers/teamsSlice';
+import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
+import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 
 // Define context types
 interface AuthContextType {
@@ -60,6 +62,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Load workspaces and teams from IndexedDB after user is authenticated
         dispatch(getWorkspacesFromIndexedDB());
         dispatch(getTeamsFromIndexedDB());
+        dispatch(getCategoriesFromIndexedDB());
+        dispatch(getTasksFromIndexedDB());
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user data:', error);

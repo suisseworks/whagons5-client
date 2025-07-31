@@ -1,14 +1,36 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Settings } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 
 export const Workspace = () => {
+  const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('grid');
   // State to store the fetched data
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
+
+  // Clear cache when workspace ID changes
+  useEffect(() => {
+    if (id) {
+      console.log(`Switching to workspace ${id}, clearing cache`);
+      rowCache.current.clear();
+    }
+  }, [id]);
+
+  // Handle invalid workspace ID
+  if (!id) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
+          <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
+        </div>
+      </div>
+    );
+  }
 
 
   return (
@@ -29,7 +51,7 @@ export const Workspace = () => {
         value="grid"
         style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
       >
-        <WorkspaceTable rowCache={rowCache} />
+        <WorkspaceTable rowCache={rowCache} workspaceId={id} />
       </TabsContent>
       <TabsContent value="list" className="flex-1 h-0">
         <SettingsComponent />

@@ -8,12 +8,16 @@ import OnboardingRoute from './OnboardingRoute';
 import { useEffect } from 'react';
 import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
 import { TeamsCache } from '@/store/indexedDB/TeamsCache';
+import { CategoriesCache } from '@/store/indexedDB/CategoriesCache';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
 
 export const AppRouter = () => {
 
   useEffect(() => {
     WorkspaceCache.init();
     TeamsCache.init();
+    CategoriesCache.init();
+    TasksCache.init();
   }, []);
 
   return (
