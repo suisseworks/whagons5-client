@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { api } from '@/api/whagonsApi';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
@@ -147,12 +148,12 @@ const WorkspaceTable = ({
     [getCacheKey, workspaceId]
   );
 
-  // Clear cache and refresh grid when workspaceId changes
-  useEffect(() => {
+  // Function to refresh the grid
+  const refreshGrid = useCallback(() => {
     if (gridRef.current?.api && modulesLoaded) {
-      console.log(`Workspace changed to ${workspaceId}, clearing cache and refreshing grid`);
+      console.log('Refreshing grid data...');
       
-      // Clear the cache for this workspace change
+      // Clear the cache
       rowCache.current.clear();
       
       // Refresh datasource to trigger new data fetch
@@ -162,7 +163,52 @@ const WorkspaceTable = ({
       };
       gridRef.current.api.setGridOption('datasource', dataSource);
     }
-  }, [workspaceId, getRows, modulesLoaded]);
+  }, [getRows, modulesLoaded]);
+
+  // Clear cache and refresh grid when workspaceId changes
+  useEffect(() => {
+    if (gridRef.current?.api && modulesLoaded) {
+      console.log(`Workspace changed to ${workspaceId}, clearing cache and refreshing grid`);
+      refreshGrid();
+    }
+  }, [workspaceId, refreshGrid, modulesLoaded]);
+
+  // Listen for task events to refresh the table
+  useEffect(() => {
+    const unsubscribeCreated = TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, (data) => {
+      console.log('Task created, refreshing grid:', data);
+      refreshGrid();
+    });
+
+    const unsubscribeUpdated = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, (data) => {
+      console.log('Task updated, refreshing grid:', data);
+      refreshGrid();
+    });
+
+    const unsubscribeDeleted = TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, (data) => {
+      console.log('Task deleted, refreshing grid:', data);
+      refreshGrid();
+    });
+
+    const unsubscribeBulkUpdate = TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, () => {
+      console.log('Bulk task update, refreshing grid');
+      refreshGrid();
+    });
+
+    const unsubscribeInvalidate = TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, () => {
+      console.log('Cache invalidated, refreshing grid');
+      refreshGrid();
+    });
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+      unsubscribeBulkUpdate();
+      unsubscribeInvalidate();
+    };
+  }, [refreshGrid]);
 
   const onGridReady = useCallback(
     (params: any) => {

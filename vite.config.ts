@@ -16,6 +16,9 @@ export default defineConfig({
       brotliSize: true,
     }),
   ],
+  define: {
+    global: 'globalThis',
+  },
   preview: {
     allowedHosts: ['whagons5.whagons.com'],
   },
@@ -65,6 +68,9 @@ export default defineConfig({
           
           // HTTP Client
           http: ['axios'],
+          
+          // WebSocket/SockJS
+          sockjs: ['sockjs-client'],
           
           // Utilities
           utils: [

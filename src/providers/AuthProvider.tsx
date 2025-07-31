@@ -10,6 +10,7 @@ import { getWorkspacesFromIndexedDB } from '../store/reducers/workspacesSlice';
 import { getTeamsFromIndexedDB } from '../store/reducers/teamsSlice';
 import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
 import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
+import { RealTimeListener } from '@/store/realTimeListener/RTL';
 
 // Define context types
 interface AuthContextType {
@@ -64,6 +65,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         dispatch(getTeamsFromIndexedDB());
         dispatch(getCategoriesFromIndexedDB());
         dispatch(getTasksFromIndexedDB());
+
+        const rtl = new RealTimeListener({ debug: true });
+        rtl.connectAndHold();
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user data:', error);

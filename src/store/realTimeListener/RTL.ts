@@ -1,0 +1,570 @@
+import { getTokenForUser } from "@/api/whagonsApi";
+import { auth } from "@/firebase/firebaseConfig";
+import { getEnvVariables } from "@/lib/getEnvVariables";
+import { TasksCache } from "@/store/indexedDB/TasksCache";
+import SockJS from 'sockjs-client';
+
+interface RTLMessage {
+  type: 'ping' | 'system' | 'error' | 'echo' | 'database';
+  operation?: string;
+  message?: string;
+  data?: any;
+  tenant_name?: string;
+  table?: string;
+  new_data?: any;
+  old_data?: any;
+  db_timestamp?: number;
+  client_timestamp?: string;
+  sessionId?: string;
+}
+
+interface ConnectionOptions {
+  autoReconnect?: boolean;
+  reconnectInterval?: number;
+  maxReconnectAttempts?: number;
+  debug?: boolean;
+}
+
+export class RealTimeListener {
+  private sock: any | null = null;
+  private isConnected: boolean = false;
+  private isConnecting: boolean = false;
+  private reconnectAttempts: number = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private options: ConnectionOptions;
+  
+  // Event listeners
+  private listeners: Map<string, ((data: any) => void)[]> = new Map();
+  private keepAliveListenerAdded = false;
+
+  constructor(options: ConnectionOptions = {}) {
+    this.options = {
+      autoReconnect: true,
+      reconnectInterval: 5000, // 5 seconds
+      maxReconnectAttempts: 5,
+      debug: false,
+      ...options
+    };
+  }
+
+  /**
+   * Debug logging - only logs when debug flag is enabled
+   */
+  private debugLog(message: string, ...args: any[]): void {
+    if (this.options.debug) {
+      console.log(`RTL: ${message}`, ...args);
+    }
+  }
+
+  /**
+   * Get the SockJS URL for connection
+   */
+  private getSockJSUrl(): string {
+    const { VITE_API_URL, VITE_DEVELOPMENT } = getEnvVariables();
+    const subdomain = this.getSubdomain();
+    const token = this.getStoredToken();
+    
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    // Clean up subdomain - ensure it has trailing dot if not empty
+    let cleanSubdomain = subdomain.trim();
+    if (cleanSubdomain && !cleanSubdomain.endsWith('.')) {
+      cleanSubdomain += '.';
+    }
+
+    // Construct domain from subdomain and API URL (remove port for domain param)
+    const apiUrlWithoutPort = VITE_API_URL.replace(/:\d+$/, ''); // Remove port from API URL
+    const domain = cleanSubdomain ? `${cleanSubdomain}${apiUrlWithoutPort}` : apiUrlWithoutPort;
+    
+    // SockJS uses regular HTTP/HTTPS protocol, not WebSocket protocol
+    const protocol = VITE_DEVELOPMENT === 'true' ? 'http' : 'https';
+    const host = VITE_DEVELOPMENT === 'true' ? 'localhost:8082' : domain;
+    
+    const wsUrl = `${protocol}://${host}/ws?domain=${encodeURIComponent(domain)}&token=${encodeURIComponent(token)}`;
+    
+    // Enhanced debug logging
+    this.debugLog('WebSocket URL construction:', {
+      VITE_API_URL,
+      VITE_DEVELOPMENT,
+      rawSubdomain: subdomain,
+      cleanSubdomain,
+      apiUrlWithoutPort,
+      domain,
+      protocol,
+      host,
+      wsUrl,
+      tokenPreview: token.substring(0, 10) + '...'
+    });
+    
+    return wsUrl;
+  }
+
+  /**
+   * Get subdomain from localStorage
+   */
+  private getSubdomain(): string {
+    return localStorage.getItem('whagons-subdomain') || '';
+  }
+
+  /**
+   * Get stored authentication token
+   */
+  private getStoredToken(): string | null {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      return getTokenForUser(currentUser.uid);
+    }
+    return null;
+  }
+
+  /**
+   * Check if SockJS server is available
+   */
+  async checkServerAvailability(): Promise<boolean> {
+    const { VITE_DEVELOPMENT } = getEnvVariables();
+    
+    if (VITE_DEVELOPMENT === 'true') {
+      // In development, check if localhost:8082 is accessible
+      try {
+        const response = await fetch('http://localhost:8082/health', { 
+          method: 'GET',
+          mode: 'no-cors' // Allow connection even if CORS isn't configured
+        });
+        this.debugLog('Server health check response:', response.status);
+        return true;
+      } catch (error) {
+        this.debugLog('Server health check failed:', error);
+        console.warn('⚠️  SockJS server appears to be offline at localhost:8082');
+        console.warn('💡 Make sure your SockJS server is running before connecting');
+        return false;
+      }
+    }
+    
+    // In production, assume server is available (will be handled by connection timeout)
+    return true;
+  }
+
+  /**
+   * Connect to WebSocket and immediately send a keep-alive message
+   */
+  async connectAndHold(): Promise<void> {
+   //check if server is available
+   const serverAvailable = await this.checkServerAvailability();
+   if(!serverAvailable) {
+    throw new Error('SockJS server is not available. Please start the server and try again.');
+   }
+   
+   this.connect();
+   
+   // Remove any existing keep-alive listeners first
+   this.off('connection:status', this.keepAliveHandler);
+   this.on('connection:status', this.keepAliveHandler);
+  }
+
+  private keepAliveHandler = (data: any) => {
+    if(data.status === 'authenticated') {
+      this.send('keep alive');
+    }
+  };
+
+  /**
+   * Connect to SockJS
+   */
+  async connect(): Promise<void> {
+    if (this.isConnected || this.isConnecting) {
+      this.debugLog('Already connected or connecting');
+      return;
+    }
+
+    try {
+      this.isConnecting = true;
+      const wsUrl = this.getSockJSUrl();
+      
+      this.debugLog('Connecting to SockJS...', { subdomain: this.getSubdomain(), wsUrl });
+      this.emit('connection:status', { status: 'connecting', message: 'Connecting to SockJS...' });
+
+      this.sock = new SockJS(wsUrl);
+      
+      this.sock.onopen = this.handleOpen.bind(this);
+      this.sock.onmessage = this.handleMessage.bind(this);
+      this.sock.onclose = this.handleClose.bind(this);
+      this.sock.onerror = this.handleError.bind(this);
+
+    } catch (error) {
+      console.error('RTL: Failed to create WebSocket connection:', error);
+      this.isConnecting = false;
+      this.emit('connection:error', { error: error instanceof Error ? error.message : String(error) });
+      
+      if (this.options.autoReconnect) {
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  /**
+   * Smart connect - checks server availability first, then connects
+   */
+  async smartConnect(): Promise<void> {
+    this.debugLog('Starting smart connect...');
+    
+    // Check server availability in development
+    const serverAvailable = await this.checkServerAvailability();
+    if (!serverAvailable) {
+      throw new Error('SockJS server is not available. Please start the server and try again.');
+    }
+    
+    return this.connect();
+  }
+
+  /**
+   * Smart connect and hold - checks server, connects, and sends keep-alive
+   */
+  async smartConnectAndHold(): Promise<void> {
+    this.debugLog('Starting smart connect and hold...');
+    
+    // Check server availability in development
+    const serverAvailable = await this.checkServerAvailability();
+    if (!serverAvailable) {
+      throw new Error('SockJS server is not available. Please start the server and try again.');
+    }
+    
+    return this.connectAndHold();
+  }
+
+  /**
+   * Disconnect from SockJS
+   */
+  disconnect(): void {
+    this.debugLog('Disconnecting...');
+    this.options.autoReconnect = false; // Disable auto-reconnect for manual disconnect
+    
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.sock) {
+      this.sock.close();
+      this.sock = null;
+    }
+
+    this.isConnected = false;
+    this.isConnecting = false;
+    this.reconnectAttempts = 0;
+    
+    this.emit('connection:status', { status: 'disconnected', message: 'Disconnected' });
+  }
+
+  /**
+   * Send a message through SockJS
+   */
+  send(message: string | object): void {
+    if (!this.isConnected || !this.sock) {
+      console.warn('RTL: Cannot send message - not connected');
+      return;
+    }
+
+    const payload = typeof message === 'string' ? message : JSON.stringify(message);
+    this.sock.send(payload);
+    this.debugLog('Message sent:', payload);
+  }
+
+  /**
+   * Handle SockJS open event
+   */
+  private handleOpen(): void {
+    this.debugLog('SockJS connected');
+    this.isConnected = true;
+    this.isConnecting = false;
+    this.reconnectAttempts = 0;
+    
+    this.emit('connection:status', { status: 'connected', message: 'Connected - Authenticating...' });
+  }
+
+  /**
+   * Handle SockJS message event
+   */
+  private handleMessage(event: MessageEvent): void {
+    try {
+      const data: RTLMessage = JSON.parse(event.data);
+      this.debugLog('Message received:', data);
+      
+      this.handleRTLMessage(data);
+    } catch (error) {
+      console.error('RTL: Failed to parse message:', error);
+      this.emit('message:error', { error: 'Failed to parse message', rawData: event.data });
+    }
+  }
+
+  /**
+   * Handle SockJS close event
+   */
+  private handleClose(event: CloseEvent): void {
+    this.debugLog('SockJS disconnected', { code: event.code, reason: event.reason });
+    this.isConnected = false;
+    this.isConnecting = false;
+    
+    this.emit('connection:status', { status: 'disconnected', message: 'Connection closed' });
+
+    // Auto-reconnect if enabled and not a manual disconnect
+    if (this.options.autoReconnect && event.code !== 1000) { // 1000 = normal closure
+      this.scheduleReconnect();
+    }
+  }
+
+  /**
+   * Handle SockJS error event
+   */
+  private handleError(error: Event): void {
+    console.error('RTL: SockJS error:', error);
+    this.isConnecting = false;
+    
+    // More specific error message based on the current state
+    const wsUrl = this.sock?.url || 'unknown';
+    const errorMessage = this.getConnectionErrorMessage(wsUrl);
+    
+    console.error('❌ SockJS Connection Failed');
+    console.error('📍 URL:', wsUrl);
+    console.error('💡 Suggestion:', errorMessage);
+    
+    this.emit('connection:error', { error: errorMessage, url: wsUrl });
+
+    if (this.options.autoReconnect) {
+      this.scheduleReconnect();
+    }
+  }
+
+  /**
+   * Get user-friendly error message based on connection URL
+   */
+  private getConnectionErrorMessage(wsUrl: string): string {
+    if (wsUrl.includes('localhost:8082')) {
+      return 'SockJS server not running on localhost:8082. Please start your SockJS server.';
+    } else if (wsUrl.includes('localhost')) {
+      return 'Local SockJS server connection failed. Check if the server is running.';
+    } else {
+      return 'SockJS connection failed. Check your network connection and server status.';
+    }
+  }
+
+  /**
+   * Handle different types of RTL messages
+   */
+  private handleRTLMessage(data: RTLMessage): void {
+    switch (data.type) {
+      case 'ping':
+        // Silently handle server ping messages for health checks
+        this.debugLog('Received ping from server');
+        break;
+        
+      case 'system':
+        this.handleSystemMessage(data);
+        break;
+        
+      case 'error':
+        this.handleErrorMessage(data);
+        break;
+        
+      case 'echo':
+        this.emit('message:echo', { message: data.message, data: data.data });
+        break;
+        
+      case 'database':
+        this.handlePublicationMessage(data);
+        break;
+        
+      default:
+        // Handle unknown message types
+        this.debugLog('Unknown message type:', data);
+        this.emit('message:unknown', data);
+        break;
+    }
+  }
+
+  /**
+   * Handle system messages
+   */
+  private handleSystemMessage(data: RTLMessage): void {
+    if (data.operation === 'authenticated') {
+      this.debugLog('Successfully authenticated', data.data);
+      this.emit('connection:status', { 
+        status: 'authenticated', 
+        message: 'Authenticated ✅',
+        data: data.data 
+      });
+      this.emit('auth:success', data.data);
+    } else {
+      this.emit('message:system', { message: data.message, data: data.data });
+    }
+  }
+
+  /**
+   * Handle error messages
+   */
+  private handleErrorMessage(data: RTLMessage): void {
+    console.error('RTL: Received error message:', data);
+    this.emit('message:error', { message: data.message, data: data });
+    
+    if (data.operation === 'auth_error') {
+      this.emit('connection:status', { status: 'auth_failed', message: 'Authentication Failed ❌' });
+      this.emit('auth:error', data);
+    }
+  }
+
+  /**
+   * Handle publication messages (database changes)
+   */
+  private handlePublicationMessage(data: RTLMessage): void {
+    this.debugLog('Database change received:', {
+      tenant: data.tenant_name,
+      table: data.table,
+      operation: data.operation,
+      new_data: data.new_data,
+      old_data: data.old_data
+    });
+
+    // Emit general publication event
+    this.emit('publication:received', data);
+
+    // Handle task-specific operations
+    if (data.table === 'wh_tasks') {
+      this.handleTaskPublication(data).catch(error => {
+        console.error('Error handling task publication:', error);
+      });
+    }
+
+    // Handle other table operations as needed
+    // Add more table-specific handlers here
+  }
+
+  /**
+   * Handle task-specific publication messages
+   */
+  private async handleTaskPublication(data: RTLMessage): Promise<void> {
+    const operation = data.operation?.toUpperCase();
+    
+    try {
+      switch (operation) {
+        case 'INSERT':
+          if (data.new_data) {
+            await TasksCache.addTask(data.new_data);
+            this.debugLog('Task inserted into cache:', data.new_data.id);
+          }
+          break;
+          
+        case 'UPDATE':
+          if (data.new_data && data.new_data.id) {
+            await TasksCache.updateTask(data.new_data.id.toString(), data.new_data);
+            this.debugLog('Task updated in cache:', data.new_data.id);
+          }
+          break;
+          
+        case 'DELETE':
+          if (data.old_data && data.old_data.id) {
+            await TasksCache.deleteTask(data.old_data.id.toString());
+            this.debugLog('Task deleted from cache:', data.old_data.id);
+          }
+          break;
+          
+        default:
+          this.debugLog('Unknown task operation:', operation);
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling task publication:', error, data);
+    }
+  }
+
+  /**
+   * Schedule reconnection attempt
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectAttempts >= (this.options.maxReconnectAttempts || 5)) {
+      this.debugLog('Max reconnection attempts reached');
+      this.emit('connection:status', { 
+        status: 'failed', 
+        message: 'Max reconnection attempts reached' 
+      });
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = this.options.reconnectInterval || 5000;
+    
+    this.debugLog(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.options.maxReconnectAttempts} in ${delay}ms`);
+    
+    this.emit('connection:status', { 
+      status: 'reconnecting', 
+      message: `Reconnecting... (${this.reconnectAttempts}/${this.options.maxReconnectAttempts})` 
+    });
+
+    this.reconnectTimer = setTimeout(() => {
+      this.connectAndHold();
+    }, delay);
+  }
+
+  /**
+   * Subscribe to RTL events
+   */
+  on(event: string, callback: (data: any) => void): () => void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event)!.push(callback);
+
+    // Return unsubscribe function
+    return () => {
+      this.off(event, callback);
+    };
+  }
+
+  /**
+   * Unsubscribe from RTL events
+   */
+  off(event: string, callback: (data: any) => void): void {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      const index = callbacks.indexOf(callback);
+      if (index > -1) {
+        callbacks.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit RTL events
+   */
+  private emit(event: string, data?: any): void {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      callbacks.forEach(callback => callback(data));
+    }
+  }
+
+  /**
+   * Get connection status
+   */
+  get connectionStatus(): { connected: boolean; connecting: boolean } {
+    return {
+      connected: this.isConnected,
+      connecting: this.isConnecting
+    };
+  }
+
+  /**
+   * Enable/disable auto-reconnect
+   */
+  setAutoReconnect(enabled: boolean): void {
+    this.options.autoReconnect = enabled;
+  }
+
+  /**
+   * Enable/disable debug logging
+   */
+  setDebug(enabled: boolean): void {
+    this.options.debug = enabled;
+    this.debugLog(`Debug logging ${enabled ? 'enabled' : 'disabled'}`);
+  }
+}

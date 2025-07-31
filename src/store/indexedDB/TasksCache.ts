@@ -2,6 +2,7 @@ import { auth } from "@/firebase/firebaseConfig";
 import { Task } from "../types";
 import { DB } from "./DB";
 import api from "@/api/whagonsApi";
+import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 
 export class TasksCache {
 
@@ -72,12 +73,18 @@ export class TasksCache {
         if (!DB.inited) await DB.init();
         const store = DB.getStoreWrite("tasks");
         store.delete(taskId);
+        
+        // Emit event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.TASK_DELETED, { id: taskId });
     }
 
     public static async deleteTasks() {
         if (!DB.inited) await DB.init();
         const store = DB.getStoreWrite("tasks");
         store.clear();
+        
+        // Emit cache invalidate event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
     }
 
     public static async updateTask(id: string, task: Task) {
@@ -87,12 +94,18 @@ export class TasksCache {
         store.delete(id);
         //add the new task
         store.put(task);
+        
+        // Emit event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, task);
     }
 
     public static async addTask(task: Task) {
         if (!DB.inited) await DB.init();
         const store = DB.getStoreWrite("tasks");
         store.put(task);
+        
+        // Emit event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.TASK_CREATED, task);
     }
 
     public static async addTasks(tasks: Task[]) {
@@ -101,6 +114,9 @@ export class TasksCache {
         tasks.forEach(task => {
             store.put(task);
         });
+        
+        // Emit bulk update event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, tasks);
     }
 
     public static async getTask(taskId: string) {
@@ -155,14 +171,131 @@ export class TasksCache {
     }
 
     public static async fetchTasks() {
+        let allTasks: Task[] = [];
+        let currentPage = 1;
+        let totalApiCalls = 0;
+        
         try {
-            const response = await api.get("/tasks");
-            const tasks = response.data.rows as Task[];
-            console.log("tasks", tasks);
-            this.addTasks(tasks);
+            let hasNextPage = true;
+            let totalPagesExpected = 0;
+            
+            console.log("🚀 Starting to fetch all tasks with pagination...");
+            
+            // Clear existing tasks first
+            await this.deleteTasks();
+            
+            // Loop through all pages
+            while (hasNextPage) {
+                totalApiCalls++;
+                const apiParams = {
+                    page: currentPage,
+                    per_page: 500, // Maximum allowed per page
+                    sort_by: 'id',
+                    sort_direction: 'asc'
+                };
+                console.log(`📡 API Call #${totalApiCalls} - Fetching tasks page ${currentPage}...`);
+                console.log(`🔗 API URL: GET /api/tasks?${new URLSearchParams({
+                    page: currentPage.toString(),
+                    per_page: '500',
+                    sort_by: 'id',
+                    sort_direction: 'asc'
+                }).toString()}`);
+                
+                const response = await api.get("/tasks", {
+                    params: apiParams
+                });
+                
+                // Handle the new API response structure
+                const pageData = response.data.data as Task[];
+                const pagination = response.data.pagination;
+                
+                // Debug pagination info
+                console.log(`📊 Pagination Info for Page ${currentPage}:`, {
+                    current_page: pagination?.current_page,
+                    per_page: pagination?.per_page,
+                    total: pagination?.total,
+                    last_page: pagination?.last_page,
+                    from: pagination?.from,
+                    to: pagination?.to,
+                    has_next_page: pagination?.has_next_page,
+                    next_page: pagination?.next_page,
+                    tasks_in_response: pageData?.length || 0
+                });
+                
+                // Set expected total pages from first response
+                if (currentPage === 1 && pagination?.last_page) {
+                    totalPagesExpected = pagination.last_page;
+                    console.log(`📈 Expected total pages: ${totalPagesExpected}, Expected total tasks: ${pagination.total}`);
+                }
+                
+                if (pageData && pageData.length > 0) {
+                    const tasksBefore = allTasks.length;
+                    
+                    // Get ID range for this page
+                    const pageIds = pageData.map(task => task.id);
+                    const minId = Math.min(...pageIds);
+                    const maxId = Math.max(...pageIds);
+                    
+                    console.log(`📋 Page ${currentPage} ID range: ${minId} to ${maxId}`);
+                    
+                    // DEDUPLICATION: Only add tasks that we don't already have
+                    const existingIds = new Set(allTasks.map(task => task.id));
+                    const newTasks = pageData.filter(task => !existingIds.has(task.id));
+                    const duplicatesSkipped = pageData.length - newTasks.length;
+                    
+                    if (duplicatesSkipped > 0) {
+                        console.warn(`⚠️  Page ${currentPage}: Skipped ${duplicatesSkipped} duplicate tasks (backend pagination issue)`);
+                    }
+                    
+                    allTasks = [...allTasks, ...newTasks];
+                    console.log(`✅ Page ${currentPage}: fetched ${pageData.length} tasks, added ${newTasks.length} new tasks (total unique: ${allTasks.length})`);
+                } else {
+                    console.warn(`⚠️  Page ${currentPage}: No tasks returned or empty response`);
+                }
+                
+                // Check if there's a next page
+                hasNextPage = pagination?.has_next_page || false;
+                if (hasNextPage) {
+                    currentPage = pagination.next_page || currentPage + 1;
+                    console.log(`➡️  Moving to next page: ${currentPage}`);
+                } else {
+                    console.log(`🏁 Completed fetching all tasks!`);
+                    console.log(`📊 Final Summary:`);
+                    console.log(`   - Total API calls made: ${totalApiCalls}`);
+                    console.log(`   - Expected pages: ${totalPagesExpected}`);
+                    console.log(`   - Last page processed: ${currentPage}`);
+                    console.log(`   - Unique tasks collected: ${allTasks.length}`);
+                    console.log(`   - Expected total (from API): ${pagination?.total || 'unknown'}`);
+                    
+                    if (pagination?.total && allTasks.length < pagination.total) {
+                        const expectedDuplicates = pagination.total - allTasks.length;
+                        console.warn(`⚠️  Backend pagination issue: Expected ${pagination.total} tasks, got ${allTasks.length} unique tasks`);
+                        console.warn(`⚠️  This suggests ${expectedDuplicates} duplicates were filtered out due to overlapping pagination`);
+                        console.warn(`💡 Recommendation: Fix backend pagination to return sequential, non-overlapping pages`);
+                    } else if (allTasks.length === pagination?.total) {
+                        console.log(`✅ Perfect! All tasks fetched with no duplicates`);
+                    }
+                }
+            }
+            
+            // Add all tasks to IndexedDB (this will emit TASKS_BULK_UPDATE event)
+            if (allTasks.length > 0) {
+                console.log(`💾 Saving ${allTasks.length} tasks to IndexedDB...`);
+                await this.addTasks(allTasks);
+                console.log(`✅ Successfully saved ${allTasks.length} tasks to IndexedDB`);
+            } else {
+                console.warn(`⚠️  No tasks to save to IndexedDB`);
+            }
+            
             return true;
         } catch (error) {
-            console.error("fetchTasks", error);
+            console.error("❌ fetchTasks error:", error);
+            console.error("Error details:", {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                currentPage,
+                totalTasksCollected: allTasks?.length || 0
+            });
             return false;
         }
     }
@@ -172,12 +305,20 @@ export class TasksCache {
             //we fetch only tasks with a last_updated greater than the lastUpdated date
             const response = await api.get("/tasks", {
                 params: {
-                    updated_after: this.lastUpdated.toISOString()
+                    updated_after: this.lastUpdated.toISOString(),
+                    per_page: 500, // Use max per page for efficiency
+                    sort_by: 'id',
+                    sort_direction: 'asc'
                 }
             });
-            const tasks = response.data.rows as Task[];
-            if (tasks.length > 0) {
-                this.addTasks(tasks);
+            const tasks = response.data.data as Task[];
+            if (tasks && tasks.length > 0) {
+                console.log(`Validating tasks: found ${tasks.length} updated tasks`);
+                
+                // Add updated tasks (this will emit TASKS_BULK_UPDATE event)
+                await this.addTasks(tasks);
+            } else {
+                console.log("validateTasks: no updates found");
             }
             return true;
         } catch (error) {
@@ -441,4 +582,6 @@ export class TasksCache {
             return 0;
         });
     }
+
+
 } 

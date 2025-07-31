@@ -64,7 +64,7 @@ const setTokenForUser = (token: string, firebaseUid: string) => {
     uid: firebaseUid,
     timestamp: Date.now()
   };
-  setCookie('auth_token', btoa(JSON.stringify(tokenData)), 30 / (24 * 60)); // 30 minutes in days
+  setCookie('auth_token', btoa(JSON.stringify(tokenData)), 90); // 90 days
 };
 
 // Function to clear all stored tokens (for logout)
@@ -88,13 +88,7 @@ export const getTokenForUser = (firebaseUid: string): string | null => {
       return null;
     }
     
-    // Check if token is expired (30 minutes)
-    const expirationTime = tokenData.timestamp + (30 * 60 * 1000); // 30 minutes
-    if (Date.now() > expirationTime) {
-      console.log('Token expired, clearing token');
-      deleteCookie('auth_token');
-      return null;
-    }
+    // Token expiration is now handled by the backend only
     
     return deObfuscateToken(tokenData.token);
   } catch (error) {
@@ -139,7 +133,7 @@ export const updateAuthToken = (token: string) => {
   } else {
     console.warn('No Firebase user found when updating auth token');
     // Fallback to old method for edge cases
-    setCookie('auth_token', obfuscateToken(token), 30 / (24 * 60));
+    setCookie('auth_token', obfuscateToken(token), 90); // 90 days
   }
 };
 

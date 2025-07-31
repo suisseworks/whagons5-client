@@ -2,7 +2,7 @@ import { auth } from "@/firebase/firebaseConfig";
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = "1.0.1";
+const CURRENT_DB_VERSION = "1.0.7";
 const DB_VERSION_KEY = "indexeddb_version";
 
 //static class to access the message cache
