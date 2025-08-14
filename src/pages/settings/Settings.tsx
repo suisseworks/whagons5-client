@@ -27,7 +27,7 @@ function Settings() {
       color: 'text-red-500'
     },
     {
-      id: 'tasks',
+      id: 'templates',
       title: 'Templates',
       icon: faClipboardList,
       count: 148,
@@ -68,20 +68,17 @@ function Settings() {
       case 'categories':
         navigate('/settings/categories');
         break;
-      case 'tasks':
-        navigate('/settings/tasks');
+      case 'templates':
+        navigate('/settings/templates');
         break;
       case 'spots':
-        // navigate('/settings/spots'); // TODO: Create Spots page
-        console.log('Spots page not yet implemented');
+        navigate('/settings/spots');
         break;
       case 'teams':
-        // navigate('/settings/teams'); // TODO: Create Teams page
-        console.log('Teams page not yet implemented');
+        navigate('/settings/teams');
         break;
       case 'users':
-        // navigate('/settings/users'); // TODO: Create Users page
-        console.log('Users page not yet implemented');
+        navigate('/settings/users');
         break;
       default:
         console.log(`Unknown setting: ${settingId}`);

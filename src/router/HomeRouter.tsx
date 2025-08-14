@@ -10,6 +10,9 @@ import Settings from '@/pages/settings/Settings';
 import Stuff from '@/pages/stuff/Stuff';
 import Categories from '@/pages/settings/components/Categories';
 import Templates from '@/pages/settings/components/Templates';
+import Teams from '@/pages/settings/components/Teams';
+import Spots from '@/pages/settings/components/Spots';
+import Users from '@/pages/settings/components/Users';
 
 const pages = [
   // { path: '/tasks', component: <Workspace /> },
@@ -45,7 +48,10 @@ export const HomeRoutes = () => {
           <Route path="/workspace/:id" element={<Workspace />} /> 
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/settings/categories" element={<Categories />} />
-          <Route path="/settings/tasks" element={<Templates />} /> 
+          <Route path="/settings/templates" element={<Templates />} />
+          <Route path="/settings/teams" element={<Teams />} />
+          <Route path="/settings/spots" element={<Spots />} />
+          <Route path="/settings/users" element={<Users />} /> 
         </Routes>
       </MainLayout>
     </>
