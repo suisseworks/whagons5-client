@@ -8,6 +8,16 @@ import NameStep from '@/pages/onboarding/steps/NameStep';
 import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep';
 import OptionalStep from '@/pages/onboarding/steps/OptionalStep';
 import WhagonsCheck from '@/assets/WhagonsCheck';
+import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
+import { TeamsCache } from '@/store/indexedDB/TeamsCache';
+import { CategoriesCache } from '@/store/indexedDB/CategoriesCache';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/store/store';
+import { getWorkspacesFromIndexedDB } from '@/store/reducers/workspacesSlice';
+import { getTeamsFromIndexedDB } from '@/store/reducers/teamsSlice';
+import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
+import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 
 interface OnboardingWrapperProps {
   user: User;
@@ -16,6 +26,7 @@ interface OnboardingWrapperProps {
 const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const navigate = useNavigate();
   const { refetchUser } = useAuth();
+  const dispatch = useDispatch<AppDispatch>();
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     email: user.email,
@@ -26,6 +37,24 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     url_picture: user.url_picture,
   });
   const [loading, setLoading] = useState<boolean>(false);
+
+  const syncCachesAndStore = async () => {
+    // Ensure caches are initialized and up-to-date
+    await Promise.all([
+      WorkspaceCache.init(),
+      TeamsCache.init(),
+      CategoriesCache.init(),
+      TasksCache.init()
+    ]);
+
+    // Populate Redux store from IndexedDB once caches are ready
+    await Promise.all([
+      dispatch(getWorkspacesFromIndexedDB()),
+      dispatch(getTeamsFromIndexedDB()),
+      dispatch(getCategoriesFromIndexedDB()),
+      dispatch(getTasksFromIndexedDB())
+    ]);
+  };
 
   // Determine starting step based on user's current state
   useEffect(() => {
@@ -146,8 +175,12 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           success = await updateUserProfile({}, InitializationStage.COMPLETED);
         }
         if (success) {
-          // Refetch user data to ensure AuthProvider has the latest state
+          // Refetch user data to ensure AuthProvider has the latest state,
+          // then initialize caches and populate Redux before navigating
+          setLoading(true);
           await refetchUser();
+          await syncCachesAndStore();
+          setLoading(false);
           navigate('/');
         }
         break;
@@ -161,8 +194,11 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       // Skipping optional step - complete onboarding
       const success = await updateUserProfile({}, InitializationStage.COMPLETED);
       if (success) {
-        // Refetch user data to ensure AuthProvider has the latest state
+        // Refetch user, sync caches/store, then navigate
+        setLoading(true);
         await refetchUser();
+        await syncCachesAndStore();
+        setLoading(false);
         navigate('/');
       }
     }

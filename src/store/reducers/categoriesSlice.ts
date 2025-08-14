@@ -24,14 +24,31 @@ export const addCategoryAsync = createAsyncThunk(
         try {
             // Call API to create category
             const response = await api.post('/categories', category);
-            const newCategory = {
-                ...response.data,
-                created_at: response.data.created_at,
-                updated_at: response.data.updated_at
+            // Some endpoints return the created row under different keys.
+            // Normalize the payload to a Category-like object.
+            const payload = (response?.data?.data
+                ?? response?.data?.row
+                ?? response?.data?.category
+                ?? response?.data);
+
+            const normalized: Partial<Category> = {
+                ...payload,
+                // Try a few common id field names just in case
+                id: payload?.id ?? payload?.category_id ?? payload?.ID ?? payload?.Id,
+                created_at: payload?.created_at ?? new Date().toISOString(),
+                updated_at: payload?.updated_at ?? new Date().toISOString()
             };
+
+            const newCategory = normalized as Category;
             
-            // Update IndexedDB on success
-            await CategoriesCache.addCategory(newCategory);
+            // Update IndexedDB on success (only if we have a valid id)
+            if (newCategory?.id !== undefined && newCategory?.id !== null) {
+                await CategoriesCache.addCategory(newCategory);
+            } else {
+                console.warn('addCategoryAsync: API did not return an id for the created category. Skipping IndexedDB write and refreshing categories.');
+                // Fallback: refresh local cache to pick up the new category with its server id
+                await CategoriesCache.fetchCategories();
+            }
             
             return newCategory;
         } catch (error: any) {

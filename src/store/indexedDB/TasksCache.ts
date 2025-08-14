@@ -3,11 +3,20 @@ import { Task } from "../types";
 import { DB } from "./DB";
 import api from "@/api/whagonsApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
+import sha256 from "crypto-js/sha256";
+import encHex from "crypto-js/enc-hex";
 
 export class TasksCache {
 
     private static initPromise: Promise<boolean> | null = null;
     private static authListener: (() => void) | null = null;
+    private static validating = false;
+    private static get debug(): boolean {
+        return localStorage.getItem('wh-debug-integrity') === 'true';
+    }
+    private static dlog(...args: any[]) {
+        if (this.debug) console.log('[TasksCache]', ...args);
+    }
 
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
@@ -53,20 +62,12 @@ export class TasksCache {
             });
         }
 
-        if (!this.initialized) {
-            console.log("fetching tasks, initialized: ", this.initialized);
-            const success = await this.fetchTasks();
-            if (success) {
-                this.initialized = true;
-                this.lastUpdated = await this.getLastUpdated();
-                console.log("tasks fetched, initialized: ", this.initialized, "lastUpdated: ", this.lastUpdated);
-            }
-            return success;
-        } else {
-            //I must run a fetch to check if tasks have changed   
-            console.log("validating tasks, lastUpdated: ", await this.getLastUpdated()); 
-            return await this.validateTasks();
+        // Always validate on mount; full fetch only when cache is empty
+        const localCount = (await this.getTasks()).length;
+        if (localCount === 0) {
+            return await this.fetchTasks();
         }
+        return await this.validateTasks();
     }
 
     public static async deleteTask(taskId: string) {
@@ -156,19 +157,11 @@ export class TasksCache {
     }
 
     //set flag for initialized from local storage
-    public static get initialized(): boolean {
-        return localStorage.getItem(`tasksCacheInitialized-${auth.currentUser?.uid}`) === "true";
-    }
-    public static set initialized(value: boolean) {
-        localStorage.setItem(`tasksCacheInitialized-${auth.currentUser?.uid}`, value.toString());
-    }
-
-    public static get lastUpdated(): Date {
-        return new Date(localStorage.getItem(`tasksCacheLastUpdated-${auth.currentUser?.uid}`) || "0");
-    }
-    public static set lastUpdated(value: Date) {
-        localStorage.setItem(`tasksCacheLastUpdated-${auth.currentUser?.uid}`, value.toISOString());
-    }
+    // Deprecated: lastUpdated/initialized now unnecessary with hashing; always validate on mount
+    public static get initialized(): boolean { return true; }
+    public static set initialized(_: boolean) { /* no-op */ }
+    public static get lastUpdated(): Date { return new Date(0); }
+    public static set lastUpdated(_: Date) { /* no-op */ }
 
     public static async fetchTasks() {
         let allTasks: Task[] = [];
@@ -229,7 +222,7 @@ export class TasksCache {
                 }
                 
                 if (pageData && pageData.length > 0) {
-                    const tasksBefore = allTasks.length;
+                    // keep position; avoid unused var
                     
                     // Get ID range for this page
                     const pageIds = pageData.map(task => task.id);
@@ -302,29 +295,186 @@ export class TasksCache {
 
     public static async validateTasks() {
         try {
-            //we fetch only tasks with a last_updated greater than the lastUpdated date
-            const response = await api.get("/tasks", {
-                params: {
-                    updated_after: this.lastUpdated.toISOString(),
-                    per_page: 500, // Use max per page for efficiency
-                    sort_by: 'id',
-                    sort_direction: 'asc'
-                }
-            });
-            const tasks = response.data.data as Task[];
-            if (tasks && tasks.length > 0) {
-                console.log(`Validating tasks: found ${tasks.length} updated tasks`);
-                
-                // Add updated tasks (this will emit TASKS_BULK_UPDATE event)
-                await this.addTasks(tasks);
-            } else {
-                console.log("validateTasks: no updates found");
+            if (this.validating) {
+                this.dlog('validateTasks: already running, skipping re-entry');
+                return true;
             }
+            this.validating = true;
+            const t0 = performance.now();
+            // 0) Quick global-hash short-circuit
+            const localBlocks = await this.computeLocalTaskBlockHashes();
+            const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
+            const localGlobalHash = sha256(localGlobalConcat).toString(encHex);
+            try {
+                const globalResp = await api.get('/integrity/global', { params: { table: 'wh_tasks' } });
+                const serverGlobal = globalResp.data?.data?.global_hash;
+                const serverBlockCount = globalResp.data?.data?.block_count ?? null;
+                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash });
+                if (serverGlobal && serverGlobal === localGlobalHash && (serverBlockCount === null || serverBlockCount === localBlocks.length)) {
+                    this.dlog('global hash match; skipping block compare');
+                    this.validating = false;
+                    // Perfect match – nothing to do
+                    return true;
+                }
+            } catch (_) {
+                // ignore and continue with block-level comparison
+            }
+
+            // 1) Integrity blocks comparison (cheap): compare local block hashes vs server
+            let serverBlocksResp = await api.get('/integrity/blocks', { params: { table: 'wh_tasks' } });
+            let serverBlocks: Array<{ block_id: number; block_hash: string; min_row_id: number; max_row_id: number; row_count: number }> = serverBlocksResp.data.data || [];
+
+            // If server has no hashes yet, trigger a rebuild once and retry
+            if (serverBlocks.length === 0 && localBlocks.length > 0) {
+                try {
+                    await api.post('/integrity/rebuild', { table: 'wh_tasks' });
+                    serverBlocksResp = await api.get('/integrity/blocks', { params: { table: 'wh_tasks' } });
+                    serverBlocks = serverBlocksResp.data.data || [];
+                    if (serverBlocks.length === 0) { this.validating = false; return true; } // nothing to compare, avoid refetching all
+                } catch (_) {
+                    this.validating = false; return true; // avoid heavy refetch
+                }
+            }
+
+            const serverMap = new Map(serverBlocks.map(b => [b.block_id, b]));
+            const mismatchedBlocks: number[] = [];
+            for (const lb of localBlocks) {
+                const sb = serverMap.get(lb.block_id);
+                if (!sb || sb.block_hash !== lb.block_hash || sb.row_count !== lb.row_count) {
+                    this.dlog('mismatch block', { block: lb.block_id, reason: !sb ? 'missing' : (sb.block_hash !== lb.block_hash ? 'hash' : 'count') });
+                    mismatchedBlocks.push(lb.block_id);
+                }
+            }
+            // Also consider server blocks we don't have locally
+            for (const sb of serverBlocks) {
+                if (!localBlocks.find(b => b.block_id === sb.block_id)) {
+                    mismatchedBlocks.push(sb.block_id);
+                }
+            }
+
+            if (mismatchedBlocks.length === 0) {
+                this.dlog('blocks equal; finishing', { ms: Math.round(performance.now() - t0) });
+                this.validating = false;
+                console.log('validateTasks: hashes match. No changes needed.');
+                return true;
+            }
+
+            // 2) For mismatched blocks, fetch server row hashes and refetch rows that differ
+            for (const blockId of Array.from(new Set(mismatchedBlocks))) {
+                const serverRowsResp = await api.get(`/integrity/blocks/${blockId}/rows`, { params: { table: 'wh_tasks' } });
+                const serverRows: Array<{ row_id: number; row_hash: string }> = serverRowsResp.data.data || [];
+                const serverRowMap = new Map(serverRows.map(r => [r.row_id, r.row_hash]));
+
+                // Build local row hash map for this block
+                const localRowsInBlock = await this.getTasksInBlock(blockId);
+                const localRowMap = new Map<number, string>();
+                for (const r of localRowsInBlock) {
+                    localRowMap.set(r.id, this.hashTask(r));
+                }
+
+                const toRefetch: number[] = [];
+                // Rows present locally: compare
+                for (const [rowId, localHash] of localRowMap.entries()) {
+                    const sh = serverRowMap.get(rowId);
+                    if (!sh || sh !== localHash) toRefetch.push(rowId);
+                }
+                // Rows present on server but not locally
+                for (const [rowId] of serverRowMap.entries()) {
+                    if (!localRowMap.has(rowId)) toRefetch.push(rowId);
+                }
+
+                if (toRefetch.length > 0) {
+                    this.dlog('refetch ids', { blockId, count: toRefetch.length });
+                    const chunk = 200;
+                    for (let i = 0; i < toRefetch.length; i += chunk) {
+                        const ids = toRefetch.slice(i, i + chunk);
+                        try {
+                            const resp = await api.get('/tasks', { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
+                            const rows = (resp.data.data || resp.data.rows) as Task[];
+                            if (rows?.length) await this.addTasks(rows);
+                        } catch (e) {
+                            console.warn('validateTasks: batch fetch failed', e);
+                        }
+                    }
+                }
+
+                // Cleanup: delete local tasks not present in server block rows
+                const serverIds = new Set<number>(serverRows.map(r => r.row_id));
+                for (const localId of Array.from(localRowMap.keys())) {
+                    if (!serverIds.has(localId)) {
+                        await this.deleteTask(String(localId));
+                    }
+                }
+            }
+
+            // Refresh watermark
+            this.lastUpdated = await this.getLastUpdated();
+            this.dlog('validateTasks finished', { ms: Math.round(performance.now() - t0) });
+            this.validating = false;
             return true;
         } catch (error) {
-            console.error("validateTasks", error);
+            console.error('validateTasks', error);
+            this.validating = false;
             return false;
         }
+    }
+
+    // --- Integrity helpers ---
+    private static hashTask(task: Task): string {
+        const row = [
+            task.id,
+            task.name || '',
+            task.description || '',
+            task.workspace_id,
+            task.category_id,
+            task.team_id,
+            task.template_id || 0,
+            task.spot_id || 0,
+            task.status_id,
+            task.priority_id,
+            task.start_date ? new Date(task.start_date).getTime() : '',
+            task.due_date ? new Date(task.due_date).getTime() : '',
+            task.expected_duration,
+            task.response_date ? new Date(task.response_date).getTime() : '',
+            task.resolution_date ? new Date(task.resolution_date).getTime() : '',
+            task.work_duration,
+            task.pause_duration,
+            new Date(task.updated_at).getTime()
+        ].join('|');
+        return sha256(row).toString(encHex);
+    }
+
+    private static async computeLocalTaskBlockHashes() {
+        const tasks = await this.getTasks();
+        const BLOCK_SIZE = 1024;
+        const byBlock = new Map<number, Array<{ id: number; hash: string }>>();
+        for (const t of tasks) {
+            const blk = Math.floor(t.id / BLOCK_SIZE);
+            if (!byBlock.has(blk)) byBlock.set(blk, []);
+            byBlock.get(blk)!.push({ id: t.id, hash: this.hashTask(t) });
+        }
+        const blocks: Array<{ block_id: number; min_row_id: number; max_row_id: number; row_count: number; block_hash: string }> = [];
+        for (const [blk, arr] of byBlock.entries()) {
+            arr.sort((a,b) => a.id - b.id);
+            const concat = arr.map(x => x.hash).join('');
+            const hash = sha256(concat).toString(encHex);
+            blocks.push({ block_id: blk, min_row_id: arr[0].id, max_row_id: arr[arr.length-1].id, row_count: arr.length, block_hash: hash });
+        }
+        blocks.sort((a,b) => a.block_id - b.block_id);
+        return blocks;
+    }
+
+    private static async getTasksInBlock(blockId: number) {
+        const BLOCK_SIZE = 1024;
+        const minId = blockId * BLOCK_SIZE;
+        const maxId = minId + BLOCK_SIZE - 1;
+        const tasks = await this.getTasks();
+        return tasks.filter(t => t.id >= minId && t.id <= maxId);
+    }
+
+    // Exposed for hashing self-tests
+    public static computeHashForTest(task: Task): string {
+        return this.hashTask(task);
     }
 
     /**
@@ -423,7 +573,7 @@ export class TasksCache {
                 // AG Grid-style pagination
                 const startRow = parseInt(params.startRow);
                 const endRow = parseInt(params.endRow);
-                const pageSize = endRow - startRow;
+                const pageSize = endRow - startRow; // retained for clarity
                 
                 return {
                     rows: tasks.slice(startRow, endRow),
