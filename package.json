@@ -29,6 +29,7 @@
     "@radix-ui/react-tabs": "^1.1.9",
     "@radix-ui/react-tooltip": "^1.2.4",
     "@reduxjs/toolkit": "^2.7.0",
+    "ag-grid-enterprise": "^34.1.1",
     "ag-grid-react": "^33.2.4",
     "axios": "^1.8.4",
     "class-variance-authority": "^0.7.1",

@@ -1,9 +1,17 @@
 'use client';
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { api } from '@/api/whagonsApi';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import 'ag-grid-enterprise';
+import { LicenseManager } from 'ag-grid-enterprise';
+
+const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
+if (AG_GRID_LICENSE) {
+  LicenseManager.setLicenseKey(AG_GRID_LICENSE);
+} else {
+  console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
+}
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
