@@ -210,6 +210,17 @@ const refreshToken = async () => {
   }
 };
 
+// Ensure only a single refresh is in-flight across concurrent 401s
+let inFlightRefresh: Promise<string> | null = null;
+const getSingleFlightRefreshToken = async (): Promise<string> => {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshToken().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+};
+
 // Function to clear auth state
 export const clearAuth = () => {
   delete api.defaults.headers.common['Authorization'];
@@ -307,7 +318,8 @@ api.interceptors.response.use(
         // console.log('originalRequest.url', originalRequest.url);
         // Clear stored token on 401 and get a fresh one
         deleteCookie('auth_token');
-        const newToken = await refreshToken();
+        // Single-flight refresh so concurrent 401s share the same /login
+        const newToken = await getSingleFlightRefreshToken();
 
         return api({
           ...originalRequest,

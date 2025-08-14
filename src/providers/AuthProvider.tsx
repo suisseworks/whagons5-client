@@ -11,6 +11,10 @@ import { getTeamsFromIndexedDB } from '../store/reducers/teamsSlice';
 import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
 import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
+import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
+import { TeamsCache } from '@/store/indexedDB/TeamsCache';
+import { CategoriesCache } from '@/store/indexedDB/CategoriesCache';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
 
 // Define context types
 interface AuthContextType {
@@ -59,8 +63,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userData = response.data.data || response.data;
         setUser(userData);
         // console.log('AuthContext: User data loaded successfully');
-        
-        // Load workspaces and teams from IndexedDB after user is authenticated
+
+        // On mount/reload: validate and hydrate caches, then populate Redux from IndexedDB
+        await Promise.all([
+          WorkspaceCache.init(),
+          TeamsCache.init(),
+          CategoriesCache.init(),
+          TasksCache.init()
+        ]);
+
         dispatch(getWorkspacesFromIndexedDB());
         dispatch(getTeamsFromIndexedDB());
         dispatch(getCategoriesFromIndexedDB());

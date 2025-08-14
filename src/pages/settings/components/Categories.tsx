@@ -154,6 +154,7 @@ function Categories() {
   const [rowData, setRowData] = useState<Category[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -370,6 +371,13 @@ function Categories() {
   // Create new category via Redux
   const createCategory = async () => {
     try {
+      // Validate required associations before attempting to create
+      if (!formData.team_id) {
+        setFormError('Please select a team for this category.');
+        return;
+      }
+
+      setFormError(null);
       setIsSubmitting(true);
       
       const categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'> = {
@@ -378,7 +386,7 @@ function Categories() {
         color: formData.color,
         icon: formData.icon,
         enabled: formData.enabled,
-        team_id: formData.team_id ? parseInt(formData.team_id) : 0,
+        team_id: parseInt(formData.team_id),
         workspace_id: formData.workspace_id,
         sla_id: formData.sla_id,
         deleted_at: null
@@ -397,6 +405,7 @@ function Categories() {
         workspace_id: 1,
         sla_id: 1
       });
+      setFormError(null);
       setIsCreateDialogOpen(false);
     } catch (error) {
       console.error('Error creating category:', error);
@@ -417,6 +426,7 @@ function Categories() {
       workspace_id: 1,
       sla_id: 1
     });
+    setFormError(null);
     // Reset icon search state
     setIconSearch('');
     setShowIconDropdown(false);
@@ -840,9 +850,9 @@ function Categories() {
                 </div>
               </div>
               <DialogFooter>
-                {error && (
+                {(formError || error) && (
                   <div className="text-sm text-destructive mb-2 text-left">
-                    {error}
+                    {formError || error}
                   </div>
                 )}
                 <Button type="submit" disabled={isSubmitting || !formData.name.trim()}>
