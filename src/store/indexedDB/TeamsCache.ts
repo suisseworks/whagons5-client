@@ -1,12 +1,21 @@
 import { auth } from "@/firebase/firebaseConfig";
-import { Team } from "../Types";
+import { Team } from "../types";
 import { DB } from "./DB";
 import api from "@/api/whagonsApi";
+import sha256 from "crypto-js/sha256";
+import encHex from "crypto-js/enc-hex";
 
 export class TeamsCache {
 
     private static initPromise: Promise<boolean> | null = null;
     private static authListener: (() => void) | null = null;
+    private static validating = false;
+    private static get debug(): boolean {
+        return localStorage.getItem('wh-debug-integrity') === 'true';
+    }
+    private static dlog(...args: any[]) {
+        if (this.debug) console.log('[TeamsCache]', ...args);
+    }
 
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
@@ -68,10 +77,11 @@ export class TeamsCache {
         }
     }
 
-    public static async deleteTeam(teamId: string) {
+    public static async deleteTeam(teamId: number | string) {
         if (!DB.inited) await DB.init();
         const store = DB.getStoreWrite("teams");
-        store.delete(teamId);
+        const key = typeof teamId === 'number' ? teamId : Number(teamId);
+        store.delete(key);
     }
 
     public static async deleteTeams() {
@@ -139,20 +149,11 @@ export class TeamsCache {
         return lastUpdated; 
     }
 
-    //set flag for initialized from local storage
-    public static get initialized(): boolean {
-        return localStorage.getItem(`teamsCacheInitialized-${auth.currentUser?.uid}`) === "true";
-    }
-    public static set initialized(value: boolean) {
-        localStorage.setItem(`teamsCacheInitialized-${auth.currentUser?.uid}`, value.toString());
-    }
-
-    public static get lastUpdated(): Date {
-        return new Date(localStorage.getItem(`teamsCacheLastUpdated-${auth.currentUser?.uid}`) || "0");
-    }
-    public static set lastUpdated(value: Date) {
-        localStorage.setItem(`teamsCacheLastUpdated-${auth.currentUser?.uid}`, value.toISOString());
-    }
+    // Deprecated flags for hashing-based validation
+    public static get initialized(): boolean { return true; }
+    public static set initialized(_: boolean) { /* no-op */ }
+    public static get lastUpdated(): Date { return new Date(0); }
+    public static set lastUpdated(_: Date) { /* no-op */ }
 
     public static async fetchTeams() {
         try {
@@ -178,29 +179,120 @@ export class TeamsCache {
 
     public static async validateTeams() {
         try {
-            //we fetch only teams with a last_updated greater than the lastUpdated date
-            const response = await api.get("/teams", {
-                params: {
-                    updated_after: this.lastUpdated.toISOString()
+            if (this.validating) { this.dlog('validateTeams: already running'); return true; }
+            this.validating = true;
+            const t0 = performance.now();
+            const localBlocks = await this.computeLocalBlockHashes();
+            // 0) Global hash short-circuit
+            const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
+            const localGlobalHash = sha256(localGlobalConcat).toString(encHex);
+            try {
+                const globalResp = await api.get('/integrity/global', { params: { table: 'wh_teams' } });
+                const serverGlobal = globalResp.data?.data?.global_hash;
+                const serverBlockCount = globalResp.data?.data?.block_count ?? null;
+                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash });
+                if (serverGlobal && serverGlobal === localGlobalHash && (serverBlockCount === null || serverBlockCount === localBlocks.length)) {
+                    this.dlog('global hash match; skipping block compare');
+                    this.validating = false;
+                    return true;
                 }
-            });
-            const rawTeams = response.data.rows;
-            console.log("raw teams", rawTeams);
-            
-            // Transform snake_case API response to camelCase format
-            const teams: Team[] = rawTeams.map((team: any) => ({
-                ...team,
-                created_at: team.created_at,
-                updated_at: team.updated_at
-            }));
-            
-            if (teams.length > 0) {
-                this.addTeams(teams);
+            } catch (_) {}
+
+            // 1) Blocks (rebuild if empty)
+            let serverBlocksResp = await api.get('/integrity/blocks', { params: { table: 'wh_teams' } });
+            let serverBlocks: Array<{ block_id: number; block_hash: string; row_count: number }> = serverBlocksResp.data.data || [];
+            if (serverBlocks.length === 0 && localBlocks.length > 0) {
+                try {
+                    await api.post('/integrity/rebuild', { table: 'wh_teams' });
+                    serverBlocksResp = await api.get('/integrity/blocks', { params: { table: 'wh_teams' } });
+                    serverBlocks = serverBlocksResp.data.data || [];
+                    if (serverBlocks.length === 0) { this.validating = false; return true; }
+                } catch (_) { this.validating = false; return true; }
             }
+            const serverMap = new Map(serverBlocks.map(b => [b.block_id, b]));
+            const mismatched: number[] = [];
+            for (const lb of localBlocks) {
+                const sb = serverMap.get(lb.block_id);
+                if (!sb || sb.block_hash !== lb.block_hash || sb.row_count !== lb.row_count) {
+                    this.dlog('mismatch block', { block: lb.block_id, reason: !sb ? 'missing' : (sb.block_hash !== lb.block_hash ? 'hash' : 'count') });
+                    mismatched.push(lb.block_id);
+                }
+            }
+            for (const sb of serverBlocks) if (!localBlocks.find(b => b.block_id === sb.block_id)) mismatched.push(sb.block_id);
+
+            if (mismatched.length === 0) { this.dlog('blocks equal; finishing', { ms: Math.round(performance.now() - t0) }); this.validating = false; return true; }
+
+            for (const blockId of Array.from(new Set(mismatched))) {
+                const serverRowsResp = await api.get(`/integrity/blocks/${blockId}/rows`, { params: { table: 'wh_teams' } });
+                const serverRows: Array<{ row_id: number; row_hash: string }> = serverRowsResp.data.data || [];
+                const serverMapRows = new Map(serverRows.map(r => [r.row_id, r.row_hash]));
+                const locals = await this.getTeams();
+                const localInBlock = locals.filter(t => Math.floor(t.id / 1024) === blockId);
+                const localMap = new Map<number, string>();
+                for (const r of localInBlock) localMap.set(r.id, this.hashTeam(r));
+
+                const toFetch: number[] = [];
+                for (const [id, lh] of localMap.entries()) if (serverMapRows.get(id) !== lh) toFetch.push(id);
+                for (const [id] of serverMapRows.entries()) if (!localMap.has(id)) toFetch.push(id);
+
+                if (toFetch.length) {
+                    this.dlog('refetch ids', { blockId, count: toFetch.length });
+                    const chunk = 200;
+                    for (let i = 0; i < toFetch.length; i += chunk) {
+                        const ids = toFetch.slice(i, i + chunk);
+                        try {
+                            const resp = await api.get('/teams', { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
+                            const rows = (resp.data.data || resp.data.rows) as Team[];
+                            if (rows?.length) await this.addTeams(rows);
+                        } catch (e) {
+                            console.warn('validateTeams: batch fetch failed', e);
+                        }
+                    }
+                }
+
+                // Cleanup: remove local-only rows
+                const serverIds = new Set<number>(serverRows.map(r => r.row_id));
+                const localIds = new Set<number>(localInBlock.map(l => l.id));
+                for (const id of localIds) if (!serverIds.has(id)) await this.deleteTeam(String(id));
+            }
+            this.dlog('validateTeams finished', { ms: Math.round(performance.now() - t0) });
+            this.validating = false;
             return true;
         } catch (error) {
-            console.error("validateTeams", error);
+            console.error('validateTeams', error);
+            this.validating = false;
             return false;
         }
+    }
+
+    private static hashTeam(t: Team): string {
+        const row = [
+            t.id,
+            t.name || '',
+            t.description || '',
+            t.color || '',
+            new Date(t.updated_at).getTime()
+        ].join('|');
+        return sha256(row).toString(encHex);
+    }
+
+    private static async computeLocalBlockHashes() {
+        const teams = await this.getTeams();
+        const BLOCK_SIZE = 1024;
+        const byBlock = new Map<number, Array<{ id: number; hash: string }>>();
+        for (const t of teams) {
+            const blk = Math.floor(t.id / BLOCK_SIZE);
+            if (!byBlock.has(blk)) byBlock.set(blk, []);
+            byBlock.get(blk)!.push({ id: t.id, hash: this.hashTeam(t) });
+        }
+        const blocks: Array<{ block_id: number; row_count: number; block_hash: string }> = [];
+        for (const [blk, arr] of byBlock.entries()) {
+            arr.sort((a,b) => a.id - b.id);
+            const concat = arr.map(x => x.hash).join('');
+            const hash = sha256(concat).toString(encHex);
+            blocks.push({ block_id: blk, row_count: arr.length, block_hash: hash });
+        }
+        blocks.sort((a,b) => a.block_id - b.block_id);
+        return blocks;
     }
 } 

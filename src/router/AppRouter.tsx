@@ -5,6 +5,7 @@ import { HomeRoutes } from './HomeRouter';
 import SignIn from '@/pages/authentication/SignIn';
 import SignUp from '@/pages/authentication/SignUp';
 import OnboardingRoute from './OnboardingRoute';
+<<<<<<< HEAD
 import { useEffect, useRef } from 'react';
 import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
 import { TeamsCache } from '@/store/indexedDB/TeamsCache';
@@ -25,6 +26,11 @@ export const AppRouter = () => {
     
    
   }, []);
+=======
+
+export const AppRouter = () => {
+
+>>>>>>> gabriel
 
   return (
     <Routes>
