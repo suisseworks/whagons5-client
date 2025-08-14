@@ -28,10 +28,10 @@ function Settings() {
     },
     {
       id: 'tasks',
-      title: 'Tasks',
+      title: 'Templates',
       icon: faClipboardList,
       count: 148,
-      description: 'Configure task templates and workflows',
+      description: 'Manage task templates and standardized workflows',
       color: 'text-blue-500'
     },
     {
@@ -69,8 +69,7 @@ function Settings() {
         navigate('/settings/categories');
         break;
       case 'tasks':
-        // navigate('/settings/tasks'); // TODO: Create Tasks page
-        console.log('Tasks page not yet implemented');
+        navigate('/settings/tasks');
         break;
       case 'spots':
         // navigate('/settings/spots'); // TODO: Create Spots page

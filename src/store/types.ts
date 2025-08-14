@@ -38,6 +38,22 @@ export interface Category {
     deleted_at: string | null;
 }
 
+export interface Template {
+    id: number;
+    name: string;
+    description: string | null;
+    category_id: number;
+    team_id: number;
+    workspace_id: number;
+    default_priority: number;
+    default_duration: number;
+    instructions: string | null;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+}
+
 export interface Task {
     id: number;
     name: string;

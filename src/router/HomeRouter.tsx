@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import Settings from '@/pages/settings/Settings';
 import Stuff from '@/pages/stuff/Stuff';
 import Categories from '@/pages/settings/components/Categories';
+import Templates from '@/pages/settings/components/Templates';
 
 const pages = [
   // { path: '/tasks', component: <Workspace /> },
@@ -43,7 +44,8 @@ export const HomeRoutes = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/workspace/:id" element={<Workspace />} /> 
           <Route path="/stuff" element={<Stuff />} />
-          <Route path="/settings/categories" element={<Categories />} /> 
+          <Route path="/settings/categories" element={<Categories />} />
+          <Route path="/settings/tasks" element={<Templates />} /> 
         </Routes>
       </MainLayout>
     </>

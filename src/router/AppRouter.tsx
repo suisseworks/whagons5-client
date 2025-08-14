@@ -10,6 +10,7 @@ import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
 import { TeamsCache } from '@/store/indexedDB/TeamsCache';
 import { CategoriesCache } from '@/store/indexedDB/CategoriesCache';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TemplatesCache } from '@/store/indexedDB/TemplatesCache';
 
 export const AppRouter = () => {
 
@@ -19,6 +20,7 @@ export const AppRouter = () => {
     TeamsCache.init();
     CategoriesCache.init();
     TasksCache.init();
+    TemplatesCache.init();
 
     
    
