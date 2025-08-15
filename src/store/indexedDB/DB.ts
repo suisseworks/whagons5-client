@@ -2,7 +2,7 @@ import { auth } from "@/firebase/firebaseConfig";
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = "1.0.8";
+const CURRENT_DB_VERSION = "1.1.0";
 const DB_VERSION_KEY = "indexeddb_version";
 
 //static class to access the message cache
@@ -39,7 +39,7 @@ export class DB {
     const request = indexedDB.open(userID, 1);
 
     // Wrap in a Promise to await db setup
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const db = await new Promise<IDBDatabase>((resolve, _reject) => {
       request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains("workspaces")) {
@@ -54,11 +54,24 @@ export class DB {
         if (!db.objectStoreNames.contains("teams")) {
           db.createObjectStore("teams", { keyPath: "id" });
         }
+        // New reference tables used by RTL publications
+        if (!db.objectStoreNames.contains("statuses")) {
+          db.createObjectStore("statuses", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("priorities")) {
+          db.createObjectStore("priorities", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("spots")) {
+          db.createObjectStore("spots", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("tags")) {
+          db.createObjectStore("tags", { keyPath: "id" });
+        }
       };
 
       request.onerror = () => {
         console.error("DB.init: Error opening database:", request.error);
-        reject(request.error);
+        _reject(request.error as any);
       };
       request.onsuccess = () => {   
         resolve(request.result);
@@ -108,7 +121,7 @@ export class DB {
       DB.db = undefined as unknown as IDBDatabase;
     }
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, _reject) => {
       // Create a timeout to prevent indefinite hanging
       const timeout = setTimeout(() => {
         console.warn("Database deletion timed out after 5 seconds");
@@ -145,7 +158,7 @@ export class DB {
   }
 
   public static getStoreRead(
-    name: "workspaces" | "categories" | "tasks" | "teams",
+    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags",
     mode: IDBTransactionMode = "readonly"
   ) {
     if (!DB.inited) throw new Error("DB not initialized");
@@ -154,7 +167,7 @@ export class DB {
   }
 
   public static getStoreWrite(
-    name: "workspaces" | "categories" | "tasks" | "teams",
+    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags",
     mode: IDBTransactionMode = "readwrite"
   ) {
     if (!DB.inited) throw new Error("DB not initialized");

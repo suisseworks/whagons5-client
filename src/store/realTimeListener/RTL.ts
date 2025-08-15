@@ -1,7 +1,8 @@
 import { getTokenForUser } from "@/api/whagonsApi";
 import { auth } from "@/firebase/firebaseConfig";
 import { getEnvVariables } from "@/lib/getEnvVariables";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
+// Removed direct TasksCache usage; routed through CacheRegistry
+import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
 import SockJS from 'sockjs-client';
 
 interface RTLMessage {
@@ -35,7 +36,7 @@ export class RealTimeListener {
   
   // Event listeners
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
-  private keepAliveListenerAdded = false;
+  // removed unused keepAliveListenerAdded
 
   constructor(options: ConnectionOptions = {}) {
     this.options = {
@@ -428,52 +429,42 @@ export class RealTimeListener {
     // Emit general publication event
     this.emit('publication:received', data);
 
-    // Handle task-specific operations
-    if (data.table === 'wh_tasks') {
-      this.handleTaskPublication(data).catch(error => {
-        console.error('Error handling task publication:', error);
-      });
-    }
-
-    // Handle other table operations as needed
-    // Add more table-specific handlers here
+    // Route to appropriate cache by table name
+    this.handleTablePublication(data).catch(error => {
+      console.error('Error handling table publication:', error);
+    });
   }
 
   /**
-   * Handle task-specific publication messages
+   * Generic table publication handler using CacheRegistry
    */
-  private async handleTaskPublication(data: RTLMessage): Promise<void> {
+  private async handleTablePublication(data: RTLMessage): Promise<void> {
+    const table = data.table;
+    if (!table) return;
+    const cache = getCacheForTable(table);
+    if (!cache) {
+      this.debugLog('No cache handler registered for table', table);
+      return;
+    }
+
     const operation = data.operation?.toUpperCase();
-    
     try {
       switch (operation) {
         case 'INSERT':
-          if (data.new_data) {
-            await TasksCache.addTask(data.new_data);
-            this.debugLog('Task inserted into cache:', data.new_data.id);
-          }
+          if (data.new_data) await cache.add(data.new_data);
           break;
-          
         case 'UPDATE':
-          if (data.new_data && data.new_data.id) {
-            await TasksCache.updateTask(data.new_data.id.toString(), data.new_data);
-            this.debugLog('Task updated in cache:', data.new_data.id);
-          }
+          if (data.new_data && data.new_data.id != null) await cache.update(data.new_data.id, data.new_data);
           break;
-          
         case 'DELETE':
-          if (data.old_data && data.old_data.id) {
-            await TasksCache.deleteTask(data.old_data.id.toString());
-            this.debugLog('Task deleted from cache:', data.old_data.id);
-          }
+          if (data.old_data && data.old_data.id != null) await cache.remove(data.old_data.id);
           break;
-          
         default:
-          this.debugLog('Unknown task operation:', operation);
+          this.debugLog('Unknown operation for table', table, operation);
           break;
       }
     } catch (error) {
-      console.error('Error handling task publication:', error, data);
+      console.error('RTL generic cache handler error', { table, operation, error });
     }
   }
 
