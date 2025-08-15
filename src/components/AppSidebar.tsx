@@ -22,6 +22,7 @@ import {
   Plus,
   ChevronDown,
   Briefcase,
+  BarChart3,
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -251,7 +252,9 @@ export function AppSidebar() {
         }`}
       >
         <div className="flex items-center justify-center w-full">
-          <div
+          <Link
+            to="/home"
+            title="Home"
             className={`flex items-center pt-3 pb-3 transition-all duration-300 ${
               isCollapsed ? 'justify-center' : 'justify-center'
             }`}
@@ -269,7 +272,7 @@ export function AppSidebar() {
                 Whagons
               </div>
             )}
-          </div>
+          </Link>
           {!isCollapsed && !isMobile && (
             <PinnedSidebarTrigger className="ml-2 text-primary hover:text-primary/80" />
           )}
@@ -373,6 +376,18 @@ export function AppSidebar() {
               <CollapsibleContent>
                 {(!isCollapsed || isMobile) && (
                   <SidebarGroupContent className="pt-2 pl-1">
+                    {/* Everything pseudo-workspace */}
+                    <Link
+                      to={`/workspace/all`}
+                      className={`flex items-center space-x-2 rounded-md relative transition-colors px-4 py-2 mx-2 ${
+                        pathname === `/workspace/all`
+                          ? 'bg-primary/10 text-primary border-l-4 border-primary'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
+                      }`}
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>Everything</span>
+                    </Link>
                     {workspaces.map((workspace) => (
                       <Link
                         key={workspace.id}
@@ -398,6 +413,17 @@ export function AppSidebar() {
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
                     <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent/30">
+                      <Link
+                        to={`/workspace/all`}
+                        className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
+                          pathname === `/workspace/all`
+                            ? 'bg-primary/20 text-primary border border-primary/40'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                        }`}
+                        title={'Everything'}
+                      >
+                        <Users className="w-4 h-4" />
+                      </Link>
                       {workspaces.map((workspace) => (
                         <Link
                           key={workspace.id}
@@ -432,6 +458,37 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem className="pt-1 pb-1">
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
+                  className={`rounded-md relative transition-colors ${
+                    isCollapsed && !isMobile
+                      ? `h-10 flex justify-center items-center ${
+                          pathname === '/analytics'
+                            ? 'bg-primary/10 text-primary border-2 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                        }`
+                      : `h-10 ${
+                          pathname === '/analytics'
+                            ? 'bg-primary/10 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                        }`
+                  }`}
+                >
+                  <Link
+                    to="/analytics"
+                    className={
+                      isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : ''
+                    }
+                  >
+                    <BarChart3 size={20} className="w-5! h-5! p-[1px]" />
+                    {showExpandedContent && <span>Analytics</span>}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem className="pt-1 pb-1">
                 <SidebarMenuButton
                   asChild

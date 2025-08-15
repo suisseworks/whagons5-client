@@ -1,5 +1,7 @@
  
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
  
 import { Badge } from "@/components/ui/badge";
@@ -12,17 +14,119 @@ import {
   faUsers, 
   faUser 
 } from "@fortawesome/free-solid-svg-icons";
+import { RootState, AppDispatch } from "@/store/store";
+import { getCategoriesFromIndexedDB } from "@/store/reducers/categoriesSlice";
+import { getTemplatesFromIndexedDB } from "@/store/reducers/templatesSlice";
+import { getTeamsFromIndexedDB } from "@/store/reducers/teamsSlice";
+import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
+import { getWorkspacesFromIndexedDB } from "@/store/reducers/workspacesSlice";
+import api from "@/api/whagonsApi";
+import { useState } from "react";
 
 function Settings() {
   const navigate = useNavigate();
-  
+  const dispatch = useDispatch<AppDispatch>();
+  const [spotCount, setSpotCount] = useState<number | undefined>(undefined);
+
+  // Hydrate data (idempotent if already loaded)
+  useEffect(() => {
+    dispatch(getCategoriesFromIndexedDB());
+    dispatch(getTemplatesFromIndexedDB());
+    dispatch(getTeamsFromIndexedDB());
+    dispatch(getTasksFromIndexedDB());
+    dispatch(getWorkspacesFromIndexedDB());
+  }, [dispatch]);
+
+  // Fetch authoritative spot count from backend
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSpotCount = async () => {
+      // 1) Try integrity blocks API (most reliable and cheap for totals)
+      try {
+        for (const table of ['wh_spots']) {
+          try {
+            const r = await api.get('/integrity/blocks', { params: { table } });
+            const blocks = r?.data?.data || [];
+            if (Array.isArray(blocks) && blocks.length) {
+              const total = blocks.reduce((sum: number, b: any) => sum + (b?.row_count || 0), 0);
+              if (!cancelled && total > 0) { setSpotCount(total); return; }
+            }
+          } catch (_) { /* try next table name */ }
+        }
+      } catch (_) { /* fall through to REST fallback */ }
+
+      // 2) Fallback to REST list endpoint and rely on pagination.total if available
+      try {
+        const resp = await api.get('/spots', { params: { page: 1, per_page: 1 } });
+        const total = resp?.data?.pagination?.total
+          ?? resp?.data?.total
+          ?? resp?.data?.meta?.total
+          ?? (resp?.headers && (parseInt((resp.headers as any)['x-total-count']) || undefined));
+        if (!cancelled && typeof total === 'number') { setSpotCount(total); return; }
+      } catch (_) { /* ignore; will fallback to client-side derivations */ }
+
+      // 3) Final fallback: request a large page and count rows directly
+      try {
+        const resp = await api.get('/spots', { params: { page: 1, per_page: 1000 } });
+        const rows = Array.isArray(resp?.data?.data)
+          ? resp.data.data
+          : (Array.isArray(resp?.data?.rows) ? resp.data.rows : []);
+        if (!cancelled && Array.isArray(rows)) { setSpotCount(rows.length); return; }
+      } catch (_) { /* last resort: keep derived value */ }
+    };
+    fetchSpotCount();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Select from store
+  const categories = useSelector((s: RootState) => s.categories.value);
+  const templates = useSelector((s: RootState) => s.templates.value);
+  const teams = useSelector((s: RootState) => s.teams.value);
+  const tasks = useSelector((s: RootState) => s.tasks.value);
+  const workspaces = useSelector((s: RootState) => s.workspaces.value);
+
+  const counts = useMemo(() => {
+    // Prefer authoritative count from workspaces.spots when present. The API may
+    // return spots either as an array or as a JSON-encoded string – handle both.
+    const spotsFromWorkspaces = workspaces.reduce((sum, w: any) => {
+      let length = 0;
+      const spotsVal = w?.spots;
+      if (Array.isArray(spotsVal)) {
+        length = spotsVal.length;
+      } else if (typeof spotsVal === 'string') {
+        try {
+          const parsed = JSON.parse(spotsVal);
+          if (Array.isArray(parsed)) length = parsed.length;
+        } catch { /* ignore parse errors */ }
+      }
+      return sum + length;
+    }, 0);
+
+    let spotsFromTasks = 0;
+    if (spotsFromWorkspaces === 0) {
+      const spotIds = new Set<number>();
+      for (const t of tasks) {
+        if (t.spot_id && t.spot_id > 0) spotIds.add(t.spot_id);
+      }
+      spotsFromTasks = spotIds.size;
+    }
+
+    return {
+      categories: categories.length,
+      templates: templates.length,
+      teams: teams.length,
+      spots: spotCount ?? (spotsFromWorkspaces > 0 ? spotsFromWorkspaces : spotsFromTasks),
+      users: undefined as number | undefined,
+    };
+  }, [categories.length, templates.length, teams.length, tasks, workspaces, spotCount]);
+
   // Settings configuration data
   const settingsOptions = [
     {
       id: 'categories',
       title: 'Categories',
       icon: faTags,
-      count: 12,
+      count: counts.categories,
       description: 'Manage task categories and labels',
       color: 'text-red-500'
     },
@@ -30,7 +134,7 @@ function Settings() {
       id: 'templates',
       title: 'Templates',
       icon: faClipboardList,
-      count: 148,
+      count: counts.templates,
       description: 'Manage task templates and standardized workflows',
       color: 'text-blue-500'
     },
@@ -38,7 +142,7 @@ function Settings() {
       id: 'spots',
       title: 'Spots',
       icon: faLocationDot,
-      count: 48,
+      count: counts.spots,
       description: 'Set up locations and spot management',
       color: 'text-green-500'
     },
@@ -46,7 +150,7 @@ function Settings() {
       id: 'teams',
       title: 'Teams',
       icon: faUsers,
-      count: 8,
+      count: counts.teams,
       description: 'Organize and manage work teams',
       color: 'text-purple-500'
     },
@@ -54,7 +158,7 @@ function Settings() {
       id: 'users',
       title: 'Users',
       icon: faUser,
-      count: 24,
+      count: counts.users,
       description: 'User accounts and permissions',
       color: 'text-indigo-500'
     }
@@ -113,9 +217,11 @@ function Settings() {
                 <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
                   <FontAwesomeIcon icon={setting.icon} />
                 </div>
-                <Badge variant="secondary" className="font-bold">
-                  {setting.count}
-                </Badge>
+                {setting.count !== undefined && (
+                  <Badge variant="secondary" className="font-bold">
+                    {setting.count}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
                 <CardTitle className="text-xl">{setting.title}</CardTitle>

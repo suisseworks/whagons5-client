@@ -9,10 +9,13 @@ import { useMemo } from 'react';
 import Settings from '@/pages/settings/Settings';
 import Stuff from '@/pages/stuff/Stuff';
 import Categories from '@/pages/settings/components/Categories';
+import CustomFieldsTab from '@/pages/settings/components/CustomFieldsTab';
 import Templates from '@/pages/settings/components/Templates';
 import Teams from '@/pages/settings/components/Teams';
 import Spots from '@/pages/settings/components/Spots';
 import Users from '@/pages/settings/components/Users';
+import Analytics from '@/pages/analytics/Analytics';
+import Home from '@/pages/home/Home';
 
 const pages = [
   // { path: '/tasks', component: <Workspace /> },
@@ -41,13 +44,17 @@ export const HomeRoutes = () => {
       <MainLayout>
         <AllPages />
         <Routes>
-          {/* <Route path="/" element={<Navigate to="/tasks" replace />} /> */}
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/tasks" element={<Workspace />} />
+          <Route path="/workspace/all" element={<Workspace />} />
           <Route path="/workspace/:id" element={<Workspace />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/workspace/:id" element={<Workspace />} /> 
           <Route path="/stuff" element={<Stuff />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings/categories" element={<Categories />} />
+          <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
           <Route path="/settings/teams" element={<Teams />} />
           <Route path="/settings/spots" element={<Spots />} />

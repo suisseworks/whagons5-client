@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -885,6 +885,10 @@ function Categories() {
               Manage task categories and labels for better organization
             </p>
           </div>
+          <div className="flex items-center space-x-2">
+          <Link to="/settings/categories/custom-fields">
+            <Button variant="outline">Manage custom fields</Button>
+          </Link>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={handleAddCategory} className="flex items-center space-x-2">
@@ -1127,7 +1131,8 @@ function Categories() {
             </form>
           </DialogContent>
         </Dialog>
-
+        </div>
+ 
         {/* Edit Category Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>

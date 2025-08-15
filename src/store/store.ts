@@ -4,13 +4,17 @@ import { teamsSlice } from "./reducers/teamsSlice";
 import { categoriesSlice } from "./reducers/categoriesSlice";
 import { tasksSlice } from "./reducers/tasksSlice";
 import { templatesSlice } from "./reducers/templatesSlice";
+import customFieldsReducer from "./reducers/customFieldsSlice";
+import categoryFieldAssignmentsReducer from "./reducers/categoryFieldAssignmentsSlice";
 
 const rootReducer = combineReducers({
     workspaces: workspacesSlice.reducer,
     teams: teamsSlice.reducer,
     categories: categoriesSlice.reducer,
     tasks: tasksSlice.reducer,
-    templates: templatesSlice.reducer
+    templates: templatesSlice.reducer,
+    customFields: customFieldsReducer,
+    categoryFieldAssignments: categoryFieldAssignmentsReducer
 });
 
 const store = configureStore({
