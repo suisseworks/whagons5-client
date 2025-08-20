@@ -9,15 +9,11 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { workspacesSlice, addWorkspaceAsync, updateWorkspaceAsync, removeWorkspaceAsync } from '@/store/reducers/workspacesSlice';
-import { Workspace } from '@/store/Types';
+import { workspacesSlice, addWorkspaceAsync } from '@/store/reducers/workspacesSlice';
 import {
   Settings,
-  User,
   Users,
   Plus,
   ChevronDown,

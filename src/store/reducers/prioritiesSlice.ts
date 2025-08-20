@@ -8,6 +8,11 @@ export const getPrioritiesFromIndexedDB = createAsyncThunk('loadPriorities', asy
 	return await cache.getAll();
 });
 
+export const fetchPriorities = createAsyncThunk('priorities/fetch', async () => {
+    await cache.fetchAll({ per_page: 500, page: 1 });
+    return await cache.getAll();
+});
+
 const initialState = {
 	value: [] as Priority[],
 	loading: false,
@@ -27,6 +32,10 @@ export const prioritiesSlice = createSlice({
 		builder.addCase(getPrioritiesFromIndexedDB.pending, (state) => { state.loading = true; });
 		builder.addCase(getPrioritiesFromIndexedDB.fulfilled, (state, action) => { state.loading = false; state.value = action.payload; });
 		builder.addCase(getPrioritiesFromIndexedDB.rejected, (state, action) => { state.loading = false; state.error = action.error.message || null; });
+
+		builder.addCase(fetchPriorities.pending, (state) => { state.loading = true; });
+		builder.addCase(fetchPriorities.fulfilled, (state, action) => { state.loading = false; state.value = action.payload; });
+		builder.addCase(fetchPriorities.rejected, (state, action) => { state.loading = false; state.error = action.error.message || null; });
 	}
 });
 

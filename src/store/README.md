@@ -22,14 +22,17 @@ API Server → IndexedDB (Local Cache) → Redux Store → React Components
 
 ### 1. Initial Load (User Authentication)
 ```typescript
-User Authenticates → AuthProvider → dispatch(getWorkspacesFromIndexedDB()) → WorkspaceCache.init()
+User Authenticates → AuthProvider
+  → Initialize caches (Workspace/Teams/Categories/Tasks)
+  → Hydrate Redux from IndexedDB
+  → For GenericCache-backed reference tables, hydrate + network refresh
 ```
 
 1. **User logs in** via Firebase Authentication
 2. **AuthProvider** detects authentication and fetches user data
-3. **After successful user fetch**, AuthProvider dispatches `getWorkspacesFromIndexedDB()`
-4. **Async thunk** calls `WorkspaceCache.getWorkspaces()` to get cached data
-5. **Redux store** is populated with workspace data
+3. **After successful user fetch**, AuthProvider initializes caches and hydrates Redux state
+4. **Redux store** is populated from IndexedDB for fast UI
+5. **Reference tables** (GenericCache-backed) also fetch from network to refresh cache
 6. **Components** receive data via `useSelector`
 
 ### 2. Cache Initialization Process
@@ -59,6 +62,66 @@ Components access workspace data through Redux:
 ```typescript
 const { value: workspaces, loading, error } = useSelector((state: RootState) => state.workspaces);
 ```
+
+## GenericCache-backed entities (reference tables)
+
+Some smaller/reference entities use the shared `GenericCache` with thin slices that:
+- Load from IndexedDB (fast, offline) using `get<X>FromIndexedDB`
+- Optionally call `fetch<X>` to refresh the cache from the network
+
+Current GenericCache-backed slices:
+- `statusesSlice` → `getStatusesFromIndexedDB`, `fetchStatuses`
+- `prioritiesSlice` → `getPrioritiesFromIndexedDB`, `fetchPriorities`
+- `spotsSlice` → `getSpotsFromIndexedDB`, `fetchSpots`
+- `tagsSlice` → `getTagsFromIndexedDB`, `fetchTags`
+- `customFieldsSlice` → `getCustomFieldsFromIndexedDB`, `fetchCustomFields`
+- `categoryFieldAssignmentsSlice` → fetch per category (`getAssignmentsForCategory`); assignments are persisted in a GenericCache store and reused
+
+### AuthProvider hydration
+
+After login, the provider initializes caches and dispatches hydration for all tables. Key lines:
+
+```ts
+// Initialize IndexedDB caches that require auth
+await Promise.all([
+  WorkspaceCache.init(),
+  TeamsCache.init(),
+  CategoriesCache.init(),
+  TasksCache.init(),
+]);
+
+// Hydrate Redux from IndexedDB (fast)
+dispatch(getWorkspacesFromIndexedDB());
+dispatch(getTeamsFromIndexedDB());
+dispatch(getCategoriesFromIndexedDB());
+dispatch(getTasksFromIndexedDB());
+
+// GenericCache-backed reference tables: load from cache, then refresh from network
+dispatch(getStatusesFromIndexedDB());
+dispatch(fetchStatuses());
+dispatch(getPrioritiesFromIndexedDB());
+dispatch(fetchPriorities());
+dispatch(getSpotsFromIndexedDB());
+dispatch(fetchSpots());
+dispatch(getTagsFromIndexedDB());
+dispatch(fetchTags());
+dispatch(getCustomFieldsFromIndexedDB());
+dispatch(fetchCustomFields());
+
+// Category-field-assignments are fetched per category on demand and cached
+```
+
+Notes:
+- `DB.ts` defines object stores; new stores (`custom_fields`, `category_field_assignments`) require a DB version bump.
+- For large listings (e.g., Workspace tasks grid), components may read directly from IndexedDB (via a cache/query helper) for performance.
+
+## Tasks vs GenericCache
+
+`TasksCache` is bespoke to support:
+- Real-time event emitters for grid refresh
+- Local query engine to filter/sort/paginate offline, mirroring backend
+
+This coexists with GenericCache-backed slices for reference data. Future large entities can adopt the GenericCache + local query helper pattern documented in `GenericCache-Guide.md`.
 
 ## Implementation Details
 

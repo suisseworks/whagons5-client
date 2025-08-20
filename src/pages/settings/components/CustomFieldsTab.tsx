@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faEdit, faTrash, faCubes, faCheck, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
-import { CategoryCustomField, createCustomField, deleteCustomField, getCustomFieldsFromApi, updateCustomField } from "@/store/reducers/customFieldsSlice";
+import { CategoryCustomField, createCustomField, deleteCustomField, getCustomFieldsFromIndexedDB, fetchCustomFields, updateCustomField } from "@/store/reducers/customFieldsSlice";
 import { bulkAssignFieldToCategories } from "@/store/reducers/categoryFieldAssignmentsSlice";
 
 type DraftField = {
@@ -52,7 +52,7 @@ export default function CustomFieldsTab() {
   const [selectedField, setSelectedField] = useState<CategoryCustomField | null>(null);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-  useEffect(() => { dispatch(getCustomFieldsFromApi()); }, [dispatch]);
+  useEffect(() => { dispatch(getCustomFieldsFromIndexedDB()); dispatch(fetchCustomFields()); }, [dispatch]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();

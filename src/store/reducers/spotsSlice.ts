@@ -8,6 +8,11 @@ export const getSpotsFromIndexedDB = createAsyncThunk('loadSpots', async () => {
 	return await cache.getAll();
 });
 
+export const fetchSpots = createAsyncThunk('spots/fetch', async () => {
+    await cache.fetchAll({ per_page: 500, page: 1 });
+    return await cache.getAll();
+});
+
 const initialState = {
 	value: [] as Spot[],
 	loading: false,
@@ -27,6 +32,10 @@ export const spotsSlice = createSlice({
 		builder.addCase(getSpotsFromIndexedDB.pending, (state) => { state.loading = true; });
 		builder.addCase(getSpotsFromIndexedDB.fulfilled, (state, action) => { state.loading = false; state.value = action.payload; });
 		builder.addCase(getSpotsFromIndexedDB.rejected, (state, action) => { state.loading = false; state.error = action.error.message || null; });
+
+		builder.addCase(fetchSpots.pending, (state) => { state.loading = true; });
+		builder.addCase(fetchSpots.fulfilled, (state, action) => { state.loading = false; state.value = action.payload; });
+		builder.addCase(fetchSpots.rejected, (state, action) => { state.loading = false; state.error = action.error.message || null; });
 	}
 });
 

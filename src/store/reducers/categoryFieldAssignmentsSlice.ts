@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api from "@/api/whagonsApi";
+import { GenericCache } from "../indexedDB/GenericCache";
 
 export interface CategoryFieldAssignment {
   id: number;
@@ -14,12 +15,29 @@ export interface CategoryFieldAssignment {
   updated_at: string;
 }
 
+// Cache holds all assignments; component can filter by category locally if needed
+const cfaCache = new GenericCache({
+  table: "wh_category_field_assignments",
+  endpoint: "/category-field-assignments",
+  store: "category_field_assignments",
+  hashFields: [
+    "id",
+    "category_id",
+    "custom_field_id",
+    "order",
+    "active",
+    "updated_at",
+  ],
+});
+
 export const getAssignmentsForCategory = createAsyncThunk(
   "categoryFieldAssignments/getForCategory",
   async (categoryId: number) => {
+    // Fetch from API (authoritative), then upsert into cache for reuse
     const resp = await api.get(`/categories/${categoryId}/custom-fields`);
-    const rows = resp?.data?.data ?? resp?.data?.rows ?? [];
-    return { categoryId, rows: rows as CategoryFieldAssignment[] };
+    const rows = (resp?.data?.data ?? resp?.data?.rows ?? []) as CategoryFieldAssignment[];
+    for (const r of rows) await cfaCache.add(r);
+    return { categoryId, rows };
   }
 );
 
@@ -27,9 +45,19 @@ export const bulkAssignFieldToCategories = createAsyncThunk(
   "categoryFieldAssignments/bulkAssign",
   async ({ fieldId, categoryIds }: { fieldId: number; categoryIds: number[] }) => {
     const resp = await api.post(`/category-custom-fields/${fieldId}/assign`, { category_ids: categoryIds });
+    // Refresh cache for affected categories
+    for (const catId of categoryIds) {
+      try {
+        const r = await api.get(`/categories/${catId}/custom-fields`);
+        const rows = (r?.data?.data ?? r?.data?.rows ?? []) as CategoryFieldAssignment[];
+        for (const row of rows) await cfaCache.add(row);
+      } catch {}
+    }
     return resp?.data ?? { fieldId, categoryIds };
   }
 );
+
+// Note: no global fetch endpoint for all assignments is assumed; we populate per-category
 
 const initialState = {
   // Map categoryId -> assignments
@@ -58,6 +86,8 @@ export const categoryFieldAssignmentsSlice = createSlice({
     builder.addCase(bulkAssignFieldToCategories.rejected, (state, action) => {
       state.error = action.error.message || null;
     });
+
+    // no-op placeholder to keep builder shape consistent
   }
 });
 

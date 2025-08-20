@@ -2,7 +2,7 @@ import { auth } from "@/firebase/firebaseConfig";
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = "1.1.0";
+const CURRENT_DB_VERSION = "1.2.0";
 const DB_VERSION_KEY = "indexeddb_version";
 
 //static class to access the message cache
@@ -66,6 +66,13 @@ export class DB {
         }
         if (!db.objectStoreNames.contains("tags")) {
           db.createObjectStore("tags", { keyPath: "id" });
+        }
+        // Custom fields and category-field-assignments (GenericCache-backed)
+        if (!db.objectStoreNames.contains("custom_fields")) {
+          db.createObjectStore("custom_fields", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("category_field_assignments")) {
+          db.createObjectStore("category_field_assignments", { keyPath: "id" });
         }
       };
 
@@ -158,7 +165,7 @@ export class DB {
   }
 
   public static getStoreRead(
-    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags",
+    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments",
     mode: IDBTransactionMode = "readonly"
   ) {
     if (!DB.inited) throw new Error("DB not initialized");
@@ -167,7 +174,7 @@ export class DB {
   }
 
   public static getStoreWrite(
-    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags",
+    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments",
     mode: IDBTransactionMode = "readwrite"
   ) {
     if (!DB.inited) throw new Error("DB not initialized");

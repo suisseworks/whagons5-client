@@ -10,6 +10,11 @@ import { getWorkspacesFromIndexedDB } from '../store/reducers/workspacesSlice';
 import { getTeamsFromIndexedDB } from '../store/reducers/teamsSlice';
 import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
 import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
+import { getStatusesFromIndexedDB, fetchStatuses } from '@/store/reducers/statusesSlice';
+import { getPrioritiesFromIndexedDB, fetchPriorities } from '@/store/reducers/prioritiesSlice';
+import { getSpotsFromIndexedDB, fetchSpots } from '@/store/reducers/spotsSlice';
+import { getTagsFromIndexedDB, fetchTags } from '@/store/reducers/tagsSlice';
+import { getCustomFieldsFromIndexedDB, fetchCustomFields } from '@/store/reducers/customFieldsSlice';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
 import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
 import { TeamsCache } from '@/store/indexedDB/TeamsCache';
@@ -76,6 +81,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         dispatch(getTeamsFromIndexedDB());
         dispatch(getCategoriesFromIndexedDB());
         dispatch(getTasksFromIndexedDB());
+        // Hydrate small reference tables via GenericCache-backed slices
+        dispatch(getStatusesFromIndexedDB());
+        dispatch(fetchStatuses());
+        dispatch(getPrioritiesFromIndexedDB());
+        dispatch(fetchPriorities());
+        dispatch(getSpotsFromIndexedDB());
+        dispatch(fetchSpots());
+        dispatch(getTagsFromIndexedDB());
+        dispatch(fetchTags());
+        dispatch(getCustomFieldsFromIndexedDB());
+        dispatch(fetchCustomFields());
+        // Category-field-assignments are fetched per category on demand and cached via GenericCache
 
         const rtl = new RealTimeListener({ debug: true });
         rtl.connectAndHold();
