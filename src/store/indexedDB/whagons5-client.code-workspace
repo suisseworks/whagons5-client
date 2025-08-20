@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../.."
+		},
+		{
+			"path": "../../../../whagons5-api"
+		},
+		{
+			"path": "../../../../whagonsRLE"
+		}
+	],
+	"settings": {}
+}
