@@ -76,3 +76,38 @@ export interface Task {
     updated_at: string;
 }
 
+export interface Status {
+    id: number;
+    name: string;
+    color?: string | null;
+    position?: number | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+}
+
+export interface Priority {
+    id: number;
+    name: string;
+    color?: string | null;
+    level?: number | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+}
+
+export interface Spot {
+    id: number;
+    name: string;
+    workspace_id?: number | null;
+    description?: string | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+}
+
+export interface Tag {
+    id: number;
+    name: string;
+    color?: string | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+}
+

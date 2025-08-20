@@ -6,6 +6,10 @@ import { tasksSlice } from "./reducers/tasksSlice";
 import { templatesSlice } from "./reducers/templatesSlice";
 import customFieldsReducer from "./reducers/customFieldsSlice";
 import categoryFieldAssignmentsReducer from "./reducers/categoryFieldAssignmentsSlice";
+import { statusesSlice } from "./reducers/statusesSlice";
+import { prioritiesSlice } from "./reducers/prioritiesSlice";
+import { spotsSlice } from "./reducers/spotsSlice";
+import { tagsSlice } from "./reducers/tagsSlice";
 
 const rootReducer = combineReducers({
     workspaces: workspacesSlice.reducer,
@@ -14,7 +18,11 @@ const rootReducer = combineReducers({
     tasks: tasksSlice.reducer,
     templates: templatesSlice.reducer,
     customFields: customFieldsReducer,
-    categoryFieldAssignments: categoryFieldAssignmentsReducer
+    categoryFieldAssignments: categoryFieldAssignmentsReducer,
+    statuses: statusesSlice.reducer,
+    priorities: prioritiesSlice.reducer,
+    spots: spotsSlice.reducer,
+    tags: tagsSlice.reducer
 });
 
 const store = configureStore({

@@ -573,7 +573,7 @@ export class TasksCache {
                 // AG Grid-style pagination
                 const startRow = parseInt(params.startRow);
                 const endRow = parseInt(params.endRow);
-                const pageSize = endRow - startRow; // retained for clarity
+                // const pageSize = endRow - startRow; // retained for clarity
                 
                 return {
                     rows: tasks.slice(startRow, endRow),
@@ -630,7 +630,24 @@ export class TasksCache {
      * Evaluate a single filter condition
      */
     private static evaluateCondition(value: any, condition: any): boolean {
-        const { filterType, type, filter, filterTo, dateFrom, dateTo } = condition;
+        const { filterType, type, filter, filterTo, dateFrom, dateTo, values } = condition;
+
+        // Handle set filter (AG Grid Set Filter)
+        if (filterType === 'set') {
+            const selected = Array.isArray(values) ? values : [];
+            if (selected.length === 0) return true;
+            // Coerce types to compare consistently
+            const normalizedSelectedNums = selected.map((v: any) => {
+                const n = Number(v);
+                return isNaN(n) ? null : n;
+            });
+            // Prefer numeric comparison when possible
+            if (typeof value === 'number') {
+                return normalizedSelectedNums.includes(value);
+            }
+            // Fall back to string comparison
+            return selected.map((v: any) => String(v)).includes(String(value));
+        }
         
         if (type === 'inRange') {
             if (filterType === 'number') {

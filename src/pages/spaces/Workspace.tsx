@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Settings } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
+import { Input } from '@/components/ui/input';
 
 export const Workspace = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +12,7 @@ export const Workspace = () => {
   // State to store the fetched data
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
+  const [searchText, setSearchText] = useState('');
 
   // Clear cache when workspace ID changes
   useEffect(() => {
@@ -45,13 +47,22 @@ export const Workspace = () => {
           Settings
         </TabsTrigger>
       </TabsList>
+      <div className="flex items-center gap-3 mb-3">
+        <Input
+          placeholder="Search tasks..."
+          className="max-w-sm"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
+
       <TabsContent
         forceMount
         className='flex-1 h-0'
         value="grid"
         style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
       >
-        <WorkspaceTable rowCache={rowCache} workspaceId={id} />
+        <WorkspaceTable rowCache={rowCache} workspaceId={id} searchText={searchText} />
       </TabsContent>
       <TabsContent value="list" className="flex-1 h-0">
         <SettingsComponent />
