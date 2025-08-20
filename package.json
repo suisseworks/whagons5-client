@@ -9,8 +9,6 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
-    "@ag-grid-community/core": "^32.3.5",
-    "@ag-grid-community/infinite-row-model": "^32.3.5",
     "@firebase/auth": "^1.10.0",
     "@fortawesome/fontawesome-free": "^6.7.2",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
@@ -29,8 +27,9 @@
     "@radix-ui/react-tabs": "^1.1.9",
     "@radix-ui/react-tooltip": "^1.2.4",
     "@reduxjs/toolkit": "^2.7.0",
+    "ag-grid-community": "^34.1.1",
     "ag-grid-enterprise": "^34.1.1",
-    "ag-grid-react": "^33.2.4",
+    "ag-grid-react": "^34.1.1",
     "axios": "^1.8.4",
     "class-variance-authority": "^0.7.1",
     "crypto-js": "^4.2.0",
