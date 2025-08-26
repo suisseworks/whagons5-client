@@ -34,7 +34,7 @@ import {
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
-import { Category } from "@/store/types";
+import { Category, Task, Team } from "@/store/types";
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -146,9 +146,9 @@ function Categories() {
   const gridRef = useRef<AgGridReact>(null);
   
   // Redux state
-  const { value: categories, loading, error } = useSelector((state: RootState) => state.categories);
-  const { value: teams } = useSelector((state: RootState) => state.teams);
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const { value: categories, loading, error } = useSelector((state: RootState) => state.categories) as { value: Category[]; loading: boolean; error: string | null };
+  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
+  const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   
   const [rowData, setRowData] = useState<Category[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -210,7 +210,7 @@ function Categories() {
 
   // Get task count for a category
   const getCategoryTaskCount = useCallback((categoryId: number) => {
-    return tasks.filter(task => task.category_id === categoryId).length;
+    return tasks.filter((task: Task) => task.category_id === categoryId).length;
   }, [tasks]);
 
   // Handle delete category
@@ -465,94 +465,7 @@ function Categories() {
     return () => clearTimeout(debounceTimer);
   }, [iconSearch, popularIcons]);
 
-  // Create new category via Redux
-  const createCategory = async () => {
-    try {
-      // Validate required associations before attempting to create
-      if (!formData.team_id) {
-        setFormError('Please select a team for this category.');
-        return;
-      }
-
-      setFormError(null);
-      setIsSubmitting(true);
-      
-      const categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'> = {
-        name: formData.name,
-        description: formData.description,
-        color: formData.color,
-        icon: formData.icon,
-        enabled: formData.enabled,
-        team_id: parseInt(formData.team_id),
-        workspace_id: formData.workspace_id,
-        sla_id: formData.sla_id,
-        deleted_at: null
-      };
-      
-      await dispatch(genericActions.categories.addAsync(categoryData)).unwrap();
-      
-      // Reset form and close dialog
-      setFormData({
-        name: '',
-        description: '',
-        color: '#4ECDC4',
-        icon: 'fas fa-tags',
-        enabled: true,
-        team_id: '',
-        workspace_id: 1,
-        sla_id: 1
-      });
-      setFormError(null);
-      setIsCreateDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating category:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Update existing category via Redux
-  const updateCategory = async () => {
-    if (!editingCategory) return;
-    
-    try {
-      setIsSubmitting(true);
-      
-      const updates: Partial<Category> = {
-        name: editFormData.name,
-        description: editFormData.description,
-        color: editFormData.color,
-        icon: editFormData.icon,
-        enabled: editFormData.enabled,
-        team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
-        workspace_id: editFormData.workspace_id,
-        sla_id: editFormData.sla_id
-      };
-      
-      await dispatch(genericActions.categories.updateAsync({
-        id: editingCategory.id,
-        updates
-      })).unwrap();
-      
-      // Reset form and close dialog
-      setEditFormData({
-        name: '',
-        description: '',
-        color: '#4ECDC4',
-        icon: 'fas fa-tags',
-        enabled: true,
-        team_id: '',
-        workspace_id: 1,
-        sla_id: 1
-      });
-      setEditingCategory(null);
-      setIsEditDialogOpen(false);
-    } catch (error) {
-      console.error('Error updating category:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  // Removed redundant createCategory/updateCategory wrappers; inline in submit handlers
 
   const handleAddCategory = () => {
     // Reset form data when opening dialog
@@ -740,17 +653,79 @@ function Categories() {
     }
   }, [editLoadedIconsCount, totalIconsCount, allIconsMetadata, editLoadingMoreIcons, editIsSearching]);
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.name.trim()) {
-      createCategory();
+    if (!formData.name.trim()) return;
+    try {
+      if (!formData.team_id) {
+        setFormError('Please select a team for this category.');
+        return;
+      }
+      setFormError(null);
+      setIsSubmitting(true);
+      const categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'> = {
+        name: formData.name,
+        description: formData.description,
+        color: formData.color,
+        icon: formData.icon,
+        enabled: formData.enabled,
+        team_id: parseInt(formData.team_id),
+        workspace_id: formData.workspace_id,
+        sla_id: formData.sla_id,
+        deleted_at: null
+      };
+      await dispatch(genericActions.categories.addAsync(categoryData)).unwrap();
+      setFormData({
+        name: '',
+        description: '',
+        color: '#4ECDC4',
+        icon: 'fas fa-tags',
+        enabled: true,
+        team_id: '',
+        workspace_id: 1,
+        sla_id: 1
+      });
+      setFormError(null);
+      setIsCreateDialogOpen(false);
+    } catch (error) {
+      console.error('Error creating category:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEditFormSubmit = (e: React.FormEvent) => {
+  const handleEditFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editFormData.name.trim()) {
-      updateCategory();
+    if (!editFormData.name.trim() || !editingCategory) return;
+    try {
+      setIsSubmitting(true);
+      const updates: Partial<Category> = {
+        name: editFormData.name,
+        description: editFormData.description,
+        color: editFormData.color,
+        icon: editFormData.icon,
+        enabled: editFormData.enabled,
+        team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
+        workspace_id: editFormData.workspace_id,
+        sla_id: editFormData.sla_id
+      };
+      await dispatch(genericActions.categories.updateAsync({ id: editingCategory.id, updates })).unwrap();
+      setEditFormData({
+        name: '',
+        description: '',
+        color: '#4ECDC4',
+        icon: 'fas fa-tags',
+        enabled: true,
+        team_id: '',
+        workspace_id: 1,
+        sla_id: 1
+      });
+      setEditingCategory(null);
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating category:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -763,9 +738,9 @@ function Categories() {
     if (lowerCaseValue === '') {
       setRowData(categories);
     } else {
-      const filteredData = categories.filter((category) => {
+      const filteredData = categories.filter((category: Category) => {
         const enabledText = category.enabled ? 'enabled active' : 'disabled inactive';
-        const team = teams.find(t => t.id === category.team_id);
+        const team = teams.find((t: Team) => t.id === category.team_id);
         const teamText = team ? team.name.toLowerCase() : (category.team_id ? `team ${category.team_id}` : 'no team');
         
         return category.name?.toLowerCase().includes(lowerCaseValue) ||
@@ -1059,7 +1034,7 @@ function Categories() {
                     className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   >
                     <option value="">No Team</option>
-                    {teams.map((team) => (
+                    {teams.map((team: Team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
                       </option>
@@ -1096,10 +1071,10 @@ function Categories() {
                     {formData.team_id && (
                       <div className="flex items-center space-x-1">
                         <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">
-                          {teams.find(t => t.id === parseInt(formData.team_id))?.name?.charAt(0).toUpperCase() || 'T'}
+                          {teams.find((t: Team) => t.id === parseInt(formData.team_id))?.name?.charAt(0).toUpperCase() || 'T'}
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          {teams.find(t => t.id === parseInt(formData.team_id))?.name || `Team ${formData.team_id}`}
+                          {teams.find((t: Team) => t.id === parseInt(formData.team_id))?.name || `Team ${formData.team_id}`}
                         </span>
                       </div>
                     )}
@@ -1298,7 +1273,7 @@ function Categories() {
                     className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   >
                     <option value="">No Team</option>
-                    {teams.map((team) => (
+                    {teams.map((team: Team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
                       </option>
@@ -1335,10 +1310,10 @@ function Categories() {
                     {editFormData.team_id && (
                       <div className="flex items-center space-x-1">
                         <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">
-                          {teams.find(t => t.id === parseInt(editFormData.team_id))?.name?.charAt(0).toUpperCase() || 'T'}
+                          {teams.find((t: Team) => t.id === parseInt(editFormData.team_id))?.name?.charAt(0).toUpperCase() || 'T'}
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          {teams.find(t => t.id === parseInt(editFormData.team_id))?.name || `Team ${editFormData.team_id}`}
+                          {teams.find((t: Team) => t.id === parseInt(editFormData.team_id))?.name || `Team ${editFormData.team_id}`}
                         </span>
                       </div>
                     )}
@@ -1441,10 +1416,10 @@ function Categories() {
                         {deletingCategory.team_id && (
                           <div className="flex items-center space-x-1">
                             <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">
-                              {teams.find(t => t.id === deletingCategory.team_id)?.name?.charAt(0).toUpperCase() || 'T'}
+                              {teams.find((t: Team) => t.id === deletingCategory.team_id)?.name?.charAt(0).toUpperCase() || 'T'}
                             </div>
                             <span className="text-xs text-muted-foreground">
-                              {teams.find(t => t.id === deletingCategory.team_id)?.name || `Team ${deletingCategory.team_id}`}
+                              {teams.find((t: Team) => t.id === deletingCategory.team_id)?.name || `Team ${deletingCategory.team_id}`}
                             </span>
                           </div>
                         )}
@@ -1543,13 +1518,13 @@ function Categories() {
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold">
-              {categories.filter(cat => cat.enabled).length}
+              {categories.filter((cat: Category) => cat.enabled).length}
             </div>
             <div className="text-sm text-muted-foreground">Enabled Categories</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold">
-              {categories.filter(cat => !cat.enabled).length}
+              {categories.filter((cat: Category) => !cat.enabled).length}
             </div>
             <div className="text-sm text-muted-foreground">Disabled Categories</div>
           </div>

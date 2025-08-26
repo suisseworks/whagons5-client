@@ -72,6 +72,31 @@ export class GenericCache {
 		DB.getStoreWrite(this.store as any).delete(key);
 	}
 
+	// --- Remote CRUD helpers ---
+	/**
+	 * Create on server and return created row (tries common REST response shapes)
+	 */
+	async createRemote(row: any): Promise<any> {
+		const resp = await api.post(this.endpoint, row);
+		return (resp.data?.data ?? resp.data?.row ?? resp.data);
+	}
+
+	/**
+	 * Update on server and return updated row (tries common REST response shapes)
+	 */
+	async updateRemote(id: IdType, updates: any): Promise<any> {
+		const resp = await api.patch(`${this.endpoint}/${id}`, updates);
+		return (resp.data?.data ?? resp.data?.row ?? resp.data);
+	}
+
+	/**
+	 * Delete on server
+	 */
+	async deleteRemote(id: IdType): Promise<boolean> {
+		await api.delete(`${this.endpoint}/${id}`);
+		return true;
+	}
+
 	async getAll(): Promise<any[]> {
 		if (!DB.inited) await DB.init();
 		const store = DB.getStoreRead(this.store as any);

@@ -3,6 +3,7 @@ import { auth } from "@/firebase/firebaseConfig";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 // Removed direct TasksCache usage; routed through CacheRegistry
 import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
+import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
 import SockJS from 'sockjs-client';
 
 interface RTLMessage {
@@ -441,7 +442,9 @@ export class RealTimeListener {
   private async handleTablePublication(data: RTLMessage): Promise<void> {
     const table = data.table;
     if (!table) return;
+
     const cache = getCacheForTable(table);
+
     if (!cache) {
       this.debugLog('No cache handler registered for table', table);
       return;
@@ -451,13 +454,25 @@ export class RealTimeListener {
     try {
       switch (operation) {
         case 'INSERT':
-          if (data.new_data) await cache.add(data.new_data);
+          if (data.new_data) {
+            await cache.add(data.new_data);
+            // Sync Redux slice from IndexedDB after write
+            syncReduxForTable(table);
+          }
           break;
         case 'UPDATE':
-          if (data.new_data && data.new_data.id != null) await cache.update(data.new_data.id, data.new_data);
+          if (data.new_data && data.new_data.id != null) {
+            await cache.update(data.new_data.id, data.new_data);
+            // Sync Redux slice from IndexedDB after write
+            syncReduxForTable(table);
+          }
           break;
         case 'DELETE':
-          if (data.old_data && data.old_data.id != null) await cache.remove(data.old_data.id);
+          if (data.old_data && data.old_data.id != null) {
+            await cache.remove(data.old_data.id);
+            // Sync Redux slice from IndexedDB after write
+            syncReduxForTable(table);
+          }
           break;
         default:
           this.debugLog('Unknown operation for table', table, operation);
