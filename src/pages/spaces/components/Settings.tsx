@@ -1,10 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useCallback, useEffect } from "react";
-import { Users, Building, Eye, Filter } from "lucide-react";
+import { Users, Eye, Filter } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useParams } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
-import { workspacesSlice, updateWorkspaceAsync } from "@/store/reducers/workspacesSlice";
+import { genericActions } from '@/store/genericSlices';
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";
@@ -75,18 +75,18 @@ function Settings() {
   // Using async actions for workspace operations
 
   // Get current workspace from Redux store
-  const { value: workspaces } = useSelector((state: RootState) => state.workspaces);
+  const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
   
   // Find workspace by ID from URL params or fallback to first workspace
   const currentWorkspace = params.id 
-    ? workspaces.find(workspace => workspace.id.toString() === params.id)
+    ? workspaces.find((workspace: any) => workspace.id.toString() === params.id)
     : workspaces.length > 0 ? workspaces[0] : null;
 
   // Debug logging
   console.log('Workspace matching debug:', {
     paramsId: params.id,
     workspacesLength: workspaces.length,
-    workspaceIds: workspaces.map(w => ({ id: w.id, name: w.name })),
+    workspaceIds: workspaces.map((w: any) => ({ id: w.id, name: w.name })),
     currentWorkspace: currentWorkspace ? { id: currentWorkspace.id, name: currentWorkspace.name } : null,
     pathname: location.pathname
   });
@@ -273,10 +273,10 @@ function Settings() {
       updatedAt: new Date().toISOString()
     };
     
-          dispatch(updateWorkspaceAsync({ 
-        id: currentWorkspace.id, 
-        updates: updatedWorkspace 
-      }));
+          dispatch(genericActions.workspaces.updateAsync({
+            id: currentWorkspace.id,
+            updates: updatedWorkspace
+          }));
     }, [currentWorkspace, dispatch]);
 
   return (

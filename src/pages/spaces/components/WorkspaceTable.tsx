@@ -6,8 +6,7 @@ import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import 'ag-grid-enterprise';
 import { LicenseManager } from 'ag-grid-enterprise';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchStatuses, getStatusesFromIndexedDB } from '@/store/reducers/statusesSlice';
-import { getWorkspacesFromIndexedDB } from '@/store/reducers/workspacesSlice';
+import { genericActions } from '@/store/genericSlices';
 import type { RootState } from '@/store';
 
 const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
@@ -81,10 +80,14 @@ const WorkspaceTable = ({
 
   // Load status metadata (name + color) from store
   const dispatch = useDispatch();
-  const statuses = useSelector((s: RootState) => s.statuses.value);
-  const workspaces = useSelector((s: RootState) => s.workspaces.value);
-  const workspaceNumericId = useMemo(() => Number(workspaceId), [workspaceId]);
-  const currentWorkspace = useMemo(() => workspaces.find((w: any) => Number(w.id) === workspaceNumericId), [workspaces, workspaceNumericId]);
+  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
+  const workspaces = useSelector((s: RootState) => (s as any).workspaces.value as any[]);
+  const isAllWorkspaces = useMemo(() => workspaceId === 'all', [workspaceId]);
+  const workspaceNumericId = useMemo(() => isAllWorkspaces ? null : Number(workspaceId), [workspaceId, isAllWorkspaces]);
+  const currentWorkspace = useMemo(() => {
+    if (isAllWorkspaces) return null;
+    return workspaces.find((w: any) => Number(w.id) === workspaceNumericId);
+  }, [workspaces, workspaceNumericId, isAllWorkspaces]);
   const defaultCategoryId = currentWorkspace?.category_id ?? null;
 
   const filteredStatuses = useMemo(() => {
@@ -106,11 +109,9 @@ const WorkspaceTable = ({
   useEffect(() => {
     // first attempt from IndexedDB (fast, offline), then refresh from network
     // @ts-ignore
-    dispatch(getStatusesFromIndexedDB());
+    dispatch(genericActions.statuses.getFromIndexedDB());
     // @ts-ignore
-    dispatch(fetchStatuses());
-    // @ts-ignore
-    dispatch(getWorkspacesFromIndexedDB());
+    dispatch(genericActions.workspaces.getFromIndexedDB());
   }, [dispatch]);
 
   // When statuses are loaded/updated, refresh the Status column cells to replace #id with names
@@ -239,11 +240,17 @@ const WorkspaceTable = ({
           }
         }
 
-        const result = await TasksCache.queryTasks({
+        const queryParams: any = {
           ...normalized,
-          workspace_id: workspaceId,
           search: searchText,
-        });
+        };
+
+        // Only add workspace_id if we're not in "all" mode
+        if (!isAllWorkspaces) {
+          queryParams.workspace_id = workspaceId;
+        }
+
+        const result = await TasksCache.queryTasks(queryParams);
 
         const rows = result?.rows || [];
         const total = result?.rowCount || 0;

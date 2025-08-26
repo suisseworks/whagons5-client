@@ -2,16 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 
-import { Users, Building, Tag, Edit, Check, X, ChevronDown, Trash2 } from "lucide-react";
+import { Users, Building, Tag, Check, X, ChevronDown, Trash2 } from "lucide-react";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
-import { removeWorkspaceAsync } from "@/store/reducers/workspacesSlice";
+import { genericActions } from '@/store/genericSlices';
 import {
   Dialog,
   DialogContent,
@@ -92,7 +91,7 @@ function OverviewTab({
   const navigate = useNavigate();
   
   // Get teams from Redux store
-  const { value: allTeams } = useSelector((state: RootState) => state.teams);
+  const { value: allTeams } = useSelector((state: RootState) => (state as any).teams as { value: any[] });
   
   // Get teams for this workspace based on workspace.teams array
   const workspaceTeamDetails = useMemo(() => {
@@ -105,7 +104,7 @@ function OverviewTab({
   // Check if workspace is default (cannot be deleted)
   const isDefaultWorkspace = workspaceType === "DEFAULT";
   
-  const [editingWorkspace, setEditingWorkspace] = useState(false);
+  // const [editingWorkspace, setEditingWorkspace] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [editingIcon, setEditingIcon] = useState(false);
@@ -127,7 +126,7 @@ function OverviewTab({
   const [loadingMoreIcons, setLoadingMoreIcons] = useState(false);
   const [currentIcon, setCurrentIcon] = useState<any>(null);
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
-  const [hasLoadedPopular, setHasLoadedPopular] = useState(false);
+  // const [hasLoadedPopular, setHasLoadedPopular] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +157,7 @@ function OverviewTab({
         setPopularIcons(popularIconsData);
         setDisplayedIcons(popularIconsData);
         setLoadedIconsCount(popularIconsData.length);
-        setHasLoadedPopular(true);
+        // setHasLoadedPopular(true);
         
         // Get total icons count without loading all icons
         const allIcons = await iconService.getAllIcons();
@@ -410,7 +409,7 @@ function OverviewTab({
     
     setIsDeleting(true);
     try {
-      await dispatch(removeWorkspaceAsync(workspaceId)).unwrap();
+      await dispatch(genericActions.workspaces.removeAsync(workspaceId)).unwrap();
       setShowDeleteDialog(false);
       // Navigate to home or workspace list after successful deletion
       navigate('/tasks'); // or wherever you want to redirect after deletion

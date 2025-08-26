@@ -1,29 +1,18 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import { workspacesSlice } from "./reducers/workspacesSlice";
-import { teamsSlice } from "./reducers/teamsSlice";
-import { categoriesSlice } from "./reducers/categoriesSlice";
+
+// Custom slice with advanced features (only tasks)
 import { tasksSlice } from "./reducers/tasksSlice";
-import { templatesSlice } from "./reducers/templatesSlice";
-import customFieldsReducer from "./reducers/customFieldsSlice";
-import categoryFieldAssignmentsReducer from "./reducers/categoryFieldAssignmentsSlice";
-import { statusesSlice } from "./reducers/statusesSlice";
-import { prioritiesSlice } from "./reducers/prioritiesSlice";
-import { spotsSlice } from "./reducers/spotsSlice";
-import { tagsSlice } from "./reducers/tagsSlice";
+
+// All other slices (30+ tables) handled by generic factory
+import { genericSlices } from "./genericSlices";
 
 const rootReducer = combineReducers({
-    workspaces: workspacesSlice.reducer,
-    teams: teamsSlice.reducer,
-    categories: categoriesSlice.reducer,
+    // Only custom slice with advanced features (tasks)
     tasks: tasksSlice.reducer,
-    templates: templatesSlice.reducer,
-    customFields: customFieldsReducer,
-    categoryFieldAssignments: categoryFieldAssignmentsReducer,
-    statuses: statusesSlice.reducer,
-    priorities: prioritiesSlice.reducer,
-    spots: spotsSlice.reducer,
-    tags: tagsSlice.reducer
-});
+
+    // All other slices (30+ tables) handled by generic factory
+    ...genericSlices.reducers,
+}) as any;
 
 const store = configureStore({
     reducer: rootReducer,

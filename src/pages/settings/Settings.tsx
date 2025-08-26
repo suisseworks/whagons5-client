@@ -15,11 +15,8 @@ import {
   faUser 
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
-import { getCategoriesFromIndexedDB } from "@/store/reducers/categoriesSlice";
-import { getTemplatesFromIndexedDB } from "@/store/reducers/templatesSlice";
-import { getTeamsFromIndexedDB } from "@/store/reducers/teamsSlice";
+import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
-import { getWorkspacesFromIndexedDB } from "@/store/reducers/workspacesSlice";
 import api from "@/api/whagonsApi";
 import { useState } from "react";
 
@@ -30,11 +27,11 @@ function Settings() {
 
   // Hydrate data (idempotent if already loaded)
   useEffect(() => {
-    dispatch(getCategoriesFromIndexedDB());
-    dispatch(getTemplatesFromIndexedDB());
-    dispatch(getTeamsFromIndexedDB());
+    dispatch(genericActions.categories.getFromIndexedDB());
+    dispatch(genericActions.templates.getFromIndexedDB());
+    dispatch(genericActions.teams.getFromIndexedDB());
     dispatch(getTasksFromIndexedDB());
-    dispatch(getWorkspacesFromIndexedDB());
+    dispatch(genericActions.workspaces.getFromIndexedDB());
   }, [dispatch]);
 
   // Fetch authoritative spot count from backend

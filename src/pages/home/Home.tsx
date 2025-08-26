@@ -8,11 +8,21 @@ import { useNavigate } from "react-router-dom";
 
 function Home() {
   const navigate = useNavigate();
-  const { value: workspaces } = useSelector((s: RootState) => s.workspaces);
-  const { value: teams } = useSelector((s: RootState) => s.teams);
-  const { value: categories } = useSelector((s: RootState) => s.categories);
-  const { value: templates } = useSelector((s: RootState) => s.templates);
-  const { value: tasks } = useSelector((s: RootState) => s.tasks);
+
+  // Safely destructure with default values
+  const workspacesState = useSelector((s: RootState) => s.workspaces);
+  const teamsState = useSelector((s: RootState) => s.teams);
+  const categoriesState = useSelector((s: RootState) => s.categories);
+  const templatesState = useSelector((s: RootState) => s.templates);
+  const tasksState = useSelector((s: RootState) => s.tasks);
+
+  const { value: workspaces = [] } = workspacesState || {};
+  const { value: teams = [] } = teamsState || {};
+  const { value: categories = [] } = categoriesState || {};
+  const { value: templates = [] } = templatesState || {};
+  const { value: tasks = [] } = tasksState || {};
+
+  // Data is hydrated globally in AuthProvider; no fetching here
 
   const topWorkspaces = useMemo(() => workspaces.slice(0, 6), [workspaces]);
 
@@ -94,7 +104,7 @@ function Home() {
             <div className="text-muted-foreground">No workspaces yet. Create one from Settings → Workspaces.</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {topWorkspaces.map((ws) => (
+              {topWorkspaces.map((ws: any) => (
                 <button
                   key={ws.id}
                   onClick={() => navigate(`/workspace/${ws.id}`)}

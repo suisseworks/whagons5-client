@@ -8,15 +8,11 @@ import NameStep from '@/pages/onboarding/steps/NameStep';
 import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep';
 import OptionalStep from '@/pages/onboarding/steps/OptionalStep';
 import WhagonsCheck from '@/assets/WhagonsCheck';
-import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
-import { TeamsCache } from '@/store/indexedDB/TeamsCache';
-import { CategoriesCache } from '@/store/indexedDB/CategoriesCache';
+// Using generic caches instead of custom caches
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
-import { getWorkspacesFromIndexedDB } from '@/store/reducers/workspacesSlice';
-import { getTeamsFromIndexedDB } from '@/store/reducers/teamsSlice';
-import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
+import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 
 interface OnboardingWrapperProps {
@@ -41,17 +37,14 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const syncCachesAndStore = async () => {
     // Ensure caches are initialized and up-to-date
     await Promise.all([
-      WorkspaceCache.init(),
-      TeamsCache.init(),
-      CategoriesCache.init(),
       TasksCache.init()
     ]);
 
     // Populate Redux store from IndexedDB once caches are ready
     await Promise.all([
-      dispatch(getWorkspacesFromIndexedDB()),
-      dispatch(getTeamsFromIndexedDB()),
-      dispatch(getCategoriesFromIndexedDB()),
+      dispatch(genericActions.workspaces.getFromIndexedDB()),
+      dispatch(genericActions.teams.getFromIndexedDB()),
+      dispatch(genericActions.categories.getFromIndexedDB()),
       dispatch(getTasksFromIndexedDB())
     ]);
   };

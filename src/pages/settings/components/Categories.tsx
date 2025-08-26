@@ -32,8 +32,7 @@ import {
   faBook
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
-import { getCategoriesFromIndexedDB, addCategoryAsync, updateCategoryAsync, removeCategoryAsync, categoriesSlice } from "@/store/reducers/categoriesSlice";
-import { getTeamsFromIndexedDB } from "@/store/reducers/teamsSlice";
+import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 import { Category } from "@/store/types";
 
@@ -217,7 +216,7 @@ function Categories() {
   // Handle delete category
   const handleDeleteCategory = useCallback((category: Category) => {
     setDeletingCategory(category);
-    dispatch(categoriesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
     setIsDeleteDialogOpen(true);
   }, [dispatch]);
 
@@ -225,7 +224,7 @@ function Categories() {
   const handleCloseDeleteDialog = () => {
     setIsDeleteDialogOpen(false);
     setDeletingCategory(null);
-    dispatch(categoriesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
   };
 
   // Delete category with validation
@@ -242,7 +241,7 @@ function Categories() {
     try {
       setIsSubmitting(true);
       
-      await dispatch(removeCategoryAsync(deletingCategory.id)).unwrap();
+      await dispatch(genericActions.categories.removeAsync(deletingCategory.id)).unwrap();
       
       // Reset state and close dialog
       handleCloseDeleteDialog();
@@ -273,7 +272,7 @@ function Categories() {
     setEditDisplayedIcons(popularIcons);
     setEditLoadedIconsCount(popularIcons.length);
     // Clear any existing errors
-    dispatch(categoriesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
     setIsEditDialogOpen(true);
   }, [popularIcons, dispatch]);
 
@@ -339,12 +338,12 @@ function Categories() {
 
   // Load categories from Redux store
   useEffect(() => {
-    dispatch(getCategoriesFromIndexedDB());
+    dispatch(genericActions.categories.getFromIndexedDB());
   }, [dispatch]);
 
   // Load teams from Redux store
   useEffect(() => {
-    dispatch(getTeamsFromIndexedDB());
+    dispatch(genericActions.teams.getFromIndexedDB());
   }, [dispatch]);
 
   // Load tasks from Redux store
@@ -490,7 +489,7 @@ function Categories() {
         deleted_at: null
       };
       
-      await dispatch(addCategoryAsync(categoryData)).unwrap();
+      await dispatch(genericActions.categories.addAsync(categoryData)).unwrap();
       
       // Reset form and close dialog
       setFormData({
@@ -530,9 +529,9 @@ function Categories() {
         sla_id: editFormData.sla_id
       };
       
-      await dispatch(updateCategoryAsync({ 
-        id: editingCategory.id, 
-        updates 
+      await dispatch(genericActions.categories.updateAsync({
+        id: editingCategory.id,
+        updates
       })).unwrap();
       
       // Reset form and close dialog
@@ -577,7 +576,7 @@ function Categories() {
     // Reset form icon to default
     setCurrentFormIcon(defaultIcon);
     // Clear any existing errors
-    dispatch(categoriesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
   };
 
   const handleIconSelect = (iconName: string) => {
@@ -852,7 +851,7 @@ function Categories() {
         <Separator />
         <div className="flex flex-col items-center justify-center h-64 space-y-4">
           <p className="text-destructive">{error}</p>
-          <Button onClick={() => dispatch(getCategoriesFromIndexedDB())} variant="outline">
+          <Button onClick={() => dispatch(genericActions.categories.getFromIndexedDB())} variant="outline">
             Try Again
           </Button>
         </div>

@@ -6,19 +6,14 @@ import { api, getTokenForUser, initializeAuth } from '../api/whagonsApi';
 import { User } from '../types/user';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
-import { getWorkspacesFromIndexedDB } from '../store/reducers/workspacesSlice';
-import { getTeamsFromIndexedDB } from '../store/reducers/teamsSlice';
-import { getCategoriesFromIndexedDB } from '@/store/reducers/categoriesSlice';
+// Custom slice with advanced features (tasks only)
 import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
-import { getStatusesFromIndexedDB, fetchStatuses } from '@/store/reducers/statusesSlice';
-import { getPrioritiesFromIndexedDB, fetchPriorities } from '@/store/reducers/prioritiesSlice';
-import { getSpotsFromIndexedDB, fetchSpots } from '@/store/reducers/spotsSlice';
-import { getTagsFromIndexedDB, fetchTags } from '@/store/reducers/tagsSlice';
-import { getCustomFieldsFromIndexedDB, fetchCustomFields } from '@/store/reducers/customFieldsSlice';
+
+// Generic slices actions (handles all other tables)
+import { genericActions, genericCaches } from '@/store/genericSlices';
+
+// Custom caches with advanced features
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
-import { WorkspaceCache } from '@/store/indexedDB/WorkspaceCache';
-import { TeamsCache } from '@/store/indexedDB/TeamsCache';
-import { CategoriesCache } from '@/store/indexedDB/CategoriesCache';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 
 // Define context types
@@ -70,28 +65,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // console.log('AuthContext: User data loaded successfully');
 
         // On mount/reload: validate and hydrate caches, then populate Redux from IndexedDB
-        await Promise.all([
-          WorkspaceCache.init(),
-          TeamsCache.init(),
-          CategoriesCache.init(),
-          TasksCache.init()
-        ]);
 
-        dispatch(getWorkspacesFromIndexedDB());
-        dispatch(getTeamsFromIndexedDB());
-        dispatch(getCategoriesFromIndexedDB());
-        dispatch(getTasksFromIndexedDB());
-        // Hydrate small reference tables via GenericCache-backed slices
-        dispatch(getStatusesFromIndexedDB());
-        dispatch(fetchStatuses());
-        dispatch(getPrioritiesFromIndexedDB());
-        dispatch(fetchPriorities());
-        dispatch(getSpotsFromIndexedDB());
-        dispatch(fetchSpots());
-        dispatch(getTagsFromIndexedDB());
-        dispatch(fetchTags());
-        dispatch(getCustomFieldsFromIndexedDB());
-        dispatch(fetchCustomFields());
+        // Initialize custom cache with advanced features
+        await TasksCache.init();
+
+        
+        try {
+          // Validate only core keys, then refresh those slices
+          const coreKeys = ['workspaces',
+            'teams',
+            'categories',
+            'templates',
+            'statuses',
+            'priorities',
+            'slas',
+            'priorities',
+          ] as const;
+          await Promise.all(coreKeys.map((k) => genericCaches[k].validate()));
+
+          coreKeys.forEach((k) => {
+            (dispatch as any)((genericActions as any)[k].getFromIndexedDB());
+          });
+        } catch (e) {
+          console.warn('AuthProvider: cache validate failed', e);
+        }
+
         // Category-field-assignments are fetched per category on demand and cached via GenericCache
 
         const rtl = new RealTimeListener({ debug: true });

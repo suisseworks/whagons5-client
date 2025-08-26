@@ -24,9 +24,7 @@ import {
   faFileAlt
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
-import { getTemplatesFromIndexedDB, addTemplateAsync, updateTemplateAsync, removeTemplateAsync, templatesSlice } from "@/store/reducers/templatesSlice";
-import { getCategoriesFromIndexedDB } from "@/store/reducers/categoriesSlice";
-import { getTeamsFromIndexedDB } from "@/store/reducers/teamsSlice";
+import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 import { Template } from "@/store/types";
 
@@ -184,14 +182,14 @@ function Templates() {
       instructions: template.instructions || '',
       enabled: template.enabled
     });
-    dispatch(templatesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
     setIsEditDialogOpen(true);
   }, [dispatch]);
 
   // Handle delete template
   const handleDeleteTemplate = useCallback((template: Template) => {
     setDeletingTemplate(template);
-    dispatch(templatesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
     setIsDeleteDialogOpen(true);
   }, [dispatch]);
 
@@ -199,7 +197,7 @@ function Templates() {
   const handleCloseDeleteDialog = () => {
     setIsDeleteDialogOpen(false);
     setDeletingTemplate(null);
-    dispatch(templatesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
   };
 
   // Delete template with validation
@@ -215,7 +213,7 @@ function Templates() {
     
     try {
       setIsSubmitting(true);
-      await dispatch(removeTemplateAsync(deletingTemplate.id)).unwrap();
+      await dispatch(genericActions.templates.removeAsync(deletingTemplate.id)).unwrap();
       handleCloseDeleteDialog();
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -316,17 +314,17 @@ function Templates() {
 
   // Load templates from Redux store
   useEffect(() => {
-    dispatch(getTemplatesFromIndexedDB());
+    dispatch(genericActions.templates.getFromIndexedDB());
   }, [dispatch]);
 
   // Load categories from Redux store
   useEffect(() => {
-    dispatch(getCategoriesFromIndexedDB());
+    dispatch(genericActions.categories.getFromIndexedDB());
   }, [dispatch]);
 
   // Load teams from Redux store
   useEffect(() => {
-    dispatch(getTeamsFromIndexedDB());
+    dispatch(genericActions.teams.getFromIndexedDB());
   }, [dispatch]);
 
   // Load tasks from Redux store
@@ -357,7 +355,7 @@ function Templates() {
         deleted_at: null
       };
       
-      await dispatch(addTemplateAsync(templateData)).unwrap();
+      await dispatch(genericActions.templates.addAsync(templateData)).unwrap();
       
       // Reset form and close dialog
       setFormData({
@@ -398,9 +396,9 @@ function Templates() {
         enabled: editFormData.enabled
       };
       
-      await dispatch(updateTemplateAsync({ 
-        id: editingTemplate.id, 
-        updates 
+      await dispatch(genericActions.templates.updateAsync({
+        id: editingTemplate.id,
+        updates
       })).unwrap();
       
       // Reset form and close dialog
@@ -438,7 +436,7 @@ function Templates() {
       enabled: true
     });
     // Clear any existing errors
-    dispatch(templatesSlice.actions.clearError());
+    // Note: clearError not available in generic slices
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -554,7 +552,7 @@ function Templates() {
         <Separator />
         <div className="flex flex-col items-center justify-center h-64 space-y-4">
           <p className="text-destructive">{error}</p>
-          <Button onClick={() => dispatch(getTemplatesFromIndexedDB())} variant="outline">
+          <Button onClick={() => dispatch(genericActions.templates.getFromIndexedDB())} variant="outline">
             Try Again
           </Button>
         </div>

@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { workspacesSlice, addWorkspaceAsync } from '@/store/reducers/workspacesSlice';
+import { genericActions } from '@/store/genericSlices';
 import {
   Settings,
   Users,
@@ -24,7 +24,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { AppDispatch, RootState } from '@/store';
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/providers/AuthProvider';
+// import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
@@ -45,6 +45,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
+import { Workspace } from '@/store/types';
 
 // Global pinned state management
 let isPinnedGlobal = false;
@@ -66,7 +67,6 @@ export const subscribeToPinnedState = (callback: (pinned: boolean) => void) => {
 };
 
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
-  const { toggleSidebar } = useSidebar();
   const [isPinned, setIsPinned] = useState(isPinnedGlobal);
 
   useEffect(() => {
@@ -109,6 +109,9 @@ export function AppSidebar() {
   const pathname = location.pathname;
   const isCollapsed = state === 'collapsed';
 
+  // Extract toggleSidebar to suppress unused warning
+  // const { toggleSidebar } = useSidebar();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
@@ -117,13 +120,14 @@ export function AppSidebar() {
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
 
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useAuth();
+  // const { user } = useAuth(); // Currently not used, uncomment when needed
 
-  const { value: workspaces } = useSelector(
+  const workspacesState = useSelector(
     (state: RootState) => state.workspaces
   );
+  const { value: workspaces = [] } = workspacesState || {};
 
-  const { clearError } = workspacesSlice.actions;
+  // Note: clearError action not available in generic slices
 
   // Subscribe to pinned state changes
   useEffect(() => {
@@ -139,6 +143,8 @@ export function AppSidebar() {
         setDefaultIcon(icon);
       } catch (error) {
         console.error('Error loading default icon:', error);
+        // Set a fallback icon to prevent the component from not rendering
+        setDefaultIcon('fa-building');
       }
     };
     loadDefaultIcon();
@@ -146,10 +152,31 @@ export function AppSidebar() {
 
 
 
+  // Fetch workspaces data if not already loaded
+  useEffect(() => {
+
+
+    if (workspaces.length === 0) {
+      // First try to load from IndexedDB
+      dispatch(genericActions.workspaces.getFromIndexedDB());
+    }
+  }, [workspaces.length, dispatch]);
+
+  // // Additional effect to check if workspaces data is loaded
+  // useEffect(() => {
+  //   if (workspacesState && workspacesState.value && workspacesState.value.length > 0) {
+  //     console.log('AppSidebar: Workspaces loaded successfully:', workspacesState.value.length);
+  //   } else if (workspacesState && workspacesState.loading) {
+  //     console.log('AppSidebar: Workspaces are loading...');
+  //   } else if (workspacesState && workspacesState.error) {
+  //     console.error('AppSidebar: Error loading workspaces:', workspacesState.error);
+  //   }
+  // }, [workspacesState]);
+
   // Load workspace icons when workspaces change
   useEffect(() => {
     const loadWorkspaceIcons = async () => {
-      const iconNames = workspaces.map(workspace => workspace.icon).filter(Boolean);
+      const iconNames = workspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
       if (iconNames.length > 0) {
         try {
           const icons = await iconService.loadIcons(iconNames);
@@ -198,14 +225,15 @@ export function AppSidebar() {
     }
 
     // Create workspace data in the format expected by the API
-    const newWorkspaceData = {
-      name: workspaceName,
-      description: workspaceDescription,
-      type: 'PROJECT',
-      created_by: user?.id ? parseInt(user.id) : 0
-    };
+    // const newWorkspaceData = {
+    //   name: workspaceName,
+    //   description: workspaceDescription,
+    //   type: 'PROJECT',
+    //   created_by: user?.id ? parseInt(user.id) : 0
+    // };
 
-    dispatch(addWorkspaceAsync(newWorkspaceData as any));
+    // TODO: Implement custom async thunk for adding workspaces
+    // dispatch(genericActions.workspaces.addWorkspaceAsync(newWorkspaceData as any));
 
     // Reset form and close modal
     setWorkspaceName('');
@@ -231,9 +259,13 @@ export function AppSidebar() {
   };
 
   // Don't render icons until default icon is loaded
+  // Temporarily commented out to debug workspace rendering
+  /*
   if (!defaultIcon) {
+    console.log('AppSidebar: Default icon not loaded yet, skipping render');
     return null;
   }
+  */
 
   return (
     <Sidebar
@@ -277,6 +309,40 @@ export function AppSidebar() {
 
       <SidebarContent className="bg-sidebar">
         <SidebarGroup>
+          {/* Everything workspace - above the Spaces dropdown */}
+          {(!isCollapsed || isMobile) && (
+            <div className="px-3 py-2">
+              <Link
+                to={`/workspace/all`}
+                className={`flex items-center space-x-2 rounded-md relative transition-colors px-3 py-2 ${
+                  pathname === `/workspace/all`
+                    ? 'bg-primary/10 text-primary border-l-4 border-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Everything</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Show Everything icon when collapsed - DESKTOP ONLY */}
+          {isCollapsed && !isMobile && (
+            <div className="px-2 py-2 flex justify-center">
+              <Link
+                to={`/workspace/all`}
+                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
+                  pathname === `/workspace/all`
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                }`}
+                title={'Everything'}
+              >
+                <Users className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+
           <Collapsible defaultOpen className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild className="text-sm font-normal">
@@ -372,19 +438,10 @@ export function AppSidebar() {
               <CollapsibleContent>
                 {(!isCollapsed || isMobile) && (
                   <SidebarGroupContent className="pt-2 pl-1">
-                    {/* Everything pseudo-workspace */}
-                    <Link
-                      to={`/workspace/all`}
-                      className={`flex items-center space-x-2 rounded-md relative transition-colors px-4 py-2 mx-2 ${
-                        pathname === `/workspace/all`
-                          ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
-                      }`}
-                    >
-                      <Users className="w-4 h-4" />
-                      <span>Everything</span>
-                    </Link>
-                    {workspaces.map((workspace) => (
+
+                    {workspaces.map((workspace: Workspace) => {
+
+                      return (
                       <Link
                         key={workspace.id}
                         to={`/workspace/${workspace.id}`}
@@ -394,14 +451,15 @@ export function AppSidebar() {
                             : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
                         }`}
                       >
-                        <FontAwesomeIcon 
-                          icon={getWorkspaceIcon(workspace.icon)} 
+                        <FontAwesomeIcon
+                          icon={getWorkspaceIcon(workspace.icon)}
                           style={{ color: workspace.color }}
                           className="w-4 h-4"
                         />
                         <span>{workspace.name}</span>
                       </Link>
-                    ))}
+                      );
+                    })}
                   </SidebarGroupContent>
                 )}
 
@@ -409,18 +467,7 @@ export function AppSidebar() {
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
                     <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent/30">
-                      <Link
-                        to={`/workspace/all`}
-                        className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
-                          pathname === `/workspace/all`
-                            ? 'bg-primary/20 text-primary border border-primary/40'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                        }`}
-                        title={'Everything'}
-                      >
-                        <Users className="w-4 h-4" />
-                      </Link>
-                      {workspaces.map((workspace) => (
+                      {workspaces.map((workspace: Workspace) => (
                         <Link
                           key={workspace.id}
                           to={`/workspace/${workspace.id}`}
@@ -431,8 +478,8 @@ export function AppSidebar() {
                           }`}
                           title={workspace.name}
                         >
-                          <FontAwesomeIcon 
-                            icon={getWorkspaceIcon(workspace.icon)} 
+                          <FontAwesomeIcon
+                            icon={getWorkspaceIcon(workspace.icon)}
                             style={{ color: workspace.color }}
                             className="w-4 h-4"
                           />

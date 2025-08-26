@@ -37,6 +37,11 @@ export class GenericCache {
 		this.hashFields = options.hashFields;
 	}
 
+	// Public getter for table name (needed by cache registry)
+	public getTableName(): string {
+		return this.table;
+	}
+
 	private getId(row: any): IdType {
 		return row?.[this.idField];
 	}
@@ -106,6 +111,9 @@ export class GenericCache {
 				const serverGlobal = globalResp.data?.data?.global_hash;
 				const serverBlockCount = globalResp.data?.data?.block_count ?? null;
 				this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash });
+				if (serverGlobal && serverGlobal !== localGlobalHash) {
+					this.dlog('global hash mismatch', { table: this.table, localGlobalHash, serverGlobal });
+				}
 				if (serverGlobal && serverGlobal === localGlobalHash && (serverBlockCount === null || serverBlockCount === localBlocks.length)) {
 					this.dlog('global hash match; skipping block compare');
 					this.validating = false;
@@ -153,7 +161,11 @@ export class GenericCache {
 				const toRefetch: number[] = [];
 				for (const [rowId, localHash] of localRowMap.entries()) {
 					const sh = serverRowMap.get(rowId);
-					if (!sh || sh !== localHash) toRefetch.push(rowId);
+					if (!sh || sh !== localHash) {
+						toRefetch.push(rowId);
+						// Detailed diff logging when debug enabled
+						this.dlog('row hash mismatch', { table: this.table, blockId, rowId, localHash, serverHash: sh });
+					}
 				}
 				for (const [rowId] of serverRowMap.entries()) if (!localRowMap.has(rowId)) toRefetch.push(rowId);
 
@@ -169,6 +181,13 @@ export class GenericCache {
 								if (!DB.inited) await DB.init();
 								const store = DB.getStoreWrite(this.store as any);
 								for (const r of rows) store.put(r);
+								// After write, log local vs server hashes for verification
+								for (const r of rows) {
+									const idNum = Number(this.getId(r));
+									const newLocalHash = await this.hashRow(r);
+									const serverHash = serverRowMap.get(idNum);
+									this.dlog('post-refetch hash', { table: this.table, rowId: idNum, localHash: newLocalHash, serverHash });
+								}
 							}
 						} catch (e) { console.warn('validate: batch fetch failed', e); }
 					}
@@ -193,8 +212,27 @@ export class GenericCache {
 
 	private async hashRow(row: any): Promise<string> {
 		if (this.hashFields && this.hashFields.length > 0) {
-			const parts = this.hashFields.map(k => this.safeValue(row?.[k]))
-				.join('|');
+			const parts = this.hashFields.map((field) => {
+				const value = row?.[field as any];
+				// Normalize timestamps for fields ending with _at or _date to epoch ms (UTC)
+				if (typeof field === 'string' && (field.endsWith('_at') || field.endsWith('_date'))) {
+					if (!value) return '';
+					let vStr = String(value);
+					// If it looks like 'YYYY-MM-DD HH:mm:ss(.sss)?' without timezone, assume UTC
+					if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(vStr) && !/[zZ]|[+\-]\d{2}:?\d{2}$/.test(vStr)) {
+						// ensure T separator and Z so Date parses as UTC
+						vStr = vStr.replace(' ', 'T') + 'Z';
+					}
+					const dt = new Date(vStr);
+					return isNaN(dt.getTime()) ? '' : String(dt.getTime());
+				}
+				// Booleans: Postgres CONCAT_WS casts to text as 't'/'f'
+				if (typeof value === 'boolean') return value ? 't' : 'f';
+				// Deterministic stringify for arrays/objects (matches server ::text casting semantics)
+				if (Array.isArray(value)) return this.stableJsonText(value);
+				if (value && typeof value === 'object') return this.stableJsonText(value);
+				return this.safeValue(value);
+			}).join('|');
 			return this.sha256Hex(parts);
 		}
 		// Fallback: stable JSON of the row

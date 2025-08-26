@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Settings } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 
 export const Workspace = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('grid');
   // State to store the fetched data
 
@@ -22,13 +23,34 @@ export const Workspace = () => {
     }
   }, [id]);
 
-  // Handle invalid workspace ID
-  if (!id) {
+  // Debug logging
+  console.log('Workspace component - id:', id, 'typeof:', typeof id);
+  console.log('Current path:', location.pathname);
+
+  // Check if this is the "all" workspace route
+  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+
+  // Handle invalid workspace ID - simplified validation
+  if (!id && !isAllWorkspaces) {
+    console.log('No workspace ID provided and not all workspaces route');
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
-          <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
+          <p className="text-gray-600 mt-2">ID: "{id}" - Please check the URL and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Additional validation for numeric IDs (but allow 'all' or all workspaces route)
+  if (!isAllWorkspaces && isNaN(Number(id))) {
+    console.log('Invalid workspace ID detected:', id);
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
+          <p className="text-gray-600 mt-2">ID: "{id}" must be a number or "all" - Please check the URL and try again.</p>
         </div>
       </div>
     );
@@ -62,7 +84,7 @@ export const Workspace = () => {
         value="grid"
         style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
       >
-        <WorkspaceTable rowCache={rowCache} workspaceId={id} searchText={searchText} />
+        <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
       </TabsContent>
       <TabsContent value="list" className="flex-1 h-0">
         <SettingsComponent />

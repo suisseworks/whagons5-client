@@ -2,7 +2,7 @@ import { auth } from "@/firebase/firebaseConfig";
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = "1.2.0";
+const CURRENT_DB_VERSION = "1.5.0";
 const DB_VERSION_KEY = "indexeddb_version";
 
 //static class to access the message cache
@@ -73,6 +73,108 @@ export class DB {
         }
         if (!db.objectStoreNames.contains("category_field_assignments")) {
           db.createObjectStore("category_field_assignments", { keyPath: "id" });
+        }
+
+        // User management tables
+        if (!db.objectStoreNames.contains("users")) {
+          db.createObjectStore("users", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("roles")) {
+          db.createObjectStore("roles", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("permissions")) {
+          db.createObjectStore("permissions", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("user_teams")) {
+          db.createObjectStore("user_teams", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("user_permissions")) {
+          db.createObjectStore("user_permissions", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("role_permissions")) {
+          db.createObjectStore("role_permissions", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("task_users")) {
+          db.createObjectStore("task_users", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("status_transitions")) {
+          db.createObjectStore("status_transitions", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("task_tags")) {
+          db.createObjectStore("task_tags", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("spot_types")) {
+          db.createObjectStore("spot_types", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("slas")) {
+          db.createObjectStore("slas", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("sla_alerts")) {
+          db.createObjectStore("sla_alerts", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("category_priorities")) {
+          db.createObjectStore("category_priorities", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("forms")) {
+          db.createObjectStore("forms", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("invitations")) {
+          db.createObjectStore("invitations", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("task_logs")) {
+          db.createObjectStore("task_logs", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("templates")) {
+          db.createObjectStore("templates", { keyPath: "id" });
+        }
+
+        // Custom Fields & Values
+        if (!db.objectStoreNames.contains("spot_custom_fields")) {
+          db.createObjectStore("spot_custom_fields", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("template_custom_fields")) {
+          db.createObjectStore("template_custom_fields", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("task_custom_field_values")) {
+          db.createObjectStore("task_custom_field_values", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("spot_custom_field_values")) {
+          db.createObjectStore("spot_custom_field_values", { keyPath: "id" });
+        }
+
+        // Forms & Fields
+        if (!db.objectStoreNames.contains("form_fields")) {
+          db.createObjectStore("form_fields", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("form_versions")) {
+          db.createObjectStore("form_versions", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("task_forms")) {
+          db.createObjectStore("task_forms", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("field_options")) {
+          db.createObjectStore("field_options", { keyPath: "id" });
+        }
+
+        // Activity & Logging
+        if (!db.objectStoreNames.contains("session_logs")) {
+          db.createObjectStore("session_logs", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("config_logs")) {
+          db.createObjectStore("config_logs", { keyPath: "id" });
+        }
+
+        // File Management
+        if (!db.objectStoreNames.contains("task_attachments")) {
+          db.createObjectStore("task_attachments", { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains("task_recurrences")) {
+          db.createObjectStore("task_recurrences", { keyPath: "id" });
+        }
+
+        // Error Tracking
+        if (!db.objectStoreNames.contains("exceptions")) {
+          db.createObjectStore("exceptions", { keyPath: "id" });
         }
       };
 
@@ -165,7 +267,7 @@ export class DB {
   }
 
   public static getStoreRead(
-    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments",
+    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments" | "users" | "roles" | "permissions" | "user_teams" | "user_permissions" | "role_permissions" | "task_users" | "status_transitions" | "task_tags" | "spot_types" | "slas" | "sla_alerts" | "category_priorities" | "forms" | "invitations" | "task_logs" | "templates" | "spot_custom_fields" | "template_custom_fields" | "task_custom_field_values" | "spot_custom_field_values" | "form_fields" | "form_versions" | "task_forms" | "field_options" | "session_logs" | "config_logs" | "task_attachments" | "task_recurrences" | "exceptions",
     mode: IDBTransactionMode = "readonly"
   ) {
     if (!DB.inited) throw new Error("DB not initialized");
@@ -174,7 +276,7 @@ export class DB {
   }
 
   public static getStoreWrite(
-    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments",
+    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments" | "users" | "roles" | "permissions" | "user_teams" | "user_permissions" | "role_permissions" | "task_users" | "status_transitions" | "task_tags" | "spot_types" | "slas" | "sla_alerts" | "category_priorities" | "forms" | "invitations" | "task_logs" | "templates" | "spot_custom_fields" | "template_custom_fields" | "task_custom_field_values" | "spot_custom_field_values" | "form_fields" | "form_versions" | "task_forms" | "field_options" | "session_logs" | "config_logs" | "task_attachments" | "task_recurrences" | "exceptions",
     mode: IDBTransactionMode = "readwrite"
   ) {
     if (!DB.inited) throw new Error("DB not initialized");

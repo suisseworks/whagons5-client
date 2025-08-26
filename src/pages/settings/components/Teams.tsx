@@ -21,8 +21,7 @@ import {
   faSpinner
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
-import { getTeamsFromIndexedDB, addTeamAsync, updateTeamAsync, removeTeamAsync, teamsSlice } from "@/store/reducers/teamsSlice";
-import { getCategoriesFromIndexedDB } from "@/store/reducers/categoriesSlice";
+import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 import { Team } from "@/store/types";
 
@@ -123,7 +122,7 @@ function Teams() {
   // Handle delete team
   const handleDeleteTeam = useCallback((team: Team) => {
     setDeletingTeam(team);
-    dispatch(teamsSlice.actions.clearError());
+    // Note: clearError not available in generic slices
     setIsDeleteDialogOpen(true);
   }, [dispatch]);
 
@@ -131,7 +130,7 @@ function Teams() {
   const handleCloseDeleteDialog = () => {
     setIsDeleteDialogOpen(false);
     setDeletingTeam(null);
-    dispatch(teamsSlice.actions.clearError());
+    // Note: clearError not available in generic slices
   };
 
   // Delete team with validation
@@ -150,7 +149,7 @@ function Teams() {
     try {
       setIsSubmitting(true);
       
-      await dispatch(removeTeamAsync(deletingTeam.id)).unwrap();
+      await dispatch(genericActions.teams.removeAsync(deletingTeam.id)).unwrap();
       
       // Reset state and close dialog
       handleCloseDeleteDialog();
@@ -170,7 +169,7 @@ function Teams() {
       color: team.color || '#4ECDC4'
     });
     // Clear any existing errors
-    dispatch(teamsSlice.actions.clearError());
+    // Note: clearError not available in generic slices
     setIsEditDialogOpen(true);
   }, [dispatch]);
 
@@ -237,12 +236,12 @@ function Teams() {
 
   // Load teams from Redux store
   useEffect(() => {
-    dispatch(getTeamsFromIndexedDB());
+    dispatch(genericActions.teams.getFromIndexedDB());
   }, [dispatch]);
 
   // Load categories from Redux store
   useEffect(() => {
-    dispatch(getCategoriesFromIndexedDB());
+    dispatch(genericActions.categories.getFromIndexedDB());
   }, [dispatch]);
 
   // Load tasks from Redux store
@@ -268,7 +267,7 @@ function Teams() {
         deleted_at: null
       };
       
-      await dispatch(addTeamAsync(teamData)).unwrap();
+      await dispatch(genericActions.teams.addAsync(teamData)).unwrap();
       
       // Reset form and close dialog
       setFormData({
@@ -298,9 +297,9 @@ function Teams() {
         color: editFormData.color
       };
       
-      await dispatch(updateTeamAsync({ 
-        id: editingTeam.id, 
-        updates 
+      await dispatch(genericActions.teams.updateAsync({
+        id: editingTeam.id,
+        updates
       })).unwrap();
       
       // Reset form and close dialog
@@ -327,7 +326,7 @@ function Teams() {
     });
     setFormError(null);
     // Clear any existing errors
-    dispatch(teamsSlice.actions.clearError());
+    // Note: clearError not available in generic slices
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -435,7 +434,7 @@ function Teams() {
         <Separator />
         <div className="flex flex-col items-center justify-center h-64 space-y-4">
           <p className="text-destructive">{error}</p>
-          <Button onClick={() => dispatch(getTeamsFromIndexedDB())} variant="outline">
+          <Button onClick={() => dispatch(genericActions.teams.getFromIndexedDB())} variant="outline">
             Try Again
           </Button>
         </div>

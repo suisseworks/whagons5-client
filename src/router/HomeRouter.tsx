@@ -47,10 +47,9 @@ export const HomeRoutes = () => {
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<Home />} />
           <Route path="/tasks" element={<Workspace />} />
-          <Route path="/workspace/all" element={<Workspace />} />
           <Route path="/workspace/:id" element={<Workspace />} />
+          <Route path="/workspace/all" element={<Workspace />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/workspace/:id" element={<Workspace />} /> 
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings/categories" element={<Categories />} />
