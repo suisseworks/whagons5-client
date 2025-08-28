@@ -100,10 +100,12 @@ export interface Priority {
 export interface Spot {
     id: number;
     name: string;
-    workspace_id?: number | null;
-    description?: string | null;
+    parent_id?: number | null;
+    spot_type_id: number;
+    is_branch: boolean;
     created_at?: string | Date;
     updated_at?: string | Date;
+    deleted_at?: string | Date | null;
 }
 
 export interface Tag {

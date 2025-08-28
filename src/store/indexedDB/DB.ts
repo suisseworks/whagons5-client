@@ -8,6 +8,7 @@ import {
   rewrapCekBlobWithWrappedKEK,
   rewrapCekBlobWithRawKEK
 } from '@/crypto/crypto';
+import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
@@ -19,7 +20,7 @@ const DB_VERSION_KEY = 'indexeddb_version';
 export class DB {
   static db: IDBDatabase;
   static inited = false;
-  private static initPromise: Promise<void> | null = null;
+  private static initPromise: Promise<boolean> | null = null;
   // Per-store operation queue to serialize actions over the same object store
   private static storeQueues: Map<string, Promise<any>> = new Map();
 
@@ -51,21 +52,36 @@ export class DB {
     return DB.ENCRYPTION_ENABLED;
   }
 
-  static async init() {
-    if (DB.inited) return;
+  static async init(uid?: string): Promise<boolean> {
+    if (DB.inited) return true;
     if (DB.initPromise) {
-      await DB.initPromise;
-      return;
+      // If a prior init started without a uid, wait for it; if it didn't complete, retry with provided uid
+      const ok = await DB.initPromise.catch(() => false);
+      if (DB.inited && DB.db) return true;
+      if (uid && !ok) {
+        // Retry initialization with the explicit uid
+      } else {
+        return ok;
+      }
     }
 
     DB.initPromise = (async () => {
-      const user = auth.currentUser;
-      if (!user) {
+      // Wait for a user id if not provided
+      const userID = await DB.waitForUID(uid);
+      if (!userID) {
+        try { console.warn('DB.init: no user id available after waiting'); } catch {}
         DB.initPromise = null;
-        return;
+        return false as any;
       }
 
-      const userID = user.uid;
+      try {
+        console.log('DB.init: starting', {
+          uid: userID,
+          secureContext: (globalThis as any).isSecureContext,
+          hasIndexedDB: typeof indexedDB !== 'undefined',
+          locationProtocol: (globalThis as any).location?.protocol,
+        });
+      } catch {}
 
       // Check stored version against current version
       const storedVersion = localStorage.getItem(DB_VERSION_KEY);
@@ -87,6 +103,7 @@ export class DB {
       // Wrap in a Promise to await db setup
       const db = await new Promise<IDBDatabase>((resolve, _reject) => {
         request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+          try { console.log('DB.init: onupgradeneeded'); } catch {}
           const db = (event.target as IDBOpenDBRequest).result;
           if (!db.objectStoreNames.contains('workspaces')) {
             db.createObjectStore('workspaces', { keyPath: 'id' });
@@ -238,21 +255,68 @@ export class DB {
           console.error('DB.init: Error opening database:', request.error);
           _reject(request.error as any);
         };
+        request.onblocked = () => {
+          console.warn('DB.init: open request blocked - another tab/window may be holding the database open');
+        };
         request.onsuccess = () => {
+          try { console.log('DB.init: open success'); } catch {}
           resolve(request.result);
         };
       });
 
       DB.db = db;
+      try {
+        DB.db.onversionchange = () => {
+          try { console.warn('DB.onversionchange: closing DB connection'); } catch {}
+          try { DB.db?.close(); } catch {}
+          DB.inited = false;
+        };
+      } catch {}
       DB.inited = true;
-      DB.initPromise = null;
+      try { console.log('DB.init: DB assigned and inited set to true'); } catch {}
+      DB.initPromise = null as any;
+      return true as any;
     })();
 
     await DB.initPromise;
     await CryptoHandler.init();
+    return DB.inited;
   }
 
-  private static async deleteDatabase(userID: string): Promise<void> {
+  // Wait until DB.db is assigned and DB.inited is true. Used to avoid races on login.
+  public static async whenReady(timeoutMs: number = 5000): Promise<boolean> {
+    if (DB.inited && DB.db) return true;
+    const start = Date.now();
+    while (!(DB.inited && DB.db)) {
+      if (DB.initPromise) {
+        try { await DB.initPromise; } catch {}
+      } else {
+        // Let the event loop progress; avoid tight loop
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      if (DB.inited && DB.db) return true;
+      if (Date.now() - start > timeoutMs) {
+        try { console.warn('DB.whenReady: timed out waiting for DB readiness'); } catch {}
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static async waitForUID(prefUid?: string, timeoutMs: number = 15000): Promise<string | null> {
+    if (prefUid) return prefUid;
+    const start = Date.now();
+    let current: string | undefined | null = auth.currentUser?.uid;
+    while (!current) {
+      await new Promise((r) => setTimeout(r, 20));
+      current = auth.currentUser?.uid;
+      if (current) break;
+      if (Date.now() - start > timeoutMs) return null;
+    }
+    return current as string;
+  }
+
+  public static async deleteDatabase(userID: string): Promise<void> {
     // Clear session storage for good measure
     sessionStorage.clear();
 
@@ -326,6 +390,8 @@ export class DB {
       }
     });
   }
+
+  
 
   public static getStoreRead(
     name:
@@ -444,6 +510,10 @@ export class DB {
   public static async getAll(storeName: string): Promise<any[]> {
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
+      if (!DB.inited || !DB.db) {
+        console.warn(`[DB] getAll: DB not initialized for ${storeName}`);
+        return [] as any[];
+      }
 
       // Use an explicit transaction and await its completion to ensure read consistency
       const tx = DB.db.transaction(storeName, 'readonly');
@@ -503,6 +573,10 @@ export class DB {
   ): Promise<any | null> {
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
+      if (!DB.inited || !DB.db) {
+        console.warn(`[DB] get: DB not initialized for ${storeName}`);
+        return null;
+      }
       // Use an explicit transaction and await its completion for consistent reads
       const tx = DB.db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName as any);
@@ -618,7 +692,9 @@ export class DB {
     const id = row?.id ?? row?.ID ?? row?.Id;
     // Use worker for encryption for isolation
     try {
-      return await encryptRow(storeName, id, row);
+      const tenant = getCurrentTenant();
+      const overrides = tenant ? { tenant } : undefined;
+      return await encryptRow(storeName, id, row, overrides);
     } catch (e) {
       console.warn(`[DB] Encryption failed for ${storeName}: ${e}, not storing`);
       return null; // Don't store the data
@@ -670,6 +746,11 @@ export class DB {
 
       // Check if crypto is available at all
       if (!CryptoHandler.kid) {
+        return false;
+      }
+
+      if (!DB.db) {
+        console.warn('[DB] ensureCEKForStore: DB not ready');
         return false;
       }
 

@@ -159,7 +159,7 @@ export function provisionWrappedKEK(wrappedKEK: WrappedKEKEnvelope): Promise<boo
   });
 }
 
-export function encryptRow(store: string, id: any, row: any): Promise<any> {
+export function encryptRow(store: string, id: any, row: any, overrides?: { tenant?: string | number, user?: string | number, version?: number | string }): Promise<any> {
   const w = getWorker();
   return new Promise((resolve, reject) => {
     const onMsg = (ev: MessageEvent) => {
@@ -172,7 +172,7 @@ export function encryptRow(store: string, id: any, row: any): Promise<any> {
       }
     };
     w.addEventListener('message', onMsg);
-    w.postMessage({ t: 'ENCRYPT', store, id, row });
+    w.postMessage({ t: 'ENCRYPT', store, id, row, overrides });
   });
 }
 

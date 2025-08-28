@@ -182,7 +182,8 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const cek = await getOrCreateCEK(msg.store);
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const pt = new TextEncoder().encode(JSON.stringify(msg.row));
-          const aadObj = buildAad(msg.store, msg.id, msg.row);
+          const aadObjBase = buildAad(msg.store, msg.id, msg.row);
+          const aadObj = { ...aadObjBase, ...(msg.overrides || {}) };
           const aad = encodeAad(aadObj);
           const ctag = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, cek, pt);
           const ctagBytes = new Uint8Array(ctag);
@@ -204,7 +205,8 @@ self.addEventListener('message', async (ev: MessageEvent) => {
               const pt = new TextEncoder().encode(JSON.stringify(msg.row));
               // First retry with AAD, then without AAD as compatibility fallback
               try {
-                const aadObj = buildAad(msg.store, msg.id, msg.row);
+                const aadObjBase = buildAad(msg.store, msg.id, msg.row);
+                const aadObj = { ...aadObjBase, ...(msg.overrides || {}) };
                 const aad = encodeAad(aadObj);
                 const ctag = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, cek, pt);
                 const cb = new Uint8Array(ctag);

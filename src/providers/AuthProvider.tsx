@@ -21,15 +21,7 @@ import { GenericCache } from '@/store/indexedDB/GenericCache';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import {
-  provisionKEK,
-  provisionWrappedKEK,
-  ensureCEK,
-  getDevicePublicKey,
-  hasKEK,
-  exportDeviceKeys,
-  importDeviceKeys,
   zeroizeKeys,
-  CryptoHandler,
 } from '@/crypto/crypto';
 import { DB } from '@/store/indexedDB/DB';
 import { verifyManifest } from '@/lib/manifestVerify';
@@ -85,11 +77,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // console.log('AuthContext: User data loaded successfully');
 
         if (!userData?.tenant_domain_prefix) {
-          // Not onboarded yet → skip device/crypto setup for now
+          return;
+        }
+        console.log(firebaseUser.uid)
+        let result = await DB.init(firebaseUser.uid);
+        console.log('DB.init: result', result);
+        if (!result) {
+          console.warn('DB failed to initialize, deferring cache hydration');
           return;
         }
 
-        await DB.init();
+        // Explicitly wait for DB readiness to avoid races during first login
+        const ready = await DB.whenReady();
+        if (!ready) {
+          console.warn('DB not ready after init, deferring cache hydration');
+          return;
+        }
 
 
 

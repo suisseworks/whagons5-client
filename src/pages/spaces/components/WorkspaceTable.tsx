@@ -12,8 +12,8 @@ import type { User } from '@/store/types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
@@ -417,7 +417,13 @@ const WorkspaceTable = ({
   }, [statusMap]);
 
   const columnDefs = useMemo(() => ([
-    // Combined Task Name and Description column
+    {
+      field: 'id',
+      headerName: 'ID',
+      filter: false,
+      maxWidth: 90
+    },
+  
     {
       field: 'name',
       headerName: 'Task',
@@ -466,22 +472,24 @@ const WorkspaceTable = ({
         const icon = getStatusIcon(iconName);
 
         return (
-          <div className="flex items-center gap-2 h-full">
-            <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+          <div className="flex items-center h-full py-2 gap-1 truncate">
+            {/* <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /> */}
             {icon && typeof icon === 'object' ? (
               <FontAwesomeIcon
                 icon={icon}
-                className="text-base"
+                className="text-sm"
                 style={{ color }}
               />
             ) : (
-              <span className="text-xs" style={{ color }}>●</span>
+              <span className="text-[10px] leading-none" style={{ color }}>●</span>
             )}
-            <span className="font-medium">{name}</span>
+            <span className="text-xs font-medium truncate max-w-[110px]" title={name}>{name}</span>
           </div>
         );
       },
-      minWidth: 180,
+      width: 140,
+      minWidth: 90,
+      maxWidth: 160,
     },
     // Priority column with badge
     {
@@ -518,14 +526,17 @@ const WorkspaceTable = ({
                 color: color,
                 backgroundColor: `${color}10`
               }}
-              className="font-medium"
+              className="text-xs px-2 py-0.5 font-medium leading-tight truncate max-w-[90px]"
+              title={name}
             >
               {name}
             </Badge>
           </div>
         );
       },
-      minWidth: 120,
+      width: 110,
+      minWidth: 72,
+      maxWidth: 120,
     },
     // Responsible column with avatars
     {
@@ -658,7 +669,7 @@ const WorkspaceTable = ({
           </div>
         );
       },
-      minWidth: 120,
+      minWidth: 100,
     },
     {
       field: 'response_date',
@@ -692,10 +703,18 @@ const WorkspaceTable = ({
           </div>
         );
       },
-      minWidth: 140,
+      width: 150,
     },
-    { field: 'work_duration', headerName: 'Work (min)', filter: false },
-    { field: 'pause_duration', headerName: 'Pause (min)', filter: false },
+    { 
+      field: 'work_duration', 
+      headerName: 'Work (min)', 
+      filter: false, 
+      width: 120
+    },
+    { field: 'pause_duration', 
+      headerName: 'Pause (min)', 
+      filter: false, 
+      width: 120 },
   ]), [statusMap, statuses, priorityMap, priorities, spotMap, spots, getUserNames, getUsersFromIds, getStatusIcon, formatDueDate]);
   const defaultColDef = useMemo(() => {
     return {

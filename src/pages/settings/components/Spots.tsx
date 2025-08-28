@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { genericActions } from "@/store/genericSlices";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
@@ -25,27 +26,20 @@ import { RootState } from "@/store/store";
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-// Local Spot type for this page
-type Spot = {
-  id: number;
-  name: string;
-  description: string;
-  address?: string;
-  color?: string;
-  created_at?: string;
-  updated_at?: string;
-};
+// Import Spot type from store types
+import { Spot } from "@/store/types";
 
-// Custom cell renderer for spot name with color indicator
+// Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
-  const spotColor = props.data?.color || '#6B7280';
   const spotName = props.value as string;
-  
+  const isBranch = props.data?.is_branch || false;
+  const indicatorColor = isBranch ? '#EF4444' : '#10B981'; // Red for branches, green for locations
+
   return (
     <div className="flex items-center space-x-3 h-full">
-      <div 
+      <div
         className="w-6 h-6 rounded-md flex items-center justify-center text-white text-xs font-medium"
-        style={{ backgroundColor: spotColor }}
+        style={{ backgroundColor: indicatorColor }}
         title={spotName}
       >
         {spotName ? spotName.charAt(0).toUpperCase() : 'S'}
@@ -91,16 +85,15 @@ const ActionsCellRenderer = (props: ICellRendererParams & { onEdit: (spot: Spot)
 
 function Spots() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const gridRef = useRef<AgGridReact>(null);
 
-  // Redux state (to compute associations)
+  // Redux state
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const { value: spots, loading, error } = useSelector((state: RootState) => state.spots);
 
-  // Local state for Spots (mock-backed for now)
-  const [spots, setSpots] = useState<Spot[]>([]);
+  // Local state for Spots
   const [rowData, setRowData] = useState<Spot[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -109,52 +102,30 @@ function Spots() {
   const [deletingSpot, setDeletingSpot] = useState<Spot | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
-    address: '',
-    color: '#2563EB'
+    parent_id: null as number | null,
+    spot_type_id: 1, // Default spot type
+    is_branch: false
   });
   const [editFormData, setEditFormData] = useState({
     name: '',
-    description: '',
-    address: '',
-    color: '#2563EB'
+    parent_id: null as number | null,
+    spot_type_id: 1,
+    is_branch: false
   });
 
-  // Mock fetch
+  // Sync rowData with spots from Redux
   useEffect(() => {
-    const fetchSpots = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        // TODO: replace with API + Redux slice
-        const mock: Spot[] = Array.from({ length: 12 }, (_, i) => ({
-          id: i + 1,
-          name: `Spot ${i + 1}`,
-          description: i % 3 === 0 ? 'Main building' : i % 3 === 1 ? 'Warehouse' : 'Back office',
-          address: `Street ${i + 1}, City`,
-          color: i % 3 === 0 ? '#EF4444' : i % 3 === 1 ? '#10B981' : '#2563EB',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-        setSpots(mock);
-        setRowData(mock);
-      } catch (e: any) {
-        setError('Failed to load spots');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSpots();
-  }, []);
+    setRowData(spots);
+  }, [spots]);
 
   // Derived counts
   const getSpotTaskCount = useCallback((spotId: number) => {
-    return tasks.filter(task => task.spot_id === spotId).length;
+    return tasks.filter((task: any) => task.spot_id === spotId).length;
   }, [tasks]);
 
   // Handlers
   const handleAddSpot = () => {
-    setFormData({ name: '', description: '', address: '', color: '#2563EB' });
+    setFormData({ name: '', parent_id: null, spot_type_id: 1, is_branch: false });
     setIsCreateDialogOpen(true);
   };
 
@@ -162,9 +133,9 @@ function Spots() {
     setEditingSpot(spot);
     setEditFormData({
       name: spot.name,
-      description: spot.description || '',
-      address: spot.address || '',
-      color: spot.color || '#2563EB'
+      parent_id: spot.parent_id || null,
+      spot_type_id: spot.spot_type_id,
+      is_branch: spot.is_branch
     });
     setIsEditDialogOpen(true);
   }, []);
@@ -182,21 +153,11 @@ function Spots() {
   const createSpot = async () => {
     try {
       setIsSubmitting(true);
-      const newSpot: Spot = {
-        id: (spots.at(-1)?.id || 0) + 1,
-        name: formData.name,
-        description: formData.description,
-        address: formData.address,
-        color: formData.color,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      const updated = [...spots, newSpot];
-      setSpots(updated);
-      setRowData(updated);
+      await dispatch(genericActions.spots.createItem(formData));
       setIsCreateDialogOpen(false);
+      setFormData({ name: '', parent_id: null, spot_type_id: 1, is_branch: false });
     } catch (e) {
-      setError('Failed to add spot');
+      console.error('Failed to create spot:', e);
     } finally {
       setIsSubmitting(false);
     }
@@ -206,15 +167,14 @@ function Spots() {
     if (!editingSpot) return;
     try {
       setIsSubmitting(true);
-      const updated = spots.map(s => s.id === editingSpot.id 
-        ? { ...s, ...editFormData, updated_at: new Date().toISOString() } 
-        : s);
-      setSpots(updated);
-      setRowData(updated);
+      await dispatch(genericActions.spots.updateItem({
+        id: editingSpot.id,
+        ...editFormData
+      }));
       setEditingSpot(null);
       setIsEditDialogOpen(false);
     } catch (e) {
-      setError('Failed to update spot');
+      console.error('Failed to update spot:', e);
     } finally {
       setIsSubmitting(false);
     }
@@ -224,12 +184,10 @@ function Spots() {
     if (!deletingSpot) return;
     try {
       setIsSubmitting(true);
-      const updated = spots.filter(s => s.id !== deletingSpot.id);
-      setSpots(updated);
-      setRowData(updated);
+      await dispatch(genericActions.spots.deleteItem(deletingSpot.id));
       handleCloseDeleteDialog();
     } catch (e) {
-      setError('Failed to delete spot');
+      console.error('Failed to delete spot:', e);
     } finally {
       setIsSubmitting(false);
     }
@@ -238,9 +196,25 @@ function Spots() {
   // Grid
   const colDefs = useMemo<ColDef[]>(() => [
     { field: 'name', headerName: 'Spot', flex: 2, minWidth: 200, cellRenderer: SpotNameCellRenderer },
-    { field: 'description', headerName: 'Description', flex: 3, minWidth: 220 },
-    { field: 'address', headerName: 'Address', flex: 2, minWidth: 200 },
-    { 
+    {
+      field: 'is_branch', headerName: 'Type', width: 100,
+      cellRenderer: (params: ICellRendererParams) => (
+        <div className="flex items-center h-full">
+          <Badge variant={params.value ? "default" : "secondary"}>
+            {params.value ? 'Branch' : 'Location'}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      field: 'spot_type_id', headerName: 'Spot Type', width: 120,
+      valueFormatter: (p) => `Type ${p.value}`
+    },
+    {
+      field: 'parent_id', headerName: 'Parent', width: 120,
+      valueFormatter: (p) => p.value ? `Spot ${p.value}` : 'Root'
+    },
+    {
       field: 'tasks', headerName: 'Tasks', width: 100,
       cellRenderer: (params: ICellRendererParams) => (
         <div className="flex items-center h-full">
@@ -267,13 +241,12 @@ function Spots() {
 
   const handleBackClick = () => navigate('/settings');
 
-  const handleSearch = (value: string) => {
+    const handleSearch = (value: string) => {
     const q = value.toLowerCase();
     if (!q) { setRowData(spots); return; }
-    setRowData(spots.filter(s => 
+    setRowData(spots.filter((s: Spot) =>
       s.name.toLowerCase().includes(q) ||
-      (s.description || '').toLowerCase().includes(q) ||
-      (s.address || '').toLowerCase().includes(q)
+      (s.is_branch ? 'branch' : 'location').includes(q)
     ));
   };
 
@@ -377,16 +350,16 @@ function Spots() {
                     <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="col-span-3" required />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="description" className="text-right">Description</Label>
-                    <Input id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="col-span-3" />
+                    <Label htmlFor="spot_type_id" className="text-right">Spot Type</Label>
+                    <Input id="spot_type_id" type="number" value={formData.spot_type_id} onChange={(e) => setFormData({ ...formData, spot_type_id: parseInt(e.target.value) || 1 })} className="col-span-3" min="1" />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="address" className="text-right">Address</Label>
-                    <Input id="address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="col-span-3" />
+                    <Label htmlFor="parent_id" className="text-right">Parent ID</Label>
+                    <Input id="parent_id" type="number" value={formData.parent_id || ''} onChange={(e) => setFormData({ ...formData, parent_id: e.target.value ? parseInt(e.target.value) : null })} className="col-span-3" placeholder="Leave empty for root" />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="color" className="text-right">Color</Label>
-                    <Input type="color" id="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="col-span-3" />
+                    <Label htmlFor="is_branch" className="text-right">Is Branch</Label>
+                    <input id="is_branch" type="checkbox" checked={formData.is_branch} onChange={(e) => setFormData({ ...formData, is_branch: e.target.checked })} className="col-span-3" />
                   </div>
                 </div>
                 <DialogFooter>
@@ -413,16 +386,16 @@ function Spots() {
                     <Input id="edit-name" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className="col-span-3" required />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-description" className="text-right">Description</Label>
-                    <Input id="edit-description" value={editFormData.description} onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })} className="col-span-3" />
+                    <Label htmlFor="edit-spot_type_id" className="text-right">Spot Type</Label>
+                    <Input id="edit-spot_type_id" type="number" value={editFormData.spot_type_id} onChange={(e) => setEditFormData({ ...editFormData, spot_type_id: parseInt(e.target.value) || 1 })} className="col-span-3" min="1" />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-address" className="text-right">Address</Label>
-                    <Input id="edit-address" value={editFormData.address} onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })} className="col-span-3" />
+                    <Label htmlFor="edit-parent_id" className="text-right">Parent ID</Label>
+                    <Input id="edit-parent_id" type="number" value={editFormData.parent_id || ''} onChange={(e) => setEditFormData({ ...editFormData, parent_id: e.target.value ? parseInt(e.target.value) : null })} className="col-span-3" placeholder="Leave empty for root" />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit-color" className="text-right">Color</Label>
-                    <Input type="color" id="edit-color" value={editFormData.color} onChange={(e) => setEditFormData({ ...editFormData, color: e.target.value })} className="col-span-3" />
+                    <Label htmlFor="edit-is_branch" className="text-right">Is Branch</Label>
+                    <input id="edit-is_branch" type="checkbox" checked={editFormData.is_branch} onChange={(e) => setEditFormData({ ...editFormData, is_branch: e.target.checked })} className="col-span-3" />
                   </div>
                 </div>
                 <DialogFooter>
@@ -456,12 +429,15 @@ function Spots() {
                 <div className="py-4">
                   <div className="bg-muted rounded-lg p-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-md flex items-center justify-center text-white text-sm font-medium" style={{ backgroundColor: deletingSpot.color || '#6B7280' }}>
+                      <div className="w-8 h-8 rounded-md flex items-center justify-center text-white text-sm font-medium" style={{ backgroundColor: deletingSpot.is_branch ? '#EF4444' : '#10B981' }}>
                         {deletingSpot.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="font-medium">{deletingSpot.name}</div>
-                        <div className="text-sm text-muted-foreground">{deletingSpot.description}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {deletingSpot.is_branch ? 'Branch' : 'Location'} • Type {deletingSpot.spot_type_id}
+                          {deletingSpot.parent_id && ` • Parent: Spot ${deletingSpot.parent_id}`}
+                        </div>
                         <div className="flex items-center space-x-2 mt-1">
                           <span className="text-xs text-muted-foreground">{getSpotTaskCount(deletingSpot.id)} tasks</span>
                         </div>

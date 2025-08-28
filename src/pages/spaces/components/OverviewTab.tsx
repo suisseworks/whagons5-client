@@ -899,17 +899,33 @@ function OverviewTab({
         <CardHeader>
           <CardTitle>Categories</CardTitle>
           <CardDescription>
-            Categories owned by this workspace - tasks created with these categories will be sent to this workspace
+            {workspaceType === "DEFAULT"
+              ? "This default workspace is associated with one category - tasks created with this category will be sent to this workspace"
+              : "Categories owned by this workspace - tasks created with these categories will be sent to this workspace"
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {workspaceOverview.categories.map((category) => (
-              <Badge key={category} variant="outline" className="text-sm">
+              <Badge
+                key={category}
+                variant={workspaceType === "DEFAULT" ? "default" : "outline"}
+                className={`text-sm ${workspaceType === "DEFAULT" ? "bg-primary text-primary-foreground" : ""}`}
+              >
                 {category}
+                {workspaceType === "DEFAULT" && <span className="ml-1 text-xs">(Default)</span>}
               </Badge>
             ))}
           </div>
+          {workspaceOverview.categories.length === 0 && (
+            <div className="text-center text-muted-foreground py-4">
+              {workspaceType === "DEFAULT"
+                ? "No category associated with this default workspace"
+                : "No categories associated with this workspace"
+              }
+            </div>
+          )}
         </CardContent>
       </Card>
 

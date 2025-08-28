@@ -76,9 +76,12 @@ function Settings() {
 
   // Get current workspace from Redux store
   const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
-  
+
+  // Get categories from Redux store
+  const { value: categories } = useSelector((state: RootState) => (state as any).categories as { value: any[] });
+
   // Find workspace by ID from URL params or fallback to first workspace
-  const currentWorkspace = params.id 
+  const currentWorkspace = params.id
     ? workspaces.find((workspace: any) => workspace.id.toString() === params.id)
     : workspaces.length > 0 ? workspaces[0] : null;
 
@@ -108,14 +111,42 @@ function Settings() {
       .catch(console.error);
   }, []);
 
+  // Load categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        // Fetch categories from the API
+        await dispatch(genericActions.categories.fetchAsync()).unwrap();
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    };
+
+    loadCategories();
+  }, [dispatch]);
+
   // Fetch workspace overview data
   useEffect(() => {
-    if (!currentWorkspace) return;
-    
+    if (!currentWorkspace || !categories.length) return;
+
     const fetchWorkspaceOverview = async () => {
       setLoading(true);
       try {
-        // Mock data for now - replace with actual API call
+        // Filter categories based on workspace type
+        let workspaceCategories: string[] = [];
+
+        if (currentWorkspace.type === "DEFAULT") {
+          // For default workspaces, find the single category associated with this workspace
+          const associatedCategory = categories.find(cat => cat.workspace_id === currentWorkspace.id);
+          if (associatedCategory) {
+            workspaceCategories = [associatedCategory.name];
+          }
+        } else {
+          // For other workspace types, show all categories (or implement specific logic)
+          workspaceCategories = categories.map(cat => cat.name);
+        }
+
+        // Mock data for teams - replace with actual API call when available
         const mockOverview: WorkspaceOverview = {
           teams: [
             {
@@ -141,7 +172,7 @@ function Settings() {
             }
           ],
           total_users: 26,
-          categories: ["Development", "Marketing", "Operations", "QA"],
+          categories: workspaceCategories,
           workspace_name: currentWorkspace.name
         };
 
@@ -154,53 +185,41 @@ function Settings() {
     };
 
     fetchWorkspaceOverview();
-  }, [currentWorkspace]);
+  }, [currentWorkspace, categories]);
 
   // Fetch workspace filters data - now focused on categories
   useEffect(() => {
+    if (!currentWorkspace || !categories.length) return;
+
     const fetchWorkspaceFilters = async () => {
       setFiltersLoading(true);
       try {
-        // Mock data for categories
+        // Filter categories based on workspace type and build allowed_categories
+        let allowedCategories: WorkspaceFilters['allowed_categories'] = [];
+
+        if (currentWorkspace.type === "DEFAULT") {
+          // For default workspaces, show only the single associated category
+          const associatedCategory = categories.find(cat => cat.workspace_id === currentWorkspace.id);
+          if (associatedCategory) {
+            allowedCategories = [{
+              category: associatedCategory.name,
+              description: associatedCategory.description || `Tasks for ${associatedCategory.name} category`,
+              enabled: associatedCategory.enabled !== false, // Default to true if not explicitly false
+              task_count: 0 // This would need to be fetched from API
+            }];
+          }
+        } else {
+          // For other workspace types, show all categories
+          allowedCategories = categories.map(cat => ({
+            category: cat.name,
+            description: cat.description || `Tasks for ${cat.name} category`,
+            enabled: cat.enabled !== false,
+            task_count: 0 // This would need to be fetched from API
+          }));
+        }
+
         const mockFilters: WorkspaceFilters = {
-          allowed_categories: [
-            {
-              category: "Development",
-              description: "Software development tasks including bugs, features, and code reviews",
-              enabled: true,
-              task_count: 5
-            },
-            {
-              category: "QA",
-              description: "Quality assurance and testing related tasks",
-              enabled: true,
-              task_count: 4
-            },
-            {
-              category: "Marketing",
-              description: "Marketing campaigns, content creation, and brand management",
-              enabled: false,
-              task_count: 4
-            },
-            {
-              category: "Operations",
-              description: "System operations, infrastructure, and user support",
-              enabled: true,
-              task_count: 4
-            },
-            {
-              category: "Analytics",
-              description: "Data analysis, reporting, and metrics tracking",
-              enabled: false,
-              task_count: 3
-            },
-            {
-              category: "Design",
-              description: "UI/UX design, wireframing, and user research",
-              enabled: true,
-              task_count: 3
-            }
-          ],
+          allowed_categories: allowedCategories,
           creation_restrictions: {
             internal_only: false,
             require_approval: false
@@ -216,7 +235,7 @@ function Settings() {
     };
 
     fetchWorkspaceFilters();
-  }, []);
+  }, [currentWorkspace, categories]);
 
   // Handle team click to filter users
   const handleTeamClick = useCallback((teamName: string) => {
@@ -231,17 +250,22 @@ function Settings() {
 
   // Toggle category enabled/disabled
   const handleToggleCategory = useCallback((categoryName: string) => {
+    // For default workspaces, don't allow toggling - category should always be enabled
+    if (currentWorkspace?.type === "DEFAULT") {
+      return;
+    }
+
     setWorkspaceFilters(prev => {
       if (!prev) return null;
-      
+
       return {
         ...prev,
-        allowed_categories: prev.allowed_categories.map(cat => 
+        allowed_categories: prev.allowed_categories.map(cat =>
           cat.category === categoryName ? { ...cat, enabled: !cat.enabled } : cat
         )
       };
     });
-  }, []);
+  }, [currentWorkspace]);
 
   // Update workspace info in Redux store
   const handleUpdateWorkspace = useCallback((updates: Partial<WorkspaceInfo>) => {

@@ -103,6 +103,12 @@ const getSubdomain = () => {
   return localStorage.getItem('whagons-subdomain') || '';
 };
 
+// Expose current tenant (domain prefix without trailing dot) for consumers like encryption AAD
+export const getCurrentTenant = (): string => {
+  const sd = getSubdomain();
+  return sd.endsWith('.') ? sd.slice(0, -1) : sd;
+};
+
 const setSubdomain = (subdomain: string) => {
   //add a dot at the end if missing, but only if subdomain is not empty
   if (subdomain && !subdomain.endsWith('.')) {
