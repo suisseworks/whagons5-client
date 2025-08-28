@@ -51,7 +51,8 @@
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "^4.0.12",
     "tailwindcss-animate": "^1.0.7",
-    "vite": "^6.3.2"
+    "vite": "^6.3.2",
+    "@noble/ed25519": "^1.7.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.4",
@@ -64,7 +65,11 @@
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
+    "javascript-obfuscator": "^4.1.1",
     "rollup-plugin-visualizer": "^6.0.1",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite-plugin-obfuscator": "^1.0.5",
+    "vite-plugin-pwa": "^1.0.3",
+    "workbox-window": "^7.3.0"
   }
 }

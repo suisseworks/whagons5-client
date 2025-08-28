@@ -58,18 +58,17 @@ export class GenericCache {
 		if (!DB.inited) await DB.init();
 		const idVal = this.getId(row);
 		if (idVal === undefined || idVal === null) return;
-		DB.getStoreWrite(this.store as any).put(row);
+		await DB.put(this.store, row);
 	}
 
 	async update(_id: IdType, row: any): Promise<void> {
 		if (!DB.inited) await DB.init();
-		DB.getStoreWrite(this.store as any).put(row);
+		await DB.put(this.store, row);
 	}
 
 	async remove(id: IdType): Promise<void> {
 		if (!DB.inited) await DB.init();
-		const key = typeof id === "number" ? id : Number(id);
-		DB.getStoreWrite(this.store as any).delete(key);
+		await DB.delete(this.store, id as any);
 	}
 
 	// --- Remote CRUD helpers ---
@@ -99,12 +98,7 @@ export class GenericCache {
 
 	async getAll(): Promise<any[]> {
 		if (!DB.inited) await DB.init();
-		const store = DB.getStoreRead(this.store as any);
-		const req = store.getAll();
-		return await new Promise<any[]>((resolve, reject) => {
-			req.onsuccess = () => resolve(req.result);
-			req.onerror = () => reject(req.error);
-		});
+		return await DB.getAll(this.store);
 	}
 
 	async fetchAll(params: Record<string, any> = {}): Promise<boolean> {
@@ -112,8 +106,7 @@ export class GenericCache {
 			const resp = await api.get(this.endpoint, { params });
 			const rows = (resp.data?.rows ?? resp.data?.data ?? resp.data) as any[];
 			if (!DB.inited) await DB.init();
-			const store = DB.getStoreWrite(this.store as any);
-			for (const r of rows) store.put(r);
+			await DB.bulkPut(this.store, rows);
 			return true;
 		} catch (e) {
 			console.error("GenericCache.fetchAll", this.endpoint, e);
@@ -127,6 +120,13 @@ export class GenericCache {
 			if (this.validating) { this.dlog('validate: already running'); return true; }
 			this.validating = true;
 			const t0 = performance.now();
+			// If no local rows, fetch once then exit
+			const preRows = await this.getAll();
+			if (preRows.length === 0) {
+				this.dlog('no local rows; fetchAll bootstrap');
+				try { await this.fetchAll(); } catch {}
+				this.validating = false; return true;
+			}
 			const localBlocks = await this.computeLocalBlockHashes();
 			// Global short-circuit
 			const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
@@ -171,7 +171,7 @@ export class GenericCache {
 
 			if (mismatched.length === 0) { this.dlog('blocks equal; finishing', { ms: Math.round(performance.now() - t0) }); this.validating = false; return true; }
 
-			for (const blockId of Array.from(new Set(mismatched))) {
+			for (const blockId of Array.from(new Set(mismatched)).filter(n => Number.isFinite(n))) {
 				const serverRowsResp = await api.get(`/integrity/blocks/${blockId}/rows`, { params: { table: this.table } });
 				const serverRows: Array<{ row_id: number; row_hash: string }> = serverRowsResp.data.data || [];
 				const serverRowMap = new Map(serverRows.map(r => [r.row_id, r.row_hash]));
@@ -203,9 +203,14 @@ export class GenericCache {
 							const resp = await api.get(this.endpoint, { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
 							const rows = (resp.data?.data || resp.data?.rows) as any[];
 							if (rows?.length) {
+								// attach server row hash for stability
+								const rowsWithHash = rows.map(r => {
+									const idNum = Number(this.getId(r));
+									const h = serverRowMap.get(idNum);
+									return h ? { ...r, __h: h } : r;
+								});
 								if (!DB.inited) await DB.init();
-								const store = DB.getStoreWrite(this.store as any);
-								for (const r of rows) store.put(r);
+								await DB.bulkPut(this.store, rowsWithHash);
 								// After write, log local vs server hashes for verification
 								for (const r of rows) {
 									const idNum = Number(this.getId(r));
@@ -213,6 +218,12 @@ export class GenericCache {
 									const serverHash = serverRowMap.get(idNum);
 									this.dlog('post-refetch hash', { table: this.table, rowId: idNum, localHash: newLocalHash, serverHash });
 								}
+							} else {
+								// Fallback: some endpoints may not support ids filter (e.g., workspaces)
+								try {
+									this.dlog('ids fetch returned 0; falling back to full fetchAll');
+									await this.fetchAll();
+								} catch { /* ignore */ }
 							}
 						} catch (e) { console.warn('validate: batch fetch failed', e); }
 					}
@@ -236,6 +247,10 @@ export class GenericCache {
 	}
 
 	private async hashRow(row: any): Promise<string> {
+		// Use server-provided hash if we cached it during validation
+		if (row && typeof (row as any).__h === 'string' && (row as any).__h.length) {
+			return (row as any).__h as string;
+		}
 		if (this.hashFields && this.hashFields.length > 0) {
 			const parts = this.hashFields.map((field) => {
 				const value = row?.[field as any];
@@ -265,11 +280,12 @@ export class GenericCache {
 	}
 
 	private async computeLocalBlockHashes(): Promise<Array<{ block_id: number; min_row_id: number; max_row_id: number; row_count: number; block_hash: string }>> {
-		const rows = await this.getAll();
+		const rows = (await this.getAll()).filter(r => r != null && this.getId(r) != null);
 		const BLOCK_SIZE = 1024;
 		const byBlock = new Map<number, Array<{ id: number; hash: string }>>();
 		for (const r of rows) {
 			const idNum = Number(this.getId(r));
+			if (!Number.isFinite(idNum)) continue;
 			const blk = Math.floor(idNum / BLOCK_SIZE);
 			if (!byBlock.has(blk)) byBlock.set(blk, []);
 			byBlock.get(blk)!.push({ id: idNum, hash: await this.hashRow(r) });

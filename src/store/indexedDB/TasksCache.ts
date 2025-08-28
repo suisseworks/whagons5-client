@@ -18,6 +18,10 @@ export class TasksCache {
         if (this.debug) console.log('[TasksCache]', ...args);
     }
 
+    private static _memTasks: Task[] | null = null;
+    private static _memTasksStamp = 0;
+    private static readonly MEM_TTL_MS = 10000; // 10s TTL for in-memory decrypted cache
+
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
         if (this.initPromise) {
@@ -72,8 +76,9 @@ export class TasksCache {
 
     public static async deleteTask(taskId: string) {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreWrite("tasks");
-        store.delete(taskId);
+        await DB.delete('tasks', taskId);
+        this._memTasks = null;
+        this._memTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_DELETED, { id: taskId });
@@ -81,8 +86,9 @@ export class TasksCache {
 
     public static async deleteTasks() {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreWrite("tasks");
-        store.clear();
+        await DB.clear('tasks');
+        this._memTasks = null;
+        this._memTasksStamp = 0;
         
         // Emit cache invalidate event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
@@ -90,11 +96,10 @@ export class TasksCache {
 
     public static async updateTask(id: string, task: Task) {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreWrite("tasks");
-        //delete the old task
-        store.delete(id);
-        //add the new task
-        store.put(task);
+        await DB.delete('tasks', id);
+        await DB.put('tasks', task);
+        this._memTasks = null;
+        this._memTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, task);
@@ -102,8 +107,9 @@ export class TasksCache {
 
     public static async addTask(task: Task) {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreWrite("tasks");
-        store.put(task);
+        await DB.put('tasks', task);
+        this._memTasks = null;
+        this._memTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_CREATED, task);
@@ -111,10 +117,9 @@ export class TasksCache {
 
     public static async addTasks(tasks: Task[]) {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreWrite("tasks");
-        tasks.forEach(task => {
-            store.put(task);
-        });
+        await DB.bulkPut('tasks', tasks);
+        this._memTasks = null;
+        this._memTasksStamp = 0;
         
         // Emit bulk update event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, tasks);
@@ -122,33 +127,16 @@ export class TasksCache {
 
     public static async getTask(taskId: string) {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreRead("tasks");
-        const request = store.get(taskId);
-        const task = await new Promise<Task>((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-        return task;
+        return await DB.get('tasks', taskId);
     }
 
     public static async getTasks() {
         if (!DB.inited) await DB.init();
-        const store = DB.getStoreRead("tasks");
-        const request = store.getAll();
-        const tasks = await new Promise<Task[]>((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-        return tasks;
+        return (await DB.getAll('tasks')).filter(t => t != null);
     }
 
     public static async getLastUpdated(): Promise<Date> {
-        const store = DB.getStoreRead("tasks");
-        const request = store.getAll();
-        const tasks = await new Promise<Task[]>((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
+        const tasks = await DB.getAll('tasks');
         //we need the most recent updated_at date
         const lastUpdated = tasks.reduce((max, task) => {
             return new Date(task.updated_at) > max ? new Date(task.updated_at) : max;
@@ -445,7 +433,7 @@ export class TasksCache {
     }
 
     private static async computeLocalTaskBlockHashes() {
-        const tasks = await this.getTasks();
+        const tasks = (await this.getTasks()).filter(t => t && Number.isFinite(Number(t.id)));
         const BLOCK_SIZE = 1024;
         const byBlock = new Map<number, Array<{ id: number; hash: string }>>();
         for (const t of tasks) {
@@ -485,8 +473,16 @@ export class TasksCache {
         try {
             if (!DB.inited) await DB.init();
             
-            // Get all tasks from IndexedDB
-            let tasks = await this.getTasks();
+            // Get all tasks from IndexedDB (reuse in-memory decrypted cache when fresh)
+            let tasks: Task[];
+            const now = Date.now();
+            if (this._memTasks && (now - this._memTasksStamp) < this.MEM_TTL_MS) {
+                tasks = this._memTasks;
+            } else {
+                tasks = await this.getTasks();
+                this._memTasks = tasks;
+                this._memTasksStamp = now;
+            }
 
             // Apply simple parameter filters
             if (params.workspace_id) {
