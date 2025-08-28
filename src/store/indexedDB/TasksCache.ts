@@ -5,16 +5,18 @@ import api from "@/api/whagonsApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import sha256 from "crypto-js/sha256";
 import encHex from "crypto-js/enc-hex";
+import { applyEncryptionConfig, shouldEncryptStore } from "@/config/encryptionConfig";
 
 export class TasksCache {
 
-    // Hardcoded default: disable encryption for tasks (fast rendering)
-    public static TASKS_ENCRYPTION_ENABLED = false;
+    // Use configuration-based encryption setting instead of hardcoded flag
+    public static get TASKS_ENCRYPTION_ENABLED(): boolean {
+        return shouldEncryptStore('tasks');
+    }
 
     // Toggle to disable encryption specifically for the 'tasks' store
     public static async setEncryptionEnabled(enabled: boolean) {
         const prev = DB.getEncryptionForStore('tasks');
-        TasksCache.TASKS_ENCRYPTION_ENABLED = enabled;
         DB.setEncryptionForStore('tasks', enabled);
         // If we are disabling encryption after it had been enabled, clear old encrypted rows
         if (prev && !enabled) {
@@ -27,7 +29,7 @@ export class TasksCache {
     }
 
     public static isEncryptionEnabled(): boolean {
-        return TasksCache.TASKS_ENCRYPTION_ENABLED;
+        return DB.getEncryptionForStore('tasks');
     }
 
     private static initPromise: Promise<boolean> | null = null;
@@ -60,8 +62,8 @@ export class TasksCache {
 
     private static async _doInit(): Promise<boolean> {
         await DB.init();
-        // Apply default/static flag on init
-        DB.setEncryptionForStore('tasks', TasksCache.TASKS_ENCRYPTION_ENABLED);
+        // Apply encryption configuration for all stores
+        applyEncryptionConfig();
         
         if (!auth.currentUser) {
             return new Promise((resolve) => {
@@ -446,6 +448,8 @@ export class TasksCache {
             task.resolution_date ? new Date(task.resolution_date).getTime() : '',
             task.work_duration,
             task.pause_duration,
+            // Include user_ids in hash for data integrity - sort for consistent hashing
+            task.user_ids ? JSON.stringify(task.user_ids.sort()) : '',
             new Date(task.updated_at).getTime()
         ].join('|');
         return sha256(row).toString(encHex);

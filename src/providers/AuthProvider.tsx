@@ -95,7 +95,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         try {
           // Validate only core keys, then refresh those slices
-          const coreKeys = ['workspaces','teams','categories','templates','statuses','priorities','slas'] as const;
+          const coreKeys = [
+            'workspaces',
+            'teams',
+            'categories',
+            'templates',
+            'statuses',
+            'priorities',
+            'slas',
+            'templates',
+            'spots',
+            'users'
+          ] as const;
           const caches: GenericCache[] = coreKeys.map((k) => genericCaches[k]);
           await GenericCache.validateMultiple(caches);
 

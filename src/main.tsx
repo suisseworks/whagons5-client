@@ -9,6 +9,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { DB } from './store/indexedDB/DB';
 import * as CryptoAPI from './crypto/crypto';
 import { genericActions } from './store/genericSlices';
+import { applyEncryptionConfig } from './config/encryptionConfig';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
@@ -21,6 +22,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </Provider>
   // {/* </React.StrictMode>, */}
 );
+
+// Initialize encryption configuration
+applyEncryptionConfig();
 
 // Register PWA in production only
 if (import.meta.env.VITE_DEVELOPMENT !== 'true') {

@@ -142,9 +142,7 @@ export class DB {
           if (!db.objectStoreNames.contains('role_permissions')) {
             db.createObjectStore('role_permissions', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('task_users')) {
-            db.createObjectStore('task_users', { keyPath: 'id' });
-          }
+          // task_users store removed - user assignments are now stored as JSON in tasks.user_ids
           if (!db.objectStoreNames.contains('status_transitions')) {
             db.createObjectStore('status_transitions', { keyPath: 'id' });
           }
@@ -347,7 +345,7 @@ export class DB {
       | 'user_teams'
       | 'user_permissions'
       | 'role_permissions'
-      | 'task_users'
+
       | 'status_transitions'
       | 'task_tags'
       | 'spot_types'
@@ -396,7 +394,7 @@ export class DB {
       | 'user_teams'
       | 'user_permissions'
       | 'role_permissions'
-      | 'task_users'
+
       | 'status_transitions'
       | 'task_tags'
       | 'spot_types'

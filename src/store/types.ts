@@ -61,8 +61,8 @@ export interface Task {
     workspace_id: number;
     category_id: number;
     team_id: number;
-    template_id: number;
-    spot_id: number;
+    template_id: number | null;
+    spot_id: number | null;
     status_id: number;
     priority_id: number;
     start_date: string | null;
@@ -72,6 +72,9 @@ export interface Task {
     resolution_date: string | null;
     work_duration: number;
     pause_duration: number;
+    // Store responsible user IDs as JSON array for efficient storage
+    // Most tasks have few responsible users, so this avoids a large junction table
+    user_ids: number[] | null;
     created_at: string;
     updated_at: string;
 }
@@ -116,7 +119,7 @@ export interface User {
     id: number;
     name: string;
     email: string;
-    avatar?: string | null;
+    url_picture?: string | null;
     role_id?: number | null;
     workspace_id?: number | null;
     is_active: boolean;
@@ -170,15 +173,6 @@ export interface RolePermission {
     id: number;
     role_id: number;
     permission_id: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface TaskUser {
-    id: number;
-    task_id: number;
-    user_id: number;
-    assigned_by: number;
     created_at: string;
     updated_at: string;
 }
