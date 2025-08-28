@@ -6,7 +6,8 @@ import {
   CryptoHandler,
   WrappedKEKEnvelope,
   rewrapCekBlobWithWrappedKEK,
-  rewrapCekBlobWithRawKEK
+  rewrapCekBlobWithRawKEK,
+  hasKEK,
 } from '@/crypto/crypto';
 import { getCurrentTenant } from '@/api/whagonsApi';
 
@@ -20,6 +21,7 @@ const DB_VERSION_KEY = 'indexeddb_version';
 export class DB {
   static db: IDBDatabase;
   static inited = false;
+  private static nuking = false;
   private static initPromise: Promise<boolean> | null = null;
   // Per-store operation queue to serialize actions over the same object store
   private static storeQueues: Map<string, Promise<any>> = new Map();
@@ -509,6 +511,10 @@ export class DB {
 
   public static async getAll(storeName: string): Promise<any[]> {
     return DB.runExclusive(storeName, async () => {
+      if (DB.nuking) {
+        console.warn('[DB] getAll skipped during nuking');
+        return [] as any[];
+      }
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
         console.warn(`[DB] getAll: DB not initialized for ${storeName}`);
@@ -572,6 +578,10 @@ export class DB {
     key: number | string
   ): Promise<any | null> {
     return DB.runExclusive(storeName, async () => {
+      if (DB.nuking) {
+        console.warn('[DB] get skipped during nuking');
+        return null;
+      }
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
         console.warn(`[DB] get: DB not initialized for ${storeName}`);
@@ -739,6 +749,7 @@ export class DB {
 
   private static async ensureCEKForStore(storeName: string): Promise<boolean> {
     return DB.runExclusive('cache_keys', async () => {
+      if (DB.nuking) return false;
       if (!DB.inited) await DB.init();
       if (CryptoHandler.kid == null || !CryptoHandler.inited) {
         await CryptoHandler.init();
@@ -754,6 +765,7 @@ export class DB {
         return false;
       }
 
+      let existingRec: any = null;
       try {
         // Read existing entry using explicit transaction and await completion
         const rtx = DB.db.transaction('cache_keys', 'readonly');
@@ -763,6 +775,7 @@ export class DB {
           rreq.onsuccess = () => resolve(rreq.result);
           rreq.onerror = () => resolve(null);
         });
+        existingRec = existing;
         await new Promise<void>((resolve, reject) => {
           rtx.oncomplete = () => resolve();
           rtx.onerror = () => reject(rtx.error as any);
@@ -774,7 +787,7 @@ export class DB {
         // If workerEnsureCEK succeeds, CEK is ready for this store
         if (result.ok) {
           // Save the wrapped CEK if we generated a new one and don't have an existing entry
-          if (!existing && result.wrappedCEK) {
+          if (!existingRec && result.wrappedCEK) {
             const wtx = DB.db.transaction('cache_keys', 'readwrite');
             const wstore = wtx.objectStore('cache_keys' as any);
             wstore.put({ store: storeName, wrappedCEK: result.wrappedCEK, kid: CryptoHandler.kid, createdAt: Date.now() });
@@ -787,10 +800,22 @@ export class DB {
           return true;
         } else {
           console.warn(`[DB] ensureCEKForStore failed for ${storeName}:`, result.error);
+          const isUnwrap = String(result?.error || '').toLowerCase().includes('unwrap');
+          const kekReady = await hasKEK();
+          const hasWrapped = !!existingRec?.wrappedCEK;
+          if (isUnwrap && kekReady && CryptoHandler.kid && hasWrapped) {
+            await DB.handleCryptoMismatch(`ensureCEK-${storeName}`);
+          }
           return false;
         }
       } catch (error) {
         console.warn(`[DB] ensureCEKForStore error for ${storeName}:`, error);
+        const isUnwrap = String((error as any)?.message || error || '').toLowerCase().includes('unwrap');
+        const kekReady = await hasKEK();
+        const hasWrapped = !!existingRec?.wrappedCEK;
+        if (isUnwrap && kekReady && CryptoHandler.kid && hasWrapped) {
+          await DB.handleCryptoMismatch(`ensureCEK-exc-${storeName}`);
+        }
         return false;
       }
     });
@@ -838,5 +863,22 @@ export class DB {
         // If rewrap fails for one store, skip and continue others
       }
     }
+  }
+
+  // --- Crypto mismatch recovery helpers ---
+  private static async handleCryptoMismatch(trigger: string): Promise<void> {
+    try {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      DB.nuking = true;
+      console.warn('Crypto mismatch detected, nuking IndexedDB and reloading...', trigger);
+      await DB.deleteDatabase(uid);
+      try { console.warn('Database delete requested; reloading'); } catch {}
+      try { DB.inited = false; DB.db = undefined as any; } catch {}
+      // Reload to re-onboard and reprovision fresh keys
+      if (typeof window !== 'undefined' && window.location) {
+        window.location.reload();
+      }
+    } catch {}
   }
 }
