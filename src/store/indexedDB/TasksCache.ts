@@ -8,6 +8,28 @@ import encHex from "crypto-js/enc-hex";
 
 export class TasksCache {
 
+    // Hardcoded default: disable encryption for tasks (fast rendering)
+    public static TASKS_ENCRYPTION_ENABLED = false;
+
+    // Toggle to disable encryption specifically for the 'tasks' store
+    public static async setEncryptionEnabled(enabled: boolean) {
+        const prev = DB.getEncryptionForStore('tasks');
+        TasksCache.TASKS_ENCRYPTION_ENABLED = enabled;
+        DB.setEncryptionForStore('tasks', enabled);
+        // If we are disabling encryption after it had been enabled, clear old encrypted rows
+        if (prev && !enabled) {
+            try {
+                await DB.clear('tasks');
+                this._memTasks = null;
+                this._memTasksStamp = 0;
+            } catch {}
+        }
+    }
+
+    public static isEncryptionEnabled(): boolean {
+        return TasksCache.TASKS_ENCRYPTION_ENABLED;
+    }
+
     private static initPromise: Promise<boolean> | null = null;
     private static authListener: (() => void) | null = null;
     private static validating = false;
@@ -38,6 +60,8 @@ export class TasksCache {
 
     private static async _doInit(): Promise<boolean> {
         await DB.init();
+        // Apply default/static flag on init
+        DB.setEncryptionForStore('tasks', TasksCache.TASKS_ENCRYPTION_ENABLED);
         
         if (!auth.currentUser) {
             return new Promise((resolve) => {
@@ -66,12 +90,7 @@ export class TasksCache {
             });
         }
 
-        // Always validate on mount; full fetch only when cache is empty
-        const localCount = (await this.getTasks()).length;
-        if (localCount === 0) {
-            return await this.fetchTasks();
-        }
-        return await this.validateTasks();
+       return true;
     }
 
     public static async deleteTask(taskId: string) {
@@ -158,9 +177,9 @@ export class TasksCache {
         
         try {
             let hasNextPage = true;
-            let totalPagesExpected = 0;
+            // const totalPagesExpected = 0; // unused
             
-            console.log("🚀 Starting to fetch all tasks with pagination...");
+            // console.log("🚀 Starting to fetch all tasks with pagination...");
             
             // Clear existing tasks first
             await this.deleteTasks();
@@ -174,13 +193,13 @@ export class TasksCache {
                     sort_by: 'id',
                     sort_direction: 'asc'
                 };
-                console.log(`📡 API Call #${totalApiCalls} - Fetching tasks page ${currentPage}...`);
-                console.log(`🔗 API URL: GET /api/tasks?${new URLSearchParams({
-                    page: currentPage.toString(),
-                    per_page: '500',
-                    sort_by: 'id',
-                    sort_direction: 'asc'
-                }).toString()}`);
+                // console.log(`📡 API Call #${totalApiCalls} - Fetching tasks page ${currentPage}...`);
+                // console.log(`🔗 API URL: GET /api/tasks?${new URLSearchParams({
+                //     page: currentPage.toString(),
+                //     per_page: '500',
+                //     sort_by: 'id',
+                //     sort_direction: 'asc'
+                // }).toString()}`);
                 
                 const response = await api.get("/tasks", {
                     params: apiParams
@@ -191,33 +210,33 @@ export class TasksCache {
                 const pagination = response.data.pagination;
                 
                 // Debug pagination info
-                console.log(`📊 Pagination Info for Page ${currentPage}:`, {
-                    current_page: pagination?.current_page,
-                    per_page: pagination?.per_page,
-                    total: pagination?.total,
-                    last_page: pagination?.last_page,
-                    from: pagination?.from,
-                    to: pagination?.to,
-                    has_next_page: pagination?.has_next_page,
-                    next_page: pagination?.next_page,
-                    tasks_in_response: pageData?.length || 0
-                });
+                // console.log(`📊 Pagination Info for Page ${currentPage}:`, {
+                //     current_page: pagination?.current_page,
+                //     per_page: pagination?.per_page,
+                //     total: pagination?.total,
+                //     last_page: pagination?.last_page,
+                //     from: pagination?.from,
+                //     to: pagination?.to,
+                //     has_next_page: pagination?.has_next_page,
+                //     next_page: pagination?.next_page,
+                //     tasks_in_response: pageData?.length || 0
+                // });
                 
                 // Set expected total pages from first response
-                if (currentPage === 1 && pagination?.last_page) {
-                    totalPagesExpected = pagination.last_page;
-                    console.log(`📈 Expected total pages: ${totalPagesExpected}, Expected total tasks: ${pagination.total}`);
-                }
+                // if (currentPage === 1 && pagination?.last_page) {
+                //     const totalPagesExpected = pagination.last_page;
+                //     console.log(`📈 Expected total pages: ${totalPagesExpected}, Expected total tasks: ${pagination.total}`);
+                // }
                 
                 if (pageData && pageData.length > 0) {
                     // keep position; avoid unused var
                     
                     // Get ID range for this page
-                    const pageIds = pageData.map(task => task.id);
-                    const minId = Math.min(...pageIds);
-                    const maxId = Math.max(...pageIds);
+                    // const pageIds = pageData.map(task => task.id);
+                    // const minId = Math.min(...pageIds);
+                    // const maxId = Math.max(...pageIds);
                     
-                    console.log(`📋 Page ${currentPage} ID range: ${minId} to ${maxId}`);
+                    // console.log(`📋 Page ${currentPage} ID range: ${minId} to ${maxId}`);
                     
                     // DEDUPLICATION: Only add tasks that we don't already have
                     const existingIds = new Set(allTasks.map(task => task.id));
@@ -229,24 +248,24 @@ export class TasksCache {
                     }
                     
                     allTasks = [...allTasks, ...newTasks];
-                    console.log(`✅ Page ${currentPage}: fetched ${pageData.length} tasks, added ${newTasks.length} new tasks (total unique: ${allTasks.length})`);
+                     console.log(`✅ Page ${currentPage}: fetched ${pageData.length} tasks, added ${newTasks.length} new tasks (total unique: ${allTasks.length})`);
                 } else {
-                    console.warn(`⚠️  Page ${currentPage}: No tasks returned or empty response`);
+                        console.warn(`⚠️  Page ${currentPage}: No tasks returned or empty response`);
                 }
                 
                 // Check if there's a next page
                 hasNextPage = pagination?.has_next_page || false;
                 if (hasNextPage) {
                     currentPage = pagination.next_page || currentPage + 1;
-                    console.log(`➡️  Moving to next page: ${currentPage}`);
+                    // console.log(`➡️  Moving to next page: ${currentPage}`);
                 } else {
-                    console.log(`🏁 Completed fetching all tasks!`);
-                    console.log(`📊 Final Summary:`);
-                    console.log(`   - Total API calls made: ${totalApiCalls}`);
-                    console.log(`   - Expected pages: ${totalPagesExpected}`);
-                    console.log(`   - Last page processed: ${currentPage}`);
-                    console.log(`   - Unique tasks collected: ${allTasks.length}`);
-                    console.log(`   - Expected total (from API): ${pagination?.total || 'unknown'}`);
+                    //  console.log(`🏁 Completed fetching all tasks!`);
+                    // console.log(`📊 Final Summary:`);
+                    // console.log(`   - Total API calls made: ${totalApiCalls}`);
+                    // console.log(`   - Expected pages: ${totalPagesExpected}`);
+                    // console.log(`   - Last page processed: ${currentPage}`);
+                    // console.log(`   - Unique tasks collected: ${allTasks.length}`);
+                    // console.log(`   - Expected total (from API): ${pagination?.total || 'unknown'}`);
                     
                     if (pagination?.total && allTasks.length < pagination.total) {
                         const expectedDuplicates = pagination.total - allTasks.length;
@@ -261,9 +280,9 @@ export class TasksCache {
             
             // Add all tasks to IndexedDB (this will emit TASKS_BULK_UPDATE event)
             if (allTasks.length > 0) {
-                console.log(`💾 Saving ${allTasks.length} tasks to IndexedDB...`);
+                // console.log(`💾 Saving ${allTasks.length} tasks to IndexedDB...`);
                 await this.addTasks(allTasks);
-                console.log(`✅ Successfully saved ${allTasks.length} tasks to IndexedDB`);
+                // console.log(`✅ Successfully saved ${allTasks.length} tasks to IndexedDB`);
             } else {
                 console.warn(`⚠️  No tasks to save to IndexedDB`);
             }

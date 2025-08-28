@@ -22,7 +22,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 import { Team } from "@/store/types";
 
 // Register AG Grid modules
@@ -234,20 +233,7 @@ function Teams() {
     }
   ], [handleEditTeam, handleDeleteTeam, getTeamCategoryCount, getTeamTaskCount]);
 
-  // Load teams from Redux store
-  useEffect(() => {
-    dispatch(genericActions.teams.getFromIndexedDB());
-  }, [dispatch]);
-
-  // Load categories from Redux store
-  useEffect(() => {
-    dispatch(genericActions.categories.getFromIndexedDB());
-  }, [dispatch]);
-
-  // Load tasks from Redux store
-  useEffect(() => {
-    dispatch(getTasksFromIndexedDB());
-  }, [dispatch]);
+  // Removed on-mount IndexedDB loads; AuthProvider hydrates core slices
 
   // Update rowData when teams change
   useEffect(() => {

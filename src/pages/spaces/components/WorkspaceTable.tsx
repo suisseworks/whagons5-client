@@ -106,13 +106,7 @@ const WorkspaceTable = ({
     }
     return m;
   }, [filteredStatuses]);
-  useEffect(() => {
-    // first attempt from IndexedDB (fast, offline), then refresh from network
-    // @ts-ignore
-    dispatch(genericActions.statuses.getFromIndexedDB());
-    // @ts-ignore
-    dispatch(genericActions.workspaces.getFromIndexedDB());
-  }, [dispatch]);
+  // Removed on-mount loads; AuthProvider hydrates core slices
 
   // When statuses are loaded/updated, refresh the Status column cells to replace #id with names
   useEffect(() => {

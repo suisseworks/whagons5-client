@@ -35,18 +35,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const syncCachesAndStore = async () => {
-    // Ensure caches are initialized and up-to-date
-    await Promise.all([
-      TasksCache.init()
-    ]);
-
-    // Populate Redux store from IndexedDB once caches are ready
-    await Promise.all([
-      dispatch(genericActions.workspaces.getFromIndexedDB()),
-      dispatch(genericActions.teams.getFromIndexedDB()),
-      dispatch(genericActions.categories.getFromIndexedDB()),
-      dispatch(getTasksFromIndexedDB())
-    ]);
+    // Ensure tasks cache is ready only; core slices are hydrated by AuthProvider
+    await TasksCache.init();
   };
 
   // Determine starting step based on user's current state

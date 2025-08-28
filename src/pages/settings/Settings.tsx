@@ -15,24 +15,15 @@ import {
   faUser 
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from '@/store/genericSlices';
-import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 import api from "@/api/whagonsApi";
 import { useState } from "react";
 
 function Settings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>();
   const [spotCount, setSpotCount] = useState<number | undefined>(undefined);
 
   // Hydrate data (idempotent if already loaded)
-  useEffect(() => {
-    dispatch(genericActions.categories.getFromIndexedDB());
-    dispatch(genericActions.templates.getFromIndexedDB());
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(getTasksFromIndexedDB());
-    dispatch(genericActions.workspaces.getFromIndexedDB());
-  }, [dispatch]);
+
 
   // Fetch authoritative spot count from backend
   useEffect(() => {
@@ -85,7 +76,7 @@ function Settings() {
   const counts = useMemo(() => {
     // Prefer authoritative count from workspaces.spots when present. The API may
     // return spots either as an array or as a JSON-encoded string – handle both.
-    const spotsFromWorkspaces = workspaces.reduce((sum, w: any) => {
+    const spotsFromWorkspaces = workspaces.reduce((sum: number, w: any) => {
       let length = 0;
       const spotsVal = w?.spots;
       if (Array.isArray(spotsVal)) {

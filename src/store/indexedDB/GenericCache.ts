@@ -54,6 +54,14 @@ export class GenericCache {
 		if (this.debug) console.log(`[GenericCache:${this.store}]`, ...args);
 	}
 
+	// Heuristic: verify row shape roughly matches this cache using hashFields presence
+	private rowLooksLikeThisStore(row: any): boolean {
+		if (!row || typeof row !== 'object') return false;
+		if (!this.hashFields || this.hashFields.length === 0) return true;
+		// consider valid if at least one of the hashFields exists on the row
+		return this.hashFields.some((f) => Object.prototype.hasOwnProperty.call(row, f));
+	}
+
 	async add(row: any): Promise<void> {
 		if (!DB.inited) await DB.init();
 		const idVal = this.getId(row);
@@ -98,7 +106,8 @@ export class GenericCache {
 
 	async getAll(): Promise<any[]> {
 		if (!DB.inited) await DB.init();
-		return await DB.getAll(this.store);
+		const rows = await DB.getAll(this.store);
+		return rows;
 	}
 
 	async fetchAll(params: Record<string, any> = {}): Promise<boolean> {
@@ -106,7 +115,13 @@ export class GenericCache {
 			const resp = await api.get(this.endpoint, { params });
 			const rows = (resp.data?.rows ?? resp.data?.data ?? resp.data) as any[];
 			if (!DB.inited) await DB.init();
-			await DB.bulkPut(this.store, rows);
+			// Signal hydration start/end to coordinate readers
+			const end = (DB as any).startHydration?.(this.store) || (() => {});
+			try {
+				await DB.bulkPut(this.store, rows);
+			} finally {
+				end();
+			}
 			return true;
 		} catch (e) {
 			console.error("GenericCache.fetchAll", this.endpoint, e);
@@ -124,27 +139,49 @@ export class GenericCache {
 			const preRows = await this.getAll();
 			if (preRows.length === 0) {
 				this.dlog('no local rows; fetchAll bootstrap');
-				try { await this.fetchAll(); } catch {}
+				try {
+					await this.fetchAll();
+					// Warm-read to ensure writes are committed and CEK is ready before returning
+					try { await this.getAll(); } catch {}
+				} catch {}
 				this.validating = false; return true;
 			}
+
+			// If local rows exist but appear to be from a different store (corrupted/mismatched), reset and fetch
+			try {
+				const sample = preRows.slice(0, Math.min(10, preRows.length));
+				const invalid = sample.filter((r) => !this.rowLooksLikeThisStore(r)).length;
+				if (invalid > sample.length / 2) {
+					this.dlog('detected mismatched rows; clearing store and refetching', { store: this.store, sampleSize: sample.length, invalid });
+					if (!DB.inited) await DB.init();
+					await DB.clear(this.store as any);
+					await this.fetchAll();
+					try { await this.getAll(); } catch {}
+					this.validating = false; return true;
+				}
+			} catch {}
 			const localBlocks = await this.computeLocalBlockHashes();
 			// Global short-circuit
 			const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
 			const localGlobalHash = await this.sha256Hex(localGlobalConcat);
 			try {
 				const globalResp = await api.get('/integrity/global', { params: { table: this.table } });
-				const serverGlobal = globalResp.data?.data?.global_hash;
-				const serverBlockCount = globalResp.data?.data?.block_count ?? null;
-				this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash });
-				if (serverGlobal && serverGlobal !== localGlobalHash) {
-					this.dlog('global hash mismatch', { table: this.table, localGlobalHash, serverGlobal });
-				}
-				if (serverGlobal && serverGlobal === localGlobalHash && (serverBlockCount === null || serverBlockCount === localBlocks.length)) {
-					this.dlog('global hash match; skipping block compare');
+				const serverGlobal = (globalResp.data?.data?.global_hash ?? globalResp.data?.global_hash) as string | undefined;
+				const rawBlockCount = (globalResp.data?.data?.block_count ?? globalResp.data?.block_count ?? null) as number | string | null;
+				const serverBlockCount = rawBlockCount === null ? null : Number(rawBlockCount);
+				this.dlog('validate: global compare', { table: this.table, localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash, serverGlobal: (serverGlobal||'').slice(0,16), localGlobal: localGlobalHash.slice(0,16) });
+				// If global hashes match, short-circuit WITHOUT fetching blocks/rows
+				if (serverGlobal && serverGlobal === localGlobalHash) {
+					this.dlog('validate: global hash match; skipping block/row validation');
 					this.validating = false;
 					return true;
 				}
-			} catch (_) {}
+				if (serverGlobal && serverGlobal !== localGlobalHash) {
+					this.dlog('validate: global hash mismatch', { table: this.table });
+				}
+			} catch (e) {
+				this.dlog('validate: global compare failed', e);
+			}
 
 			// Server blocks; rebuild if empty
 			let serverBlocksResp = await api.get('/integrity/blocks', { params: { table: this.table } });
@@ -210,7 +247,12 @@ export class GenericCache {
 									return h ? { ...r, __h: h } : r;
 								});
 								if (!DB.inited) await DB.init();
-								await DB.bulkPut(this.store, rowsWithHash);
+								const endBlk = (DB as any).startHydration?.(this.store) || (() => {});
+								try {
+									await DB.bulkPut(this.store, rowsWithHash);
+								} finally {
+									endBlk();
+								}
 								// After write, log local vs server hashes for verification
 								for (const r of rows) {
 									const idNum = Number(this.getId(r));
@@ -244,6 +286,43 @@ export class GenericCache {
 			this.validating = false;
 			return false;
 		}
+	}
+
+	// Batch validation: accept multiple caches, request one global batch from server,
+	// and short-circuit those with matching global hashes. Falls back to per-cache validate otherwise.
+	static async validateMultiple(caches: GenericCache[]): Promise<Record<string, boolean>> {
+		if (!caches.length) return {};
+		// Compute local global hashes SEQUENTIALLY to avoid cross-store races
+		const locals: Array<{ cache: GenericCache; table: string; localGlobal: string; blockCount: number }> = [];
+		for (const c of caches) {
+			const blocks = await c.computeLocalBlockHashes();
+			const concat = blocks.map(b => b.block_hash).join('');
+			const global = await c.sha256Hex(concat);
+			locals.push({ cache: c, table: c.getTableName(), localGlobal: global, blockCount: blocks.length });
+		}
+
+		
+		const tables = locals.map(l => l.table);
+		let serverMap: Record<string, { global_hash?: string; block_count?: number } | null> = {};
+		try {
+			const resp = await api.get('/integrity/global/batch', { params: { tables: tables.join(',') } });
+			serverMap = (resp.data?.data || {}) as typeof serverMap;
+		} catch (_e) {
+			// Fallback: empty map -> all will individually validate
+		}
+
+		const results: Record<string, boolean> = {};
+		for (const l of locals) {
+			const s = serverMap[l.table] || null;
+			// Strict short-circuit: use ONLY global hash equality to skip per-table calls
+			if (s && s.global_hash && s.global_hash === l.localGlobal) {
+				results[l.table] = true;
+			} else {
+				// Run full validate when mismatch or server data missing (sequential)
+				results[l.table] = await l.cache.validate();
+			}
+		}
+		return results;
 	}
 
 	private async hashRow(row: any): Promise<string> {

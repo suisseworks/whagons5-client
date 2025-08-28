@@ -11,6 +11,10 @@
   height: 100%;
 } */
 
+*{
+  font-family: 'Inter', sans-serif;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

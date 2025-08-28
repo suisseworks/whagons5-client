@@ -152,16 +152,6 @@ export function AppSidebar() {
 
 
 
-  // Fetch workspaces data if not already loaded
-  useEffect(() => {
-
-
-    if (workspaces.length === 0) {
-      // First try to load from IndexedDB
-      dispatch(genericActions.workspaces.getFromIndexedDB());
-    }
-  }, [workspaces.length, dispatch]);
-
   // // Additional effect to check if workspaces data is loaded
   // useEffect(() => {
   //   if (workspacesState && workspacesState.value && workspacesState.value.length > 0) {

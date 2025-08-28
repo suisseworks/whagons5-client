@@ -26,7 +26,7 @@ import {
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
-import { Template } from "@/store/types";
+import { Template, Task, Category, Team } from "@/store/types";
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -165,7 +165,7 @@ function Templates() {
 
   // Get task count for a template
   const getTemplateTaskCount = useCallback((templateId: number) => {
-    return tasks.filter(task => task.template_id === templateId).length;
+    return tasks.filter((task: Task) => task.template_id === templateId).length;
   }, [tasks]);
 
   // Handle edit template
@@ -313,24 +313,7 @@ function Templates() {
   ], [categories, teams, handleEditTemplate, handleDeleteTemplate]);
 
   // Load templates from Redux store
-  useEffect(() => {
-    dispatch(genericActions.templates.getFromIndexedDB());
-  }, [dispatch]);
 
-  // Load categories from Redux store
-  useEffect(() => {
-    dispatch(genericActions.categories.getFromIndexedDB());
-  }, [dispatch]);
-
-  // Load teams from Redux store
-  useEffect(() => {
-    dispatch(genericActions.teams.getFromIndexedDB());
-  }, [dispatch]);
-
-  // Load tasks from Redux store
-  useEffect(() => {
-    dispatch(getTasksFromIndexedDB());
-  }, [dispatch]);
 
   // Update rowData when templates change
   useEffect(() => {
@@ -462,11 +445,11 @@ function Templates() {
     if (lowerCaseValue === '') {
       setRowData(templates);
     } else {
-      const filteredData = templates.filter((template) => {
-        const category = categories.find(c => c.id === template.category_id);
-        const team = teams.find(t => t.id === template.team_id);
+      const filteredData = templates.filter((template: Template) => {
+        const category = categories.find((c: Category) => c.id === template.category_id);
+        const team = teams.find((t: Team) => t.id === template.team_id);
         const priority = PRIORITY_MAP[template.default_priority as keyof typeof PRIORITY_MAP];
-        
+
         return template.name?.toLowerCase().includes(lowerCaseValue) ||
                template.description?.toLowerCase().includes(lowerCaseValue) ||
                template.instructions?.toLowerCase().includes(lowerCaseValue) ||
@@ -636,7 +619,7 @@ function Templates() {
                       required
                     >
                       <option value="">Select Category</option>
-                      {categories.map((category) => (
+                      {categories.map((category: Category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
                         </option>
@@ -655,7 +638,7 @@ function Templates() {
                       required
                     >
                       <option value="">Select Team</option>
-                      {teams.map((team) => (
+                      {teams.map((team: any) => (
                         <option key={team.id} value={team.id}>
                           {team.name}
                         </option>
@@ -787,7 +770,7 @@ function Templates() {
                       required
                     >
                       <option value="">Select Category</option>
-                      {categories.map((category) => (
+                      {categories.map((category: Category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
                         </option>
@@ -806,7 +789,7 @@ function Templates() {
                       required
                     >
                       <option value="">Select Team</option>
-                      {teams.map((team) => (
+                      {teams.map((team: Team) => (
                         <option key={team.id} value={team.id}>
                           {team.name}
                         </option>
@@ -1043,13 +1026,13 @@ function Templates() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
-                {templates.filter(template => template.enabled).length}
+                {templates.filter((template: Template) => template.enabled).length}
               </div>
               <div className="text-sm text-muted-foreground">Enabled Templates</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
-                {templates.filter(template => !template.enabled).length}
+                {templates.filter((template: Template) => !template.enabled).length}
               </div>
               <div className="text-sm text-muted-foreground">Disabled Templates</div>
             </div>

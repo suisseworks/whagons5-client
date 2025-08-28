@@ -1,10 +1,18 @@
-import { auth } from "@/firebase/firebaseConfig";
-import { encryptRow, decryptRow, ensureCEK as workerEnsureCEK, rewrapCekBlobWithWrappedKEK, rewrapCekBlobWithRawKEK, WrappedKEKEnvelope } from "@/crypto/crypto";
+import { auth } from '@/firebase/firebaseConfig';
+import {
+  encryptRow,
+  decryptRow,
+  ensureCEK as workerEnsureCEK,
+  CryptoHandler,
+  WrappedKEKEnvelope,
+  rewrapCekBlobWithWrappedKEK,
+  rewrapCekBlobWithRawKEK
+} from '@/crypto/crypto';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = "1.6.0";
-const DB_VERSION_KEY = "indexeddb_version";
+const CURRENT_DB_VERSION = '1.6.0';
+const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
 // Export the DB class
@@ -12,203 +20,238 @@ export class DB {
   static db: IDBDatabase;
   static inited = false;
   private static initPromise: Promise<void> | null = null;
+  // Per-store operation queue to serialize actions over the same object store
+  private static storeQueues: Map<string, Promise<any>> = new Map();
+
+  // Per-store encryption overrides (true = enabled, false = disabled)
+  private static storeEncryptionOverrides: Map<string, boolean> = new Map();
+
+  private static runExclusive<T>(storeName: string, fn: () => Promise<T>): Promise<T> {
+    const tail = DB.storeQueues.get(storeName) || Promise.resolve();
+    const next = tail.catch(() => {}).then(fn);
+    // Ensure the tail always advances even if next rejects
+    DB.storeQueues.set(storeName, next.catch(() => {}));
+    return next;
+  }
+
+  // Allow callers to toggle encryption on a per-store basis (e.g., disable for 'tasks')
+  public static setEncryptionForStore(storeName: string, enabled: boolean): void {
+    DB.storeEncryptionOverrides.set(storeName, enabled);
+  }
+
+  public static getEncryptionForStore(storeName: string): boolean {
+    const override = DB.storeEncryptionOverrides.get(storeName);
+    if (override !== undefined) return override;
+    return DB.ENCRYPTION_ENABLED;
+  }
+
+  private static isEncryptionEnabledForStore(storeName: string): boolean {
+    const override = DB.storeEncryptionOverrides.get(storeName);
+    if (override !== undefined) return override;
+    return DB.ENCRYPTION_ENABLED;
+  }
 
   static async init() {
     if (DB.inited) return;
-    if (DB.initPromise) { await DB.initPromise; return; }
-
-    DB.initPromise = (async () => {
-
-    const user = auth.currentUser;
-    if (!user) {
-      DB.initPromise = null;
+    if (DB.initPromise) {
+      await DB.initPromise;
       return;
     }
 
-    const userID = user.uid;
+    DB.initPromise = (async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        DB.initPromise = null;
+        return;
+      }
 
-    // Check stored version against current version
-    const storedVersion = localStorage.getItem(DB_VERSION_KEY);
-    const shouldResetDatabase = storedVersion !== CURRENT_DB_VERSION;
+      const userID = user.uid;
 
-    if (shouldResetDatabase && storedVersion) {
-      console.log(
-        `DB.init: Version changed from ${storedVersion} to ${CURRENT_DB_VERSION}, resetting database`,
-        userID
-      );
-      await DB.deleteDatabase(userID);
-    }
+      // Check stored version against current version
+      const storedVersion = localStorage.getItem(DB_VERSION_KEY);
+      const shouldResetDatabase = storedVersion !== CURRENT_DB_VERSION;
 
-    // Store current version
-    localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION);
+      if (shouldResetDatabase && storedVersion) {
+        console.log(
+          `DB.init: Version changed from ${storedVersion} to ${CURRENT_DB_VERSION}, resetting database`,
+          userID
+        );
+        await DB.deleteDatabase(userID);
+      }
 
-    const request = indexedDB.open(userID, 1);
+      // Store current version
+      localStorage.setItem(DB_VERSION_KEY, CURRENT_DB_VERSION);
 
-    // Wrap in a Promise to await db setup
-    const db = await new Promise<IDBDatabase>((resolve, _reject) => {
-      request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains("workspaces")) {
-          db.createObjectStore("workspaces", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("categories")) {
-          db.createObjectStore("categories", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("tasks")) {
-          db.createObjectStore("tasks", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("teams")) {
-          db.createObjectStore("teams", { keyPath: "id" });
-        }
-        // New reference tables used by RTL publications
-        if (!db.objectStoreNames.contains("statuses")) {
-          db.createObjectStore("statuses", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("priorities")) {
-          db.createObjectStore("priorities", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("spots")) {
-          db.createObjectStore("spots", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("tags")) {
-          db.createObjectStore("tags", { keyPath: "id" });
-        }
-        // Custom fields and category-field-assignments (GenericCache-backed)
-        if (!db.objectStoreNames.contains("custom_fields")) {
-          db.createObjectStore("custom_fields", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("category_field_assignments")) {
-          db.createObjectStore("category_field_assignments", { keyPath: "id" });
-        }
+      const request = indexedDB.open(userID, 1);
 
-        // User management tables
-        if (!db.objectStoreNames.contains("users")) {
-          db.createObjectStore("users", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("roles")) {
-          db.createObjectStore("roles", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("permissions")) {
-          db.createObjectStore("permissions", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("user_teams")) {
-          db.createObjectStore("user_teams", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("user_permissions")) {
-          db.createObjectStore("user_permissions", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("role_permissions")) {
-          db.createObjectStore("role_permissions", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("task_users")) {
-          db.createObjectStore("task_users", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("status_transitions")) {
-          db.createObjectStore("status_transitions", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("task_tags")) {
-          db.createObjectStore("task_tags", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("spot_types")) {
-          db.createObjectStore("spot_types", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("slas")) {
-          db.createObjectStore("slas", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("sla_alerts")) {
-          db.createObjectStore("sla_alerts", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("category_priorities")) {
-          db.createObjectStore("category_priorities", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("forms")) {
-          db.createObjectStore("forms", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("invitations")) {
-          db.createObjectStore("invitations", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("task_logs")) {
-          db.createObjectStore("task_logs", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("templates")) {
-          db.createObjectStore("templates", { keyPath: "id" });
-        }
+      // Wrap in a Promise to await db setup
+      const db = await new Promise<IDBDatabase>((resolve, _reject) => {
+        request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains('workspaces')) {
+            db.createObjectStore('workspaces', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('categories')) {
+            db.createObjectStore('categories', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('tasks')) {
+            db.createObjectStore('tasks', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('teams')) {
+            db.createObjectStore('teams', { keyPath: 'id' });
+          }
+          // New reference tables used by RTL publications
+          if (!db.objectStoreNames.contains('statuses')) {
+            db.createObjectStore('statuses', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('priorities')) {
+            db.createObjectStore('priorities', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('spots')) {
+            db.createObjectStore('spots', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('tags')) {
+            db.createObjectStore('tags', { keyPath: 'id' });
+          }
+          // Custom fields and category-field-assignments (GenericCache-backed)
+          if (!db.objectStoreNames.contains('custom_fields')) {
+            db.createObjectStore('custom_fields', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('category_field_assignments')) {
+            db.createObjectStore('category_field_assignments', {
+              keyPath: 'id',
+            });
+          }
 
-        // Custom Fields & Values
-        if (!db.objectStoreNames.contains("spot_custom_fields")) {
-          db.createObjectStore("spot_custom_fields", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("template_custom_fields")) {
-          db.createObjectStore("template_custom_fields", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("task_custom_field_values")) {
-          db.createObjectStore("task_custom_field_values", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("spot_custom_field_values")) {
-          db.createObjectStore("spot_custom_field_values", { keyPath: "id" });
-        }
+          // User management tables
+          if (!db.objectStoreNames.contains('users')) {
+            db.createObjectStore('users', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('roles')) {
+            db.createObjectStore('roles', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('permissions')) {
+            db.createObjectStore('permissions', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('user_teams')) {
+            db.createObjectStore('user_teams', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('user_permissions')) {
+            db.createObjectStore('user_permissions', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('role_permissions')) {
+            db.createObjectStore('role_permissions', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_users')) {
+            db.createObjectStore('task_users', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('status_transitions')) {
+            db.createObjectStore('status_transitions', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_tags')) {
+            db.createObjectStore('task_tags', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('spot_types')) {
+            db.createObjectStore('spot_types', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('slas')) {
+            db.createObjectStore('slas', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('sla_alerts')) {
+            db.createObjectStore('sla_alerts', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('category_priorities')) {
+            db.createObjectStore('category_priorities', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('forms')) {
+            db.createObjectStore('forms', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('invitations')) {
+            db.createObjectStore('invitations', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_logs')) {
+            db.createObjectStore('task_logs', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('templates')) {
+            db.createObjectStore('templates', { keyPath: 'id' });
+          }
 
-        // Forms & Fields
-        if (!db.objectStoreNames.contains("form_fields")) {
-          db.createObjectStore("form_fields", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("form_versions")) {
-          db.createObjectStore("form_versions", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("task_forms")) {
-          db.createObjectStore("task_forms", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("field_options")) {
-          db.createObjectStore("field_options", { keyPath: "id" });
-        }
+          // Custom Fields & Values
+          if (!db.objectStoreNames.contains('spot_custom_fields')) {
+            db.createObjectStore('spot_custom_fields', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('template_custom_fields')) {
+            db.createObjectStore('template_custom_fields', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_custom_field_values')) {
+            db.createObjectStore('task_custom_field_values', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('spot_custom_field_values')) {
+            db.createObjectStore('spot_custom_field_values', { keyPath: 'id' });
+          }
 
-        // Activity & Logging
-        if (!db.objectStoreNames.contains("session_logs")) {
-          db.createObjectStore("session_logs", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("config_logs")) {
-          db.createObjectStore("config_logs", { keyPath: "id" });
-        }
+          // Forms & Fields
+          if (!db.objectStoreNames.contains('form_fields')) {
+            db.createObjectStore('form_fields', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('form_versions')) {
+            db.createObjectStore('form_versions', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_forms')) {
+            db.createObjectStore('task_forms', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('field_options')) {
+            db.createObjectStore('field_options', { keyPath: 'id' });
+          }
 
-        // File Management
-        if (!db.objectStoreNames.contains("task_attachments")) {
-          db.createObjectStore("task_attachments", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("task_recurrences")) {
-          db.createObjectStore("task_recurrences", { keyPath: "id" });
-        }
+          // Activity & Logging
+          if (!db.objectStoreNames.contains('session_logs')) {
+            db.createObjectStore('session_logs', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('config_logs')) {
+            db.createObjectStore('config_logs', { keyPath: 'id' });
+          }
 
-        // Error Tracking
-        if (!db.objectStoreNames.contains("exceptions")) {
-          db.createObjectStore("exceptions", { keyPath: "id" });
-        }
-        // Keys store for per-store Content Encryption Keys (CEKs)
-        if (!db.objectStoreNames.contains("cache_keys")) {
-          const ks = db.createObjectStore("cache_keys", { keyPath: "store" });
-          ks.createIndex("store_idx", "store", { unique: true });
-          // store -> { wrappedCEK: { iv, ct }, kid }
-        }
-        // Crypto provisioning metadata
-        if (!db.objectStoreNames.contains("crypto_meta")) {
-          db.createObjectStore("crypto_meta", { keyPath: "key" });
-        }
-      };
+          // File Management
+          if (!db.objectStoreNames.contains('task_attachments')) {
+            db.createObjectStore('task_attachments', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_recurrences')) {
+            db.createObjectStore('task_recurrences', { keyPath: 'id' });
+          }
 
-      request.onerror = () => {
-        console.error("DB.init: Error opening database:", request.error);
-        _reject(request.error as any);
-      };
-      request.onsuccess = () => {   
-        resolve(request.result);
-      };
-    });
+          // Error Tracking
+          if (!db.objectStoreNames.contains('exceptions')) {
+            db.createObjectStore('exceptions', { keyPath: 'id' });
+          }
+          // Keys store for per-store Content Encryption Keys (CEKs)
+          if (!db.objectStoreNames.contains('cache_keys')) {
+            const ks = db.createObjectStore('cache_keys', { keyPath: 'store' });
+            ks.createIndex('store_idx', 'store', { unique: true });
+            // store -> { wrappedCEK: { iv, ct }, kid }
+          }
+          // Crypto provisioning metadata
+          if (!db.objectStoreNames.contains('crypto_meta')) {
+            db.createObjectStore('crypto_meta', { keyPath: 'key' });
+          }
+        };
 
-    DB.db = db;
-    DB.inited = true;
-    DB.initPromise = null;
-  })();
+        request.onerror = () => {
+          console.error('DB.init: Error opening database:', request.error);
+          _reject(request.error as any);
+        };
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+      });
+
+      DB.db = db;
+      DB.inited = true;
+      DB.initPromise = null;
+    })();
 
     await DB.initPromise;
+    await CryptoHandler.init();
   }
 
   private static async deleteDatabase(userID: string): Promise<void> {
@@ -218,23 +261,23 @@ export class DB {
     // Clear all cache initialization flags from localStorage
     if (auth.currentUser?.uid) {
       const userId = auth.currentUser.uid;
-      
+
       // Clear workspace cache flags
       localStorage.removeItem(`workspaceCacheInitialized-${userId}`);
       localStorage.removeItem(`workspaceCacheLastUpdated-${userId}`);
-      
+
       // Clear teams cache flags
       localStorage.removeItem(`teamsCacheInitialized-${userId}`);
       localStorage.removeItem(`teamsCacheLastUpdated-${userId}`);
-      
+
       // Clear categories cache flags
       localStorage.removeItem(`categoriesCacheInitialized-${userId}`);
       localStorage.removeItem(`categoriesCacheLastUpdated-${userId}`);
-      
+
       // Clear tasks cache flags
       localStorage.removeItem(`tasksCacheInitialized-${userId}`);
       localStorage.removeItem(`tasksCacheLastUpdated-${userId}`);
-      
+
       console.log(`Cleared all cache flags for user ${userId}`);
     }
 
@@ -242,9 +285,9 @@ export class DB {
     if (DB.inited && DB.db) {
       try {
         DB.db.close();
-        console.log("Closed existing database connection");
+        console.log('Closed existing database connection');
       } catch (err) {
-        console.error("Error closing database connection:", err);
+        console.error('Error closing database connection:', err);
       }
       DB.inited = false;
       DB.db = undefined as unknown as IDBDatabase;
@@ -253,7 +296,7 @@ export class DB {
     return new Promise<void>((resolve, _reject) => {
       // Create a timeout to prevent indefinite hanging
       const timeout = setTimeout(() => {
-        console.warn("Database deletion timed out after 5 seconds");
+        console.warn('Database deletion timed out after 5 seconds');
         resolve(); // Resolve anyway to prevent hanging
       }, 5000);
 
@@ -262,45 +305,125 @@ export class DB {
 
         request.onsuccess = () => {
           clearTimeout(timeout);
-          console.log("Database successfully deleted");
+          console.log('Database successfully deleted');
           resolve();
         };
 
         request.onerror = () => {
           clearTimeout(timeout);
-          console.error("Error deleting database:", request.error);
+          console.error('Error deleting database:', request.error);
           // Still resolve to prevent hanging
           resolve();
         };
 
         // Critical: Handle blocked events
         request.onblocked = () => {
-          console.warn("Database deletion blocked - connections still open");
+          console.warn('Database deletion blocked - connections still open');
           // We'll continue waiting for the timeout
         };
       } catch (err) {
         clearTimeout(timeout);
-        console.error("Exception during database deletion:", err);
+        console.error('Exception during database deletion:', err);
         resolve(); // Resolve anyway to prevent hanging
       }
     });
   }
 
   public static getStoreRead(
-    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments" | "users" | "roles" | "permissions" | "user_teams" | "user_permissions" | "role_permissions" | "task_users" | "status_transitions" | "task_tags" | "spot_types" | "slas" | "sla_alerts" | "category_priorities" | "forms" | "invitations" | "task_logs" | "templates" | "spot_custom_fields" | "template_custom_fields" | "task_custom_field_values" | "spot_custom_field_values" | "form_fields" | "form_versions" | "task_forms" | "field_options" | "session_logs" | "config_logs" | "task_attachments" | "task_recurrences" | "exceptions",
-    mode: IDBTransactionMode = "readonly"
+    name:
+      | 'workspaces'
+      | 'categories'
+      | 'tasks'
+      | 'teams'
+      | 'statuses'
+      | 'priorities'
+      | 'spots'
+      | 'tags'
+      | 'custom_fields'
+      | 'category_field_assignments'
+      | 'users'
+      | 'roles'
+      | 'permissions'
+      | 'user_teams'
+      | 'user_permissions'
+      | 'role_permissions'
+      | 'task_users'
+      | 'status_transitions'
+      | 'task_tags'
+      | 'spot_types'
+      | 'slas'
+      | 'sla_alerts'
+      | 'category_priorities'
+      | 'forms'
+      | 'invitations'
+      | 'task_logs'
+      | 'templates'
+      | 'spot_custom_fields'
+      | 'template_custom_fields'
+      | 'task_custom_field_values'
+      | 'spot_custom_field_values'
+      | 'form_fields'
+      | 'form_versions'
+      | 'task_forms'
+      | 'field_options'
+      | 'session_logs'
+      | 'config_logs'
+      | 'task_attachments'
+      | 'task_recurrences'
+      | 'exceptions',
+    mode: IDBTransactionMode = 'readonly'
   ) {
-    if (!DB.inited) throw new Error("DB not initialized");
-    if (!DB.db) throw new Error("DB not initialized");
+    if (!DB.inited) throw new Error('DB not initialized');
+    if (!DB.db) throw new Error('DB not initialized');
     return DB.db.transaction(name, mode).objectStore(name);
   }
 
   public static getStoreWrite(
-    name: "workspaces" | "categories" | "tasks" | "teams" | "statuses" | "priorities" | "spots" | "tags" | "custom_fields" | "category_field_assignments" | "users" | "roles" | "permissions" | "user_teams" | "user_permissions" | "role_permissions" | "task_users" | "status_transitions" | "task_tags" | "spot_types" | "slas" | "sla_alerts" | "category_priorities" | "forms" | "invitations" | "task_logs" | "templates" | "spot_custom_fields" | "template_custom_fields" | "task_custom_field_values" | "spot_custom_field_values" | "form_fields" | "form_versions" | "task_forms" | "field_options" | "session_logs" | "config_logs" | "task_attachments" | "task_recurrences" | "exceptions",
-    mode: IDBTransactionMode = "readwrite"
+    name:
+      | 'workspaces'
+      | 'categories'
+      | 'tasks'
+      | 'teams'
+      | 'statuses'
+      | 'priorities'
+      | 'spots'
+      | 'tags'
+      | 'custom_fields'
+      | 'category_field_assignments'
+      | 'users'
+      | 'roles'
+      | 'permissions'
+      | 'user_teams'
+      | 'user_permissions'
+      | 'role_permissions'
+      | 'task_users'
+      | 'status_transitions'
+      | 'task_tags'
+      | 'spot_types'
+      | 'slas'
+      | 'sla_alerts'
+      | 'category_priorities'
+      | 'forms'
+      | 'invitations'
+      | 'task_logs'
+      | 'templates'
+      | 'spot_custom_fields'
+      | 'template_custom_fields'
+      | 'task_custom_field_values'
+      | 'spot_custom_field_values'
+      | 'form_fields'
+      | 'form_versions'
+      | 'task_forms'
+      | 'field_options'
+      | 'session_logs'
+      | 'config_logs'
+      | 'task_attachments'
+      | 'task_recurrences'
+      | 'exceptions',
+    mode: IDBTransactionMode = 'readwrite'
   ) {
-    if (!DB.inited) throw new Error("DB not initialized");
-    if (!DB.db) throw new Error("DB not initialized");
+    if (!DB.inited) throw new Error('DB not initialized');
+    if (!DB.db) throw new Error('DB not initialized');
     return DB.db.transaction(name, mode).objectStore(name);
   }
 
@@ -320,99 +443,162 @@ export class DB {
     return isNaN(n) ? key : n;
   }
 
-
   public static async getAll(storeName: string): Promise<any[]> {
-    if (!DB.inited) await DB.init();
-    const store = DB.getStoreRead(storeName as any);
-    const req = store.getAll();
-    const rows = await new Promise<any[]>((resolve, reject) => { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error as any); });
-    if (!DB.ENCRYPTION_ENABLED) return rows.filter((r) => r != null);
-    // If encrypted rows exist, make sure KEK/CEK are ready before attempting decrypt
-    const hasEncrypted = rows.some((r) => r && r.enc && r.enc.ct);
-    if (hasEncrypted) {
-      try {
-        const { hasKEK } = await import('../../crypto/crypto');
-        let ready = await hasKEK();
-        for (let i = 0; i < 6 && !ready; i++) { await new Promise(r => setTimeout(r, 50)); ready = await hasKEK(); }
-        // Ensure CEK once before decrypting many rows
+    return DB.runExclusive(storeName, async () => {
+      if (!DB.inited) await DB.init();
+
+      // Use an explicit transaction and await its completion to ensure read consistency
+      const tx = DB.db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName as any);
+      const rows = await new Promise<any[]>((resolve, reject) => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error as any);
+      });
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
+      if (!DB.isEncryptionEnabledForStore(storeName)) return rows.filter((r) => r != null);
+      // If encrypted rows exist, make sure KEK/CEK are ready before attempting decrypt
+      const hasEncrypted = rows.some((r) => r && r.enc && r.enc.ct);
+      if (hasEncrypted) {
+        if (!CryptoHandler.inited) await CryptoHandler.init();
         try {
-          await DB.ensureCEKForStore(storeName);
-        } catch (e: any) {
-          if (String(e?.message || e).includes('KEK not provisioned')) {
-            // Cannot decrypt yet; return empty to avoid endless CEK-not-ready errors
-            return [];
+          const ready = CryptoHandler.inited && !!CryptoHandler.kid;
+          if (ready) {
+            const cekReady = await DB.ensureCEKForStore(storeName);
+            if (!cekReady) {
+              console.log('CEK not ready for', storeName, '- cannot decrypt');
+              return [] as any[];
+            }
+          } else {
+            console.log('kek not ready', storeName);
+            return [] as any[];
           }
-          throw e;
+        } catch {
+          console.log('error', storeName);
+          /* proceed; decrypt will skip on failure */
         }
-      } catch { /* proceed; decrypt will skip on failure */ }
-    }
-    const out: any[] = [];
-    for (const r of rows) {
-      try {
-        if (r && r.enc && r.enc.ct && r.enc.iv) {
-          const dec = await DB.decryptEnvelope(storeName, r);
-          if (dec != null) out.push(dec);
-        } else if (r != null) {
-          out.push(r);
-        }
-      } catch (_e) {
-        // Skip rows that fail to decrypt (e.g., key not ready yet); they will
-        // be revalidated/refetched by integrity logic shortly.
       }
-    }
-    return out;
+      const out: any[] = [];
+      for (const r of rows) {
+        try {
+          if (r && r.enc && r.enc.ct && r.enc.iv) {
+            const dec = await DB.decryptEnvelope(storeName, r);
+            if (dec != null) out.push(dec);
+          } else if (r != null) {
+            out.push(r);
+          }
+        } catch (_e) {
+          console.log('error decrypting', storeName);
+        }
+      }
+      return out;
+    });
   }
 
-  public static async get(storeName: string, key: number | string): Promise<any | null> {
-    if (!DB.inited) await DB.init();
-    const store = DB.getStoreRead(storeName as any);
-    const req = store.get(DB.toKey(key));
-    const rec = await new Promise<any>((resolve, reject) => { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error as any); });
-    if (!rec) return null;
-    if (!DB.ENCRYPTION_ENABLED || !(rec && rec.enc && rec.enc.ct)) return rec;
-    return await DB.decryptEnvelope(storeName, rec);
+  public static async get(
+    storeName: string,
+    key: number | string
+  ): Promise<any | null> {
+    return DB.runExclusive(storeName, async () => {
+      if (!DB.inited) await DB.init();
+      // Use an explicit transaction and await its completion for consistent reads
+      const tx = DB.db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName as any);
+      const rec = await new Promise<any>((resolve, reject) => {
+        const req = store.get(DB.toKey(key));
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error as any);
+      });
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
+      if (!rec) return null;
+      if (!DB.isEncryptionEnabledForStore(storeName) || !(rec && rec.enc && rec.enc.ct)) return rec;
+      return await DB.decryptEnvelope(storeName, rec);
+    });
   }
 
   public static async put(storeName: string, row: any): Promise<void> {
-    if (!DB.inited) await DB.init();
-    // Important: perform any async work BEFORE opening the transaction to avoid
-    // TransactionInactiveError due to the event loop returning while idle.
-    if (!DB.ENCRYPTION_ENABLED) {
-      const store = DB.getStoreWrite(storeName as any);
-      store.put(row);
-      return;
-    }
-    const env = await DB.encryptEnvelope(storeName, row);
-    const store = DB.getStoreWrite(storeName as any);
-    store.put(env);
+    return DB.runExclusive(storeName, async () => {
+      if (!DB.inited) await DB.init();
+
+      // Important: perform any async work BEFORE opening the transaction to avoid
+      // TransactionInactiveError due to the event loop returning while idle.
+      let payload: any = row;
+      if (DB.isEncryptionEnabledForStore(storeName)) {
+        const env = await DB.encryptEnvelope(storeName, row);
+        if (env === null) {
+          console.warn(`[DB] Not storing ${storeName} row due to encryption failure`);
+          return; // Don't store the data
+        }
+        payload = env;
+      }
+      const tx = DB.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName as any);
+      store.put(payload);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
+    });
   }
 
   public static async bulkPut(storeName: string, rows: any[]): Promise<void> {
-    if (!DB.inited) await DB.init();
-    // Same rationale as put(): precompute all encryption material before opening
-    // the write transaction so it remains active for the duration of the puts.
-    if (!DB.ENCRYPTION_ENABLED) {
-      const store = DB.getStoreWrite(storeName as any);
-      for (const r of rows) store.put(r);
-      return;
-    }
-    const envelopes: any[] = [];
-    for (const r of rows) {
-      const env = await DB.encryptEnvelope(storeName, r);
-      envelopes.push(env);
-    }
-    const store = DB.getStoreWrite(storeName as any);
-    for (const env of envelopes) store.put(env);
+    return DB.runExclusive(storeName, async () => {
+      if (!DB.inited) await DB.init();
+
+      // Same rationale as put(): precompute all encryption material before opening
+      // the write transaction so it remains active for the duration of the puts.
+      let payloads: any[] = rows;
+      if (DB.isEncryptionEnabledForStore(storeName)) {
+        const envelopes: any[] = [];
+        for (const r of rows) {
+          const env = await DB.encryptEnvelope(storeName, r);
+          if (env !== null) {
+            envelopes.push(env);
+          } else {
+            console.warn(`[DB] Skipping ${storeName} row due to encryption failure`);
+          }
+        }
+        if (envelopes.length === 0) {
+          console.warn(`[DB] No ${storeName} rows stored due to encryption failures`);
+          return;
+        }
+        payloads = envelopes;
+      }
+      const tx = DB.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName as any);
+      for (const p of payloads) store.put(p);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
+    });
   }
 
-  public static async delete(storeName: string, key: number | string): Promise<void> {
-    if (!DB.inited) await DB.init();
-    DB.getStoreWrite(storeName as any).delete(DB.toKey(key));
+  public static async delete(
+    storeName: string,
+    key: number | string
+  ): Promise<void> {
+    return DB.runExclusive(storeName, async () => {
+      if (!DB.inited) await DB.init();
+      DB.getStoreWrite(storeName as any).delete(DB.toKey(key));
+    });
   }
 
   public static async clear(storeName: string): Promise<void> {
-    if (!DB.inited) await DB.init();
-    DB.getStoreWrite(storeName as any).clear();
+    return DB.runExclusive(storeName, async () => {
+      if (!DB.inited) await DB.init();
+      DB.getStoreWrite(storeName as any).clear();
+    });
   }
 
   public static async clearCryptoStores(): Promise<void> {
@@ -422,27 +608,50 @@ export class DB {
   }
 
   // --- Encryption helpers ---
-  private static async encryptEnvelope(storeName: string, row: any): Promise<any> {
-    await DB.ensureCEKForStore(storeName);
+  private static async encryptEnvelope(
+    storeName: string,
+    row: any
+  ): Promise<any | null> {
+    const cekReady = await DB.ensureCEKForStore(storeName);
+    if (!cekReady) {
+      console.warn(`[DB] Encryption failed for ${storeName}: CEK not ready, not storing`);
+      return null; // Don't store the data
+    }
     const id = row?.id ?? row?.ID ?? row?.Id;
     // Use worker for encryption for isolation
-    return await encryptRow(storeName, id, row);
+    try {
+      return await encryptRow(storeName, id, row);
+    } catch (e) {
+      console.warn(`[DB] Encryption failed for ${storeName}: ${e}, not storing`);
+      return null; // Don't store the data
+    }
   }
 
-  private static async decryptEnvelope(storeName: string, env: any): Promise<any> {
+  private static async decryptEnvelope(
+    storeName: string,
+    env: any
+  ): Promise<any> {
+
+    const cekReady = await DB.ensureCEKForStore(storeName);
+    if (!cekReady) {
+      console.warn(`[DB] Decryption skipped for ${storeName}: CEK not ready`);
+      return null;
+    }
+
     try {
-      console.debug('[DB] decryptEnvelope start', storeName, !!env?.enc?.aad);
-      await DB.ensureCEKForStore(storeName);
       const row = await decryptRow(storeName, env);
-      console.debug('[DB] decryptEnvelope ok', storeName);
+
       return row;
     } catch (e) {
       // If CEK wasn't ready yet, try to ensure and retry once
       if (String((e as any)?.message || e).includes('CEK not ready')) {
         try {
-          await DB.ensureCEKForStore(storeName);
+          const retryReady = await DB.ensureCEKForStore(storeName);
+          if (!retryReady) {
+            console.warn('[DB] decryptEnvelope retry failed: CEK not ready');
+            return null;
+          }
           const row = await decryptRow(storeName, env);
-          console.debug('[DB] decryptEnvelope retry ok', storeName);
           return row;
         } catch (e2) {
           console.warn('[DB] decryptEnvelope retry failed', storeName, e2);
@@ -454,55 +663,73 @@ export class DB {
     }
   }
 
-  private static async ensureCEKForStore(storeName: string): Promise<void> {
-    if (!DB.inited) await DB.init();
-    const ksRead = DB.getStoreRead('cache_keys' as any);
-    const getReq = ksRead.get(storeName);
-    const existing = await new Promise<any>((resolve) => { getReq.onsuccess = () => resolve(getReq.result); getReq.onerror = () => resolve(null); });
-    try {
-      const { wrappedCEK } = await workerEnsureCEK(storeName, existing?.wrappedCEK ?? null);
-      if (!existing && wrappedCEK) {
-        // Attach current kid if available
-        let kid: string | null = null;
-        try {
-          const metaStore = DB.getStoreRead('crypto_meta' as any);
-          const metaReq = metaStore.get('device');
-          const meta = await new Promise<any>((resolve) => { metaReq.onsuccess = () => resolve(metaReq.result); metaReq.onerror = () => resolve(null); });
-          kid = meta?.kid ?? null;
-        } catch {}
-        const ksWrite = DB.getStoreWrite('cache_keys' as any);
-        ksWrite.put({ store: storeName, wrappedCEK, kid, createdAt: Date.now() });
+  private static async ensureCEKForStore(storeName: string): Promise<boolean> {
+    return DB.runExclusive('cache_keys', async () => {
+      if (!DB.inited) await DB.init();
+      if (CryptoHandler.kid == null || !CryptoHandler.inited) {
+        await CryptoHandler.init();
       }
-    } catch (e: any) {
-      // If KEK not provisioned and a wrapped CEK exists, wait briefly for KEK then retry
-      if (existing?.wrappedCEK && String(e?.message || e).includes('KEK not provisioned')) {
-        try {
-          const { hasKEK } = await import('../../crypto/crypto');
-          let ready = await hasKEK();
-          for (let i = 0; i < 20 && !ready; i++) { await new Promise(r => setTimeout(r, 50)); ready = await hasKEK(); }
-          if (ready) {
-            const { wrappedCEK } = await workerEnsureCEK(storeName, existing.wrappedCEK);
-            if (wrappedCEK) {
-              const ksWrite = DB.getStoreWrite('cache_keys' as any);
-              // Preserve existing kid and createdAt
-              ksWrite.put({ store: storeName, wrappedCEK, kid: existing.kid ?? null, createdAt: existing.createdAt || Date.now() });
-            }
+
+      // Check if crypto is available at all
+      if (!CryptoHandler.kid) {
+        return false;
+      }
+
+      try {
+        // Read existing entry using explicit transaction and await completion
+        const rtx = DB.db.transaction('cache_keys', 'readonly');
+        const rstore = rtx.objectStore('cache_keys' as any);
+        const rreq = rstore.get(storeName);
+        const existing = await new Promise<any>((resolve) => {
+          rreq.onsuccess = () => resolve(rreq.result);
+          rreq.onerror = () => resolve(null);
+        });
+        await new Promise<void>((resolve, reject) => {
+          rtx.oncomplete = () => resolve();
+          rtx.onerror = () => reject(rtx.error as any);
+          rtx.onabort = () => reject(rtx.error as any);
+        });
+
+        const result = await workerEnsureCEK(storeName, existing?.wrappedCEK ?? null);
+
+        // If workerEnsureCEK succeeds, CEK is ready for this store
+        if (result.ok) {
+          // Save the wrapped CEK if we generated a new one and don't have an existing entry
+          if (!existing && result.wrappedCEK) {
+            const wtx = DB.db.transaction('cache_keys', 'readwrite');
+            const wstore = wtx.objectStore('cache_keys' as any);
+            wstore.put({ store: storeName, wrappedCEK: result.wrappedCEK, kid: CryptoHandler.kid, createdAt: Date.now() });
+            await new Promise<void>((resolve, reject) => {
+              wtx.oncomplete = () => resolve();
+              wtx.onerror = () => reject(wtx.error as any);
+              wtx.onabort = () => reject(wtx.error as any);
+            });
           }
-          return;
-        } catch (_e2) {
-          return;
+          return true;
+        } else {
+          console.warn(`[DB] ensureCEKForStore failed for ${storeName}:`, result.error);
+          return false;
         }
+      } catch (error) {
+        console.warn(`[DB] ensureCEKForStore error for ${storeName}:`, error);
+        return false;
       }
-      throw e;
-    }
+    });
   }
 
   // --- Rotation helpers ---
-  public static async rewrapAllCEKs(params: { newKid: string, wrappedKEKEnvelope?: WrappedKEKEnvelope, rawKEKBase64?: string }): Promise<void> {
+  public static async rewrapAllCEKs(params: {
+    newKid: string;
+    wrappedKEKEnvelope?: WrappedKEKEnvelope;
+    rawKEKBase64?: string;
+  }): Promise<void> {
     if (!DB.inited) await DB.init();
     const ksRead = DB.getStoreRead('cache_keys' as any);
     const getAllReq = ksRead.getAll();
-    const entries = await new Promise<any[]>((resolve) => { getAllReq.onsuccess = () => resolve(getAllReq.result || []); getAllReq.onerror = () => resolve([]); });
+    const entries = await new Promise<any[]>((resolve) => {
+      getAllReq.onsuccess = () => resolve(getAllReq.result || []);
+      getAllReq.onerror = () => resolve([]);
+    });
     if (!entries.length) return;
     const ksWrite = DB.getStoreWrite('cache_keys' as any);
     for (const entry of entries) {
@@ -510,23 +737,27 @@ export class DB {
       try {
         let newWrapped;
         if (params.wrappedKEKEnvelope) {
-          newWrapped = await rewrapCekBlobWithWrappedKEK(entry.wrappedCEK, params.wrappedKEKEnvelope);
+          newWrapped = await rewrapCekBlobWithWrappedKEK(
+            entry.wrappedCEK,
+            params.wrappedKEKEnvelope
+          );
         } else if (params.rawKEKBase64) {
-          newWrapped = await rewrapCekBlobWithRawKEK(entry.wrappedCEK, params.rawKEKBase64);
+          newWrapped = await rewrapCekBlobWithRawKEK(
+            entry.wrappedCEK,
+            params.rawKEKBase64
+          );
         } else {
           continue;
         }
-        ksWrite.put({ store: entry.store, wrappedCEK: newWrapped, kid: params.newKid, createdAt: entry.createdAt || Date.now() });
+        ksWrite.put({
+          store: entry.store,
+          wrappedCEK: newWrapped,
+          kid: params.newKid,
+          createdAt: entry.createdAt || Date.now(),
+        });
       } catch (_e) {
         // If rewrap fails for one store, skip and continue others
       }
     }
   }
-
 }
-
-
-
-
-
-

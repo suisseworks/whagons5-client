@@ -85,11 +85,32 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
     // Get event names for this table
     const events = GenericEvents.getEvents(table);
 
+    // Single-flight + cache guard for IndexedDB hydration
+    let inflightLoad: Promise<T[]> | null = null;
+    let lastLoadedAt = 0;
+    let lastResult: T[] = [] as unknown as T[];
+
     // Async thunks
-    const getFromIndexedDB = createAsyncThunk<T[]>(
+    const getFromIndexedDB = createAsyncThunk<T[], { force?: boolean } | undefined, { state: any }>(
         `${name}/loadFromIndexedDB`,
-        async () => {
-            return await cacheInstance.getAll() as T[];
+        async (arg, { getState }) => {
+            const force = Boolean(arg?.force);
+            const stateSlice = (getState() as any)?.[name];
+            const hasState = Array.isArray(stateSlice?.value) && stateSlice.value.length > 0;
+            if (!force && hasState) {
+                return stateSlice.value as T[];
+            }
+            if (!force && inflightLoad) {
+                return inflightLoad;
+            }
+            inflightLoad = (async () => {
+                const rows = await cacheInstance.getAll() as T[];
+                lastLoadedAt = Date.now();
+                lastResult = rows;
+                inflightLoad = null;
+                return rows;
+            })();
+            return inflightLoad;
         }
     );
 

@@ -5,25 +5,24 @@ type Envelope = { id: any, enc: { alg: string, iv: string, ct: string, tag?: str
 const storeToCEK: Map<string, CryptoKey> = new Map();
 let kekKey: CryptoKey | null = null;
 let deviceKeyPair: CryptoKeyPair | null = null;
+let deviceKeysLoaded = false; // track whether we've loaded/persisted device keys
 
 self.addEventListener('message', async (ev: MessageEvent) => {
   const msg = ev.data;
   try {
     // Debug: echo incoming message briefly (type only to avoid logging data)
     // @ts-ignore
-    console.debug('[crypto-worker] msg', msg?.t);
     switch (msg.t) {
       case 'HAS_KEK': {
         // Report if KEK is currently provisioned in this worker
         // @ts-ignore
+        console.log("[crypto-worker] hasKek?", kekKey!== null);
         postMessage({ ok: true, has: !!kekKey });
         break;
       }
       case 'GET_DEVICE_PUB': {
-        if (!deviceKeyPair) {
-          deviceKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-        }
-        const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair.publicKey);
+        await ensureDeviceKeysLoaded();
+        const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair!.publicKey);
         postMessage({ ok: true, dk_pub: bytesToBase64(new Uint8Array(pubRaw)) });
         break;
       }
@@ -32,6 +31,8 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const priv = await crypto.subtle.importKey('jwk', msg.privJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
           const pub = await crypto.subtle.importKey('raw', base64ToBytes(msg.pubRawB64), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
           deviceKeyPair = { privateKey: priv, publicKey: pub } as CryptoKeyPair;
+          await persistCurrentDeviceKeys();
+          deviceKeysLoaded = true;
           postMessage({ ok: true });
         } catch (err: any) {
           postMessage({ ok: false, error: String(err?.message || err) });
@@ -40,12 +41,12 @@ self.addEventListener('message', async (ev: MessageEvent) => {
       }
       case 'EXPORT_DEVICE_KEYS': {
         try {
-          if (!deviceKeyPair) {
-            deviceKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-          }
-          const privJwk = await crypto.subtle.exportKey('jwk', deviceKeyPair.privateKey);
-          const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair.publicKey);
-          postMessage({ ok: true, privJwk, pubRawB64: bytesToBase64(new Uint8Array(pubRaw)) });
+          await ensureDeviceKeysLoaded();
+          const privJwk = await crypto.subtle.exportKey('jwk', deviceKeyPair!.privateKey);
+          const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair!.publicKey);
+          const pubRawB64 = bytesToBase64(new Uint8Array(pubRaw));
+          await idbPutDeviceRecord({ key: 'device', privJwk, pubRawB64, curve: 'p256' });
+          postMessage({ ok: true, privJwk, pubRawB64 });
         } catch (err: any) {
           postMessage({ ok: false, error: String(err?.message || err) });
         }
@@ -53,35 +54,27 @@ self.addEventListener('message', async (ev: MessageEvent) => {
       }
       case 'PROVISION_KEK': {
         try {
-          // @ts-ignore
-          console.debug('[crypto-worker] PROVISION_KEK start', { raw: !!msg.rawKEK, wrapped: !!msg.wrappedKEK });
+      
         } catch {}
         // Accept dev rawKEK bypass
         if (msg.rawKEK) {
           // KEK must support encrypt/decrypt because we wrap CEKs using AES-GCM encrypt
           kekKey = await crypto.subtle.importKey('raw', base64ToBytes(msg.rawKEK), { name: 'AES-GCM' }, false, ['wrapKey','unwrapKey','encrypt','decrypt']);
-          // @ts-ignore
-          console.debug('[crypto-worker] PROVISION_KEK ok (raw)');
+       
           postMessage({ ok: true });
           break;
         }
         // P-256 unwrap path: msg.wrappedKEK = { alg: 'P256+AESGCM', eph_pub, iv, ct, salt }
         try {
-          if (!deviceKeyPair) {
-            deviceKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-          }
+          await ensureDeviceKeysLoaded();
           const w = msg.wrappedKEK;
-          try {
-            // @ts-ignore
-            console.debug('[crypto-worker] PROVISION_KEK sizes', { saltLen: (w?.salt||'').length, ivLen: (w?.iv||'').length, ctLen: (w?.ct||'').length });
-          } catch {}
+        
           const serverPub = await crypto.subtle.importKey('raw', base64ToBytes(w.eph_pub), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
-          const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: serverPub }, deviceKeyPair.privateKey, 256);
+          const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: serverPub }, deviceKeyPair!.privateKey, 256);
           try {
             const sharedBytes = new Uint8Array(shared);
             const pfx = Array.from(sharedBytes.slice(0, 8)).map(x => x.toString(16).padStart(2, '0')).join('');
-            // @ts-ignore
-            console.debug('[crypto-worker] PROVISION_KEK secret prefix', pfx);
+       
           } catch {}
           // HKDF to AES-GCM key
           const hkdfKey = await crypto.subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
@@ -89,8 +82,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(w.iv) }, aesKey, base64ToBytes(w.ct));
           // Same here: allow AES-GCM encrypt/decrypt for CEK (re)wrapping operations
           kekKey = await crypto.subtle.importKey('raw', pt, { name: 'AES-GCM' }, false, ['wrapKey','unwrapKey','encrypt','decrypt']);
-          // @ts-ignore
-          console.debug('[crypto-worker] PROVISION_KEK ok (wrapped)');
+
           postMessage({ ok: true });
         } catch (err: any) {
           // @ts-ignore
@@ -152,7 +144,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
         const store: string = msg.store;
         if (storeToCEK.has(store)) { postMessage({ ok: true }); break; }
         // @ts-ignore
-        console.debug('[crypto-worker] ENSURE_CEK', { store, hasWrapped: !!msg.wrappedCEK, hasKEK: !!kekKey });
         if (msg.wrappedCEK) {
           // If a wrapped CEK exists but KEK is not yet provisioned, do NOT generate
           // a new random CEK, as that would make existing ciphertext undecryptable.
@@ -165,7 +156,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
             const cek = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
             storeToCEK.set(store, cek);
             // @ts-ignore
-            console.debug('[crypto-worker] ENSURE_CEK ok unwrap', store);
             postMessage({ ok: true });
           } catch (unwrapErr: any) {
             const det = { store, ivLen: (msg.wrappedCEK?.iv || '').length, ctLen: (msg.wrappedCEK?.ct || '').length };
@@ -181,8 +171,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const raw = await crypto.subtle.exportKey('raw', cek);
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, kekKey, raw);
-          // @ts-ignore
-          console.debug('[crypto-worker] ENSURE_CEK ok generate+wrap', store);
           postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) } });
         }
         break;
@@ -190,7 +178,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
       case 'ENCRYPT': {
         try {
           // @ts-ignore
-          console.debug('[crypto-worker] ENCRYPT start', msg.store);
+
           const cek = await getOrCreateCEK(msg.store);
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const pt = new TextEncoder().encode(JSON.stringify(msg.row));
@@ -203,7 +191,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const tagBytes = ctagBytes.slice(ctagBytes.length - tagLen);
           const env: Envelope = { id: msg.id, enc: { alg: 'A256GCM', iv: bytesToBase64(iv), ct: bytesToBase64(ctBytes), tag: bytesToBase64(tagBytes), aad: aadObj }, meta: { updatedAt: Date.now() } };
           // @ts-ignore
-          console.debug('[crypto-worker] ENCRYPT ok', msg.store, 'aad', !!aadObj);
           postMessage({ ok: true, env });
         } catch (err: any) {
           // @ts-ignore
@@ -226,7 +213,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
                 const tagBytes = cb.slice(cb.length - tagLen);
                 const env: Envelope = { id: msg.id, enc: { alg: 'A256GCM', iv: bytesToBase64(iv), ct: bytesToBase64(ctBytes), tag: bytesToBase64(tagBytes), aad: aadObj }, meta: { updatedAt: Date.now() } };
                 // @ts-ignore
-                console.debug('[crypto-worker] ENCRYPT retry-with-aad ok');
                 postMessage({ ok: true, env });
               } catch (_retryWithAad) {
                 const ctag2 = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cek, pt);
@@ -236,7 +222,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
                 const tagBytes2 = cb2.slice(cb2.length - tagLen2);
                 const env2: Envelope = { id: msg.id, enc: { alg: 'A256GCM', iv: bytesToBase64(iv), ct: bytesToBase64(ctBytes2), tag: bytesToBase64(tagBytes2) }, meta: { updatedAt: Date.now() } };
                 // @ts-ignore
-                console.debug('[crypto-worker] ENCRYPT retry-no-aad ok');
                 postMessage({ ok: true, env: env2 });
               }
             } catch (e2: any) {
@@ -250,8 +235,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
       }
       case 'DECRYPT': {
         try {
-          // @ts-ignore
-          console.debug('[crypto-worker] DECRYPT start', msg.store);
           // Prefer existing CEK if present; do not generate a new CEK on decrypt path
           let cek = getExistingCEK(msg.store);
           if (!cek) {
@@ -275,8 +258,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
             throw inner;
           }
           const text = new TextDecoder().decode(pt);
-          // @ts-ignore
-          console.debug('[crypto-worker] DECRYPT ok');
           postMessage({ ok: true, row: JSON.parse(text) });
         } catch (err: any) {
           // @ts-ignore
@@ -294,8 +275,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
               const ctag = concatBytes(ct, tag);
               const pt = await crypto.subtle.decrypt(aad ? { name: 'AES-GCM', iv, additionalData: aad } : { name: 'AES-GCM', iv }, cek, ctag);
               const text = new TextDecoder().decode(pt);
-              // @ts-ignore
-              console.debug('[crypto-worker] DECRYPT retry ok');
               postMessage({ ok: true, row: JSON.parse(text) });
             } catch (e2: any) {
               postMessage({ ok: false, error: String(e2?.message || e2) });
@@ -366,6 +345,69 @@ function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
   const out = new Uint8Array(a.length + b.length);
   out.set(a, 0); out.set(b, a.length);
   return out;
+}
+
+// --- Worker-local IndexedDB to persist device ECDH keypair ---
+function openDeviceDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('wh-crypto', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('device')) {
+        db.createObjectStore('device', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGetDeviceRecord(): Promise<any | null> {
+  const db = await openDeviceDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction('device', 'readonly');
+    const st = tx.objectStore('device');
+    const rq = st.get('device');
+    rq.onsuccess = () => resolve(rq.result || null);
+    rq.onerror = () => resolve(null);
+  });
+}
+
+async function idbPutDeviceRecord(rec: any): Promise<void> {
+  const db = await openDeviceDB();
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction('device', 'readwrite');
+    const st = tx.objectStore('device');
+    st.put({ key: 'device', ...rec });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function ensureDeviceKeysLoaded(): Promise<void> {
+  if (deviceKeysLoaded && deviceKeyPair) return;
+  const rec = await idbGetDeviceRecord();
+  if (rec?.privJwk && rec?.pubRawB64) {
+    try {
+      const priv = await crypto.subtle.importKey('jwk', rec.privJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+      const pub = await crypto.subtle.importKey('raw', base64ToBytes(rec.pubRawB64), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+      deviceKeyPair = { privateKey: priv, publicKey: pub } as CryptoKeyPair;
+      deviceKeysLoaded = true;
+      return;
+    } catch {}
+  }
+  // Generate new and persist for next loads
+  deviceKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  await persistCurrentDeviceKeys();
+  deviceKeysLoaded = true;
+}
+
+async function persistCurrentDeviceKeys(): Promise<void> {
+  if (!deviceKeyPair) return;
+  const privJwk = await crypto.subtle.exportKey('jwk', deviceKeyPair.privateKey);
+  const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair.publicKey);
+  const pubRawB64 = bytesToBase64(new Uint8Array(pubRaw));
+  await idbPutDeviceRecord({ privJwk, pubRawB64, curve: 'p256' });
 }
 
 

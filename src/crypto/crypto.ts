@@ -1,4 +1,11 @@
+import { DB } from "@/store/indexedDB/DB";
+import { api as apiClient } from '../api/whagonsApi';
+
 let worker: Worker | null = null;
+
+
+
+
 
 function getWorker(): Worker {
   if (!worker) {
@@ -15,13 +22,82 @@ export interface WrappedKEKEnvelope {
   salt: string; // base64-encoded salt for HKDF
 }
 
+
+export class CryptoHandler {
+  static inited = false;
+  static kid: string | null = null;
+  static expIso: string | null = null;
+  static initPromise: Promise<void> | null = null;
+
+  public static async init(){
+    // If already initialized, return immediately
+    if (CryptoHandler.inited) return;
+
+    // If initialization is in progress, wait for it to complete
+    if (CryptoHandler.initPromise) {
+      return CryptoHandler.initPromise;
+    }
+
+    // Start initialization and store the promise to prevent concurrent executions
+    CryptoHandler.initPromise = (async () => {
+      try {
+        const metaR = DB.getStoreRead('crypto_meta' as any);
+        const get = metaR.get('device');
+        const prev = await new Promise<any>((resolve) => { get.onsuccess = () => resolve(get.result || {}); get.onerror = () => resolve({}); });
+
+        // Ensure stable deviceId persisted in crypto_meta
+        let deviceId: string = prev?.deviceId || ((crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
+        if (!prev?.deviceId) {
+          const metaW0 = DB.getStoreWrite('crypto_meta' as any);
+          metaW0.put({ key: 'device', ...prev, deviceId });
+        }
+
+        const dkPub = await getDevicePublicKey();
+
+        // Upsert device and receive KEK payload in same response
+        const reg = await apiClient.post('/devices', { dk_pub: dkPub, curve: 'p256', device_id: deviceId });
+        const dkid = reg.data?.data?.dkid;
+        // Always fetch wrapped KEK via endpoint (ignore rawKEK)
+        const kekResp = await apiClient.post(`/devices/${dkid}/kek`);
+        const envelope = kekResp.data?.data?.wrappedKEK;
+        const kid = kekResp.data?.data?.kid;
+        const expIso = kekResp.data?.data?.expiresAt;
+
+        await provisionWrappedKEK(envelope);
+
+        // Persist identifiers and KEK metadata
+        const metaW = DB.getStoreWrite('crypto_meta' as any);
+        metaW.put({ key: 'device', ...prev, dkid, deviceId, kid, expiresAt: expIso ? new Date(expIso).getTime() : undefined });
+
+        // Set the static properties
+        CryptoHandler.kid = kid;
+        CryptoHandler.expIso = expIso;
+
+        // Mark as initialized
+        CryptoHandler.inited = true;
+
+      } catch (error) {
+        // Reset the promise on error so future calls can retry
+        CryptoHandler.initPromise = null;
+        console.error('[CryptoHandler] Initialization failed:', error);
+        throw error;
+      } finally {
+        // Clear the promise reference when done (success or failure)
+        CryptoHandler.initPromise = null;
+      }
+    })();
+
+    return CryptoHandler.initPromise;
+  }
+}
+
+
 export function getDevicePublicKey(): Promise<string> {
   const w = getWorker();
   return new Promise((resolve, reject) => {
     const onMsg = (ev: MessageEvent) => {
       w.removeEventListener('message', onMsg);
       if (ev.data?.ok && ev.data?.dk_pub) {
-        console.debug('[crypto] GET_DEVICE_PUB ok');
         resolve(ev.data.dk_pub);
       } else {
         console.warn('[crypto] GET_DEVICE_PUB error', ev.data?.error);
@@ -29,7 +105,6 @@ export function getDevicePublicKey(): Promise<string> {
       }
     };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> GET_DEVICE_PUB');
     w.postMessage({ t: 'GET_DEVICE_PUB' });
   });
 }
@@ -63,7 +138,6 @@ export function provisionKEK(rawKEKBase64: string): Promise<boolean> {
   return new Promise((resolve) => {
     const onMsg = (ev: MessageEvent) => { w.removeEventListener('message', onMsg); resolve(!!ev.data?.ok); };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> PROVISION_KEK (raw)');
     w.postMessage({ t: 'PROVISION_KEK', rawKEK: rawKEKBase64 });
   });
 }
@@ -74,7 +148,6 @@ export function provisionWrappedKEK(wrappedKEK: WrappedKEKEnvelope): Promise<boo
     const onMsg = (ev: MessageEvent) => {
       w.removeEventListener('message', onMsg);
       if (ev.data?.ok) {
-        console.debug('[crypto] PROVISION_KEK (wrapped) ok');
         resolve(true);
       } else {
         console.warn('[crypto] PROVISION_KEK (wrapped) error', ev.data?.error);
@@ -82,7 +155,6 @@ export function provisionWrappedKEK(wrappedKEK: WrappedKEKEnvelope): Promise<boo
       }
     };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> PROVISION_KEK (wrapped)');
     w.postMessage({ t: 'PROVISION_KEK', wrappedKEK });
   });
 }
@@ -100,7 +172,6 @@ export function encryptRow(store: string, id: any, row: any): Promise<any> {
       }
     };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> ENCRYPT', store, id);
     w.postMessage({ t: 'ENCRYPT', store, id, row });
   });
 }
@@ -118,26 +189,18 @@ export function decryptRow(store: string, env: any): Promise<any> {
       }
     };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> DECRYPT', store, { hasAad: !!env?.enc?.aad });
     w.postMessage({ t: 'DECRYPT', store, env });
   });
 }
 
-export function ensureCEK(store: string, wrappedCEK?: { iv: string, ct: string } | null): Promise<{ wrappedCEK?: { iv: string, ct: string } | null }> {
+export function ensureCEK(store: string, wrappedCEK?: { iv: string, ct: string } | null): Promise<{ ok: boolean; error?: string; detail?: any; wrappedCEK?: { iv: string, ct: string } | null }> {
   const w = getWorker();
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const onMsg = (ev: MessageEvent) => {
       w.removeEventListener('message', onMsg);
-      if (ev.data?.ok) {
-        console.debug('[crypto] ENSURE_CEK ok', store, { generated: !!ev.data?.wrappedCEK });
-        resolve({ wrappedCEK: ev.data?.wrappedCEK ?? null });
-      } else {
-        console.warn('[crypto] ENSURE_CEK error', store, ev.data?.error, ev.data?.detail || null);
-        reject(new Error(ev.data?.error || 'ensure cek error'));
-      }
+      resolve(ev.data);
     };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> ENSURE_CEK', store, { hasWrapped: !!wrappedCEK });
     w.postMessage({ t: 'ENSURE_CEK', store, wrappedCEK });
   });
 }
@@ -156,7 +219,6 @@ export function hasKEK(): Promise<boolean> {
   return new Promise((resolve) => {
     const onMsg = (ev: MessageEvent) => { w.removeEventListener('message', onMsg); resolve(!!ev.data?.has); };
     w.addEventListener('message', onMsg);
-    console.debug('[crypto] -> HAS_KEK');
     w.postMessage({ t: 'HAS_KEK' });
   });
 }
