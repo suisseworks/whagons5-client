@@ -11,6 +11,7 @@ type CacheHandler = {
 	add: (row: any) => Promise<void>;
 	update: (id: number | string, row: any) => Promise<void>;
 	remove: (id: number | string) => Promise<void>;
+	getAll: () => Promise<any[]>;
 };
 
 const cacheByTable: Record<string, CacheHandler> = {
@@ -19,6 +20,7 @@ const cacheByTable: Record<string, CacheHandler> = {
 		add: (row) => TasksCache.addTask(row),
 		update: (id, row) => TasksCache.updateTask(String(id), row),
 		remove: (id) => TasksCache.deleteTask(String(id)),
+		getAll: () => TasksCache.getTasks(),
 	},
 
 	// All other tables (30+ tables) handled by generic caches
@@ -28,16 +30,17 @@ const cacheByTable: Record<string, CacheHandler> = {
 			add: (row: any) => cache.add(row),
 			update: (id: number | string, row: any) => cache.update(id, row),
 			remove: (id: number | string) => cache.remove(id),
+			getAll: () => cache.getAll(),
 		},
 	}), {}),
 };
 
 // Sync handlers: re-load Redux slice state from IndexedDB
-type SyncHandler = () => void;
+type SyncHandler = () => Promise<void>;
 
 const syncByTable: Record<string, SyncHandler> = {
 	// Tasks use custom thunk
-	wh_tasks: () => store.dispatch(getTasksFromIndexedDB()),
+	wh_tasks: async () => { await store.dispatch(getTasksFromIndexedDB()); },
 
 	// All other tables handled by generic slices
 	...Object.entries(genericCaches).reduce((acc, [key, cache]) => {
@@ -46,7 +49,7 @@ const syncByTable: Record<string, SyncHandler> = {
 		if (actions && (actions as any).getFromIndexedDB) {
 			return {
 				...acc,
-				[tableName]: () => store.dispatch((actions as any).getFromIndexedDB()),
+				[tableName]: async () => { await store.dispatch((actions as any).getFromIndexedDB()); },
 			};
 		}
 		return acc;
@@ -57,9 +60,17 @@ export function getCacheForTable(table: string): CacheHandler | null {
 	return cacheByTable[table] ?? null;
 }
 
-export function syncReduxForTable(table: string): void {
+export async function syncReduxForTable(table: string): Promise<void> {
 	const sync = syncByTable[table];
-	if (sync) sync();
+	if (sync) {
+		try {
+			await sync();
+		} catch (error) {
+			console.error('CacheRegistry: Error syncing Redux for table:', table, error);
+		}
+	} else {
+		console.warn('CacheRegistry: No sync handler found for table:', table);
+	}
 }
 
 

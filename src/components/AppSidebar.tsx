@@ -11,7 +11,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { genericActions } from '@/store/genericSlices';
 import {
   Settings,
   Users,
@@ -20,10 +19,10 @@ import {
   Briefcase,
   BarChart3,
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
-import { AppDispatch, RootState } from '@/store';
-import { useEffect, useState } from 'react';
+import { RootState } from '@/store';
+import { useEffect, useMemo, useState } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
 import {
@@ -119,13 +118,30 @@ export function AppSidebar() {
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
 
-  const dispatch = useDispatch<AppDispatch>();
+  // const dispatch = useDispatch<AppDispatch>();
   // const { user } = useAuth(); // Currently not used, uncomment when needed
 
   const workspacesState = useSelector(
     (state: RootState) => state.workspaces
   );
   const { value: workspaces = [] } = workspacesState || {};
+
+  // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
+  const uniqueWorkspaces = useMemo(() => {
+    const map = new Map<string, Workspace>();
+    for (const w of workspaces) map.set(String(w.id), w);
+    return Array.from(map.values());
+  }, [workspaces]);
+
+  // Debug logging for workspaces state changes (only in development)
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('AppSidebar: Workspaces updated:', {
+        count: uniqueWorkspaces?.length || 0,
+        names: uniqueWorkspaces?.map((w: Workspace) => w.name) || []
+      });
+    }
+  }, [uniqueWorkspaces]);
 
   // Note: clearError action not available in generic slices
 
@@ -429,11 +445,13 @@ export function AppSidebar() {
                 {(!isCollapsed || isMobile) && (
                   <SidebarGroupContent className="pt-2 pl-1">
 
-                    {workspaces.map((workspace: Workspace) => {
+                    {uniqueWorkspaces.map((workspace: Workspace) => {
+                      // Skip temporary optimistic items (negative IDs)
+                      if ((workspace.id as number) < 0) return null;
 
                       return (
                       <Link
-                        key={workspace.id}
+                        key={`workspace-${workspace.id}`}
                         to={`/workspace/${workspace.id}`}
                         className={`flex items-center space-x-2 rounded-md relative transition-colors px-4 py-2 mx-2 ${
                           pathname === `/workspace/${workspace.id}`
@@ -457,9 +475,11 @@ export function AppSidebar() {
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
                     <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent/30">
-                      {workspaces.map((workspace: Workspace) => (
+                      {uniqueWorkspaces
+                        .filter((workspace: Workspace) => (workspace.id as number) >= 0) // Skip temp items
+                        .map((workspace: Workspace) => (
                         <Link
-                          key={workspace.id}
+                          key={`workspace-collapsed-${workspace.id}`}
                           to={`/workspace/${workspace.id}`}
                           className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
                             pathname === `/workspace/${workspace.id}`

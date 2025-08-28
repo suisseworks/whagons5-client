@@ -64,14 +64,52 @@ export class GenericCache {
 
 	async add(row: any): Promise<void> {
 		if (!DB.inited) await DB.init();
+
+		console.log(`GenericCache.add: Attempting to add to ${this.store}`, {
+			row,
+			rowType: typeof row,
+			rowKeys: Object.keys(row),
+			idField: this.idField,
+			idValue: row[this.idField],
+			idType: typeof row[this.idField]
+		});
+
 		const idVal = this.getId(row);
-		if (idVal === undefined || idVal === null) return;
-		await DB.put(this.store, row);
+		if (idVal === undefined || idVal === null) {
+			console.error(`GenericCache.add: Row missing ID field '${this.idField}'`, row);
+			return;
+		}
+
+		try {
+			await DB.put(this.store, row);
+		} catch (error) {
+			console.error(`GenericCache.add: Failed to add to ${this.store}`, {
+				error,
+				row,
+				idVal,
+				store: this.store
+			});
+			throw error; // Re-throw so RTL can catch it
+		}
 	}
 
 	async update(_id: IdType, row: any): Promise<void> {
 		if (!DB.inited) await DB.init();
-		await DB.put(this.store, row);
+		try {
+			const dbg = localStorage.getItem('wh-debug-cache') === 'true';
+			if (dbg) {
+				console.log(`GenericCache.update: store=${this.store}`, {
+					incomingIdParam: _id,
+					rowHasId: row && (row.id !== undefined && row.id !== null),
+					rowId: row?.id,
+					rowKeys: row ? Object.keys(row) : [],
+				});
+			}
+			await DB.put(this.store, row);
+		} catch (e) {
+			console.error(`GenericCache.update: failed for ${this.store}`, { error: e, _id, row });
+			throw e;
+		}
 	}
 
 	async remove(id: IdType): Promise<void> {

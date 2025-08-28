@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.6.0';
+const CURRENT_DB_VERSION = '1.7.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -607,23 +607,91 @@ export class DB {
   }
 
   public static async put(storeName: string, row: any): Promise<void> {
+    // Defensive copy to prevent parameter corruption
+    const rowCopy = row ? JSON.parse(JSON.stringify(row)) : null;
+
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
 
-      // Important: perform any async work BEFORE opening the transaction to avoid
-      // TransactionInactiveError due to the event loop returning while idle.
-      let payload: any = row;
+      // Debug: Log only if there's an issue
+      if (!rowCopy) {
+        console.log(`DB.put: Received row parameter`, {
+          storeName,
+          originalRow: row,
+          rowCopy,
+          rowType: typeof row,
+          rowCopyType: typeof rowCopy
+        });
+      }
+
+      // Validate the row copy
+      if (!rowCopy) {
+        console.error(`DB.put: Row copy is null/undefined for ${storeName}`, {
+          originalRow: row,
+          rowCopy
+        });
+        throw new Error(`Cannot put null/undefined row to ${storeName}`);
+      }
+
+      // Extra debug: pre-encrypt id visibility
+      try {
+        const dbg = localStorage.getItem('wh-debug-cache') === 'true';
+        if (dbg) {
+          console.log('DB.put: pre-encrypt', {
+            storeName,
+            rowHasId: rowCopy && (rowCopy.id !== undefined && rowCopy.id !== null),
+            rowId: rowCopy?.id,
+            rowKeys: Object.keys(rowCopy || {}),
+          });
+        }
+      } catch {}
+
+      // Use the defensive copy
+      let payload: any = rowCopy;
       if (DB.isEncryptionEnabledForStore(storeName)) {
-        const env = await DB.encryptEnvelope(storeName, row);
-        if (env === null) {
-          console.warn(`[DB] Not storing ${storeName} row due to encryption failure`);
+        const env = await DB.encryptEnvelope(storeName, rowCopy);
+        if (!env) {
+          console.warn(`[DB] Not storing ${storeName} row due to encryption failure (no envelope)`);
           return; // Don't store the data
         }
         payload = env;
+        // Extra debug: post-encrypt envelope check
+        try {
+          const dbg = localStorage.getItem('wh-debug-cache') === 'true';
+          if (dbg) {
+            console.log('DB.put: post-encrypt envelope', {
+              storeName,
+              payloadType: typeof payload,
+              payloadHasId: payload && (payload.id !== undefined && payload.id !== null),
+              payloadId: payload?.id,
+              hasEnc: !!payload?.enc,
+              encKeys: payload?.enc ? Object.keys(payload.enc) : [],
+            });
+          }
+        } catch {}
       }
+
+
       const tx = DB.db.transaction(storeName, 'readwrite');
       const store = tx.objectStore(storeName as any);
-      store.put(payload);
+      // Debug: store keyPath visibility
+      try {
+        const dbg = localStorage.getItem('wh-debug-cache') === 'true';
+        if (dbg) {
+          const kp = (store as any)?.keyPath;
+          console.log('DB.put: target store', { storeName, keyPath: kp, payloadHasId: payload?.id !== undefined && payload?.id !== null, payloadId: payload?.id });
+        }
+      } catch {}
+      const putRequest = store.put(payload);
+
+      putRequest.onerror = (event) => {
+        console.error(`DB.put: IndexedDB put request failed for ${storeName}`, {
+          error: putRequest.error,
+          event,
+          payload,
+          storeName
+        });
+      };
       await new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error as any);

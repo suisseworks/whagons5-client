@@ -135,9 +135,7 @@ class IconService {
 
       // Dynamically import only the specific icon we need
       try {
-        const iconModule = await import(
-          `@fortawesome/pro-regular-svg-icons/${faIconName}.js`
-        );
+        const iconModule = await import(/* @vite-ignore */ `@fortawesome/pro-regular-svg-icons/${faIconName}.js`);
         return iconModule[faIconName];
       } catch (specificError) {
         // If specific import fails, fall back to the full module (but only load what we need)

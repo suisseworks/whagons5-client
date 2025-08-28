@@ -16,14 +16,14 @@ self.addEventListener('message', async (ev: MessageEvent) => {
       case 'HAS_KEK': {
         // Report if KEK is currently provisioned in this worker
         // @ts-ignore
-        console.log("[crypto-worker] hasKek?", kekKey!== null);
-        postMessage({ ok: true, has: !!kekKey });
+        // quiet noisy worker log
+        postMessage({ ok: true, has: !!kekKey, rid: msg.rid });
         break;
       }
       case 'GET_DEVICE_PUB': {
         await ensureDeviceKeysLoaded();
         const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair!.publicKey);
-        postMessage({ ok: true, dk_pub: bytesToBase64(new Uint8Array(pubRaw)) });
+        postMessage({ ok: true, dk_pub: bytesToBase64(new Uint8Array(pubRaw)), rid: msg.rid });
         break;
       }
       case 'IMPORT_DEVICE_KEYS': {
@@ -33,9 +33,9 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           deviceKeyPair = { privateKey: priv, publicKey: pub } as CryptoKeyPair;
           await persistCurrentDeviceKeys();
           deviceKeysLoaded = true;
-          postMessage({ ok: true });
+          postMessage({ ok: true, rid: msg.rid });
         } catch (err: any) {
-          postMessage({ ok: false, error: String(err?.message || err) });
+          postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
         }
         break;
       }
@@ -46,9 +46,9 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const pubRaw = await crypto.subtle.exportKey('raw', deviceKeyPair!.publicKey);
           const pubRawB64 = bytesToBase64(new Uint8Array(pubRaw));
           await idbPutDeviceRecord({ key: 'device', privJwk, pubRawB64, curve: 'p256' });
-          postMessage({ ok: true, privJwk, pubRawB64 });
+          postMessage({ ok: true, privJwk, pubRawB64, rid: msg.rid });
         } catch (err: any) {
-          postMessage({ ok: false, error: String(err?.message || err) });
+          postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
         }
         break;
       }
@@ -61,7 +61,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           // KEK must support encrypt/decrypt because we wrap CEKs using AES-GCM encrypt
           kekKey = await crypto.subtle.importKey('raw', base64ToBytes(msg.rawKEK), { name: 'AES-GCM' }, false, ['wrapKey','unwrapKey','encrypt','decrypt']);
        
-          postMessage({ ok: true });
+          postMessage({ ok: true, rid: msg.rid });
           break;
         }
         // P-256 unwrap path: msg.wrappedKEK = { alg: 'P256+AESGCM', eph_pub, iv, ct, salt }
@@ -71,11 +71,6 @@ self.addEventListener('message', async (ev: MessageEvent) => {
         
           const serverPub = await crypto.subtle.importKey('raw', base64ToBytes(w.eph_pub), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
           const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: serverPub }, deviceKeyPair!.privateKey, 256);
-          try {
-            const sharedBytes = new Uint8Array(shared);
-            const pfx = Array.from(sharedBytes.slice(0, 8)).map(x => x.toString(16).padStart(2, '0')).join('');
-       
-          } catch {}
           // HKDF to AES-GCM key
           const hkdfKey = await crypto.subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
           const aesKey = await crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: base64ToBytes(w.salt), info: new Uint8Array() }, hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
@@ -83,11 +78,11 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           // Same here: allow AES-GCM encrypt/decrypt for CEK (re)wrapping operations
           kekKey = await crypto.subtle.importKey('raw', pt, { name: 'AES-GCM' }, false, ['wrapKey','unwrapKey','encrypt','decrypt']);
 
-          postMessage({ ok: true });
+          postMessage({ ok: true, rid: msg.rid });
         } catch (err: any) {
           // @ts-ignore
           console.warn('[crypto-worker] PROVISION_KEK error', String(err?.message || err));
-          postMessage({ ok: false, error: String(err?.message || err) });
+          postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
         }
         break;
       }
@@ -113,9 +108,9 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           // Encrypt CEK with new kek
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, newKek, cekRaw);
-          postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) } });
+          postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) }, rid: msg.rid });
         } catch (err: any) {
-          postMessage({ ok: false, error: String(err?.message || err) });
+          postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
         }
         break;
       }
@@ -129,20 +124,20 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const cekRaw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: oldIv }, kekKey, oldCt);
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, newKek, cekRaw);
-          postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) } });
+          postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) }, rid: msg.rid });
         } catch (err: any) {
-          postMessage({ ok: false, error: String(err?.message || err) });
+          postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
         }
         break;
       }
       case 'UNWRAP_CEK': {
         // Not implemented in demo; CEKs are generated locally per store
-        postMessage({ ok: true });
+        postMessage({ ok: true, rid: msg.rid });
         break;
       }
       case 'ENSURE_CEK': {
         const store: string = msg.store;
-        if (storeToCEK.has(store)) { postMessage({ ok: true }); break; }
+        if (storeToCEK.has(store)) { postMessage({ ok: true, rid: msg.rid }); break; }
         // @ts-ignore
         if (msg.wrappedCEK) {
           // If a wrapped CEK exists but KEK is not yet provisioned, do NOT generate
@@ -156,12 +151,12 @@ self.addEventListener('message', async (ev: MessageEvent) => {
             const cek = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
             storeToCEK.set(store, cek);
             // @ts-ignore
-            postMessage({ ok: true });
+            postMessage({ ok: true, rid: msg.rid });
           } catch (unwrapErr: any) {
             const det = { store, ivLen: (msg.wrappedCEK?.iv || '').length, ctLen: (msg.wrappedCEK?.ct || '').length };
             // @ts-ignore
             console.warn('[crypto-worker] ENSURE_CEK unwrap error', det, String(unwrapErr?.message || unwrapErr));
-            postMessage({ ok: false, error: 'CEK unwrap failed', detail: det });
+            postMessage({ ok: false, error: 'CEK unwrap failed', detail: det, rid: msg.rid });
           }
         } else {
           // Generate CEK and return wrappedCEK for persistence
@@ -171,7 +166,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const raw = await crypto.subtle.exportKey('raw', cek);
           const iv = crypto.getRandomValues(new Uint8Array(12));
           const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, kekKey, raw);
-          postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) } });
+          postMessage({ ok: true, wrappedCEK: { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) }, rid: msg.rid });
         }
         break;
       }
@@ -192,7 +187,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           const tagBytes = ctagBytes.slice(ctagBytes.length - tagLen);
           const env: Envelope = { id: msg.id, enc: { alg: 'A256GCM', iv: bytesToBase64(iv), ct: bytesToBase64(ctBytes), tag: bytesToBase64(tagBytes), aad: aadObj }, meta: { updatedAt: Date.now() } };
           // @ts-ignore
-          postMessage({ ok: true, env });
+          postMessage({ ok: true, env, rid: msg.rid });
         } catch (err: any) {
           // @ts-ignore
           console.warn('[crypto-worker] ENCRYPT error', err?.name || err);
@@ -215,7 +210,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
                 const tagBytes = cb.slice(cb.length - tagLen);
                 const env: Envelope = { id: msg.id, enc: { alg: 'A256GCM', iv: bytesToBase64(iv), ct: bytesToBase64(ctBytes), tag: bytesToBase64(tagBytes), aad: aadObj }, meta: { updatedAt: Date.now() } };
                 // @ts-ignore
-                postMessage({ ok: true, env });
+                postMessage({ ok: true, env, rid: msg.rid });
               } catch (_retryWithAad) {
                 const ctag2 = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cek, pt);
                 const cb2 = new Uint8Array(ctag2);
@@ -224,13 +219,13 @@ self.addEventListener('message', async (ev: MessageEvent) => {
                 const tagBytes2 = cb2.slice(cb2.length - tagLen2);
                 const env2: Envelope = { id: msg.id, enc: { alg: 'A256GCM', iv: bytesToBase64(iv), ct: bytesToBase64(ctBytes2), tag: bytesToBase64(tagBytes2) }, meta: { updatedAt: Date.now() } };
                 // @ts-ignore
-                postMessage({ ok: true, env: env2 });
+                postMessage({ ok: true, env: env2, rid: msg.rid });
               }
             } catch (e2: any) {
-              postMessage({ ok: false, error: String(e2?.message || e2) });
+              postMessage({ ok: false, error: String(e2?.message || e2), rid: msg.rid });
             }
           } else {
-            postMessage({ ok: false, error: String(err?.message || err) });
+            postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
           }
         }
         break;
@@ -260,7 +255,7 @@ self.addEventListener('message', async (ev: MessageEvent) => {
             throw inner;
           }
           const text = new TextDecoder().decode(pt);
-          postMessage({ ok: true, row: JSON.parse(text) });
+          postMessage({ ok: true, row: JSON.parse(text), rid: msg.rid });
         } catch (err: any) {
           // @ts-ignore
           console.warn('[crypto-worker] DECRYPT error', err?.name || err);
@@ -277,12 +272,12 @@ self.addEventListener('message', async (ev: MessageEvent) => {
               const ctag = concatBytes(ct, tag);
               const pt = await crypto.subtle.decrypt(aad ? { name: 'AES-GCM', iv, additionalData: aad } : { name: 'AES-GCM', iv }, cek, ctag);
               const text = new TextDecoder().decode(pt);
-              postMessage({ ok: true, row: JSON.parse(text) });
+              postMessage({ ok: true, row: JSON.parse(text), rid: msg.rid });
             } catch (e2: any) {
-              postMessage({ ok: false, error: String(e2?.message || e2) });
+              postMessage({ ok: false, error: String(e2?.message || e2), rid: msg.rid });
             }
           } else {
-            postMessage({ ok: false, error: String(err?.message || err) });
+            postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
           }
         }
         break;
@@ -292,17 +287,17 @@ self.addEventListener('message', async (ev: MessageEvent) => {
           kekKey = null;
           storeToCEK.clear();
           // keep deviceKeyPair (registration) unless caller resets it
-          postMessage({ ok: true });
+          postMessage({ ok: true, rid: msg.rid });
         } catch (err: any) {
-          postMessage({ ok: false, error: String(err?.message || err) });
+          postMessage({ ok: false, error: String(err?.message || err), rid: msg.rid });
         }
         break;
       }
       default:
-        postMessage({ ok: false, error: 'unknown message' });
+        postMessage({ ok: false, error: 'unknown message', rid: msg.rid });
     }
   } catch (e: any) {
-    postMessage({ ok: false, error: String(e?.message || e) });
+    postMessage({ ok: false, error: String(e?.message || e), rid: msg.rid });
   }
 });
 

@@ -2,6 +2,9 @@ import { DB } from "@/store/indexedDB/DB";
 import { api as apiClient } from '../api/whagonsApi';
 
 let worker: Worker | null = null;
+let workerListenerAttached = false;
+let nextRid = 1;
+const pending: Map<number, { resolve: (v: any) => void; reject: (e: any) => void; timeout: any } > = new Map();
 
 
 
@@ -10,6 +13,21 @@ let worker: Worker | null = null;
 function getWorker(): Worker {
   if (!worker) {
     worker = new Worker(new URL('./crypto-worker.ts', import.meta.url), { type: 'module' });
+  }
+  if (!workerListenerAttached) {
+    const onMsg = (ev: MessageEvent) => {
+      const rid = ev.data?.rid;
+      if (typeof rid === 'number' && pending.has(rid)) {
+        const entry = pending.get(rid)!;
+        pending.delete(rid);
+        try { clearTimeout(entry.timeout); } catch {}
+        entry.resolve(ev.data);
+        return;
+      }
+      // Fallback: legacy listeners will handle
+    };
+    worker.addEventListener('message', onMsg);
+    workerListenerAttached = true;
   }
   return worker;
 }
@@ -90,6 +108,21 @@ export class CryptoHandler {
     return CryptoHandler.initPromise;
   }
 }
+function sendRequest<T = any>(op: string, payload: Record<string, any>, timeoutMs: number = 15000): Promise<T> {
+  const w = getWorker();
+  const rid = nextRid++;
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      if (pending.has(rid)) {
+        pending.delete(rid);
+        reject(new Error(`${op} timeout`));
+      }
+    }, timeoutMs);
+    pending.set(rid, { resolve: resolve as any, reject, timeout });
+    w.postMessage({ t: op, rid, ...payload });
+  });
+}
+
 
 
 export function getDevicePublicKey(): Promise<string> {
@@ -160,49 +193,22 @@ export function provisionWrappedKEK(wrappedKEK: WrappedKEKEnvelope): Promise<boo
 }
 
 export function encryptRow(store: string, id: any, row: any, overrides?: { tenant?: string | number, user?: string | number, version?: number | string }): Promise<any> {
-  const w = getWorker();
-  return new Promise((resolve, reject) => {
-    const onMsg = (ev: MessageEvent) => {
-      w.removeEventListener('message', onMsg);
-      if (ev.data?.ok) {
-        resolve(ev.data.env);
-      } else {
-        console.warn('[crypto] ENCRYPT error', store, ev.data?.error);
-        reject(new Error(ev.data?.error || 'encrypt error'));
-      }
-    };
-    w.addEventListener('message', onMsg);
-    w.postMessage({ t: 'ENCRYPT', store, id, row, overrides });
+  return sendRequest('ENCRYPT', { store, id, row, overrides }).then((resp: any) => {
+    if (resp?.ok && resp?.env) return resp.env;
+    if (resp?.ok && !resp?.env) throw new Error('encrypt ok but missing env');
+    throw new Error(resp?.error || 'encrypt error');
   });
 }
 
 export function decryptRow(store: string, env: any): Promise<any> {
-  const w = getWorker();
-  return new Promise((resolve, reject) => {
-    const onMsg = (ev: MessageEvent) => {
-      w.removeEventListener('message', onMsg);
-      if (ev.data?.ok) {
-        resolve(ev.data.row);
-      } else {
-        console.warn('[crypto] DECRYPT error', store, ev.data?.error);
-        reject(new Error(ev.data?.error || 'decrypt error'));
-      }
-    };
-    w.addEventListener('message', onMsg);
-    w.postMessage({ t: 'DECRYPT', store, env });
+  return sendRequest('DECRYPT', { store, env }).then((resp: any) => {
+    if (resp?.ok) return resp.row;
+    throw new Error(resp?.error || 'decrypt error');
   });
 }
 
 export function ensureCEK(store: string, wrappedCEK?: { iv: string, ct: string } | null): Promise<{ ok: boolean; error?: string; detail?: any; wrappedCEK?: { iv: string, ct: string } | null }> {
-  const w = getWorker();
-  return new Promise((resolve) => {
-    const onMsg = (ev: MessageEvent) => {
-      w.removeEventListener('message', onMsg);
-      resolve(ev.data);
-    };
-    w.addEventListener('message', onMsg);
-    w.postMessage({ t: 'ENSURE_CEK', store, wrappedCEK });
-  });
+  return sendRequest('ENSURE_CEK', { store, wrappedCEK });
 }
 
 export function zeroizeKeys(): Promise<boolean> {

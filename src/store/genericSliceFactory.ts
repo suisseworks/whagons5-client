@@ -85,28 +85,20 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
     // Get event names for this table
     const events = GenericEvents.getEvents(table);
 
-    // Single-flight + cache guard for IndexedDB hydration
-    let inflightLoad: Promise<T[]> | null = null;
-    let lastLoadedAt = 0;
-    let lastResult: T[] = [] as unknown as T[];
+    // Single-flight guard for IndexedDB hydration
+let inflightLoad: Promise<T[]> | null = null;
 
     // Async thunks
     const getFromIndexedDB = createAsyncThunk<T[], { force?: boolean } | undefined, { state: any }>(
         `${name}/loadFromIndexedDB`,
-        async (arg, { getState }) => {
-            const force = Boolean(arg?.force);
-            const stateSlice = (getState() as any)?.[name];
-            const hasState = Array.isArray(stateSlice?.value) && stateSlice.value.length > 0;
-            if (!force && hasState) {
-                return stateSlice.value as T[];
-            }
-            if (!force && inflightLoad) {
+        async (_arg, { getState: _getState }) => {
+            // Always fetch fresh data from IndexedDB
+            if (inflightLoad) {
                 return inflightLoad;
             }
+
             inflightLoad = (async () => {
                 const rows = await cacheInstance.getAll() as T[];
-                lastLoadedAt = Date.now();
-                lastResult = rows;
                 inflightLoad = null;
                 return rows;
             })();
@@ -125,13 +117,17 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
         }
     );
 
-    // Generic update async thunk
+    // Generic update async thunk with optimistic Redux updates
     const updateAsync = createAsyncThunk<{ id: number | string; updates: Partial<T> }, { id: number | string; updates: Partial<T> }, { rejectValue: string; state: any }>(
         `${name}/updateAsync`,
         async (
             { id, updates }: { id: number | string; updates: Partial<T> },
             { rejectWithValue, dispatch, getState }
         ) => {
+            // Save previous state for rollback
+            const prevItems: any[] = (getState()[name]?.value ?? []) as any[];
+            const previous = prevItems.find((it) => String((it as any).id) === String(id));
+
             try {
                 // Optimistic update in Redux
                 dispatch((slice.actions as any).updateItem({ id, ...(updates as any) }));
@@ -140,65 +136,65 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
                 // Remote update
                 const saved = await cacheInstance.updateRemote(id as any, updates as any);
 
-                // Persist to IndexedDB and ensure Redux reflects server truth
+                // Update IndexedDB with server response
                 await cacheInstance.update(id as any, saved);
+
+                // Update Redux with server truth
                 dispatch((slice.actions as any).updateItem(saved));
                 GenericEvents.emit(events.UPDATED, saved);
 
                 return { id, updates };
             } catch (error: any) {
-                // Rollback
-                try {
-                    const prevItems: any[] = (getState()[name]?.value ?? []) as any[];
-                    const previous = prevItems.find((it) => String((it as any).id) === String(id));
-                    if (previous) {
-                        dispatch((slice.actions as any).updateItem(previous));
-                    }
-                } catch {}
+                // Rollback optimistic update
+                if (previous) {
+                    dispatch((slice.actions as any).updateItem(previous));
+                }
                 return rejectWithValue(error?.message as string);
             }
         }
     );
 
-    // Generic add async thunk
+    // Generic add async thunk with optimistic Redux updates
     const addAsync = createAsyncThunk<T, T, { rejectValue: string; state: any }>(
         `${name}/addAsync`,
         async (item: T, { rejectWithValue, dispatch }) => {
-            // Generate temp id if missing for optimistic UI
+            // Generate temp id for optimistic UI
             const hasId = (item as any)?.id !== undefined && (item as any)?.id !== null;
             const tempId = hasId ? (item as any).id : -Date.now();
             const optimistic: any = { ...(item as any), id: tempId };
 
             try {
-                // Optimistic add to Redux
+                // Optimistic update to Redux immediately
                 dispatch((slice.actions as any).addItem(optimistic));
                 GenericEvents.emit(events.CREATED, optimistic);
 
                 // Create on server
                 const saved = await cacheInstance.createRemote(item as any);
 
-                // Persist to IndexedDB and update Redux (replace temp with real)
+                // Update IndexedDB with real data from server
                 await cacheInstance.add(saved);
+
+                // Replace optimistic item with real data in Redux
                 dispatch((slice.actions as any).removeItem(tempId));
                 dispatch((slice.actions as any).addItem(saved));
                 GenericEvents.emit(events.CREATED, saved);
 
                 return saved as T;
             } catch (error: any) {
-                // Rollback optimistic state
+                // Rollback optimistic update on error
                 dispatch((slice.actions as any).removeItem(tempId));
                 return rejectWithValue(error?.message as string);
             }
         }
     );
 
-    // Generic remove async thunk
+    // Generic remove async thunk with optimistic Redux updates
     const removeAsync = createAsyncThunk<number | string, number | string, { rejectValue: string; state: any }>(
         `${name}/removeAsync`,
         async (id: number | string, { rejectWithValue, dispatch, getState }) => {
-            // Save previous for rollback
+            // Save item for rollback
             const items: any[] = (getState()[name]?.value ?? []) as any[];
-            const previous = items.find((it) => String((it as any).id) === String(id));
+            const itemToRemove = items.find((it) => String((it as any).id) === String(id));
 
             try {
                 // Optimistic remove from Redux
@@ -208,13 +204,15 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
                 // Remote delete
                 await cacheInstance.deleteRemote(id as any);
 
-                // Delete from IndexedDB
+                // Remove from IndexedDB
                 await cacheInstance.remove(id);
 
                 return id;
             } catch (error: any) {
-                // Rollback
-                if (previous) dispatch((slice.actions as any).addItem(previous));
+                // Rollback optimistic delete
+                if (itemToRemove) {
+                    dispatch((slice.actions as any).addItem(itemToRemove));
+                }
                 return rejectWithValue(error?.message as string);
             }
         }
@@ -253,7 +251,16 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
                 }
             },
             addItem: (state, action: PayloadAction<T>) => {
-                state.value.push(action.payload as any);
+                const newItem = action.payload as any;
+                const existingIndex = state.value.findIndex((item: any) => (item as any).id === newItem.id);
+
+                if (existingIndex >= 0) {
+                    // Replace existing item with the same ID
+                    state.value[existingIndex] = newItem;
+                } else {
+                    // Add new item if no existing item with same ID
+                    state.value.push(newItem);
+                }
             },
             removeItem: (state, action: PayloadAction<number | string>) => {
                 state.value = state.value.filter((item: any) => (item as any).id !== action.payload) as unknown as typeof state.value;

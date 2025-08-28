@@ -351,35 +351,33 @@ export class RealTimeListener {
     }
   }
 
-  /**
+      /**
    * Handle different types of RTL messages
    */
   private handleRTLMessage(data: RTLMessage): void {
     switch (data.type) {
       case 'ping':
         // Silently handle server ping messages for health checks
-        this.debugLog('Received ping from server');
         break;
-        
+
       case 'system':
         this.handleSystemMessage(data);
         break;
-        
+
       case 'error':
         this.handleErrorMessage(data);
         break;
-        
+
       case 'echo':
         this.emit('message:echo', { message: data.message, data: data.data });
         break;
-        
+
       case 'database':
         this.handlePublicationMessage(data);
         break;
-        
+
       default:
         // Handle unknown message types
-        this.debugLog('Unknown message type:', data);
         this.emit('message:unknown', data);
         break;
     }
@@ -446,7 +444,6 @@ export class RealTimeListener {
     const cache = getCacheForTable(table);
 
     if (!cache) {
-      this.debugLog('No cache handler registered for table', table);
       return;
     }
 
@@ -455,31 +452,86 @@ export class RealTimeListener {
       switch (operation) {
         case 'INSERT':
           if (data.new_data) {
-            await cache.add(data.new_data);
-            // Sync Redux slice from IndexedDB after write
-            syncReduxForTable(table);
+            console.log(`RTL: Processing INSERT for ${table}`, {
+              newData: data.new_data,
+              hasId: data.new_data.id !== undefined && data.new_data.id !== null,
+              idValue: data.new_data.id,
+              idType: typeof data.new_data.id,
+              tableName: data.table,
+              allFields: Object.keys(data.new_data),
+              fullMessage: data
+            });
+
+            // Log the complete new_data object to see what's different
+            console.log(`RTL: Full ${table} INSERT data:`, JSON.stringify(data.new_data, null, 2));
+
+            // Check if the data has a valid ID before proceeding
+            if (data.new_data.id === undefined || data.new_data.id === null) {
+              console.error(`RTL: Skipping INSERT for ${table} - missing ID`, data.new_data);
+              return;
+            }
+
+            // Additional validation: Check if this ID already exists in IndexedDB
+            console.log(`RTL: About to add ${table} with ID ${data.new_data.id} to IndexedDB`);
+
+            try {
+                const existing = await cache.getAll();
+              const existingRecord = existing.find((record: any) => record.id === data.new_data.id);
+
+              if (existingRecord) {
+                console.warn(`RTL: ID ${data.new_data.id} already exists in ${table}, skipping duplicate INSERT`, {
+                  existing: existingRecord,
+                  incoming: data.new_data
+                });
+                return;
+              }
+
+              await cache.add(data.new_data);
+              await syncReduxForTable(table);
+            } catch (dbError) {
+              console.error(`RTL: IndexedDB error for ${table} with ID ${data.new_data.id}:`, dbError);
+              // Don't throw - just log the error to prevent crashes
+              return;
+            }
           }
           break;
         case 'UPDATE':
           if (data.new_data && data.new_data.id != null) {
+            console.log(`RTL: Processing UPDATE for ${table}`, {
+              newData: data.new_data,
+              id: data.new_data.id
+            });
+            // Extra debug: ensure id visibility just before cache.update
+            try {
+              const dbg = localStorage.getItem('wh-debug-cache') === 'true';
+              if (dbg) {
+                console.log('RTL: pre-cache.update payload check', {
+                  table,
+                  idPresent: data.new_data.id !== undefined && data.new_data.id !== null,
+                  idType: typeof data.new_data.id,
+                  keys: Object.keys(data.new_data || {}),
+                });
+              }
+            } catch {}
             await cache.update(data.new_data.id, data.new_data);
-            // Sync Redux slice from IndexedDB after write
-            syncReduxForTable(table);
+            await syncReduxForTable(table);
           }
           break;
         case 'DELETE':
           if (data.old_data && data.old_data.id != null) {
+            console.log(`RTL: Processing DELETE for ${table}`, {
+              oldData: data.old_data,
+              id: data.old_data.id
+            });
             await cache.remove(data.old_data.id);
-            // Sync Redux slice from IndexedDB after write
-            syncReduxForTable(table);
+            await syncReduxForTable(table);
           }
           break;
         default:
-          this.debugLog('Unknown operation for table', table, operation);
           break;
       }
     } catch (error) {
-      console.error('RTL generic cache handler error', { table, operation, error });
+      console.error('RTL cache handler error', { table, operation, error });
     }
   }
 
