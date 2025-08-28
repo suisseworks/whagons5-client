@@ -6,9 +6,9 @@ import { ThemeProvider } from './providers/ThemeProvider';
 import { Provider } from 'react-redux';
 import {store } from './store';
 import { registerSW } from 'virtual:pwa-register';
-import { DB } from './store/indexedDB/DB';
-import * as CryptoAPI from './crypto/crypto';
-import { genericActions } from './store/genericSlices';
+// import { DB } from './store/indexedDB/DB';
+// import * as CryptoAPI from './crypto/crypto';
+// import { genericActions } from './store/genericSlices';
 import { applyEncryptionConfig } from './config/encryptionConfig';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
@@ -31,16 +31,16 @@ if (import.meta.env.VITE_DEVELOPMENT !== 'true') {
   registerSW({ immediate: true });
 }
 
-// Expose debug helpers for manual testing in console
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-window.DB = DB;
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-window.CryptoAPI = CryptoAPI;
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-window.store = store;
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-window.genericActions = genericActions;
+// // Expose debug helpers for manual testing in console
+// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// // @ts-ignore
+// window.DB = DB;
+// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// // @ts-ignore
+// window.CryptoAPI = CryptoAPI;
+// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// // @ts-ignore
+// window.store = store;
+// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// // @ts-ignore
+// window.genericActions = genericActions;
