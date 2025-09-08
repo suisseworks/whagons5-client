@@ -75,6 +75,16 @@ export class GenericCache {
 		});
 
 		const idVal = this.getId(row);
+		// If row is soft-deleted, ensure it's removed from local cache instead of added
+		if (row && Object.prototype.hasOwnProperty.call(row, 'deleted_at') && row.deleted_at != null) {
+			try {
+				await DB.delete(this.store, idVal as any);
+				return;
+			} catch (error) {
+				console.warn(`GenericCache.add: attempted to remove soft-deleted row in ${this.store} but failed`, { error, idVal });
+				return;
+			}
+		}
 		if (idVal === undefined || idVal === null) {
 			console.error(`GenericCache.add: Row missing ID field '${this.idField}'`, row);
 			return;
@@ -104,6 +114,12 @@ export class GenericCache {
 					rowId: row?.id,
 					rowKeys: row ? Object.keys(row) : [],
 				});
+			}
+			// If row is soft-deleted, remove from local cache instead of updating
+			if (row && Object.prototype.hasOwnProperty.call(row, 'deleted_at') && row.deleted_at != null) {
+				const idVal = this.getId(row) ?? _id;
+				await DB.delete(this.store, idVal as any);
+				return;
 			}
 			await DB.put(this.store, row);
 		} catch (e) {
@@ -156,6 +172,15 @@ export class GenericCache {
 			// Signal hydration start/end to coordinate readers
 			const end = (DB as any).startHydration?.(this.store) || (() => {});
 			try {
+				// Prune local rows that are no longer present in server response (e.g., soft-deleted)
+				const existing = await this.getAll();
+				const fetchedIdSet = new Set<any>(rows.map((r) => this.getId(r)));
+				for (const localRow of existing) {
+					const idVal = this.getId(localRow);
+					if (!fetchedIdSet.has(idVal)) {
+						try { await DB.delete(this.store, idVal as any); } catch {}
+					}
+				}
 				await DB.bulkPut(this.store, rows);
 			} finally {
 				end();

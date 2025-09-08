@@ -114,31 +114,29 @@ function Users() {
   const handleBackClick = () => navigate('/settings');
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="space-y-2">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground transition-colors">
+    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+      <div className="space-y-2 py-6 border-b border-gray-200">
+        <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
+          <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer">
             <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
             <span>Settings</span>
           </button>
-          <span>»</span>
+          <span>{'>'}</span>
           <span className="text-foreground">Users</span>
         </nav>
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">
-              <FontAwesomeIcon icon={faUser} className="text-indigo-500 text-2xl" />
-              <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+              <FontAwesomeIcon icon={faUser} className="text-2xl" style={{ color: '#10b981' }} />
+              <h1 className="text-4xl font-extrabold tracking-tight">Users</h1>
             </div>
-            <p className="text-muted-foreground">User accounts and permissions</p>
+            <p className="text-sm" style={{ color: '#64748b' }}>User accounts and permissions</p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
             <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
           </div>
         </div>
       </div>
-
-      <Separator />
 
       <div className="ag-theme-quartz h-[500px] w-full">
         <Suspense fallback={<div className="flex items-center justify-center h-64"><FontAwesomeIcon icon={faSpinner} className="animate-spin" /></div>}>

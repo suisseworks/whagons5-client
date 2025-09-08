@@ -258,19 +258,19 @@ function Spots() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground transition-colors">
+      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+        <div className="space-y-2 py-6 border-b border-gray-200">
+          <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
+            <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer">
               <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
               <span>Settings</span>
             </button>
-            <span>»</span>
+            <span>{'>'}</span>
             <span className="text-foreground">Spots</span>
           </nav>
           <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faLocationDot} className="text-green-500 text-2xl" />
-            <h1 className="text-3xl font-bold tracking-tight">Spots</h1>
+            <FontAwesomeIcon icon={faLocationDot} className="text-2xl" style={{ color: '#10b981' }} />
+            <h1 className="text-4xl font-extrabold tracking-tight">Spots</h1>
           </div>
         </div>
         <Separator />
@@ -286,19 +286,19 @@ function Spots() {
 
   if (error) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground transition-colors">
+      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+        <div className="space-y-2 py-6 border-b border-gray-200">
+          <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
+            <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer">
               <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
               <span>Settings</span>
             </button>
-            <span>»</span>
+            <span>{'>'}</span>
             <span className="text-foreground">Spots</span>
           </nav>
           <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faLocationDot} className="text-green-500 text-2xl" />
-            <h1 className="text-3xl font-bold tracking-tight">Spots</h1>
+            <FontAwesomeIcon icon={faLocationDot} className="text-2xl" style={{ color: '#10b981' }} />
+            <h1 className="text-4xl font-extrabold tracking-tight">Spots</h1>
           </div>
         </div>
         <Separator />
@@ -311,27 +311,27 @@ function Spots() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
       <div className="space-y-2">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground transition-colors">
+        <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
+          <button onClick={handleBackClick} className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer">
             <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
             <span>Settings</span>
           </button>
-          <span>»</span>
+          <span>{'>'}</span>
           <span className="text-foreground">Spots</span>
         </nav>
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">
-              <FontAwesomeIcon icon={faLocationDot} className="text-green-500 text-2xl" />
-              <h1 className="text-3xl font-bold tracking-tight">Spots</h1>
+              <FontAwesomeIcon icon={faLocationDot} className="text-2xl" style={{ color: '#10b981' }} />
+              <h1 className="text-4xl font-extrabold tracking-tight">Spots</h1>
             </div>
-            <p className="text-muted-foreground">Set up locations and spot management</p>
+            <p className="text-sm" style={{ color: '#64748b' }}>Set up locations and spot management</p>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={handleAddSpot} className="flex items-center space-x-2">
+              <Button onClick={handleAddSpot} className="flex items-center space-x-2 font-semibold text-white bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]">
                 <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
                 <span>Add Spot</span>
               </Button>
@@ -460,8 +460,6 @@ function Spots() {
           </Dialog>
         </div>
       </div>
-
-      <Separator />
 
       <div className="space-y-4">
         <Input placeholder="Search spots..." className="w-full max-w-md" onChange={(e) => handleSearch(e.target.value)} />

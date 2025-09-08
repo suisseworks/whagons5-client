@@ -22,7 +22,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { Team } from "@/store/types";
+import { Team, Category, Task } from "@/store/types";
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -108,14 +108,19 @@ function Teams() {
     color: '#4ECDC4'
   });
 
+  // Ensure latest server data (excludes soft-deleted rows)
+  useEffect(() => {
+    dispatch(genericActions.teams.fetchFromAPI());
+  }, [dispatch]);
+
   // Get category count for a team
   const getTeamCategoryCount = useCallback((teamId: number) => {
-    return categories.filter(category => category.team_id === teamId).length;
+    return categories.filter((category: Category) => category.team_id === teamId).length;
   }, [categories]);
 
   // Get task count for a team
   const getTeamTaskCount = useCallback((teamId: number) => {
-    return tasks.filter(task => task.team_id === teamId).length;
+    return tasks.filter((task: Task) => task.team_id === teamId).length;
   }, [tasks]);
 
   // Handle delete team
@@ -237,7 +242,7 @@ function Teams() {
 
   // Update rowData when teams change
   useEffect(() => {
-    setRowData(teams);
+    setRowData(teams.filter((t: Team) => t.deleted_at == null));
   }, [teams]);
 
   // Create new team via Redux
@@ -336,9 +341,10 @@ function Teams() {
   const handleSearch = (value: string) => {
     const lowerCaseValue = value.toLowerCase();
     if (lowerCaseValue === '') {
-      setRowData(teams);
+      setRowData(teams.filter((t: Team) => t.deleted_at == null));
     } else {
-      const filteredData = teams.filter((team) => {
+      const filteredData = teams.filter((team: Team) => {
+        if (team.deleted_at != null) return false;
         return team.name?.toLowerCase().includes(lowerCaseValue) ||
                team.description?.toLowerCase().includes(lowerCaseValue);
       });
@@ -372,7 +378,7 @@ function Teams() {
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <button 
               onClick={handleBackClick}
-              className="flex items-center space-x-1 hover:text-foreground transition-colors"
+              className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
             >
               <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
               <span>Settings</span>
@@ -404,7 +410,7 @@ function Teams() {
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <button 
               onClick={handleBackClick}
-              className="flex items-center space-x-1 hover:text-foreground transition-colors"
+              className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
             >
               <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
               <span>Settings</span>
@@ -435,7 +441,7 @@ function Teams() {
         <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
           <button 
             onClick={handleBackClick}
-            className="flex items-center space-x-1 hover:text-foreground transition-colors"
+            className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
           >
             <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
             <span>Settings</span>
@@ -662,7 +668,7 @@ function Teams() {
                     <div className="flex items-center space-x-3">
                       <div 
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                        style={{ backgroundColor: deletingTeam.color }}
+                        style={{ backgroundColor: deletingTeam.color ?? '#6B7280' }}
                       >
                         {deletingTeam.name.charAt(0).toUpperCase()}
                       </div>
@@ -712,8 +718,6 @@ function Teams() {
           </Dialog>
         </div>
       </div>
-
-      <Separator />
 
       {/* Search and Grid */}
       <div className="space-y-4">

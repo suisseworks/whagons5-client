@@ -482,22 +482,22 @@ function Templates() {
   // Loading state
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+        <div className="space-y-2 py-6 border-b border-gray-200">
+          <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
             <button 
               onClick={handleBackClick}
-              className="flex items-center space-x-1 hover:text-foreground transition-colors"
+              className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
             >
               <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
               <span>Settings</span>
             </button>
-            <span>»</span>
+            <span>{'>'}</span>
             <span className="text-foreground">Templates</span>
           </nav>
           <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faClipboardList} className="text-blue-500 text-2xl" />
-            <h1 className="text-3xl font-bold tracking-tight">Templates</h1>
+            <FontAwesomeIcon icon={faClipboardList} className="text-2xl" style={{ color: '#10b981' }} />
+            <h1 className="text-4xl font-extrabold tracking-tight">Templates</h1>
           </div>
         </div>
         <Separator />
@@ -514,22 +514,22 @@ function Templates() {
   // Error state
   if (error) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+        <div className="space-y-2 py-6 border-b border-gray-200">
+          <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
             <button 
               onClick={handleBackClick}
-              className="flex items-center space-x-1 hover:text-foreground transition-colors"
+              className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
             >
               <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
               <span>Settings</span>
             </button>
-            <span>»</span>
+            <span>{'>'}</span>
             <span className="text-foreground">Templates</span>
           </nav>
           <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faClipboardList} className="text-blue-500 text-2xl" />
-            <h1 className="text-3xl font-bold tracking-tight">Templates</h1>
+            <FontAwesomeIcon icon={faClipboardList} className="text-2xl" style={{ color: '#10b981' }} />
+            <h1 className="text-4xl font-extrabold tracking-tight">Templates</h1>
           </div>
         </div>
         <Separator />
@@ -544,33 +544,33 @@ function Templates() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
       {/* Header */}
-      <div className="space-y-2">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+      <div className="space-y-2 py-6 border-b border-gray-200">
+        <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
           <button 
             onClick={handleBackClick}
-            className="flex items-center space-x-1 hover:text-foreground transition-colors"
+            className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
           >
             <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
             <span>Settings</span>
           </button>
-          <span>»</span>
+          <span>{'>'}</span>
           <span className="text-foreground">Templates</span>
         </nav>
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-3">
-              <FontAwesomeIcon icon={faClipboardList} className="text-blue-500 text-2xl" />
-              <h1 className="text-3xl font-bold tracking-tight">Templates</h1>
+              <FontAwesomeIcon icon={faClipboardList} className="text-2xl" style={{ color: '#10b981' }} />
+              <h1 className="text-4xl font-extrabold tracking-tight">Templates</h1>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-sm" style={{ color: '#64748b' }}>
               Manage task templates for faster task creation and standardized workflows
             </p>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={handleAddTemplate} className="flex items-center space-x-2">
+              <Button onClick={handleAddTemplate} className="flex items-center space-x-2 font-semibold text-white bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]">
                 <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
                 <span>Add Template</span>
               </Button>
@@ -975,8 +975,6 @@ function Templates() {
           </Dialog>
         </div>
       </div>
-
-      <Separator />
 
       {/* Search and Grid */}
       <div className="space-y-4">

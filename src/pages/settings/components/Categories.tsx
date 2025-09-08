@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import SettingsHeader from "@/components/SettingsHeader";
 import { useSelector, useDispatch } from "react-redux";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -16,7 +17,6 @@ import { iconService } from '@/database/iconService';
 import { ChevronDown } from "lucide-react";
 import { 
   faTags, 
-  faArrowLeft,
   faPlus,
   faEdit,
   faTrash,
@@ -29,7 +29,8 @@ import {
   faCar,
   faUtensils,
   faLaptop,
-  faBook
+  faBook,
+  faCubes
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
@@ -106,7 +107,7 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 };
 
 // Custom cell renderer for actions
-const ActionsCellRenderer = (props: ICellRendererParams & { onEdit: (category: Category) => void; onDelete: (category: Category) => void }) => {
+const ActionsCellRenderer = (props: ICellRendererParams & { onEdit: (category: Category) => void; onDelete: (category: Category) => void; onManageFields: (category: Category) => void }) => {
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     props.onEdit(props.data);
@@ -117,8 +118,22 @@ const ActionsCellRenderer = (props: ICellRendererParams & { onEdit: (category: C
     props.onDelete(props.data);
   };
 
+  const handleManageFields = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    props.onManageFields(props.data);
+  };
+
   return (
     <div className="flex items-center space-x-2 h-full">
+      <Button 
+        size="sm" 
+        variant="outline"
+        onClick={handleManageFields}
+        className="p-1 h-7"
+      >
+        <FontAwesomeIcon icon={faCubes} className="w-3 h-3 mr-1" />
+        Fields
+      </Button>
       <Button 
         size="sm" 
         variant="outline"
@@ -148,6 +163,8 @@ function Categories() {
   const { value: categories, loading, error } = useSelector((state: RootState) => state.categories) as { value: Category[]; loading: boolean; error: string | null };
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
+  const { value: customFields } = useSelector((state: RootState) => state.customFields) as { value: any[] };
+  const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
   
   const [rowData, setRowData] = useState<Category[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -190,6 +207,251 @@ function Categories() {
   const [loadingMoreIcons, setLoadingMoreIcons] = useState(false);
   const [currentFormIcon, setCurrentFormIcon] = useState<any>(null);
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
+  // Manage Fields dialog state
+  const [isFieldsDialogOpen, setIsFieldsDialogOpen] = useState(false);
+  const [fieldsCategory, setFieldsCategory] = useState<Category | null>(null);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [newFieldId, setNewFieldId] = useState<string>("");
+
+  type CategoryFieldAssignment = { id: number; field_id: number; category_id: number; is_required: boolean; order: number; default_value: string | null; updated_at?: string };
+  type CustomField = { id: number; name: string; field_type: string; options?: any; validation_rules?: any; updated_at?: string };
+
+  const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
+    const map: Record<number, number> = {};
+    (categoryFieldAssignments as CategoryFieldAssignment[]).forEach((a) => {
+      map[a.category_id] = (map[a.category_id] || 0) + 1;
+    });
+    return map;
+  }, [categoryFieldAssignments]);
+
+  const openManageFields = useCallback(async (category: Category) => {
+    setFieldsCategory(category);
+    setIsFieldsDialogOpen(true);
+    // Load reference data
+    try {
+      await Promise.all([
+        dispatch(genericActions.customFields.getFromIndexedDB()),
+        dispatch(genericActions.categoryFieldAssignments.getFromIndexedDB()),
+      ]);
+      await Promise.all([
+        dispatch(genericActions.customFields.fetchFromAPI() as any),
+        dispatch(genericActions.categoryFieldAssignments.fetchFromAPI({ category_id: category.id }) as any),
+      ]);
+    } catch (e) {
+      console.error('Error loading fields/assignments', e);
+    }
+  }, [dispatch]);
+
+  const closeManageFields = () => {
+    setIsFieldsDialogOpen(false);
+    setFieldsCategory(null);
+    setNewFieldId("");
+  };
+
+  const currentAssignments = useMemo(() => {
+    if (!fieldsCategory) return [] as CategoryFieldAssignment[];
+    return (categoryFieldAssignments as CategoryFieldAssignment[])
+      .filter(a => a.category_id === fieldsCategory.id)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [categoryFieldAssignments, fieldsCategory]);
+
+  const assignedFieldIds = useMemo(() => new Set(currentAssignments.map(a => a.field_id)), [currentAssignments]);
+  const availableFields = useMemo(() => {
+    return (customFields as CustomField[]).filter(f => !assignedFieldIds.has(f.id));
+  }, [customFields, assignedFieldIds]);
+
+  const addAssignment = async () => {
+    if (!fieldsCategory || !newFieldId) return;
+    setAssignSubmitting(true);
+    try {
+      const nextOrder = currentAssignments.length > 0 ? Math.max(...currentAssignments.map(a => a.order || 0)) + 1 : 0;
+      await dispatch(genericActions.categoryFieldAssignments.addAsync({
+        field_id: parseInt(newFieldId, 10),
+        category_id: fieldsCategory.id,
+        is_required: false,
+        order: nextOrder,
+        default_value: null,
+      } as any)).unwrap();
+      setNewFieldId("");
+    } catch (e) {
+      console.error('Error adding assignment', e);
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  const removeAssignment = async (assignment: CategoryFieldAssignment) => {
+    setAssignSubmitting(true);
+    try {
+      await dispatch(genericActions.categoryFieldAssignments.removeAsync(assignment.id)).unwrap();
+    } catch (e) {
+      console.error('Error removing assignment', e);
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
+  const updateAssignment = async (assignmentId: number, updates: Partial<CategoryFieldAssignment>) => {
+    try {
+      await dispatch(genericActions.categoryFieldAssignments.updateAsync({ id: assignmentId, updates } as any)).unwrap();
+    } catch (e) {
+      console.error('Error updating assignment', e);
+    }
+  };
+
+  const reorderAssignments = async (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= currentAssignments.length) return;
+    const reordered = [...currentAssignments];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    for (let i = 0; i < reordered.length; i++) {
+      const a = reordered[i];
+      const desired = i;
+      if ((a.order ?? i) !== desired) {
+        updateAssignment(a.id, { order: desired } as any);
+      }
+    }
+  };
+
+  // Helpers to render default value editor by field type
+  const coerceBoolean = (v: any): boolean => {
+    if (typeof v === 'boolean') return v;
+    if (v == null) return false;
+    const s = String(v).toLowerCase();
+    return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+  };
+
+  const parseFieldOptions = (f?: CustomField): Array<{ value: string; label: string }> => {
+    if (!f) return [];
+    const raw = (f as any).options;
+    try {
+      if (Array.isArray(raw)) {
+        return raw.map((o: any) => {
+          if (typeof o === 'string') return { value: o, label: o };
+          if (o && typeof o === 'object') {
+            const val = String(o.value ?? o.id ?? o.name ?? '');
+            const lab = String(o.label ?? o.name ?? val);
+            return { value: val, label: lab };
+          }
+          return { value: String(o), label: String(o) };
+        });
+      }
+      if (typeof raw === 'string' && raw.trim().length) {
+        // Try JSON first
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed.map((o: any) => {
+              if (typeof o === 'string') return { value: o, label: o };
+              const val = String(o.value ?? o.id ?? o.name ?? '');
+              const lab = String(o.label ?? o.name ?? val);
+              return { value: val, label: lab };
+            });
+          }
+        } catch {}
+        // Fallback: comma-separated
+        const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+        return parts.map(s => ({ value: s, label: s }));
+      }
+    } catch {}
+    return [];
+  };
+
+  const parseMultiDefault = (val: string | null | undefined): string[] => {
+    if (!val) return [];
+    // Try JSON array, else comma-separated
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {}
+    return String(val).split(',').map(s => s.trim()).filter(Boolean);
+  };
+
+  const renderDefaultValueEditor = (a: CategoryFieldAssignment, f?: CustomField) => {
+    const type = (f?.field_type || '').toLowerCase();
+    const onText = (v: string) => updateAssignment(a.id, { default_value: v } as any);
+    if (type === 'checkbox') {
+      const checked = coerceBoolean(a.default_value);
+      return (
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => updateAssignment(a.id, { default_value: e.target.checked ? 'true' : 'false' } as any)}
+          className="rounded"
+        />
+      );
+    }
+    if (type === 'select') {
+      const opts = parseFieldOptions(f);
+      return (
+        <select
+          className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+          value={a.default_value ?? ''}
+          onChange={(e) => onText(e.target.value)}
+        >
+          <option value="">—</option>
+          {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      );
+    }
+    if (type === 'multi_select') {
+      const opts = parseFieldOptions(f);
+      const selected = new Set(parseMultiDefault(a.default_value));
+      const toggle = (val: string) => {
+        const next = new Set(selected);
+        if (next.has(val)) next.delete(val); else next.add(val);
+        const arr = Array.from(next.values());
+        onText(arr.join(','));
+      };
+      return (
+        <div className="flex flex-wrap gap-2">
+          {opts.map(o => (
+            <label key={o.value} className="flex items-center space-x-1 text-xs border rounded px-2 py-1">
+              <input type="checkbox" checked={selected.has(o.value)} onChange={() => toggle(o.value)} />
+              <span>{o.label}</span>
+            </label>
+          ))}
+        </div>
+      );
+    }
+    if (type === 'date') {
+      return (
+        <input
+          type="date"
+          className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+          value={a.default_value ?? ''}
+          onChange={(e) => onText(e.target.value)}
+        />
+      );
+    }
+    if (type === 'datetime' || type === 'datetime_local' || type === 'datetime-local') {
+      return (
+        <input
+          type="datetime-local"
+          className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+          value={a.default_value ?? ''}
+          onChange={(e) => onText(e.target.value)}
+        />
+      );
+    }
+    if (type === 'number') {
+      return (
+        <input
+          type="number"
+          className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+          value={a.default_value ?? ''}
+          onChange={(e) => onText(e.target.value)}
+        />
+      );
+    }
+    // Fallback text
+    return (
+      <Input
+        value={a.default_value ?? ''}
+        onChange={(e) => onText(e.target.value)}
+      />
+    );
+  };
 
   const [isSearching, setIsSearching] = useState(false);
   const iconDropdownRef = useRef<HTMLDivElement>(null);
@@ -290,6 +552,14 @@ function Categories() {
       flex: 2,
       minWidth: 150
     },
+    {
+      field: 'fields',
+      headerName: 'Fields',
+      width: 100,
+      valueGetter: (params: any) => assignmentCountByCategory[params.data?.id] || 0,
+      sortable: true,
+      filter: true
+    },
     { 
       field: 'team_id', 
       headerName: 'Team',
@@ -327,13 +597,13 @@ function Categories() {
       field: 'actions',
       headerName: 'Actions',
       width: 120,
-      cellRenderer: (params: ICellRendererParams) => ActionsCellRenderer({...params, onEdit: handleEditCategory, onDelete: handleDeleteCategory}),
+      cellRenderer: (params: ICellRendererParams) => ActionsCellRenderer({...params, onEdit: handleEditCategory, onDelete: handleDeleteCategory, onManageFields: openManageFields}),
       sortable: false,
       filter: false,
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, handleEditCategory, handleDeleteCategory]);
+  ], [teams, handleEditCategory, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
 
   // Removed on-mount IndexedDB loads; AuthProvider hydrates core slices
 
@@ -759,24 +1029,14 @@ function Categories() {
   // Loading state
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <button 
-              onClick={handleBackClick}
-              className="flex items-center space-x-1 hover:text-foreground transition-colors"
-            >
-              <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
-              <span>Settings</span>
-            </button>
-            <span>»</span>
-            <span className="text-foreground">Categories</span>
-          </nav>
-          <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faTags} className="text-red-500 text-2xl" />
-            <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-          </div>
-        </div>
+      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+        <SettingsHeader
+          title="Categories"
+          sectionLabel="Categories"
+          subtitle="Manage task categories and labels for better organization"
+          icon={<FontAwesomeIcon icon={faTags} className="text-2xl" style={{ color: '#10b981' }} />}
+          onBack={handleBackClick}
+        />
         <Separator />
         <div className="flex items-center justify-center h-64">
           <div className="flex items-center space-x-2">
@@ -791,24 +1051,14 @@ function Categories() {
   // Error state
   if (error) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <button 
-              onClick={handleBackClick}
-              className="flex items-center space-x-1 hover:text-foreground transition-colors"
-            >
-              <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
-              <span>Settings</span>
-            </button>
-            <span>»</span>
-            <span className="text-foreground">Categories</span>
-          </nav>
-          <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faTags} className="text-red-500 text-2xl" />
-            <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-          </div>
-        </div>
+      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+        <SettingsHeader
+          title="Categories"
+          sectionLabel="Categories"
+          subtitle="Manage task categories and labels for better organization"
+          icon={<FontAwesomeIcon icon={faTags} className="text-2xl" style={{ color: '#10b981' }} />}
+          onBack={handleBackClick}
+        />
         <Separator />
         <div className="flex flex-col items-center justify-center h-64 space-y-4">
           <p className="text-destructive">{error}</p>
@@ -821,278 +1071,257 @@ function Categories() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <button 
-            onClick={handleBackClick}
-            className="flex items-center space-x-1 hover:text-foreground transition-colors"
-          >
-            <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
-            <span>Settings</span>
-          </button>
-          <span>»</span>
-          <span className="text-foreground">Categories</span>
-        </nav>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-3">
-              <FontAwesomeIcon icon={faTags} className="text-red-500 text-2xl" />
-              <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Manage task categories and labels for better organization
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-          <Link to="/settings/categories/custom-fields">
-            <Button variant="outline">Manage custom fields</Button>
-          </Link>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleAddCategory} className="flex items-center space-x-2">
-                <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-                <span>Add Category</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Category</DialogTitle>
-                <DialogDescription>
-                  Add a new category to organize your tasks.
-                </DialogDescription>
-              </DialogHeader>
-            <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="grid gap-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="col-span-3"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="description" className="text-right">
-                    Description
-                  </Label>
-                  <Input
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="color" className="text-right">
-                    Color
-                  </Label>
-                  <Input
-                    type="color"
-                    id="color"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="icon" className="text-right">
-                    Icon
-                  </Label>
-                  <div className="col-span-3 relative" ref={iconDropdownRef}>
-                    <div
-                      className="flex items-center justify-between w-full px-3 py-2 border border-input bg-background rounded-md cursor-pointer hover:bg-accent transition-colors"
-                      onClick={() => setShowIconDropdown(!showIconDropdown)}
-                    >
-                      <div className="flex items-center space-x-2">
+    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+      <SettingsHeader
+        title="Categories"
+        sectionLabel="Categories"
+        subtitle="Manage task categories and labels for better organization"
+        icon={<FontAwesomeIcon icon={faTags} className="text-2xl" style={{ color: '#10b981' }} />}
+        onBack={handleBackClick}
+        actions={(
+          <>
+            <Link to="/settings/categories/custom-fields">
+              <Button variant="outline" className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#10b981]">Manage custom fields</Button>
+            </Link>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleAddCategory} className="flex items-center space-x-2 font-semibold text-white bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]">
+                  <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+                  <span>Add Category</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Category</DialogTitle>
+                  <DialogDescription>
+                    Add a new category to organize your tasks.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="name" className="text-right">
+                        Name
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="col-span-3"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="description" className="text-right">
+                        Description
+                      </Label>
+                      <Input
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="color" className="text-right">
+                        Color
+                      </Label>
+                      <Input
+                        type="color"
+                        id="color"
+                        value={formData.color}
+                        onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="icon" className="text-right">
+                        Icon
+                      </Label>
+                      <div className="col-span-3 relative" ref={iconDropdownRef}>
+                        <div
+                          className="flex items-center justify-between w-full px-3 py-2 border border-input bg-background rounded-md cursor-pointer hover:bg-accent transition-colors"
+                          onClick={() => setShowIconDropdown(!showIconDropdown)}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <FontAwesomeIcon 
+                              icon={currentFormIcon || defaultIcon} 
+                              className="w-4 h-4" 
+                              style={{ color: formData.color }}
+                            />
+                            <span className="text-sm">{formData.icon.replace('fas fa-', '')}</span>
+                          </div>
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        
+                        {showIconDropdown && (
+                          <div className="absolute top-full left-0 mt-2 w-96 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+                            <div className="p-3">
+                              <Input
+                                placeholder="Search icons... (e.g., heart, user, star)"
+                                value={iconSearch}
+                                onChange={(e) => setIconSearch(e.target.value)}
+                                className="mb-3"
+                                autoFocus
+                              />
+                              <div className="text-xs text-muted-foreground mb-2">
+                                {loadingIcons ? 'Searching icons...' : 
+                                 isSearching ? 
+                                   `${displayedIcons.length} icons found for "${iconSearch}"` :
+                                   `${displayedIcons.length} popular icons • ${totalIconsCount} total icons available`}
+                              </div>
+                              <div 
+                                ref={scrollContainerRef}
+                                className="grid grid-cols-10 gap-1 overflow-y-auto pr-2"
+                                style={{ 
+                                  height: (() => {
+                                    const iconsPerRow = 10;
+                                    const totalRows = Math.ceil(displayedIcons.length / iconsPerRow);
+                                    const iconHeight = 32;
+                                    const gapSize = 4;
+                                    const calculatedHeight = totalRows * iconHeight + Math.max(0, totalRows - 1) * gapSize;
+                                    if (displayedIcons.length > 50 || (!isSearching && loadedIconsCount > 50)) {
+                                      return '240px';
+                                    } else if (totalRows <= 3) {
+                                      return `${calculatedHeight}px`;
+                                    } else {
+                                      return 'auto';
+                                    }
+                                  })(),
+                                  maxHeight: '240px',
+                                  minHeight: (() => {
+                                    if (displayedIcons.length > 50 || (!isSearching && loadedIconsCount > 50)) {
+                                      return '240px';
+                                    }
+                                    return 'auto';
+                                  })()
+                                }}
+                                onScroll={handleIconScroll}
+                              >
+                                {loadingIcons ? (
+                                  <div className="col-span-10 text-center py-4">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {displayedIcons.map((item, index) => (
+                                      <button
+                                        key={`${item.name}-${index}`}
+                                        onClick={() => handleIconSelect(item.name)}
+                                        className="w-8 h-8 text-sm hover:bg-accent rounded-md transition-colors flex items-center justify-center"
+                                        title={item.name}
+                                      >
+                                        <FontAwesomeIcon icon={item.icon} />
+                                      </button>
+                                    ))}
+                                    {loadingMoreIcons && (
+                                      <div className="col-span-10 text-center py-2">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              {!loadingIcons && !isSearching && loadedIconsCount < totalIconsCount && (
+                                <div className="text-xs text-muted-foreground mt-2 text-center">
+                                  Scroll down to load more icons ({loadedIconsCount} of {totalIconsCount} loaded)
+                                </div>
+                              )}
+                              {!loadingIcons && displayedIcons.length === 0 && (
+                                <div className="text-center text-muted-foreground py-4">
+                                  {iconSearch.trim() ? 'No icons found. Try different search terms.' : 'No popular icons available.'}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="team" className="text-right">
+                        Team
+                      </Label>
+                      <select
+                        id="team"
+                        value={formData.team_id}
+                        onChange={(e) => setFormData({ ...formData, team_id: e.target.value })}
+                        className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                      >
+                        <option value="">No Team</option>
+                        {teams.map((team: Team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="enabled" className="text-right">
+                        Status
+                      </Label>
+                      <div className="col-span-3 flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="enabled"
+                          checked={formData.enabled}
+                          onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <Label htmlFor="enabled" className="text-sm">
+                          {formData.enabled ? 'Enabled' : 'Disabled'}
+                        </Label>
+                      </div>
+                    </div>
+                    {/* Preview */}
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label className="text-right">Preview</Label>
+                      <div className="col-span-3 flex items-center space-x-3 p-2 border rounded">
                         <FontAwesomeIcon 
                           icon={currentFormIcon || defaultIcon} 
                           className="w-4 h-4" 
                           style={{ color: formData.color }}
                         />
-                        <span className="text-sm">{formData.icon.replace('fas fa-', '')}</span>
+                        <span>{formData.name || 'Category Name'}</span>
+                        {formData.team_id && (
+                          <div className="flex items-center space-x-1">
+                            <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">
+                              {teams.find((t: Team) => t.id === parseInt(formData.team_id))?.name?.charAt(0).toUpperCase() || 'T'}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {teams.find((t: Team) => t.id === parseInt(formData.team_id))?.name || `Team ${formData.team_id}`}
+                            </span>
+                          </div>
+                        )}
+                        <Badge 
+                          variant={formData.enabled ? "default" : "secondary"} 
+                          className={formData.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
+                        >
+                          {formData.enabled ? "Enabled" : "Disabled"}
+                        </Badge>
                       </div>
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </div>
-                    
-                    {showIconDropdown && (
-                      <div className="absolute top-full left-0 mt-2 w-96 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
-                        <div className="p-3">
-                          <Input
-                            placeholder="Search icons... (e.g., heart, user, star)"
-                            value={iconSearch}
-                            onChange={(e) => setIconSearch(e.target.value)}
-                            className="mb-3"
-                            autoFocus
-                          />
-                          <div className="text-xs text-muted-foreground mb-2">
-                            {loadingIcons ? 'Searching icons...' : 
-                             isSearching ? 
-                               `${displayedIcons.length} icons found for "${iconSearch}"` :
-                               `${displayedIcons.length} popular icons • ${totalIconsCount} total icons available`}
-                          </div>
-                          <div 
-                            ref={scrollContainerRef}
-                            className="grid grid-cols-10 gap-1 overflow-y-auto pr-2"
-                            style={{ 
-                              height: (() => {
-                                // Calculate number of rows needed
-                                const iconsPerRow = 10;
-                                const totalRows = Math.ceil(displayedIcons.length / iconsPerRow);
-                                const iconHeight = 32; // w-8 h-8 = 32px
-                                const gapSize = 4; // gap-1 = 4px
-                                const calculatedHeight = totalRows * iconHeight + Math.max(0, totalRows - 1) * gapSize;
-                                
-                                // Use calculated height for small grids, fixed height for large grids
-                                if (displayedIcons.length > 50 || (!isSearching && loadedIconsCount > 50)) {
-                                  return '240px';
-                                } else if (totalRows <= 3) {
-                                  // For 3 rows or less, use exact calculated height
-                                  return `${calculatedHeight}px`;
-                                } else {
-                                  // For more than 3 rows but less than 50 icons, use auto with max
-                                  return 'auto';
-                                }
-                              })(),
-                              maxHeight: '240px',
-                              minHeight: (() => {
-                                // Only set minHeight when there are actually many icons
-                                if (displayedIcons.length > 50 || (!isSearching && loadedIconsCount > 50)) {
-                                  return '240px';
-                                }
-                                return 'auto';
-                              })()
-                            }}
-                            onScroll={handleIconScroll}
-                          >
-                            {loadingIcons ? (
-                              <div className="col-span-10 text-center py-4">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                              </div>
-                            ) : (
-                              <>
-                                {displayedIcons.map((item, index) => (
-                                  <button
-                                    key={`${item.name}-${index}`}
-                                    onClick={() => handleIconSelect(item.name)}
-                                    className="w-8 h-8 text-sm hover:bg-accent rounded-md transition-colors flex items-center justify-center"
-                                    title={item.name}
-                                  >
-                                    <FontAwesomeIcon icon={item.icon} />
-                                  </button>
-                                ))}
-                                {loadingMoreIcons && (
-                                  <div className="col-span-10 text-center py-2">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                          {!loadingIcons && !isSearching && loadedIconsCount < totalIconsCount && (
-                            <div className="text-xs text-muted-foreground mt-2 text-center">
-                              Scroll down to load more icons ({loadedIconsCount} of {totalIconsCount} loaded)
-                            </div>
-                          )}
-                          {!loadingIcons && displayedIcons.length === 0 && (
-                            <div className="text-center text-muted-foreground py-4">
-                              {iconSearch.trim() ? 'No icons found. Try different search terms.' : 'No popular icons available.'}
-                            </div>
-                          )}
-                        </div>
+                  </div>
+                  <DialogFooter>
+                    {(formError || error) && (
+                      <div className="text-sm text-destructive mb-2 text-left">
+                        {formError || error}
                       </div>
                     )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="team" className="text-right">
-                    Team
-                  </Label>
-                  <select
-                    id="team"
-                    value={formData.team_id}
-                    onChange={(e) => setFormData({ ...formData, team_id: e.target.value })}
-                    className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                  >
-                    <option value="">No Team</option>
-                    {teams.map((team: Team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="enabled" className="text-right">
-                    Status
-                  </Label>
-                  <div className="col-span-3 flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="enabled"
-                      checked={formData.enabled}
-                      onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                      className="rounded"
-                    />
-                    <Label htmlFor="enabled" className="text-sm">
-                      {formData.enabled ? 'Enabled' : 'Disabled'}
-                    </Label>
-                  </div>
-                </div>
-                {/* Preview */}
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Preview</Label>
-                  <div className="col-span-3 flex items-center space-x-3 p-2 border rounded">
-                    <FontAwesomeIcon 
-                      icon={currentFormIcon || defaultIcon} 
-                      className="w-4 h-4" 
-                      style={{ color: formData.color }}
-                    />
-                    <span>{formData.name || 'Category Name'}</span>
-                    {formData.team_id && (
-                      <div className="flex items-center space-x-1">
-                        <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">
-                          {teams.find((t: Team) => t.id === parseInt(formData.team_id))?.name?.charAt(0).toUpperCase() || 'T'}
-                        </div>
-                        <span className="text-sm text-muted-foreground">
-                          {teams.find((t: Team) => t.id === parseInt(formData.team_id))?.name || `Team ${formData.team_id}`}
-                        </span>
-                      </div>
-                    )}
-                    <Badge 
-                      variant={formData.enabled ? "default" : "secondary"} 
-                      className={formData.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
-                    >
-                      {formData.enabled ? "Enabled" : "Disabled"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                {(formError || error) && (
-                  <div className="text-sm text-destructive mb-2 text-left">
-                    {formError || error}
-                  </div>
-                )}
-                <Button type="submit" disabled={isSubmitting || !formData.name.trim()}>
-                  {isSubmitting ? (
-                    <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-                  ) : (
-                    <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                  )}
-                  {isSubmitting ? 'Adding...' : 'Add Category'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-        </div>
- 
+                    <Button type="submit" disabled={isSubmitting || !formData.name.trim()}>
+                      {isSubmitting ? (
+                        <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                      ) : (
+                        <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                      )}
+                      {isSubmitting ? 'Adding...' : 'Add Category'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      />
         {/* Edit Category Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>
@@ -1331,6 +1560,83 @@ function Categories() {
           </DialogContent>
         </Dialog>
 
+        {/* Manage Fields Dialog */}
+        <Dialog open={isFieldsDialogOpen} onOpenChange={(open) => { if (!open) closeManageFields(); }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Manage Fields{fieldsCategory ? ` • ${fieldsCategory.name}` : ''}</DialogTitle>
+              <DialogDescription>
+                Assign custom fields to this category and configure their requirements, defaults, and order.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <select
+                  value={newFieldId}
+                  onChange={(e) => setNewFieldId(e.target.value)}
+                  className="px-3 py-2 border border-input bg-background rounded-md text-sm"
+                >
+                  <option value="">Select field to add</option>
+                  {availableFields.map((f: any) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <Button onClick={addAssignment} disabled={!newFieldId || assignSubmitting}>
+                  {assignSubmitting ? <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" /> : <FontAwesomeIcon icon={faPlus} className="mr-2" />}
+                  Add Field
+                </Button>
+              </div>
+
+              <div className="border rounded-md">
+                <div className="grid grid-cols-12 gap-2 p-2 text-sm font-medium text-muted-foreground">
+                  <div className="col-span-5">Field</div>
+                  <div className="col-span-2">Required</div>
+                  <div className="col-span-3">Default</div>
+                  <div className="col-span-2 text-right">Actions</div>
+                </div>
+                <div className="divide-y">
+                  {currentAssignments.map((a, idx) => {
+                    const f = (customFields as CustomField[]).find(cf => cf.id === a.field_id);
+                    return (
+                      <div key={a.id} className="grid grid-cols-12 gap-2 items-center p-2">
+                        <div className="col-span-5 truncate">
+                          <div className="font-medium">{f?.name || `Field #${a.field_id}`}</div>
+                          <div className="text-xs text-muted-foreground">{f?.field_type || ''}</div>
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="checkbox"
+                            checked={!!a.is_required}
+                            onChange={(e) => updateAssignment(a.id, { is_required: e.target.checked } as any)}
+                            className="rounded"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          {renderDefaultValueEditor(a, f)}
+                        </div>
+                        <div className="col-span-2 flex items-center justify-end space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => reorderAssignments(idx, idx - 1)}>Up</Button>
+                          <Button variant="outline" size="sm" onClick={() => reorderAssignments(idx, idx + 1)}>Down</Button>
+                          <Button variant="destructive" size="sm" onClick={() => removeAssignment(a)}>
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {currentAssignments.length === 0 && (
+                    <div className="p-4 text-sm text-muted-foreground">No fields assigned yet.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={closeManageFields}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* Delete Category Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={handleCloseDeleteDialog}>
           <DialogContent className="sm:max-w-[425px]">
@@ -1451,74 +1757,70 @@ function Categories() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    </div>
 
-    <Separator />
-
-    {/* Search and Grid */}
-    <div className="space-y-4">
-      <Input
-        placeholder="Search categories..."
-        className="w-full max-w-md"
-        onChange={(e) => handleSearch(e.target.value)}
-      />
-      
-      <div className="ag-theme-quartz h-[400px] w-full">
-        <AgGridReact
-          ref={gridRef}
-          rowData={rowData}
-          columnDefs={colDefs}
-          onGridReady={onGridReady}
-          suppressColumnVirtualisation={true}
-          animateRows={true}
-          rowHeight={50}
-          headerHeight={40}
-          defaultColDef={{
-            sortable: true,
-            filter: true,
-            resizable: true
-          }}
-          noRowsOverlayComponent={() => (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No categories found</p>
-            </div>
-          )}
+      {/* Search and Grid */}
+      <div className="space-y-4">
+        <Input
+          placeholder="Search categories..."
+          className="w-full max-w-md"
+          onChange={(e) => handleSearch(e.target.value)}
         />
-      </div>
-    </div>
-
-    <Separator />
-
-    {/* Stats Section */}
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Category Statistics</CardTitle>
-        <CardDescription>Overview of your category usage</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold">{categories.length}</div>
-            <div className="text-sm text-muted-foreground">Total Categories</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold">
-              {categories.filter((cat: Category) => cat.enabled).length}
-            </div>
-            <div className="text-sm text-muted-foreground">Enabled Categories</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold">
-              {categories.filter((cat: Category) => !cat.enabled).length}
-            </div>
-            <div className="text-sm text-muted-foreground">Disabled Categories</div>
-          </div>
+        
+        <div className="ag-theme-quartz h-[400px] w-full">
+          <AgGridReact
+            ref={gridRef}
+            rowData={rowData}
+            columnDefs={colDefs}
+            onGridReady={onGridReady}
+            suppressColumnVirtualisation={true}
+            animateRows={true}
+            rowHeight={50}
+            headerHeight={40}
+            defaultColDef={{
+              sortable: true,
+              filter: true,
+              resizable: true
+            }}
+            noRowsOverlayComponent={() => (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No categories found</p>
+              </div>
+            )}
+          />
         </div>
-      </CardContent>
-    </Card>
-  </div>
-);
+      </div>
+
+      <Separator />
+
+      {/* Stats Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Category Statistics</CardTitle>
+          <CardDescription>Overview of your category usage</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold">{categories.length}</div>
+              <div className="text-sm text-muted-foreground">Total Categories</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">
+                {categories.filter((cat: Category) => cat.enabled).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Enabled Categories</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">
+                {categories.filter((cat: Category) => !cat.enabled).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Disabled Categories</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 export default Categories;
