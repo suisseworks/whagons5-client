@@ -11,8 +11,6 @@ import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { genericActions } from '@/store/genericSlices';
-// Custom fields are handled by generic slices
-// getCustomFieldsFromIndexedDB and fetchCustomFields are available through generic slices
 
 type DraftField = {
   id?: number;
@@ -20,6 +18,19 @@ type DraftField = {
   field_type: string;
   optionsText?: string; // comma-separated list for UI input
   validation_rules?: string;
+};
+
+// Local UI type for selected field (aligns with component usage)
+type CategoryCustomField = {
+  id: number;
+  label: string;
+  key: string;
+  type: string;
+  description?: string | null;
+  required: boolean;
+  options_json?: any;
+  default_value_json?: any;
+  active: boolean;
 };
 
 const TYPES = [
@@ -83,13 +94,13 @@ export default function CustomFieldsTab() {
   }, [dispatch]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return fields as any[];
-    return (fields as any[]).filter(f => {
-      const name = String((f?.name ?? '')).toLowerCase();
-      const type = String((f?.field_type ?? '')).toLowerCase();
-      return name.includes(q) || type.includes(q);
-    });
+    const q = search.toLowerCase();
+    if (!q) return fields;
+    return fields.filter((f: any) => (
+      f.label.toLowerCase().includes(q) ||
+      f.key.toLowerCase().includes(q) ||
+      f.type.toLowerCase().includes(q)
+    ));
   }, [fields, search]);
 
   useEffect(() => {
@@ -238,23 +249,26 @@ export default function CustomFieldsTab() {
 
       <Separator />
 
-      <div className="ag-theme-quartz h-[420px] w-full">
-        <AgGridReact
-          ref={gridRef}
-          rowData={rowData}
-          columnDefs={colDefs}
-          onGridReady={onGridReady}
-          suppressColumnVirtualisation={true}
-          animateRows={true}
-          rowHeight={44}
-          headerHeight={40}
-          defaultColDef={{ sortable: true, filter: true, resizable: true }}
-          noRowsOverlayComponent={() => (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">No custom fields found</p>
-            </div>
-          )}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((f: any) => (
+          <Card key={f.id} className="group">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{f.label}</CardTitle>
+                <Badge variant={f.active ? "default" : "secondary"}>{f.active ? "Active" : "Archived"}</Badge>
+              </div>
+              <CardDescription>Key: {f.key} • Type: {f.type}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground truncate max-w-[60%]">{f.description}</div>
+              <div className="flex items-center space-x-2">
+                <Button size="sm" variant="outline" onClick={() => openEdit(f)}><FontAwesomeIcon icon={faEdit} className="w-3 h-3 mr-1" />Edit</Button>
+                <Button size="sm" variant="outline" onClick={() => openAssign(f)}><FontAwesomeIcon icon={faLayerGroup} className="w-3 h-3 mr-1" />Assign</Button>
+                <Button size="sm" variant="destructive" onClick={() => onDelete(f)}><FontAwesomeIcon icon={faTrash} className="w-3 h-3" /></Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Create/Edit dialog */}
@@ -291,6 +305,30 @@ export default function CustomFieldsTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Assign dialog */}
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Assign to categories</DialogTitle>
+            <DialogDescription>Select one or more categories to attach this field.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto p-1 border rounded-md">
+              {categories.map((c: any) => (
+                <label key={c.id} className="flex items-center space-x-2 px-2 py-1">
+                  <input type="checkbox" checked={selectedCategoryIds.includes(c.id)} onChange={(e) => {
+                    setSelectedCategoryIds(prev => e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id));
+                  }} />
+                  <span className="text-sm">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={onAssign}><FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />Assign</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

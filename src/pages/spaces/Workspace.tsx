@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useMatch, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Settings } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
@@ -7,7 +7,8 @@ import SettingsComponent from '@/pages/spaces/components/Settings';
 import { Input } from '@/components/ui/input';
 
 export const Workspace = () => {
-  const { id } = useParams<{ id: string }>();
+  const match = useMatch('/workspace/:id');
+  const id = (match && (match.params as any)?.id) as string | undefined;
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('grid');
   // State to store the fetched data
