@@ -14,6 +14,7 @@ import Templates from '@/pages/settings/components/Templates';
 import Teams from '@/pages/settings/components/Teams';
 import Spots from '@/pages/settings/components/Spots';
 import Users from '@/pages/settings/components/Users';
+import Statuses from '@/pages/settings/components/Statuses';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 
@@ -58,6 +59,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/teams" element={<Teams />} />
           <Route path="/settings/spots" element={<Spots />} />
           <Route path="/settings/users" element={<Users />} /> 
+          <Route path="/settings/statuses" element={<Statuses />} />
         </Routes>
       </MainLayout>
     </>

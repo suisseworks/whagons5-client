@@ -1029,7 +1029,7 @@ function Categories() {
   // Loading state
   if (loading) {
     return (
-      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+      <div className="p-6 space-y-6">
         <SettingsHeader
           title="Categories"
           sectionLabel="Categories"
@@ -1051,7 +1051,7 @@ function Categories() {
   // Error state
   if (error) {
     return (
-      <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+      <div className="p-6 space-y-6">
         <SettingsHeader
           title="Categories"
           sectionLabel="Categories"
@@ -1071,7 +1071,7 @@ function Categories() {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-screen">
+    <div className="p-6 space-y-6">
       <SettingsHeader
         title="Categories"
         sectionLabel="Categories"

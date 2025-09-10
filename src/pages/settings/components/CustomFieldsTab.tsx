@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faEdit, faTrash, faCubes, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faEdit, faTrash, faCubes, faCheck, faArrowLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
@@ -38,6 +39,7 @@ const TYPES = [
 export default function CustomFieldsTab() {
   const dispatch = useDispatch<AppDispatch>();
   const { value: fields } = useSelector((s: RootState) => s.customFields);
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -222,6 +224,26 @@ export default function CustomFieldsTab() {
 
   return (
     <div className="space-y-6">
+      <div className="space-y-2">
+        <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
+          >
+            <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
+            <span>Settings</span>
+          </button>
+          <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3" />
+          <button
+            onClick={() => navigate('/settings/categories')}
+            className="hover:text-foreground hover:underline transition-colors cursor-pointer"
+          >
+            Categories
+          </button>
+          <FontAwesomeIcon icon={faChevronRight} className="w-3 h-3" />
+          <span className="text-foreground">Custom fields</span>
+        </nav>
+      </div>
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center space-x-3">

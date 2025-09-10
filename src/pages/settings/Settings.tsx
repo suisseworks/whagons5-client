@@ -12,7 +12,8 @@ import {
   faClipboardList, 
   faLocationDot, 
   faUsers, 
-  faUser 
+  faUser, 
+  faSitemap 
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import api from "@/api/whagonsApi";
@@ -72,6 +73,7 @@ function Settings() {
   const teams = useSelector((s: RootState) => s.teams.value);
   const tasks = useSelector((s: RootState) => s.tasks.value);
   const workspaces = useSelector((s: RootState) => s.workspaces.value);
+  const statuses = useSelector((s: RootState) => s.statuses.value);
 
   const counts = useMemo(() => {
     // Prefer authoritative count from workspaces.spots when present. The API may
@@ -104,9 +106,10 @@ function Settings() {
       templates: templates.length,
       teams: teams.length,
       spots: spotCount ?? (spotsFromWorkspaces > 0 ? spotsFromWorkspaces : spotsFromTasks),
+      statuses: statuses.length,
       users: undefined as number | undefined,
     };
-  }, [categories.length, templates.length, teams.length, tasks, workspaces, spotCount]);
+  }, [categories.length, templates.length, teams.length, tasks, workspaces, spotCount, statuses.length]);
 
   // Settings configuration data
   const settingsOptions = [
@@ -117,6 +120,14 @@ function Settings() {
       count: counts.categories,
       description: 'Manage task categories and labels',
       color: 'text-red-500'
+    },
+    {
+      id: 'statuses',
+      title: 'Statuses',
+      icon: faSitemap,
+      count: counts.statuses,
+      description: 'Manage statuses and transitions',
+      color: 'text-amber-500'
     },
     {
       id: 'templates',
@@ -162,6 +173,9 @@ function Settings() {
         break;
       case 'templates':
         navigate('/settings/templates');
+        break;
+      case 'statuses':
+        navigate('/settings/statuses');
         break;
       case 'spots':
         navigate('/settings/spots');
