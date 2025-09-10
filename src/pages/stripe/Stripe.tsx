@@ -89,65 +89,65 @@ const tiers = [
 
           {/* Money Back Guarantee */}
           <div className="text-center mb-16">
-            <div className="inline-block bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-4">
-              <p className="text-white text-lg">
+            <div className="inline-block bg-white bg-opacity-95 backdrop-filter backdrop-blur-lg rounded-xl p-4 shadow-lg">
+              <p className="text-gray-800 text-lg">
                 <span className="font-bold">30-Day Money-Back Guarantee</span> - Try risk-free and see the results for yourself
               </p>
             </div>
           </div>
 
           {/* FAQ Section */}
-          <div className="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-3xl p-8 mb-16">
-            <h2 className="text-3xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>
+          <div className="bg-white bg-opacity-95 backdrop-filter backdrop-blur-lg rounded-3xl p-8 mb-16 shadow-lg">
+            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Frequently Asked Questions</h2>
             <div className="grid md:grid-cols-2 gap-8">
               <div>
-                <h3 className="text-xl font-bold text-white mb-2">Can I switch plans later?</h3>
-                <p className="text-gray-200">Yes, you can upgrade or downgrade your plan at any time. The new pricing will be prorated based on your billing cycle.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Can I switch plans later?</h3>
+                <p className="text-gray-700">Yes, you can upgrade or downgrade your plan at any time. The new pricing will be prorated based on your billing cycle.</p>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white mb-2">What payment methods do you accept?</h3>
-                <p className="text-gray-200">We accept all major credit cards, including Visa, Mastercard, and American Express. We also support payment via PayPal.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">What payment methods do you accept?</h3>
+                <p className="text-gray-700">We accept all major credit cards, including Visa, Mastercard, and American Express. We also support payment via PayPal.</p>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white mb-2">Is there a setup fee?</h3>
-                <p className="text-gray-200">No, there are no hidden fees. You only pay the advertised price for your chosen plan.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Is there a setup fee?</h3>
+                <p className="text-gray-700">No, there are no hidden fees. You only pay the advertised price for your chosen plan.</p>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white mb-2">Do you offer custom enterprise solutions?</h3>
-                <p className="text-gray-200">Yes, we can create custom solutions for large organizations. Contact our sales team for more information.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Do you offer custom enterprise solutions?</h3>
+                <p className="text-gray-700">Yes, we can create custom solutions for large organizations. Contact our sales team for more information.</p>
               </div>
             </div>
           </div>
 
           {/* Testimonials */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-            <div className="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6">
-              <p className="text-gray-200 mb-4">"This platform has revolutionized how we manage our hotel operations. The AI-powered insights are game-changing."</p>
+            <div className="bg-white bg-opacity-95 backdrop-filter backdrop-blur-lg rounded-xl p-6 shadow-lg">
+              <p className="text-gray-700 mb-4">"This platform has revolutionized how we manage our hotel operations. The AI-powered insights are game-changing."</p>
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gray-300 rounded-full mr-4"></div>
                 <div>
-                  <p className="text-white font-bold">Sarah Johnson</p>
-                  <p className="text-gray-300">Operations Manager, Luxury Hotel Group</p>
+                  <p className="text-gray-900 font-bold">Sarah Johnson</p>
+                  <p className="text-gray-600">Operations Manager, Luxury Hotel Group</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6">
-              <p className="text-gray-200 mb-4">"The team performance analytics have helped us optimize our staffing and improve guest satisfaction."</p>
+            <div className="bg-white bg-opacity-95 backdrop-filter backdrop-blur-lg rounded-xl p-6 shadow-lg">
+              <p className="text-gray-700 mb-4">"The team performance analytics have helped us optimize our staffing and improve guest satisfaction."</p>
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gray-300 rounded-full mr-4"></div>
                 <div>
-                  <p className="text-white font-bold">Michael Chen</p>
-                  <p className="text-gray-300">General Manager, Boutique Hotels</p>
+                  <p className="text-gray-900 font-bold">Michael Chen</p>
+                  <p className="text-gray-600">General Manager, Boutique Hotels</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6">
-              <p className="text-gray-200 mb-4">"Outstanding customer support and continuous feature updates. Worth every penny."</p>
+            <div className="bg-white bg-opacity-95 backdrop-filter backdrop-blur-lg rounded-xl p-6 shadow-lg">
+              <p className="text-gray-700 mb-4">"Outstanding customer support and continuous feature updates. Worth every penny."</p>
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gray-300 rounded-full mr-4"></div>
                 <div>
-                  <p className="text-white font-bold">Emma Rodriguez</p>
-                  <p className="text-gray-300">Director of Housekeeping</p>
+                  <p className="text-gray-900 font-bold">Emma Rodriguez</p>
+                  <p className="text-gray-600">Director of Housekeeping</p>
                 </div>
               </div>
             </div>

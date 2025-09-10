@@ -1,0 +1,1 @@
+right now in  I run a validate call for several tables I want to keep it this way but I don't like that it needs to make a seperate api call per table it should call global on all at once so global endpoint should take a list 
