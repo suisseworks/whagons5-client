@@ -605,8 +605,11 @@ export class TasksCache {
                 const sortDirection = params.sort_direction || 'desc';
                 tasks = this.applySorting(tasks, [{ colId: sortBy, sort: sortDirection }]);
             } else {
-                // Default sorting by created_at desc
-                tasks = this.applySorting(tasks, [{ colId: 'created_at', sort: 'desc' }]);
+                // Default sorting: created_at desc (latest first) with id desc as stable tiebreaker
+                tasks = this.applySorting(tasks, [
+                    { colId: 'created_at', sort: 'desc' },
+                    { colId: 'id', sort: 'desc' }
+                ]);
             }
 
             // Handle pagination

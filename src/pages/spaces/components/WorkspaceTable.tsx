@@ -8,7 +8,7 @@ import { LicenseManager } from 'ag-grid-enterprise';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
-import type { User } from '@/store/types';
+import type { User, Task } from '@/store/types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -290,6 +290,41 @@ const WorkspaceTable = ({
   useEffect(() => { userMapRef.current = userMap; }, [userMap]);
   const globalStatusesRef = useRef(globalStatuses);
   useEffect(() => { globalStatusesRef.current = globalStatuses; }, [globalStatuses]);
+
+  // Hybrid mode: client-side when filtered row count is small enough
+  const CLIENT_THRESHOLD = 1000;
+  const [useClientSide, setUseClientSide] = useState(false);
+  const [clientRows, setClientRows] = useState<Task[]>([]);
+
+  useEffect(() => {
+    const decideMode = async () => {
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+
+        // Build minimal params equivalent to the grid query
+        const baseParams: any = { search: searchText };
+        if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+
+        // Normalize status set filter by names if ever needed in future (not applied here)
+
+        // Get filtered count only
+        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const totalFiltered = countResp?.rowCount ?? 0;
+        if (totalFiltered > 0 && totalFiltered <= CLIENT_THRESHOLD) {
+          const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+          setClientRows(rowsResp?.rows || []);
+          setUseClientSide(true);
+        } else {
+          setClientRows([]);
+          setUseClientSide(false);
+        }
+      } catch (e) {
+        console.warn('decideMode failed', e);
+        setUseClientSide(false);
+      }
+    };
+    decideMode();
+  }, [workspaceId, searchText]);
 
 
 
@@ -979,9 +1014,11 @@ const WorkspaceTable = ({
   }, [refreshGrid]);
 
   const onGridReady = useCallback((params: any) => {
-    const ds = { rowCount: undefined, getRows };
-    params.api.setGridOption('datasource', ds);
-  }, [getRows]);
+    if (!useClientSide) {
+      const ds = { rowCount: undefined, getRows };
+      params.api.setGridOption('datasource', ds);
+    }
+  }, [getRows, useClientSide]);
 
   // Show loading spinner while modules are loading
   if (!modulesLoaded) {
@@ -997,19 +1034,28 @@ const WorkspaceTable = ({
       <div style={gridStyle}>
         <Suspense fallback={<div>Loading AgGridReact...</div>}>
           <AgGridReact
+            key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}`}
             ref={gridRef}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             rowHeight={80}
             headerHeight={44}
             rowBuffer={50}
-            rowModelType={'infinite'}
-            cacheBlockSize={500}
-            maxConcurrentDatasourceRequests={1}
-            maxBlocksInCache={10}
+            {...(useClientSide ? {
+              // Client-Side Row Model
+              rowData: clientRows,
+              immutableData: true,
+              getRowId: (params: any) => String(params.data.id),
+            } : {
+              // Infinite Row Model
+              rowModelType: 'infinite' as const,
+              cacheBlockSize: 500,
+              maxConcurrentDatasourceRequests: 1,
+              maxBlocksInCache: 10,
+              getRowId: (params: any) => String(params.data.id),
+            })}
             onGridReady={onGridReady}
             animateRows={true}
-            getRowId={(params: any) => String(params.data.id)}
             suppressColumnVirtualisation={true}
             suppressLoadingOverlay={true}
             suppressNoRowsOverlay={true}

@@ -11,6 +11,9 @@ import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { genericActions } from '@/store/genericSlices';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { faLayerGroup } from "@fortawesome/free-solid-svg-icons";
 
 type DraftField = {
   id?: number;
@@ -21,17 +24,18 @@ type DraftField = {
 };
 
 // Local UI type for selected field (aligns with component usage)
-type CategoryCustomField = {
-  id: number;
-  label: string;
-  key: string;
-  type: string;
-  description?: string | null;
-  required: boolean;
-  options_json?: any;
-  default_value_json?: any;
-  active: boolean;
-};
+// type kept for reference; remove if unused in future refactor
+// type CategoryCustomField = {
+//   id: number;
+//   label: string;
+//   key: string;
+//   type: string;
+//   description?: string | null;
+//   required: boolean;
+//   options_json?: any;
+//   default_value_json?: any;
+//   active: boolean;
+// };
 
 const TYPES = [
   { id: "text", label: "Text" },
@@ -49,6 +53,7 @@ const TYPES = [
 export default function CustomFieldsTab() {
   const dispatch = useDispatch<AppDispatch>();
   const { value: fields } = useSelector((s: RootState) => s.customFields);
+  const { value: categories } = useSelector((s: RootState) => s.categories || { value: [] });
 
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -56,6 +61,8 @@ export default function CustomFieldsTab() {
   const [draft, setDraft] = useState<DraftField>({ name: "", field_type: "text", optionsText: "", validation_rules: "" });
   const [selectedField, setSelectedField] = useState<any | null>(null);
   const [rowData, setRowData] = useState<any[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const gridRef = useRef<AgGridReact>(null);
 
   // Register AG Grid modules
@@ -187,45 +194,71 @@ export default function CustomFieldsTab() {
     setOpen(true);
   };
 
-  const onGridReady = useCallback(() => {
-    if (gridRef.current?.api) {
-      gridRef.current.api.sizeColumnsToFit();
-    }
-  }, []);
+  const openAssign = (f: any) => {
+    setSelectedField(f);
+    setSelectedCategoryIds(Array.isArray((f as any).category_ids) ? (f as any).category_ids : []);
+    setAssignOpen(true);
+  };
 
-  const colDefs = useMemo<ColDef[]>(() => [
-    { field: 'name', headerName: 'Name', flex: 1.5, minWidth: 180 },
-    { field: 'field_type', headerName: 'Type', width: 150 },
-    { field: 'options', headerName: 'Options', flex: 1.2, minWidth: 180, valueGetter: (p: any) => {
-        const v = p.data?.options;
-        if (Array.isArray(v)) return v.join(', ');
-        if (v && typeof v === 'object') return Object.keys(v).length ? JSON.stringify(v) : '';
-        return String(v ?? '');
-      }
-    },
-    { field: 'validation_rules', headerName: 'Validation', flex: 1.2, minWidth: 180, valueGetter: (p: any) => {
-        const v = p.data?.validation_rules;
-        if (Array.isArray(v)) return v.join(', ');
-        if (v && typeof v === 'object') return Object.keys(v).length ? JSON.stringify(v) : '';
-        return String(v ?? '');
-      }
-    },
-    { field: 'updated_at', headerName: 'Updated', width: 140, valueGetter: (p: any) => p.data?.updated_at ? new Date(p.data.updated_at).toLocaleDateString() : '' },
-    {
-      field: 'actions', headerName: 'Actions', width: 120,
-      cellRenderer: (params: ICellRendererParams) => (
-        <div className="flex items-center space-x-2 h-full">
-          <Button size="sm" variant="outline" onClick={() => openEdit(params.data)} className="p-1 h-7 w-7">
-            <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => dispatch(genericActions.customFields.removeAsync(params.data.id))} className="p-1 h-7 w-7">
-            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-          </Button>
-        </div>
-      ),
-      sortable: false, filter: false, resizable: false, pinned: 'right'
+  const onAssign = async () => {
+    if (!selectedField) return;
+    try {
+      await dispatch(genericActions.customFields.assignToCategories({ id: selectedField.id, category_ids: selectedCategoryIds } as any)).unwrap?.();
+      setAssignOpen(false);
+    } catch (_) {
+      // best-effort
+      setAssignOpen(false);
     }
-  ], [dispatch, openEdit]);
+  };
+
+  const onDelete = async (f: any) => {
+    try {
+      await dispatch(genericActions.customFields.removeAsync(f.id as any)).unwrap?.();
+      await dispatch(genericActions.customFields.fetchFromAPI() as any);
+    } catch (_) {
+      /* ignore */
+    }
+  };
+
+  // const onGridReady = useCallback(() => {
+  //   if (gridRef.current?.api) {
+  //     gridRef.current.api.sizeColumnsToFit();
+  //   }
+  // }, []);
+
+  // const colDefs = useMemo<ColDef[]>(() => [
+  //   { field: 'name', headerName: 'Name', flex: 1.5, minWidth: 180 },
+  //   { field: 'field_type', headerName: 'Type', width: 150 },
+  //   { field: 'options', headerName: 'Options', flex: 1.2, minWidth: 180, valueGetter: (p: any) => {
+  //       const v = p.data?.options;
+  //       if (Array.isArray(v)) return v.join(', ');
+  //       if (v && typeof v === 'object') return Object.keys(v).length ? JSON.stringify(v) : '';
+  //       return String(v ?? '');
+  //     }
+  //   },
+  //   { field: 'validation_rules', headerName: 'Validation', flex: 1.2, minWidth: 180, valueGetter: (p: any) => {
+  //       const v = p.data?.validation_rules;
+  //       if (Array.isArray(v)) return v.join(', ');
+  //       if (v && typeof v === 'object') return Object.keys(v).length ? JSON.stringify(v) : '';
+  //       return String(v ?? '');
+  //     }
+  //   },
+  //   { field: 'updated_at', headerName: 'Updated', width: 140, valueGetter: (p: any) => p.data?.updated_at ? new Date(p.data.updated_at).toLocaleDateString() : '' },
+  //   {
+  //     field: 'actions', headerName: 'Actions', width: 120,
+  //     cellRenderer: (params: ICellRendererParams) => (
+  //       <div className="flex items-center space-x-2 h-full">
+  //         <Button size="sm" variant="outline" onClick={() => openEdit(params.data)} className="p-1 h-7 w-7">
+  //           <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+  //         </Button>
+  //         <Button size="sm" variant="destructive" onClick={() => dispatch(genericActions.customFields.removeAsync(params.data.id))} className="p-1 h-7 w-7">
+  //           <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+  //         </Button>
+  //       </div>
+  //     ),
+  //     sortable: false, filter: false, resizable: false, pinned: 'right'
+  //   }
+  // ], [dispatch, openEdit]);
 
   
 
