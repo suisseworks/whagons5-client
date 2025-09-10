@@ -153,6 +153,18 @@
     @apply bg-background text-foreground;
   }
   
+  /* Gradient button helpers */
+  .btn-gradient-primary {
+    background: var(--gradient-primary);
+    color: var(--primary-foreground);
+  }
+  .btn-gradient-primary:hover {
+    opacity: 0.9;
+  }
+  .btn-gradient-ring {
+    --tw-ring-color: var(--color-ring);
+  }
+  
   /* Add gradient utility classes */
   .bg-gradient-primary {
     background: var(--gradient-primary);

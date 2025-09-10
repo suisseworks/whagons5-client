@@ -1,0 +1,376 @@
+import { useMemo } from "react";
+import { useSelector } from "react-redux";
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLocationDot, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { RootState } from "@/store/store";
+import { Spot } from "@/store/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  SettingsLayout,
+  SettingsGrid,
+  SettingsDialog,
+  useSettingsState,
+  createActionsCellRenderer
+} from "../components";
+
+// Custom cell renderer for spot name with type indicator
+const SpotNameCellRenderer = (props: ICellRendererParams) => {
+  const spotName = props.value as string;
+  const isBranch = props.data?.is_branch || false;
+  const indicatorClass = isBranch ? 'bg-destructive' : 'bg-primary';
+
+  return (
+    <div className="flex items-center space-x-3 h-full">
+      <div
+        className={`w-6 h-6 rounded-md flex items-center justify-center text-primary-foreground text-xs font-medium ${indicatorClass}`}
+        title={spotName}
+      >
+        {spotName ? spotName.charAt(0).toUpperCase() : 'S'}
+      </div>
+      <span>{spotName}</span>
+    </div>
+  );
+};
+
+function Spots() {
+  // Redux state for related data
+  const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  
+  // Use shared state management
+  const {
+    items: spots,
+    filteredItems,
+    loading,
+    error,
+    searchQuery,
+    setSearchQuery,
+    handleSearch,
+    createItem,
+    updateItem,
+    deleteItem,
+    isSubmitting,
+    formError,
+    isCreateDialogOpen,
+    setIsCreateDialogOpen,
+    isEditDialogOpen,
+    setIsEditDialogOpen,
+    isDeleteDialogOpen,
+    editingItem: editingSpot,
+    deletingItem: deletingSpot,
+    handleEdit,
+    handleDelete,
+    handleCloseDeleteDialog
+  } = useSettingsState<Spot>({
+    entityName: 'spots',
+    searchFields: ['name']
+  });
+
+  // Helper functions
+  const getSpotTaskCount = (spotId: number) => {
+    return tasks.filter((task: any) => task.spot_id === spotId).length;
+  };
+
+  // Column definitions for AG Grid
+  const colDefs = useMemo<ColDef[]>(() => [
+    { 
+      field: 'name', 
+      headerName: 'Spot', 
+      flex: 2, 
+      minWidth: 200, 
+      cellRenderer: SpotNameCellRenderer 
+    },
+    {
+      field: 'is_branch', 
+      headerName: 'Type', 
+      width: 100,
+      cellRenderer: (params: ICellRendererParams) => (
+        <div className="flex items-center h-full">
+          <Badge variant={params.value ? "default" : "secondary"}>
+            {params.value ? 'Branch' : 'Location'}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      field: 'spot_type_id', 
+      headerName: 'Spot Type', 
+      width: 120,
+      valueFormatter: (p) => `Type ${p.value}`
+    },
+    {
+      field: 'parent_id', 
+      headerName: 'Parent', 
+      width: 120,
+      valueFormatter: (p) => p.value ? `Spot ${p.value}` : 'Root'
+    },
+    {
+      field: 'tasks', 
+      headerName: 'Tasks', 
+      width: 100,
+      cellRenderer: (params: ICellRendererParams) => (
+        <div className="flex items-center h-full">
+          <Badge variant="secondary" className="bg-green-100 text-green-800">
+            {getSpotTaskCount(params.data.id)}
+          </Badge>
+        </div>
+      ),
+      sortable: false, 
+      filter: false
+    },
+    { 
+      field: 'updated_at', 
+      headerName: 'Updated', 
+      width: 140, 
+      valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString() : '' 
+    },
+    {
+      field: 'actions', 
+      headerName: 'Actions', 
+      width: 120,
+      cellRenderer: createActionsCellRenderer({
+        onEdit: handleEdit,
+        onDelete: handleDelete
+      }),
+      sortable: false, 
+      filter: false, 
+      resizable: false, 
+      pinned: 'right'
+    }
+  ], [getSpotTaskCount, handleEdit, handleDelete]);
+
+  // Form handlers
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const spotData = {
+      name: formData.get('name') as string,
+      parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : null,
+      spot_type_id: parseInt(formData.get('spot_type_id') as string) || 1,
+      is_branch: formData.get('is_branch') === 'on'
+    };
+    await createItem(spotData);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSpot) return;
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const updates = {
+      name: formData.get('name') as string,
+      parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : null,
+      spot_type_id: parseInt(formData.get('spot_type_id') as string) || 1,
+      is_branch: formData.get('is_branch') === 'on'
+    };
+    await updateItem(editingSpot.id, updates);
+  };
+
+  // Render entity preview for delete dialog
+  const renderSpotPreview = (spot: Spot) => (
+    <div className="flex items-center space-x-3">
+      <div className={`w-8 h-8 rounded-md flex items-center justify-center text-primary-foreground text-sm font-medium ${spot.is_branch ? 'bg-destructive' : 'bg-primary'}`}>
+        {spot.name.charAt(0).toUpperCase()}
+      </div>
+      <div>
+        <div className="font-medium">{spot.name}</div>
+        <div className="text-sm text-muted-foreground">
+          {spot.is_branch ? 'Branch' : 'Location'} • Type {spot.spot_type_id}
+          {spot.parent_id && ` • Parent: Spot ${spot.parent_id}`}
+        </div>
+        <div className="flex items-center space-x-2 mt-1">
+          <span className="text-xs text-muted-foreground">{getSpotTaskCount(spot.id)} tasks</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <SettingsLayout
+      title="Spots"
+      description="Set up locations and spot management"
+      icon={faLocationDot}
+      iconColor="#10b981"
+      search={{
+        placeholder: "Search spots...",
+        value: searchQuery,
+        onChange: (value: string) => {
+          setSearchQuery(value);
+          handleSearch(value);
+        }
+      }}
+      loading={{
+        isLoading: loading,
+        message: "Loading spots..."
+      }}
+      error={error ? {
+        message: error,
+        onRetry: () => window.location.reload()
+      } : undefined}
+      statistics={{
+        title: "Spot Statistics",
+        description: "Overview of your locations",
+        items: [
+          { label: "Total Spots", value: spots.length },
+          { label: "Total Tasks", value: tasks.length },
+          { label: "Avg Tasks/Spot", value: spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0 }
+        ]
+      }}
+      headerActions={
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="flex items-center space-x-2 font-semibold bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]"
+        >
+          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+          <span>Add Spot</span>
+        </Button>
+      }
+    >
+      <SettingsGrid
+        rowData={filteredItems}
+        columnDefs={colDefs}
+        noRowsMessage="No spots found"
+      />
+
+      {/* Create Spot Dialog */}
+      <SettingsDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        type="create"
+        title="Add New Spot"
+        description="Create a new spot to organize your tasks by location."
+        onSubmit={handleCreateSubmit}
+        isSubmitting={isSubmitting}
+        error={formError}
+        submitDisabled={isSubmitting}
+      >
+        <div className="grid gap-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">Name *</Label>
+            <Input id="name" name="name" className="col-span-3" required />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="spot_type_id" className="text-right">Spot Type</Label>
+            <Input 
+              id="spot_type_id" 
+              name="spot_type_id"
+              type="number" 
+              defaultValue="1"
+              className="col-span-3" 
+              min="1" 
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="parent_id" className="text-right">Parent ID</Label>
+            <Input 
+              id="parent_id" 
+              name="parent_id"
+              type="number" 
+              className="col-span-3" 
+              placeholder="Leave empty for root" 
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="is_branch" className="text-right">Is Branch</Label>
+            <div className="col-span-3 flex items-center space-x-2">
+              <input 
+                id="is_branch" 
+                name="is_branch"
+                type="checkbox" 
+                className="rounded" 
+              />
+              <Label htmlFor="is_branch" className="text-sm">This is a branch location</Label>
+            </div>
+          </div>
+        </div>
+      </SettingsDialog>
+
+      {/* Edit Spot Dialog */}
+      <SettingsDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        type="edit"
+        title="Edit Spot"
+        description="Update the spot information."
+        onSubmit={handleEditSubmit}
+        isSubmitting={isSubmitting}
+        error={formError}
+        submitDisabled={isSubmitting || !editingSpot}
+      >
+        {editingSpot && (
+          <div className="grid gap-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-name" className="text-right">Name *</Label>
+              <Input
+                id="edit-name"
+                name="name"
+                defaultValue={editingSpot.name}
+                className="col-span-3"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-spot_type_id" className="text-right">Spot Type</Label>
+              <Input
+                id="edit-spot_type_id"
+                name="spot_type_id"
+                type="number"
+                defaultValue={editingSpot.spot_type_id}
+                className="col-span-3"
+                min="1"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-parent_id" className="text-right">Parent ID</Label>
+              <Input
+                id="edit-parent_id"
+                name="parent_id"
+                type="number"
+                defaultValue={editingSpot.parent_id || ''}
+                className="col-span-3"
+                placeholder="Leave empty for root"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-is_branch" className="text-right">Is Branch</Label>
+              <div className="col-span-3 flex items-center space-x-2">
+                <input
+                  id="edit-is_branch"
+                  name="is_branch"
+                  type="checkbox"
+                  defaultChecked={editingSpot.is_branch}
+                  className="rounded"
+                />
+                <Label htmlFor="edit-is_branch" className="text-sm">This is a branch location</Label>
+              </div>
+            </div>
+          </div>
+        )}
+      </SettingsDialog>
+
+      {/* Delete Spot Dialog */}
+      <SettingsDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={handleCloseDeleteDialog}
+        type="delete"
+        title="Delete Spot"
+        description={
+          deletingSpot 
+            ? `Are you sure you want to delete the spot "${deletingSpot.name}"? This action cannot be undone.`
+            : undefined
+        }
+        onConfirm={() => deletingSpot ? deleteItem(deletingSpot.id) : undefined}
+        isSubmitting={isSubmitting}
+        error={formError}
+        entityName="spot"
+        entityData={deletingSpot}
+        renderEntityPreview={renderSpotPreview}
+      />
+    </SettingsLayout>
+  );
+}
+
+export default Spots;

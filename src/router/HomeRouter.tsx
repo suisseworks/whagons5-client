@@ -8,12 +8,12 @@ import Profile from '@/pages/profile/Profile';
 import { useMemo } from 'react';
 import Settings from '@/pages/settings/Settings';
 import Stuff from '@/pages/stuff/Stuff';
-import Categories from '@/pages/settings/components/Categories';
-import CustomFieldsTab from '@/pages/settings/components/CustomFieldsTab';
-import Templates from '@/pages/settings/components/Templates';
-import Teams from '@/pages/settings/components/Teams';
-import Spots from '@/pages/settings/components/Spots';
-import Users from '@/pages/settings/components/Users';
+import Categories from '@/pages/settings/sub_pages/Categories';
+import CustomFieldsTab from   '@/pages/settings/sub_pages/CustomFieldsTab';
+import Templates from '@/pages/settings/sub_pages/Templates';
+import Teams from '@/pages/settings/sub_pages/Teams';
+import Spots from '@/pages/settings/sub_pages/Spots';
+import Users from '@/pages/settings/sub_pages/Users';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 
