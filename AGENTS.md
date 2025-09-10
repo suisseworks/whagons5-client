@@ -1,4 +1,4 @@
-# Agents: Frontend Data Flow, Caching, and State Management
+git# Agents: Frontend Data Flow, Caching, and State Management
 
 This document explains the generic architecture and lifecycle applied across the frontend application, detailing how Redux, IndexedDB caching, real-time listeners, and event-driven updates work together to provide a seamless user experience. This complements the backend AGENTS.md by explaining the client-side data management patterns.
 

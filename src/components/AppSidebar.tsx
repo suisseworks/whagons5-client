@@ -22,7 +22,7 @@ import {
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { RootState } from '@/store';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
 import {
@@ -117,6 +117,8 @@ export function AppSidebar() {
   const [isPinned, setIsPinned] = useState(getPinnedState());
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
+  const hoverOpenTimerRef = useRef<number | null>(null);
+  const hoverCloseTimerRef = useRef<number | null>(null);
 
   // const dispatch = useDispatch<AppDispatch>();
   // const { user } = useAuth(); // Currently not used, uncomment when needed
@@ -201,6 +203,18 @@ export function AppSidebar() {
     iconService.preloadCommonIcons();
   }, []);
 
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverOpenTimerRef.current as any) {
+        clearTimeout(hoverOpenTimerRef.current as any);
+      }
+      if (hoverCloseTimerRef.current as any) {
+        clearTimeout(hoverCloseTimerRef.current as any);
+      }
+    };
+  }, []);
+
   const getWorkspaceIcon = (iconName?: string) => {
     if (!iconName || typeof iconName !== 'string') {
       return defaultIcon;
@@ -252,15 +266,36 @@ export function AppSidebar() {
   const showExpandedContent = !isCollapsed || isMobile;
 
   const handleMouseEnter = () => {
-    if (isCollapsed) {
-      setOpen(true);
+    // Debounce hover-open to prevent flicker
+    if (isMobile) return;
+    if (!isCollapsed) return;
+    if ((hoverCloseTimerRef.current as any)) {
+      clearTimeout(hoverCloseTimerRef.current as any);
+      hoverCloseTimerRef.current = null;
+    }
+    if (!(hoverOpenTimerRef.current as any)) {
+      hoverOpenTimerRef.current = setTimeout(() => {
+        setOpen(true);
+        hoverOpenTimerRef.current = null;
+      }, 150) as unknown as number;
     }
   };
 
   const handleMouseLeave = () => {
-    // Only collapse if not pinned
-    if (!isCollapsed && !isPinned) {
-      setOpen(false);
+    // Debounce hover-close to prevent flicker when moving near the edge
+    if (isMobile) return;
+    if (isPinned) return;
+    if (hoverOpenTimerRef.current as any) {
+      clearTimeout(hoverOpenTimerRef.current as any);
+      hoverOpenTimerRef.current = null;
+    }
+    if (!isCollapsed) {
+      if (!(hoverCloseTimerRef.current as any)) {
+        hoverCloseTimerRef.current = setTimeout(() => {
+          setOpen(false);
+          hoverCloseTimerRef.current = null;
+        }, 300) as unknown as number;
+      }
     }
   };
 
@@ -320,14 +355,16 @@ export function AppSidebar() {
             <div className="px-3 py-2">
               <Link
                 to={`/workspace/all`}
-                className={`flex items-center space-x-2 rounded-md relative transition-colors px-3 py-2 ${
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
                   pathname === `/workspace/all`
                     ? 'bg-primary/10 text-primary border-l-4 border-primary'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                }`}
+                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
               >
-                <Users className="w-4 h-4" />
-                <span>Everything</span>
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                  <Users className="w-4 h-4" />
+                </span>
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Everything</span>
               </Link>
             </div>
           )}
@@ -337,7 +374,7 @@ export function AppSidebar() {
             <div className="px-2 py-2 flex justify-center">
               <Link
                 to={`/workspace/all`}
-                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
+                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
                   pathname === `/workspace/all`
                     ? 'bg-primary/20 text-primary border border-primary/40'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent'
@@ -453,18 +490,20 @@ export function AppSidebar() {
                       <Link
                         key={`workspace-${workspace.id}`}
                         to={`/workspace/${workspace.id}`}
-                        className={`flex items-center space-x-2 rounded-md relative transition-colors px-4 py-2 mx-2 ${
+                        className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-4 py-2 mx-2 ${
                           pathname === `/workspace/${workspace.id}`
                             ? 'bg-primary/10 text-primary border-l-4 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
-                        }`}
+                        } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                       >
-                        <FontAwesomeIcon
-                          icon={getWorkspaceIcon(workspace.icon)}
-                          style={{ color: workspace.color }}
-                          className="w-4 h-4"
-                        />
-                        <span>{workspace.name}</span>
+                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                          <FontAwesomeIcon
+                            icon={getWorkspaceIcon(workspace.icon)}
+                            style={{ color: workspace.color }}
+                            className="w-4 h-4"
+                          />
+                        </span>
+                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">{workspace.name}</span>
                       </Link>
                       );
                     })}
@@ -481,7 +520,7 @@ export function AppSidebar() {
                         <Link
                           key={`workspace-collapsed-${workspace.id}`}
                           to={`/workspace/${workspace.id}`}
-                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
+                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
                             pathname === `/workspace/${workspace.id}`
                               ? 'bg-primary/20 text-primary border border-primary/40'
                               : 'text-sidebar-foreground hover:bg-sidebar-accent'
@@ -531,14 +570,16 @@ export function AppSidebar() {
                 >
                   <Link
                     to="/analytics"
-                    className={
+                    className={`${
                       isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
-                        : ''
-                    }
+                        : 'flex items-center'
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                   >
-                    <BarChart3 size={20} className="w-5! h-5! p-[1px]" />
-                    {showExpandedContent && <span>Analytics</span>}
+                    <BarChart3 size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
+                    {showExpandedContent && (
+                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Analytics</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -562,14 +603,16 @@ export function AppSidebar() {
                 >
                   <Link
                     to="/settings"
-                    className={
+                    className={`${
                       isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
-                        : ''
-                    }
+                        : 'flex items-center'
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                   >
-                    <Settings size={20} className="w-5! h-5! p-[1px]" />
-                    {showExpandedContent && <span>Settings</span>}
+                    <Settings size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
+                    {showExpandedContent && (
+                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Settings</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
