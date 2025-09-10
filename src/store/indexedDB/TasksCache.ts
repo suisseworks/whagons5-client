@@ -530,13 +530,51 @@ export class TasksCache {
                 tasks = tasks.filter(task => task.category_id === parseInt(params.category_id));
             }
 
-            // Apply search filter
+            // Apply search filter: includes ID, status/priority/spot names and responsible user names
             if (params.search) {
-                const searchTerm = params.search.toLowerCase();
-                tasks = tasks.filter(task => 
-                    (task.name && task.name.toLowerCase().includes(searchTerm)) ||
-                    (task.description && task.description.toLowerCase().includes(searchTerm))
-                );
+                const searchTerm = String(params.search).toLowerCase();
+
+                // Optional lookup maps provided by caller for richer search
+                const statusMap: Record<number, { name?: string }> = params.__statusMap || {};
+                const priorityMap: Record<number, { name?: string }> = params.__priorityMap || {};
+                const spotMap: Record<number, { name?: string }> = params.__spotMap || {};
+                const userMap: Record<number, { name?: string; email?: string }> = params.__userMap || {};
+
+                const matches = (t: Task): boolean => {
+                    // ID
+                    if (String(t.id).includes(searchTerm)) return true;
+
+                    // Name / description
+                    if (t.name && t.name.toLowerCase().includes(searchTerm)) return true;
+                    if (t.description && t.description.toLowerCase().includes(searchTerm)) return true;
+
+                    // Status name
+                    const st = statusMap[t.status_id];
+                    if (st?.name && st.name.toLowerCase().includes(searchTerm)) return true;
+
+                    // Priority name
+                    const pr = priorityMap[t.priority_id];
+                    if (pr?.name && pr.name.toLowerCase().includes(searchTerm)) return true;
+
+                    // Spot/location name
+                    if (t.spot_id != null) {
+                        const sp = spotMap[t.spot_id as number];
+                        if (sp?.name && sp.name.toLowerCase().includes(searchTerm)) return true;
+                    }
+
+                    // Responsible user names
+                    if (Array.isArray(t.user_ids) && t.user_ids.length > 0) {
+                        for (const uid of t.user_ids) {
+                            const u = userMap[uid];
+                            const uname = u?.name || u?.email;
+                            if (uname && uname.toLowerCase().includes(searchTerm)) return true;
+                        }
+                    }
+
+                    return false;
+                };
+
+                tasks = tasks.filter(matches);
             }
 
             // Apply date filters
@@ -567,8 +605,11 @@ export class TasksCache {
                 const sortDirection = params.sort_direction || 'desc';
                 tasks = this.applySorting(tasks, [{ colId: sortBy, sort: sortDirection }]);
             } else {
-                // Default sorting by created_at desc
-                tasks = this.applySorting(tasks, [{ colId: 'created_at', sort: 'desc' }]);
+                // Default sorting: created_at desc (latest first) with id desc as stable tiebreaker
+                tasks = this.applySorting(tasks, [
+                    { colId: 'created_at', sort: 'desc' },
+                    { colId: 'id', sort: 'desc' }
+                ]);
             }
 
             // Handle pagination

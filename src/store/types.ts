@@ -33,6 +33,7 @@ export interface Category {
     sla_id: number;
     team_id: number;
     workspace_id: number;
+    status_transition_group_id: number;
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -82,10 +83,14 @@ export interface Task {
 export interface Status {
     id: number;
     name: string;
+    action: 'NONE' | 'WORKING' | 'PAUSED' | 'FINISHED';
     color?: string | null;
-    position?: number | null;
+    icon?: string | null;
+    system: boolean;
+    initial: boolean;
     created_at?: string | Date;
     updated_at?: string | Date;
+    deleted_at?: string | Date | null;
 }
 
 export interface Priority {
@@ -190,11 +195,20 @@ export interface TaskTag {
 // Status & Transitions
 export interface StatusTransition {
     id: number;
-    from_status_id: number;
-    to_status_id: number;
+    status_transition_group_id: number;
+    from_status: number;
+    to_status: number;
+    initial: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface StatusTransitionGroup {
+    id: number;
     name: string;
     description?: string | null;
-    workspace_id?: number | null;
+    is_default: boolean;
+    is_active: boolean;
     created_at: string;
     updated_at: string;
 }

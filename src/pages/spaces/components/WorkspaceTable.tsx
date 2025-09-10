@@ -8,7 +8,7 @@ import { LicenseManager } from 'ag-grid-enterprise';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 
-import type { User } from '@/store/types';
+import type { User, Task } from '@/store/types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -123,6 +123,11 @@ const WorkspaceTable = ({
   const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
+  // Refs to avoid stale closures so we can refresh cache without rebinding datasource
+  const searchRef = useRef<string>(searchText);
+  useEffect(() => { searchRef.current = searchText; }, [searchText]);
+  const workspaceRef = useRef<string>(workspaceId);
+  useEffect(() => { workspaceRef.current = workspaceId; }, [workspaceId]);
 
   // Load modules on component mount
   useEffect(() => {
@@ -193,17 +198,17 @@ const WorkspaceTable = ({
     return statusIcons[parsedIconName] || defaultStatusIcon;
   }, [statusIcons, defaultStatusIcon]);
 
-  const filteredStatuses = useMemo(() => {
-    if (defaultCategoryId == null) return statuses;
-    return (statuses || []).filter((s: any) => Number((s as any).category_id) === Number(defaultCategoryId));
-  }, [statuses, defaultCategoryId]);
+  const globalStatuses = useMemo(() => {
+    // Statuses are global now; no per-category filtering
+    return statuses;
+  }, [statuses]);
 
   // Load status icons when statuses change
   useEffect(() => {
     const loadStatusIcons = async () => {
-      if (!filteredStatuses || filteredStatuses.length === 0) return;
+      if (!globalStatuses || globalStatuses.length === 0) return;
 
-      const iconNames = filteredStatuses
+      const iconNames = globalStatuses
         .map((status: any) => status.icon)
         .filter(Boolean);
 
@@ -218,11 +223,17 @@ const WorkspaceTable = ({
     };
 
     loadStatusIcons();
-  }, [filteredStatuses]);
+  }, [globalStatuses]);
+
+  // Loaded flags to avoid interim fallbacks
+  const statusesLoaded = !!(globalStatuses && globalStatuses.length > 0);
+  const prioritiesLoaded = !!(priorities && priorities.length > 0);
+  const spotsLoaded = !!(spots && spots.length > 0);
+  const usersLoaded = !!(users && users.length > 0);
 
   const statusMap = useMemo(() => {
     const m: Record<number, { name: string; color?: string; icon?: string }> = {};
-    for (const st of filteredStatuses || []) {
+    for (const st of globalStatuses || []) {
       const anySt: any = st as any;
       if (anySt && typeof anySt.id !== 'undefined') {
         const idNum = Number(anySt.id);
@@ -230,7 +241,9 @@ const WorkspaceTable = ({
       }
     }
     return m;
-  }, [filteredStatuses]);
+  }, [globalStatuses]);
+  const statusMapRef = useRef(statusMap);
+  useEffect(() => { statusMapRef.current = statusMap; }, [statusMap]);
 
   const priorityMap = useMemo(() => {
     const m: Record<number, { name: string; color?: string; level?: number }> = {};
@@ -243,6 +256,8 @@ const WorkspaceTable = ({
     }
     return m;
   }, [priorities]);
+  const priorityMapRef = useRef(priorityMap);
+  useEffect(() => { priorityMapRef.current = priorityMap; }, [priorityMap]);
 
   const filteredPriorities = useMemo(() => {
     if (defaultCategoryId == null) return priorities;
@@ -260,6 +275,8 @@ const WorkspaceTable = ({
     }
     return m;
   }, [spots]);
+  const spotMapRef = useRef(spotMap);
+  useEffect(() => { spotMapRef.current = spotMap; }, [spotMap]);
 
   // Create user map for quick lookup
   const userMap = useMemo(() => {
@@ -269,6 +286,45 @@ const WorkspaceTable = ({
     }
     return m;
   }, [users]);
+  const userMapRef = useRef(userMap);
+  useEffect(() => { userMapRef.current = userMap; }, [userMap]);
+  const globalStatusesRef = useRef(globalStatuses);
+  useEffect(() => { globalStatusesRef.current = globalStatuses; }, [globalStatuses]);
+
+  // Hybrid mode: client-side when filtered row count is small enough
+  const CLIENT_THRESHOLD = 1000;
+  const [useClientSide, setUseClientSide] = useState(false);
+  const [clientRows, setClientRows] = useState<Task[]>([]);
+
+  useEffect(() => {
+    const decideMode = async () => {
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+
+        // Build minimal params equivalent to the grid query
+        const baseParams: any = { search: searchText };
+        if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+
+        // Normalize status set filter by names if ever needed in future (not applied here)
+
+        // Get filtered count only
+        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const totalFiltered = countResp?.rowCount ?? 0;
+        if (totalFiltered > 0 && totalFiltered <= CLIENT_THRESHOLD) {
+          const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+          setClientRows(rowsResp?.rows || []);
+          setUseClientSide(true);
+        } else {
+          setClientRows([]);
+          setUseClientSide(false);
+        }
+      } catch (e) {
+        console.warn('decideMode failed', e);
+        setUseClientSide(false);
+      }
+    };
+    decideMode();
+  }, [workspaceId, searchText]);
 
 
 
@@ -416,6 +472,25 @@ const WorkspaceTable = ({
     }
   }, [statusMap]);
 
+  // Refresh other columns when their metadata resolves
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.refreshCells({ columns: ['user_ids'], force: true, suppressFlash: true });
+    }
+  }, [usersLoaded]);
+
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.refreshCells({ columns: ['priority_id'], force: true, suppressFlash: true });
+    }
+  }, [priorityMap]);
+
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.refreshCells({ columns: ['spot_id'], force: true, suppressFlash: true });
+    }
+  }, [spotMap]);
+
   const columnDefs = useMemo(() => ([
     {
       field: 'id',
@@ -454,7 +529,7 @@ const WorkspaceTable = ({
       },
       filterParams: {
         values: (params: any) => {
-          const ids = (filteredStatuses || []).map((s: any) => Number((s as any).id));
+          const ids = (globalStatuses || []).map((s: any) => Number((s as any).id));
           params.success(ids);
         },
         suppressMiniFilter: false,
@@ -465,8 +540,29 @@ const WorkspaceTable = ({
         },
       },
       cellRenderer: (p: any) => {
+        if (!statusesLoaded) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
+        if (p.value == null) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
         const meta: any = statusMap[p.value as number];
-        const name = meta?.name || `#${p.value}`;
+        if (!meta) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
+        const name = meta.name;
         const color = meta?.color || '#6B7280';
         const iconName = meta?.icon;
         const icon = getStatusIcon(iconName);
@@ -513,8 +609,29 @@ const WorkspaceTable = ({
         },
       },
       cellRenderer: (p: any) => {
+        if (!prioritiesLoaded) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
+        if (p.value == null) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
         const meta: any = priorityMap[p.value as number];
-        const name = meta?.name || `#${p.value}`;
+        if (!meta) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
+        const name = meta.name;
         const color = meta?.color || '#6B7280';
 
         return (
@@ -545,7 +662,22 @@ const WorkspaceTable = ({
       flex: 1,
       filter: false,
       cellRenderer: (p: any) => {
+        if (!usersLoaded) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
         const userIds = p.data?.user_ids;
+        // If the field hasn't arrived yet for this row, render placeholder instead of false "No users"
+        if (userIds == null) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
         const users = getUsersFromIds(userIds);
 
         if (!users || users.length === 0) {
@@ -658,8 +790,29 @@ const WorkspaceTable = ({
         },
       },
       cellRenderer: (p: any) => {
+        if (!spotsLoaded) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
+        if (p.value == null) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
         const meta: any = spotMap[p.value as number];
-        const name = meta?.name || `#${p.value}`;
+        if (!meta) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="opacity-0">.</span>
+            </div>
+          );
+        }
+        const name = meta.name;
 
         return (
           <div className="flex items-center h-full py-2">
@@ -729,7 +882,10 @@ const WorkspaceTable = ({
   // Infinite Row Model datasource using IndexedDB as the data source
   const getRows = useCallback(
     async (params: any) => {
-      const cacheKey = getCacheKey(params);
+      // Build cache key using current refs so we don't need to rebind datasource
+      const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(
+        params.filterModel || {}
+      )}-${JSON.stringify(params.sortModel || [])}-${searchRef.current}`;
 
       if (rowCache.current.has(cacheKey)) {
         const cachedData = rowCache.current.get(cacheKey)!;
@@ -752,7 +908,7 @@ const WorkspaceTable = ({
           if (hasNonNumeric) {
             const wanted = new Set<string>(rawValues.map((v) => String(v)));
             const idSet = new Set<number>();
-            for (const s of filteredStatuses || []) {
+            for (const s of globalStatusesRef.current || []) {
               const anyS: any = s as any;
               if (wanted.has(String(anyS.name))) idSet.add(Number(anyS.id));
             }
@@ -768,13 +924,19 @@ const WorkspaceTable = ({
 
         const queryParams: any = {
           ...normalized,
-          search: searchText,
+          search: searchRef.current,
         };
 
         // Only add workspace_id if we're not in "all" mode
-        if (!isAllWorkspaces) {
-          queryParams.workspace_id = workspaceId;
+        if (workspaceRef.current !== 'all') {
+          queryParams.workspace_id = workspaceRef.current;
         }
+
+        // Provide lookup maps for richer local searching
+        queryParams.__statusMap = statusMapRef.current;
+        queryParams.__priorityMap = priorityMapRef.current;
+        queryParams.__spotMap = spotMapRef.current;
+        queryParams.__userMap = userMapRef.current;
 
         const result = await TasksCache.queryTasks(queryParams);
 
@@ -787,20 +949,17 @@ const WorkspaceTable = ({
         params.failCallback();
       }
     },
-    [getCacheKey, rowCache, searchText, workspaceId]
+    [rowCache]
   );
 
   // Function to refresh the grid
   const refreshGrid = useCallback(() => {
     if (gridRef.current?.api && modulesLoaded) {
       rowCache.current.clear();
-      const ds = {
-        rowCount: undefined,
-        getRows,
-      };
-      gridRef.current.api.setGridOption('datasource', ds);
+      // Keep existing datasource; refresh cache to avoid blanking the grid
+      gridRef.current.api.refreshInfiniteCache();
     }
-  }, [getRows, modulesLoaded, rowCache]);
+  }, [modulesLoaded, rowCache]);
 
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {
@@ -855,9 +1014,11 @@ const WorkspaceTable = ({
   }, [refreshGrid]);
 
   const onGridReady = useCallback((params: any) => {
-    const ds = { rowCount: undefined, getRows };
-    params.api.setGridOption('datasource', ds);
-  }, [getRows]);
+    if (!useClientSide) {
+      const ds = { rowCount: undefined, getRows };
+      params.api.setGridOption('datasource', ds);
+    }
+  }, [getRows, useClientSide]);
 
   // Show loading spinner while modules are loading
   if (!modulesLoaded) {
@@ -873,20 +1034,31 @@ const WorkspaceTable = ({
       <div style={gridStyle}>
         <Suspense fallback={<div>Loading AgGridReact...</div>}>
           <AgGridReact
+            key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}`}
             ref={gridRef}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             rowHeight={80}
             headerHeight={44}
             rowBuffer={50}
-            rowModelType={'infinite'}
-            cacheBlockSize={500}
-            maxConcurrentDatasourceRequests={1}
-            maxBlocksInCache={10}
+            {...(useClientSide ? {
+              // Client-Side Row Model
+              rowData: clientRows,
+              immutableData: true,
+              getRowId: (params: any) => String(params.data.id),
+            } : {
+              // Infinite Row Model
+              rowModelType: 'infinite' as const,
+              cacheBlockSize: 500,
+              maxConcurrentDatasourceRequests: 1,
+              maxBlocksInCache: 10,
+              getRowId: (params: any) => String(params.data.id),
+            })}
             onGridReady={onGridReady}
             animateRows={true}
-            getRowId={(params: any) => String(params.data.id)}
             suppressColumnVirtualisation={true}
+            suppressLoadingOverlay={true}
+            suppressNoRowsOverlay={true}
           />
         </Suspense>
       </div>

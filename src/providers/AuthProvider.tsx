@@ -124,6 +124,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await TasksCache.init();
         await TasksCache.validateTasks();
 
+
         // Manifest verify LAST to avoid racing with decryption/hydration
         try {
           const manifestResp = await apiClient.get('/sync/manifest');
