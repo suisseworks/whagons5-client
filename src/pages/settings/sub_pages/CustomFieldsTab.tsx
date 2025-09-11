@@ -221,12 +221,9 @@ export default function CustomFieldsTab() {
         onChange: setSearch
       }}
       headerActions={
-        <Button 
-          onClick={openCreate} 
-          className="flex items-center space-x-2 font-semibold bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]"
-        >
-          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-          <span>New field</span>
+        <Button onClick={openCreate} size="sm">
+          <FontAwesomeIcon icon={faPlus} className="mr-2" />
+          New field
         </Button>
       }
     >

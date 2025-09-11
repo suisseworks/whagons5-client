@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.7.0';
+const CURRENT_DB_VERSION = '1.7.1';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -164,6 +164,9 @@ export class DB {
           // task_users store removed - user assignments are now stored as JSON in tasks.user_ids
           if (!db.objectStoreNames.contains('status_transitions')) {
             db.createObjectStore('status_transitions', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('status_transition_groups')) {
+            db.createObjectStore('status_transition_groups', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('task_tags')) {
             db.createObjectStore('task_tags', { keyPath: 'id' });

@@ -118,35 +118,57 @@ export function SettingsDialog({
           </div>
         )}
 
-        {(type === 'create' || type === 'edit' || type === 'custom') && (
+        {(type === 'create' || type === 'edit' || type === 'custom') ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {children}
+            <DialogFooter>
+              {error && (
+                <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                  {error}
+                </div>
+              )}
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                {cancelText}
+              </Button>
+              <Button
+                type="submit"
+                variant={getSubmitVariant()}
+                disabled={isSubmitting || submitDisabled}
+              >
+                {isSubmitting ? (
+                  <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                ) : (
+                  <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
+                )}
+                {getDefaultSubmitText()}
+              </Button>
+            </DialogFooter>
           </form>
-        )}
-
-        <DialogFooter>
-          {error && (
-            <div className="text-sm text-destructive mb-2 text-left mr-auto">
-              {error}
-            </div>
-          )}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {cancelText}
-          </Button>
-          <Button
-            type={type === 'delete' ? 'button' : 'submit'}
-            variant={getSubmitVariant()}
-            onClick={type === 'delete' ? onConfirm : undefined}
-            disabled={isSubmitting || submitDisabled}
-          >
-            {isSubmitting ? (
-              <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-            ) : (
-              <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
+        ) : (
+          <DialogFooter>
+            {error && (
+              <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                {error}
+              </div>
             )}
-            {getDefaultSubmitText()}
-          </Button>
-        </DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {cancelText}
+            </Button>
+            <Button
+              type="button"
+              variant={getSubmitVariant()}
+              onClick={onConfirm}
+              disabled={isSubmitting || submitDisabled}
+            >
+              {isSubmitting ? (
+                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+              ) : (
+                <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
+              )}
+              {getDefaultSubmitText()}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

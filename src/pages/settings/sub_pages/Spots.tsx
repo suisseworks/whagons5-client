@@ -2,11 +2,13 @@ import { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLocationDot, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faLocationDot, faPlus, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Spot } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -83,18 +85,7 @@ function Spots() {
       minWidth: 200, 
       cellRenderer: SpotNameCellRenderer 
     },
-    {
-      field: 'is_branch', 
-      headerName: 'Type', 
-      width: 100,
-      cellRenderer: (params: ICellRendererParams) => (
-        <div className="flex items-center h-full">
-          <Badge variant={params.value ? "default" : "secondary"}>
-            {params.value ? 'Branch' : 'Location'}
-          </Badge>
-        </div>
-      )
-    },
+    // Type column removed per request (no corresponding DB field)
     {
       field: 'spot_type_id', 
       headerName: 'Spot Type', 
@@ -107,26 +98,8 @@ function Spots() {
       width: 120,
       valueFormatter: (p) => p.value ? `Spot ${p.value}` : 'Root'
     },
-    {
-      field: 'tasks', 
-      headerName: 'Tasks', 
-      width: 100,
-      cellRenderer: (params: ICellRendererParams) => (
-        <div className="flex items-center h-full">
-          <Badge variant="secondary" className="bg-green-100 text-green-800">
-            {getSpotTaskCount(params.data.id)}
-          </Badge>
-        </div>
-      ),
-      sortable: false, 
-      filter: false
-    },
-    { 
-      field: 'updated_at', 
-      headerName: 'Updated', 
-      width: 140, 
-      valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString() : '' 
-    },
+    // Tasks column removed per request
+    // Updated column removed per request
     {
       field: 'actions', 
       headerName: 'Actions', 
@@ -220,13 +193,18 @@ function Spots() {
         ]
       }}
       headerActions={
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="flex items-center space-x-2 font-semibold bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]"
-        >
-          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-          <span>Add Spot</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+            <FontAwesomeIcon icon={faPlus} className="mr-2" />
+            Add Spot
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/settings/spots/types" className="flex items-center">
+              <FontAwesomeIcon icon={faLayerGroup} className="mr-2" />
+              Spot Types
+            </Link>
+          </Button>
+        </div>
       }
     >
       <SettingsGrid

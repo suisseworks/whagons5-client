@@ -178,14 +178,7 @@ function Categories() {
       flex: 2,
       minWidth: 150
     },
-    {
-      field: 'fields',
-      headerName: 'Fields',
-      width: 100,
-      valueGetter: (params: any) => assignmentCountByCategory[params.data?.id] || 0,
-      sortable: true,
-      filter: true
-    },
+    // Fields column removed per request
     { 
       field: 'team_id', 
       headerName: 'Team',
@@ -381,7 +374,6 @@ function Categories() {
           </Link>
           <Button 
             onClick={() => setIsCreateDialogOpen(true)}
-            className="flex items-center space-x-2 font-semibold bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]"
           >
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
             <span>Add Category</span>
@@ -393,6 +385,8 @@ function Categories() {
         rowData={filteredItems}
         columnDefs={colDefs}
         noRowsMessage="No categories found"
+        rowSelection="single"
+        onRowDoubleClicked={(row: any) => handleEdit(row)}
       />
 
       {/* Create Category Dialog */}
@@ -418,13 +412,15 @@ function Categories() {
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="color" className="text-right">Color</Label>
-            <Input
-              type="color"
-              id="color"
-              name="color"
-              defaultValue="#4ECDC4"
-              className="col-span-3"
-            />
+            <div className="col-span-3">
+              <input
+                type="color"
+                id="color"
+                name="color"
+                defaultValue="#4ECDC4"
+                className="h-9 w-16 p-0 border rounded"
+              />
+            </div>
           </div>
           <IconPicker
             id="icon"
@@ -506,13 +502,15 @@ function Categories() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <Input
-                type="color"
-                id="edit-color"
-                name="color"
-                defaultValue={editingCategory.color || '#4ECDC4'}
-                className="col-span-3"
-              />
+              <div className="col-span-3">
+                <input
+                  type="color"
+                  id="edit-color"
+                  name="color"
+                  defaultValue={editingCategory.color || '#4ECDC4'}
+                  className="h-9 w-16 p-0 border rounded"
+                />
+              </div>
             </div>
             <IconPicker
               id="edit-icon"

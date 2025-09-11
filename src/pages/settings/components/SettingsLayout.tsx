@@ -113,7 +113,7 @@ export function SettingsLayout({
               />
               <h1 className="text-4xl font-extrabold tracking-tight">{title}</h1>
             </div>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            <p className="text-xs text-muted-foreground/80 leading-relaxed">{description}</p>
           </div>
           <div className="flex items-center space-x-2">
             {headerActions && (

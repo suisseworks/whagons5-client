@@ -14,6 +14,10 @@ export interface SettingsGridProps<T = any> {
   className?: string;
   noRowsMessage?: string;
   defaultColDef?: ColDef;
+  rowSelection?: 'single' | 'multiple';
+  onSelectionChanged?: (selectedRows: T[]) => void;
+  onRowDoubleClicked?: (row: T) => void;
+  onCellValueChanged?: (event: any) => void;
 }
 
 export function SettingsGrid<T = any>({
@@ -27,7 +31,11 @@ export function SettingsGrid<T = any>({
     sortable: true,
     filter: true,
     resizable: true
-  }
+  },
+  rowSelection,
+  onSelectionChanged,
+  onRowDoubleClicked,
+  onCellValueChanged
 }: SettingsGridProps<T>) {
   const gridRef = useRef<AgGridReact>(null);
 
@@ -51,17 +59,30 @@ export function SettingsGrid<T = any>({
   }, []);
 
   return (
-    <div className={`ag-theme-quartz w-full ${className}`} style={{ height }}>
+    <div className={`ag-theme-quartz wh-settings-grid w-full ${className}`} style={{ height }}>
       <AgGridReact
         ref={gridRef}
         rowData={rowData}
         columnDefs={columnDefs}
         onGridReady={handleGridReady}
+        rowSelection={rowSelection}
         suppressColumnVirtualisation={true}
         animateRows={true}
         rowHeight={50}
         headerHeight={40}
         defaultColDef={defaultColDef}
+        onCellValueChanged={onCellValueChanged}
+        onSelectionChanged={() => {
+          if (gridRef.current?.api && onSelectionChanged) {
+            const selected = gridRef.current.api.getSelectedRows() as T[];
+            onSelectionChanged(selected);
+          }
+        }}
+        onRowDoubleClicked={(event: any) => {
+          if (onRowDoubleClicked) {
+            onRowDoubleClicked(event?.data as T);
+          }
+        }}
         noRowsOverlayComponent={() => (
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">{noRowsMessage}</p>

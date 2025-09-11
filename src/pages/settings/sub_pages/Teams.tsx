@@ -117,23 +117,7 @@ function Teams() {
       sortable: false,
       filter: false
     },
-    { 
-      field: 'tasks', 
-      headerName: 'Tasks',
-      width: 100,
-      cellRenderer: (params: ICellRendererParams) => {
-        const taskCount = getTeamTaskCount(params.data.id);
-        return (
-          <div className="flex items-center h-full">
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              {taskCount}
-            </Badge>
-          </div>
-        );
-      },
-      sortable: false,
-      filter: false
-    },
+    // Tasks column removed per request; task counts still used in delete validation and stats
     {
       field: 'actions',
       headerName: 'Actions',
@@ -234,12 +218,12 @@ function Teams() {
         ]
       }}
       headerActions={
-        <Button 
+        <Button
+          size="sm"
           onClick={() => setIsCreateDialogOpen(true)}
-          className="flex items-center space-x-2 font-semibold bg-[linear-gradient(90deg,#ff6b35,#f59e0b)] hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#f59e0b]"
         >
-          <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-          <span>Add Team</span>
+          <FontAwesomeIcon icon={faPlus} className="mr-2" />
+          Add Team
         </Button>
       }
     >
@@ -247,6 +231,8 @@ function Teams() {
         rowData={filteredItems}
         columnDefs={colDefs}
         noRowsMessage="No teams found"
+        rowSelection="single"
+        onRowDoubleClicked={(row: any) => handleEdit(row)}
       />
 
       {/* Create Team Dialog */}
@@ -281,13 +267,15 @@ function Teams() {
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="color" className="text-right">Color</Label>
-            <Input
-              id="color"
-              name="color"
-              type="color"
-              defaultValue="#4ECDC4"
-              className="col-span-3"
-            />
+            <div className="col-span-3">
+              <input
+                id="color"
+                name="color"
+                type="color"
+                defaultValue="#4ECDC4"
+                className="h-9 w-16 p-0 border rounded"
+              />
+            </div>
           </div>
         </div>
       </SettingsDialog>
@@ -327,13 +315,15 @@ function Teams() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <Input
-                id="edit-color"
-                name="color"
-                type="color"
-                defaultValue={editingTeam.color || '#4ECDC4'}
-                className="col-span-3"
-              />
+              <div className="col-span-3">
+                <input
+                  id="edit-color"
+                  name="color"
+                  type="color"
+                  defaultValue={editingTeam.color || '#4ECDC4'}
+                  className="h-9 w-16 p-0 border rounded"
+                />
+              </div>
             </div>
           </div>
         )}

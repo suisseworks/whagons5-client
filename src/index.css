@@ -255,6 +255,15 @@
     height: 8px;
   }
 
+  /* Make rows feel clickable in our reusable grid wrapper */
+  .wh-settings-grid .ag-center-cols-container .ag-row:not(.ag-row-selected) {
+    cursor: pointer;
+  }
+  .wh-settings-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+    background-color: var(--ag-row-hover-color) !important;
+    filter: saturate(1.05);
+  }
+
   ::-webkit-scrollbar-track {
     background: var(--color-muted);
     border-radius: var(--radius-sm);
