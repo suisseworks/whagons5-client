@@ -104,9 +104,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             'categories',
             'templates',
             'statuses',
+            'statusTransitions',
+            'statusTransitionGroups',
             'priorities',
             'slas',
-            'templates',
             'spots',
             'users'
           ] as const;

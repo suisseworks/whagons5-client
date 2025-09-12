@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
@@ -18,7 +18,8 @@ import {
   faBook
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { Category, Task, Team } from "@/store/types";
+import { Category, Task, Team, StatusTransitionGroup } from "@/store/types";
+import { genericActions } from "@/store/genericSlices";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,10 +91,18 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Categories() {
+  const dispatch = useDispatch();
   // Redux state for related data
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
+  const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
+
+  // Load transition groups (for dropdowns and column rendering)
+  useEffect(() => {
+    dispatch(genericActions.statusTransitionGroups.getFromIndexedDB());
+    dispatch(genericActions.statusTransitionGroups.fetchFromAPI({ per_page: 1000 }));
+  }, [dispatch]);
   
   // Use shared state management
   const {
@@ -204,6 +213,21 @@ function Categories() {
       sortable: true,
       filter: true
     },
+    {
+      field: 'status_transition_group_id',
+      headerName: 'Transition Group',
+      width: 220,
+      cellRenderer: (params: ICellRendererParams) => {
+        const groupId = params.value as number | null | undefined;
+        if (!groupId) {
+          return <span className="text-muted-foreground">Unassigned</span>;
+        }
+        const group = statusTransitionGroups.find((g: any) => g.id === Number(groupId));
+        return <span>{group?.name || `Group ${groupId}`}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
     { 
       field: 'enabled', 
       headerName: 'Status',
@@ -234,7 +258,7 @@ function Categories() {
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
+  ], [teams, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -243,6 +267,9 @@ function Categories() {
     
     if (!formData.get('team_id')) {
       throw new Error('Please select a team for this category.');
+    }
+    if (!formData.get('status_transition_group_id')) {
+      throw new Error('Please select a transition group for this category.');
     }
     
     const categoryData = {
@@ -254,7 +281,7 @@ function Categories() {
       team_id: parseInt(formData.get('team_id') as string),
       workspace_id: 1,
       sla_id: 1,
-      status_transition_group_id: 1,
+      status_transition_group_id: parseInt(formData.get('status_transition_group_id') as string),
       deleted_at: null
     };
     await createItem(categoryData);
@@ -273,7 +300,8 @@ function Categories() {
       enabled: formData.get('enabled') === 'on',
       team_id: formData.get('team_id') ? parseInt(formData.get('team_id') as string) : 0,
       workspace_id: 1,
-      sla_id: 1
+      sla_id: 1,
+      status_transition_group_id: formData.get('status_transition_group_id') ? parseInt(formData.get('status_transition_group_id') as string) : undefined
     };
     await updateItem(editingCategory.id, updates);
   };
@@ -452,6 +480,20 @@ function Categories() {
             </select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status-group" className="text-right">Transition Group *</Label>
+            <select
+              id="status-group"
+              name="status_transition_group_id"
+              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              required
+            >
+              <option value="" disabled selected>Select group…</option>
+              {statusTransitionGroups.map((g: StatusTransitionGroup) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="enabled" className="text-right">Status</Label>
             <div className="col-span-3 flex items-center space-x-2">
               <input
@@ -537,6 +579,21 @@ function Categories() {
                   <option key={team.id} value={team.id}>
                     {team.name}
                   </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-status-group" className="text-right">Transition Group *</Label>
+              <select
+                id="edit-status-group"
+                name="status_transition_group_id"
+                defaultValue={editingCategory.status_transition_group_id || ''}
+                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                required
+              >
+                <option value="" disabled>Select group…</option>
+                {statusTransitionGroups.map((g: StatusTransitionGroup) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
             </div>

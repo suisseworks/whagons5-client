@@ -10,11 +10,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell } from "lucide-react";
+import { User, LogOut, Bell, Plus } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 
 
 // Cache key prefix for the user's avatar
@@ -70,16 +71,17 @@ function Header() {
     }, [location.pathname]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
-    const { currentWorkspaceName } = useMemo(() => {
+    const { currentWorkspaceName, currentWorkspaceId } = useMemo(() => {
         // Supports /workspace/:id and /workspace/all
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
         const allMatch = /\/workspace\/all$/.test(location.pathname);
-        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null };
-        if (allMatch) return { currentWorkspaceName: 'Everything' };
+        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null };
+        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null };
         const wid = parseInt(numMatch![1], 10);
         const ws = workspaces.find((w: any) => w.id === wid);
-        return { currentWorkspaceName: ws?.name || `Workspace ${wid}` };
+        return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid };
     }, [location.pathname, workspaces]);
+    const [openCreateTask, setOpenCreateTask] = useState(false);
 
 
 
@@ -268,6 +270,16 @@ function Header() {
 
                 {/* Right: Actions */}
                 <div className="flex items-center space-x-2">
+                    {typeof currentWorkspaceId === 'number' && (
+                        <button
+                            className="h-9 px-3 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
+                            onClick={() => setOpenCreateTask(true)}
+                            title="Create Task"
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">New Task</span>
+                        </button>
+                    )}
                     <ModeToggle />
 
                     {/* Notifications */}
@@ -326,6 +338,10 @@ function Header() {
             </div>
 
         </header>
+
+        {typeof currentWorkspaceId === 'number' && (
+            <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={currentWorkspaceId} />
+        )}
 
         </>
     );

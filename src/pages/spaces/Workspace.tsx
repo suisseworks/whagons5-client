@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMatch, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardList, Settings } from 'lucide-react';
+import { ClipboardList, Settings, Plus } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import { Input } from '@/components/ui/input';
+import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 
 export const Workspace = () => {
   const match = useMatch('/workspace/:id');
@@ -15,6 +16,7 @@ export const Workspace = () => {
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
+  const [openCreateTask, setOpenCreateTask] = useState(false);
 
   // Clear cache when workspace ID changes
   useEffect(() => {
@@ -77,6 +79,17 @@ export const Workspace = () => {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
+        {/* Mobile FAB substitute: visible on small screens */}
+        {!isAllWorkspaces && !isNaN(Number(id)) && (
+          <button
+            className="ml-auto sm:hidden inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground"
+            onClick={() => setOpenCreateTask(true)}
+            title="Create Task"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New
+          </button>
+        )}
       </div>
 
       <TabsContent
@@ -90,6 +103,19 @@ export const Workspace = () => {
       <TabsContent value="list" className="flex-1 h-0">
         <SettingsComponent />
       </TabsContent>
+      {/* Floating Action Button for mobile (bottom-right) */}
+      {!isAllWorkspaces && !isNaN(Number(id)) && (
+        <>
+          <button
+            className="fixed right-5 bottom-20 sm:hidden inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg"
+            onClick={() => setOpenCreateTask(true)}
+            aria-label="Create Task"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+          <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
+        </>
+      )}
     </Tabs>
 
 
