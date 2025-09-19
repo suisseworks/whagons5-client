@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -28,6 +29,7 @@ const TeamNameCellRenderer = (props: ICellRendererParams) => (
 );
 
 function Teams() {
+  const navigate = useNavigate();
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
@@ -218,13 +220,18 @@ function Teams() {
         ]
       }}
       headerActions={
-        <Button
-          size="sm"
-          onClick={() => setIsCreateDialogOpen(true)}
-        >
-          <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          Add Team
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings/users')}>
+            Manage Users
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <FontAwesomeIcon icon={faPlus} className="mr-2" />
+            Add Team
+          </Button>
+        </div>
       }
     >
       <SettingsGrid

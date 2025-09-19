@@ -113,7 +113,7 @@ export function SettingsLayout({
               />
               <h1 className="text-4xl font-extrabold tracking-tight">{title}</h1>
             </div>
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">{description}</p>
+            <p className="text-xs text-muted-foreground/60 leading-relaxed">{description}</p>
           </div>
           <div className="flex items-center space-x-2">
             {headerActions && (
@@ -177,7 +177,9 @@ export function SettingsLayout({
               <CardHeader>
                 <CardTitle className="text-lg">{statistics.title}</CardTitle>
                 {statistics.description && (
-                  <CardDescription>{statistics.description}</CardDescription>
+                  <CardDescription className="text-muted-foreground/70">
+                    {statistics.description}
+                  </CardDescription>
                 )}
               </CardHeader>
               <CardContent>

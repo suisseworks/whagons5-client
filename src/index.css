@@ -44,14 +44,14 @@
   --chart-5: oklch(0.74 0.14 210); /* Cyan */
   --radius: 0.625rem;
   
-  /* Neutral cool sidebar for light mode */
-  --sidebar: oklch(0.95 0.01 240); /* Cool light neutral */
-  --sidebar-foreground: oklch(0.1 0.02 25); /* Dark sidebar text */
+  /* Global sidebar theme (applies to both light and dark for brand consistency) */
+  --sidebar: #ffffff; /* White sidebar */
+  --sidebar-foreground: #111827; /* Gray-900 text for readability */
   --sidebar-primary: oklch(0.72 0.12 195); /* Teal highlights in sidebar */
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.92 0.01 240); /* Subtle hover accent */
-  --sidebar-accent-foreground: oklch(0.1 0.02 25); /* Dark accent text */
-  --sidebar-border: oklch(0.86 0.01 240); /* Neutral border */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: oklch(0.97 0.008 230); /* Light gray hover */
+  --sidebar-accent-foreground: #111827; /* Dark text on hover */
+  --sidebar-border: oklch(0.85 0.02 45); /* Subtle light border */
   --sidebar-ring: oklch(0.72 0.12 195 / 0.5); /* Teal focus in sidebar */
   
   /* Gradient definitions for teal theme */
@@ -86,14 +86,14 @@
   --chart-4: oklch(0.72 0.13 170); /* Green-teal */
   --chart-5: oklch(0.76 0.14 260); /* Indigo */
   
-  /* Dark sidebar - neutral colors */
-  --sidebar: oklch(0.25 0.01 25); /* Dark neutral sidebar */
-  --sidebar-foreground: oklch(0.98 0.005 25); /* Nearly white sidebar text */
+  /* Dark sidebar palette */
+  --sidebar: #0b1440; /* Deep navy */
+  --sidebar-foreground: #e5e7eb; /* Light text */
   --sidebar-primary: oklch(0.78 0.15 195); /* Teal highlights */
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.35 0.02 25); /* Neutral accent background */
-  --sidebar-accent-foreground: oklch(0.98 0.005 25); /* Nearly white accent text */
-  --sidebar-border: oklch(0.4 0.02 25); /* Neutral border */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: oklch(0.28 0.04 250); /* Lighter than sidebar for clear hover */
+  --sidebar-accent-foreground: #e5e7eb; /* Light text */
+  --sidebar-border: oklch(0.38 0.03 240); /* Slightly lighter border for definition */
   --sidebar-ring: oklch(0.7 0.2 45 / 0.5);
   
   /* Dark mode gradients */
@@ -219,8 +219,10 @@
 .ag-theme-quartz {
   --ag-background-color: var(--color-background);
   --ag-foreground-color: var(--color-foreground);
-  --ag-header-background-color: var(--color-card);
-  --ag-header-foreground-color: var(--color-card-foreground);
+  /* Modern header styling */
+  --ag-header-background-color: oklch(from var(--color-muted) l calc(l - 0.03) c h); /* subtle tinted bg */
+  --ag-header-foreground-color: var(--color-foreground);
+  --ag-header-column-resize-handle-color: var(--color-border);
   --ag-odd-row-background-color: var(--color-muted);
   --ag-row-border-color: var(--color-border);
   --ag-selected-row-background-color: oklch(from var(--color-accent) l c h / 0.15); /* Semi-transparent accent */
@@ -233,6 +235,7 @@
   --ag-header-cell-hover-background-color: var(--color-secondary);
   --ag-row-hover-color: var(--color-secondary);
   --ag-column-hover-color: var(--color-secondary);
+  --ag-header-column-hover-color: var(--color-secondary);
   --ag-input-disabled-background-color: oklch(from var(--color-background) l calc(l + 0.02) c h); /* Slightly lighter background */
   --ag-font-family: inherit; /* Use app's font */
   --ag-font-size: inherit; /* Use app's font size */
@@ -245,6 +248,43 @@
   /* Variables unique to dark theme or needing specific override */
   --ag-selected-row-background-color: oklch(from var(--color-accent) l c h / 0.2); /* Slightly more opaque for dark */
   --ag-input-disabled-background-color: oklch(from var(--color-background) l calc(l - 0.02) c h); /* Slightly darker background */
+}
+
+/* Modern header polish for settings grids */
+.wh-settings-grid .ag-header {
+  background: var(--gradient-secondary);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 1px 0 var(--color-border), 0 6px 16px oklch(from var(--color-background) l calc(l - 0.08) c h / 0.15);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+}
+
+.wh-settings-grid .ag-header .ag-header-cell,
+.wh-settings-grid .ag-header .ag-header-group-cell {
+  background: transparent;
+}
+
+.wh-settings-grid .ag-header-cell-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wh-settings-grid .ag-header-cell-text {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--color-foreground);
+}
+
+.wh-settings-grid .ag-header-cell:hover {
+  background-color: oklch(from var(--color-secondary) l c h / 0.6) !important;
+}
+
+.wh-settings-grid .ag-header-viewport .ag-header-row .ag-header-cell:first-child {
+  border-top-left-radius: var(--radius-md);
+}
+.wh-settings-grid .ag-header-viewport .ag-header-row .ag-header-cell:last-child {
+  border-top-right-radius: var(--radius-md);
 }
 
 /* Custom Scrollbar Styles */

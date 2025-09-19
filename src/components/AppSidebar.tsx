@@ -18,6 +18,7 @@ import {
   ChevronDown,
   Briefcase,
   BarChart3,
+  MessageSquareMore,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -311,8 +312,7 @@ export function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-gray-100`}
-      style={{ backgroundColor: '#374151' }}
+      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -320,7 +320,6 @@ export function AppSidebar() {
         className={`shadow-md bg-sidebar transition-all duration-300 ${
           isCollapsed ? 'px-1' : ''
         }`}
-        style={{ backgroundColor: '#374151' }}
       >
         <div className="flex items-center justify-center w-full">
           <Link
@@ -350,7 +349,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar" style={{ backgroundColor: '#374151' }}>
+      <SidebarContent className="bg-sidebar">
         <SidebarGroup>
           {/* Everything workspace - above the Spaces dropdown */}
           {(!isCollapsed || isMobile) && (
@@ -359,8 +358,8 @@ export function AppSidebar() {
                 to={`/workspace/all`}
                 className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
                   pathname === `/workspace/all`
-                    ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                    : 'text-gray-100 hover:bg-white/10'
+                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
               >
                 <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
@@ -379,7 +378,7 @@ export function AppSidebar() {
                 className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
                   pathname === `/workspace/all`
                     ? 'bg-primary/20 text-primary border border-primary/40'
-                    : 'text-gray-100 hover:bg-white/10'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 }`}
                 title={'Everything'}
               >
@@ -397,7 +396,7 @@ export function AppSidebar() {
                   }`}
                 >
                   <CollapsibleTrigger
-                    className={`flex items-center cursor-pointer hover:bg-white/10 rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
+                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
                       isCollapsed && !isMobile
                         ? 'flex-col justify-center ml-0 px-2'
                         : 'justify-start flex-1'
@@ -405,12 +404,12 @@ export function AppSidebar() {
                   >
                     {isCollapsed && !isMobile ? (
                       <div className="flex flex-col items-center">
-                        <Briefcase className="text-gray-100 w-5 h-5 mb-1" />
+                        <Briefcase className="text-sidebar-foreground w-5 h-5 mb-1" />
                       </div>
                     ) : (
                       <>
-                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-gray-100" />
-                        <span className="text-base font-semibold pl-2 text-gray-100 flex items-center">
+                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
+                        <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
                           <Briefcase className="w-4 h-4 mr-2" />
                           Spaces
                         </span>
@@ -424,7 +423,7 @@ export function AppSidebar() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-white hover:text-white hover:bg-white/20"
+                          className="h-6 w-6 text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent"
                           title="Add Workspace"
                         >
                           <Plus size={16} />
@@ -499,8 +498,8 @@ export function AppSidebar() {
                         to={`/workspace/${workspace.id}`}
                         className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-4 py-2 mx-2 ${
                           pathname === `/workspace/${workspace.id}`
-                            ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                            : 'text-gray-100 hover:bg-white/10 px-5'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
                         } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                       >
                         <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
@@ -520,7 +519,7 @@ export function AppSidebar() {
                 {/* Show workspace icons when collapsed AND collapsible is open - DESKTOP ONLY */}
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
-                    <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-white/5">
+                    <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent">
                       {uniqueWorkspaces
                         .filter((workspace: Workspace) => (workspace.id as number) >= 0) // Skip temp items
                         .map((workspace: Workspace) => (
@@ -530,7 +529,7 @@ export function AppSidebar() {
                           className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
                             pathname === `/workspace/${workspace.id}`
                               ? 'bg-primary/20 text-primary border border-primary/40'
-                              : 'text-gray-100 hover:bg-white/10'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                           }`}
                           title={workspace.name}
                         >
@@ -547,13 +546,45 @@ export function AppSidebar() {
               </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
-          <SidebarGroupContent>
-            {/* Other content can go here if needed */}
-          </SidebarGroupContent>
+          {/* Messages link after Spaces */}
+          {(!isCollapsed || isMobile) && (
+            <div className="px-3 py-2">
+              <Link
+                to={`/messages`}
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
+                  pathname === `/messages`
+                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+              >
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                  <MessageSquareMore className="w-4 h-4" />
+                </span>
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Messages</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Show Messages icon when collapsed - DESKTOP ONLY */}
+          {isCollapsed && !isMobile && (
+            <div className="px-2 py-2 flex justify-center">
+              <Link
+                to={`/messages`}
+                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                  pathname === `/messages`
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                }`}
+                title={'Messages'}
+              >
+                <MessageSquareMore className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar border-t border-sidebar-border" style={{ backgroundColor: '#374151' }}>
+      <SidebarFooter className="bg-sidebar border-t border-sidebar-border">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -566,12 +597,12 @@ export function AppSidebar() {
                       ? `h-10 flex justify-center items-center ${
                           pathname === '/analytics'
                             ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-gray-100 hover:bg-white/25'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                       : `h-10 ${
                           pathname === '/analytics'
-                            ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                            : 'text-gray-100 hover:bg-white/25'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                   }`}
                 >
@@ -599,12 +630,12 @@ export function AppSidebar() {
                       ? `h-10 flex justify-center items-center ${
                           pathname === '/settings'
                             ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-gray-100 hover:bg-white/25'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                       : `h-10 ${
                           pathname === '/settings'
-                            ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                            : 'text-gray-100 hover:bg-white/25'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                   }`}
                 >

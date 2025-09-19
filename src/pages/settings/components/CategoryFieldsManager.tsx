@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faSpinner, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faSpinner, faTrash, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,8 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [newFieldId, setNewFieldId] = useState<string>("");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   const currentAssignments = useMemo(() => {
     if (!category) return [] as CategoryFieldAssignment[];
@@ -288,7 +290,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <select
               value={newFieldId}
               onChange={(e) => setNewFieldId(e.target.value)}
@@ -299,54 +301,69 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
-            <Button onClick={addAssignment} disabled={!newFieldId || assignSubmitting}>
+            <Button onClick={addAssignment} disabled={!newFieldId || assignSubmitting} size="sm">
               {assignSubmitting ? <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" /> : <FontAwesomeIcon icon={faPlus} className="mr-2" />}
               Add Field
             </Button>
           </div>
 
-          <div className="border rounded-md">
-            <div className="grid grid-cols-12 gap-2 p-2 text-sm font-medium text-muted-foreground">
-              <div className="col-span-5">Field</div>
-              <div className="col-span-2">Required</div>
-              <div className="col-span-3">Default</div>
-              <div className="col-span-2 text-right">Actions</div>
+          {currentAssignments.length === 0 ? (
+            <div className="rounded-md border border-dashed p-8 text-center">
+              <div className="text-sm text-muted-foreground">No fields assigned yet.</div>
+              <div className="text-xs text-muted-foreground mt-1">Select a field above and click Add Field.</div>
             </div>
-            <div className="divide-y">
-              {currentAssignments.map((a, idx) => {
-                const f = (customFields as CustomField[]).find(cf => cf.id === a.field_id);
-                return (
-                  <div key={a.id} className="grid grid-cols-12 gap-2 items-center p-2">
-                    <div className="col-span-5 truncate">
-                      <div className="font-medium">{f?.name || `Field #${a.field_id}`}</div>
-                      <div className="text-xs text-muted-foreground">{f?.field_type || ''}</div>
+          ) : (
+            <div className="border rounded-md">
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-t-md">
+                <div className="col-span-6">Field</div>
+                <div className="col-span-2">Required</div>
+                <div className="col-span-3">Default</div>
+                <div className="col-span-1 text-right">Actions</div>
+              </div>
+              <div className="divide-y">
+                {currentAssignments.map((a, idx) => {
+                  const f = (customFields as CustomField[]).find(cf => cf.id === a.field_id);
+                  return (
+                    <div
+                      key={a.id}
+                      className={`grid grid-cols-12 gap-2 items-center px-3 py-2.5 ${overIndex === idx ? 'bg-muted/20' : ''}`}
+                      draggable
+                      onDragStart={() => setDragIndex(idx)}
+                      onDragOver={(e) => { e.preventDefault(); setOverIndex(idx); }}
+                      onDrop={() => { if (dragIndex != null && dragIndex !== idx) reorderAssignments(dragIndex, idx); setDragIndex(null); setOverIndex(null); }}
+                      onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                    >
+                      <div className="col-span-6 truncate flex items-center gap-2">
+                        <span className="text-muted-foreground cursor-grab"><FontAwesomeIcon icon={faGripVertical} /></span>
+                        <div>
+                          <div className="font-medium leading-tight">{f?.name || `Field #${a.field_id}`}</div>
+                          <div className="mt-0.5 inline-block text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {f?.field_type || ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={!!a.is_required}
+                          onChange={(e) => updateAssignment(a.id, { is_required: e.target.checked } as any)}
+                          className="rounded"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        {renderDefaultValueEditor(a, f)}
+                      </div>
+                      <div className="col-span-1 flex items-center justify-end gap-1">
+                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => removeAssignment(a)} title="Remove field" aria-label="Remove field">
+                          <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="col-span-2">
-                      <input
-                        type="checkbox"
-                        checked={!!a.is_required}
-                        onChange={(e) => updateAssignment(a.id, { is_required: e.target.checked } as any)}
-                        className="rounded"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      {renderDefaultValueEditor(a, f)}
-                    </div>
-                    <div className="col-span-2 flex items-center justify-end space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => reorderAssignments(idx, idx - 1)}>Up</Button>
-                      <Button variant="outline" size="sm" onClick={() => reorderAssignments(idx, idx + 1)}>Down</Button>
-                      <Button variant="destructive" size="sm" onClick={() => removeAssignment(a)}>
-                        <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-              {currentAssignments.length === 0 && (
-                <div className="p-4 text-sm text-muted-foreground">No fields assigned yet.</div>
-              )}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter>

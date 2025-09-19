@@ -69,7 +69,7 @@ export function SettingsGrid<T = any>({
         suppressColumnVirtualisation={true}
         animateRows={true}
         rowHeight={50}
-        headerHeight={40}
+        headerHeight={44}
         defaultColDef={defaultColDef}
         onCellValueChanged={onCellValueChanged}
         onSelectionChanged={() => {

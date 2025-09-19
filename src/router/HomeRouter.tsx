@@ -16,8 +16,11 @@ import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';
 import Users from '@/pages/settings/sub_pages/Users';
 import Statuses from '@/pages/settings/sub_pages/Statuses';
+import Priorities from '@/pages/settings/sub_pages/Priorities';
+import Slas from '@/pages/settings/sub_pages/Slas';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
+import Messages from '@/pages/messages/Messages';
 
 const pages = [
   { path: '/workspace/:id', component: <Workspace /> },
@@ -55,6 +58,7 @@ export const HomeRoutes = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/messages" element={<Messages />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
@@ -63,6 +67,8 @@ export const HomeRoutes = () => {
           <Route path="/settings/spots/types" element={<SpotTypes />} />
           <Route path="/settings/users" element={<Users />} /> 
           <Route path="/settings/statuses" element={<Statuses />} />
+          <Route path="/settings/priorities" element={<Priorities />} />
+          <Route path="/settings/slas" element={<Slas />} />
         </Routes>
       </MainLayout>
     </>
