@@ -24,40 +24,40 @@
   --card-foreground: oklch(0.1 0.02 25); /* Even darker card text */
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.1 0.02 25); /* Even darker popover text */
-  --primary: oklch(0.65 0.18 45); /* Vibrant orange primary */
-  --primary-foreground: oklch(1 0 0); /* White text on orange */
-  --secondary: oklch(0.95 0.02 45); /* Very light orange-tinted background */
-  --secondary-foreground: oklch(0.15 0.08 45); /* Much darker secondary text */
-  --muted: oklch(0.97 0.01 45); /* Very light orange-gray */
-  --muted-foreground: oklch(0.25 0.04 45); /* Much darker muted text for maximum contrast */
-  --accent: oklch(0.7 0.16 35); /* Slightly redder orange accent */
+  --primary: oklch(0.72 0.12 195); /* Teal primary */
+  --primary-foreground: oklch(1 0 0); /* White text on primary */
+  --secondary: oklch(0.97 0.02 195); /* Very light teal-tinted background */
+  --secondary-foreground: oklch(0.15 0.02 195); /* Darker secondary text */
+  --muted: oklch(0.97 0.008 230); /* Light neutral with cool tint */
+  --muted-foreground: oklch(0.28 0.02 230); /* Darker muted text */
+  --accent: oklch(0.68 0.12 195); /* Teal accent */
   --accent-foreground: oklch(1 0 0); /* White text on accent */
-  --destructive: oklch(0.6 0.2 25); /* Red-orange destructive */
+  --destructive: oklch(0.6 0.2 25); /* Keep red destructive */
   --destructive-foreground: oklch(0.98 0.01 25);
   --border: oklch(0.85 0.02 45); /* Darker border for better visibility */
   --input: oklch(0.98 0.01 45); /* Very light input background */
-  --ring: oklch(0.65 0.18 45 / 0.3); /* Orange focus ring */
-  --chart-1: oklch(0.65 0.18 45); /* Orange primary */
-  --chart-2: oklch(0.7 0.16 35); /* Red-orange */
-  --chart-3: oklch(0.6 0.14 60); /* Yellow-orange */
-  --chart-4: oklch(0.55 0.12 25); /* Darker orange */
-  --chart-5: oklch(0.75 0.2 50); /* Bright orange */
+  --ring: oklch(0.72 0.12 195 / 0.35); /* Teal focus ring */
+  --chart-1: oklch(0.72 0.12 195); /* Teal */
+  --chart-2: oklch(0.66 0.12 230); /* Blue */
+  --chart-3: oklch(0.62 0.1 260); /* Indigo */
+  --chart-4: oklch(0.68 0.12 170); /* Green-teal */
+  --chart-5: oklch(0.74 0.14 210); /* Cyan */
   --radius: 0.625rem;
   
-  /* Keep sidebar clean white design */
-  --sidebar: oklch(1 0 0); /* Pure white sidebar for light mode */
-  --sidebar-foreground: oklch(0.1 0.02 25); /* Dark sidebar text on white background */
-  --sidebar-primary: oklch(0.65 0.18 45); /* Orange highlights in sidebar */
+  /* Neutral cool sidebar for light mode */
+  --sidebar: oklch(0.95 0.01 240); /* Cool light neutral */
+  --sidebar-foreground: oklch(0.1 0.02 25); /* Dark sidebar text */
+  --sidebar-primary: oklch(0.72 0.12 195); /* Teal highlights in sidebar */
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.97 0.01 25); /* Very light neutral accent */
+  --sidebar-accent: oklch(0.92 0.01 240); /* Subtle hover accent */
   --sidebar-accent-foreground: oklch(0.1 0.02 25); /* Dark accent text */
-  --sidebar-border: oklch(0.9 0.01 25); /* Light neutral border */
-  --sidebar-ring: oklch(0.65 0.18 45 / 0.5); /* Orange focus in sidebar */
+  --sidebar-border: oklch(0.86 0.01 240); /* Neutral border */
+  --sidebar-ring: oklch(0.72 0.12 195 / 0.5); /* Teal focus in sidebar */
   
-  /* Gradient definitions for orange theme */
-  --gradient-primary: linear-gradient(135deg, oklch(0.65 0.18 45) 0%, oklch(0.7 0.16 35) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.95 0.02 45) 0%, oklch(0.98 0.01 35) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.7 0.16 35) 0%, oklch(0.6 0.14 60) 100%);
+  /* Gradient definitions for teal theme */
+  --gradient-primary: linear-gradient(135deg, oklch(0.72 0.12 195) 0%, oklch(0.74 0.14 210) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.98 0.005 200) 0%, oklch(0.96 0.01 220) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.68 0.12 195) 0%, oklch(0.66 0.12 230) 100%);
 }
 
 .dark {
@@ -67,39 +67,39 @@
   --card-foreground: oklch(0.99 0.005 45); /* Nearly pure white card text */
   --popover: oklch(0.22 0.03 25);
   --popover-foreground: oklch(0.99 0.005 45); /* Nearly pure white popover text */
-  --primary: oklch(0.7 0.2 45); /* Brighter orange for dark mode */
-  --primary-foreground: oklch(0.1 0.02 25); /* Dark text on bright orange */
+  --primary: oklch(0.78 0.15 195); /* Brighter teal for dark mode */
+  --primary-foreground: oklch(1 0 0); /* White text on primary */
   --secondary: oklch(0.28 0.06 45); /* Lighter secondary background */
   --secondary-foreground: oklch(0.98 0.01 45); /* Nearly white secondary text */
   --muted: oklch(0.25 0.04 45); /* Lighter muted background */
   --muted-foreground: oklch(0.9 0.02 45); /* Much brighter muted text for maximum contrast */
-  --accent: oklch(0.75 0.18 35); /* Bright red-orange accent */
-  --accent-foreground: oklch(0.1 0.02 35);
-  --destructive: oklch(0.7 0.22 25); /* Bright red-orange */
+  --accent: oklch(0.74 0.14 210); /* Cyan-teal accent */
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.7 0.22 25); /* Keep red destructive */
   --destructive-foreground: oklch(0.1 0.02 25);
   --border: oklch(0.4 0.06 45); /* Lighter border for better visibility */
   --input: oklch(0.28 0.05 45); /* Lighter input background */
-  --ring: oklch(0.7 0.2 45 / 0.4); /* Bright orange focus ring */
-  --chart-1: oklch(0.7 0.2 45);
-  --chart-2: oklch(0.75 0.18 35);
-  --chart-3: oklch(0.65 0.16 60);
-  --chart-4: oklch(0.6 0.14 25);
-  --chart-5: oklch(0.8 0.22 50);
+  --ring: oklch(0.78 0.15 195 / 0.45); /* Teal focus ring */
+  --chart-1: oklch(0.78 0.15 195); /* Teal */
+  --chart-2: oklch(0.74 0.14 210); /* Cyan */
+  --chart-3: oklch(0.7 0.12 230); /* Blue */
+  --chart-4: oklch(0.72 0.13 170); /* Green-teal */
+  --chart-5: oklch(0.76 0.14 260); /* Indigo */
   
   /* Dark sidebar - neutral colors */
   --sidebar: oklch(0.25 0.01 25); /* Dark neutral sidebar */
   --sidebar-foreground: oklch(0.98 0.005 25); /* Nearly white sidebar text */
-  --sidebar-primary: oklch(0.7 0.2 45); /* Orange highlights */
-  --sidebar-primary-foreground: oklch(0.1 0.02 25);
+  --sidebar-primary: oklch(0.78 0.15 195); /* Teal highlights */
+  --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.35 0.02 25); /* Neutral accent background */
   --sidebar-accent-foreground: oklch(0.98 0.005 25); /* Nearly white accent text */
   --sidebar-border: oklch(0.4 0.02 25); /* Neutral border */
   --sidebar-ring: oklch(0.7 0.2 45 / 0.5);
   
   /* Dark mode gradients */
-  --gradient-primary: linear-gradient(135deg, oklch(0.7 0.2 45) 0%, oklch(0.75 0.18 35) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.25 0.06 45) 0%, oklch(0.28 0.05 35) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.75 0.18 35) 0%, oklch(0.65 0.16 60) 100%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.15 195) 0%, oklch(0.74 0.14 210) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.25 0.03 220) 0%, oklch(0.28 0.04 240) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.74 0.14 210) 0%, oklch(0.7 0.12 230) 100%);
 }
 
 @theme inline {
@@ -151,6 +151,18 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Gradient button helpers */
+  .btn-gradient-primary {
+    background: var(--gradient-primary);
+    color: var(--primary-foreground);
+  }
+  .btn-gradient-primary:hover {
+    opacity: 0.9;
+  }
+  .btn-gradient-ring {
+    --tw-ring-color: var(--color-ring);
   }
   
   /* Add gradient utility classes */
@@ -241,6 +253,15 @@
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
+  }
+
+  /* Make rows feel clickable in our reusable grid wrapper */
+  .wh-settings-grid .ag-center-cols-container .ag-row:not(.ag-row-selected) {
+    cursor: pointer;
+  }
+  .wh-settings-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+    background-color: var(--ag-row-hover-color) !important;
+    filter: saturate(1.05);
   }
 
   ::-webkit-scrollbar-track {

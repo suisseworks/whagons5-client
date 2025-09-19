@@ -28,8 +28,8 @@ export default function SettingsHeader({
   }, [navigate, onBack]);
 
   return (
-    <div className="space-y-2 py-6 border-b border-gray-200">
-      <nav className="flex items-center space-x-2 text-sm text-[#64748b]">
+    <div className="space-y-2 py-6 border-b border-border">
+      <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
         <button
           onClick={handleBack}
           className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
@@ -47,7 +47,7 @@ export default function SettingsHeader({
             <h1 className="text-4xl font-extrabold tracking-tight">{title}</h1>
           </div>
           {subtitle ? (
-            <p className="text-sm" style={{ color: "#64748b" }}>
+            <p className="text-sm text-muted-foreground">
               {subtitle}
             </p>
           ) : null}

@@ -1,19 +1,15 @@
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faEdit, faTrash, faCubes, faCheck } from "@fortawesome/free-solid-svg-icons";
-import { AgGridReact } from 'ag-grid-react';
-import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { faPlus, faEdit, faTrash, faCubes, faCheck, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
 import { genericActions } from '@/store/genericSlices';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { faLayerGroup } from "@fortawesome/free-solid-svg-icons";
+import { SettingsLayout } from "../components";
 
 type DraftField = {
   id?: number;
@@ -22,20 +18,6 @@ type DraftField = {
   optionsText?: string; // comma-separated list for UI input
   validation_rules?: string;
 };
-
-// Local UI type for selected field (aligns with component usage)
-// type kept for reference; remove if unused in future refactor
-// type CategoryCustomField = {
-//   id: number;
-//   label: string;
-//   key: string;
-//   type: string;
-//   description?: string | null;
-//   required: boolean;
-//   options_json?: any;
-//   default_value_json?: any;
-//   active: boolean;
-// };
 
 const TYPES = [
   { id: "text", label: "Text" },
@@ -58,15 +40,15 @@ export default function CustomFieldsTab() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftField>({ name: "", field_type: "text", optionsText: "", validation_rules: "" });
+  const [draft, setDraft] = useState<DraftField>({ 
+    name: "", 
+    field_type: "text", 
+    optionsText: "", 
+    validation_rules: "" 
+  });
   const [selectedField, setSelectedField] = useState<any | null>(null);
-  const [rowData, setRowData] = useState<any[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
-  const gridRef = useRef<AgGridReact>(null);
-
-  // Register AG Grid modules
-  ModuleRegistry.registerModules([AllCommunityModule]);
 
   const UI_TO_DB_TYPE: Record<string, string> = useMemo(() => ({
     text: 'TEXT',
@@ -93,7 +75,6 @@ export default function CustomFieldsTab() {
     LIST: 'select',
     MULTI_SELECT: 'multi_select',
   }), []);
-  // Send field_type as-is; backend expects these ids: text, textarea, number, date, datetime, checkbox, select, multi_select, user, team, spot, url, file
 
   useEffect(() => {
     dispatch(genericActions.customFields.getFromIndexedDB());
@@ -109,10 +90,6 @@ export default function CustomFieldsTab() {
       f.type.toLowerCase().includes(q)
     ));
   }, [fields, search]);
-
-  useEffect(() => {
-    setRowData(filtered);
-  }, [filtered]);
 
   const onCreate = async () => {
     setFormError(null);
@@ -175,7 +152,12 @@ export default function CustomFieldsTab() {
     }
   };
 
-  const openCreate = () => { setSelectedField(null); setDraft({ name: "", field_type: "text", optionsText: "", validation_rules: "" }); setOpen(true); };
+  const openCreate = () => { 
+    setSelectedField(null); 
+    setDraft({ name: "", field_type: "text", optionsText: "", validation_rules: "" }); 
+    setOpen(true); 
+  };
+  
   const openEdit = (f: any) => {
     setSelectedField(f);
     const optionsText = (() => {
@@ -203,7 +185,10 @@ export default function CustomFieldsTab() {
   const onAssign = async () => {
     if (!selectedField) return;
     try {
-      await dispatch(genericActions.customFields.assignToCategories({ id: selectedField.id, category_ids: selectedCategoryIds } as any)).unwrap?.();
+      await dispatch(genericActions.customFields.assignToCategories({ 
+        id: selectedField.id, 
+        category_ids: selectedCategoryIds 
+      } as any)).unwrap?.();
       setAssignOpen(false);
     } catch (_) {
       // best-effort
@@ -220,84 +205,56 @@ export default function CustomFieldsTab() {
     }
   };
 
-  // const onGridReady = useCallback(() => {
-  //   if (gridRef.current?.api) {
-  //     gridRef.current.api.sizeColumnsToFit();
-  //   }
-  // }, []);
-
-  // const colDefs = useMemo<ColDef[]>(() => [
-  //   { field: 'name', headerName: 'Name', flex: 1.5, minWidth: 180 },
-  //   { field: 'field_type', headerName: 'Type', width: 150 },
-  //   { field: 'options', headerName: 'Options', flex: 1.2, minWidth: 180, valueGetter: (p: any) => {
-  //       const v = p.data?.options;
-  //       if (Array.isArray(v)) return v.join(', ');
-  //       if (v && typeof v === 'object') return Object.keys(v).length ? JSON.stringify(v) : '';
-  //       return String(v ?? '');
-  //     }
-  //   },
-  //   { field: 'validation_rules', headerName: 'Validation', flex: 1.2, minWidth: 180, valueGetter: (p: any) => {
-  //       const v = p.data?.validation_rules;
-  //       if (Array.isArray(v)) return v.join(', ');
-  //       if (v && typeof v === 'object') return Object.keys(v).length ? JSON.stringify(v) : '';
-  //       return String(v ?? '');
-  //     }
-  //   },
-  //   { field: 'updated_at', headerName: 'Updated', width: 140, valueGetter: (p: any) => p.data?.updated_at ? new Date(p.data.updated_at).toLocaleDateString() : '' },
-  //   {
-  //     field: 'actions', headerName: 'Actions', width: 120,
-  //     cellRenderer: (params: ICellRendererParams) => (
-  //       <div className="flex items-center space-x-2 h-full">
-  //         <Button size="sm" variant="outline" onClick={() => openEdit(params.data)} className="p-1 h-7 w-7">
-  //           <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-  //         </Button>
-  //         <Button size="sm" variant="destructive" onClick={() => dispatch(genericActions.customFields.removeAsync(params.data.id))} className="p-1 h-7 w-7">
-  //           <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-  //         </Button>
-  //       </div>
-  //     ),
-  //     sortable: false, filter: false, resizable: false, pinned: 'right'
-  //   }
-  // ], [dispatch, openEdit]);
-
-  
-
-  // Assignment is managed in Categories → Manage Fields dialog
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center space-x-3">
-            <FontAwesomeIcon icon={faCubes} className="text-blue-500 text-2xl" />
-            <h2 className="text-2xl font-bold">Custom fields</h2>
-          </div>
-          <p className="text-muted-foreground">Reusable fields you can assign to any category.</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Input placeholder="Search fields..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
-          <Button onClick={openCreate} className="flex items-center space-x-2"><FontAwesomeIcon icon={faPlus} className="w-4 h-4" /><span>New field</span></Button>
-        </div>
-      </div>
-
-      <Separator />
-
+    <SettingsLayout
+      title="Custom fields"
+      description="Reusable fields you can assign to any category"
+      icon={faCubes}
+      iconColor="#f59e0b"
+      backPath="/settings/categories"
+      breadcrumbs={[
+        { label: "Categories", path: "/settings/categories" }
+      ]}
+      search={{
+        placeholder: "Search fields...",
+        value: search,
+        onChange: setSearch
+      }}
+      headerActions={
+        <Button onClick={openCreate} size="sm">
+          <FontAwesomeIcon icon={faPlus} className="mr-2" />
+          New field
+        </Button>
+      }
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((f: any) => (
           <Card key={f.id} className="group">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{f.label}</CardTitle>
-                <Badge variant={f.active ? "default" : "secondary"}>{f.active ? "Active" : "Archived"}</Badge>
+                <Badge variant={f.active ? "default" : "secondary"}>
+                  {f.active ? "Active" : "Archived"}
+                </Badge>
               </div>
               <CardDescription>Key: {f.key} • Type: {f.type}</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground truncate max-w-[60%]">{f.description}</div>
+              <div className="text-sm text-muted-foreground truncate max-w-[60%]">
+                {f.description}
+              </div>
               <div className="flex items-center space-x-2">
-                <Button size="sm" variant="outline" onClick={() => openEdit(f)}><FontAwesomeIcon icon={faEdit} className="w-3 h-3 mr-1" />Edit</Button>
-                <Button size="sm" variant="outline" onClick={() => openAssign(f)}><FontAwesomeIcon icon={faLayerGroup} className="w-3 h-3 mr-1" />Assign</Button>
-                <Button size="sm" variant="destructive" onClick={() => onDelete(f)}><FontAwesomeIcon icon={faTrash} className="w-3 h-3" /></Button>
+                <Button size="sm" variant="outline" onClick={() => openEdit(f)}>
+                  <FontAwesomeIcon icon={faEdit} className="w-3 h-3 mr-1" />
+                  Edit
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => openAssign(f)}>
+                  <FontAwesomeIcon icon={faLayerGroup} className="w-3 h-3 mr-1" />
+                  Assign
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => onDelete(f)}>
+                  <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -314,26 +271,46 @@ export default function CustomFieldsTab() {
           <div className="space-y-3">
             <div className="grid grid-cols-4 items-center gap-3">
               <label className="text-right text-sm">Name</label>
-              <Input className="col-span-3" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+              <Input 
+                className="col-span-3" 
+                value={draft.name} 
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })} 
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <label className="text-right text-sm">Type</label>
-              <select className="col-span-3 px-3 py-2 border rounded-md" value={draft.field_type} onChange={(e) => setDraft({ ...draft, field_type: e.target.value })}>
+              <select 
+                className="col-span-3 px-3 py-2 border rounded-md" 
+                value={draft.field_type} 
+                onChange={(e) => setDraft({ ...draft, field_type: e.target.value })}
+              >
                 {TYPES.map(t => (<option key={t.id} value={t.id}>{t.label}</option>))}
               </select>
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <label className="text-right text-sm">Options (comma-separated)</label>
-              <Input className="col-span-3" placeholder="e.g., Low, Medium, High" value={draft.optionsText || ''} onChange={(e) => setDraft({ ...draft, optionsText: e.target.value })} />
+              <Input 
+                className="col-span-3" 
+                placeholder="e.g., Low, Medium, High" 
+                value={draft.optionsText || ''} 
+                onChange={(e) => setDraft({ ...draft, optionsText: e.target.value })} 
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <label className="text-right text-sm">Validation rules (JSON/text)</label>
-              <Input className="col-span-3" value={draft.validation_rules || ''} onChange={(e) => setDraft({ ...draft, validation_rules: e.target.value })} />
+              <Input 
+                className="col-span-3" 
+                value={draft.validation_rules || ''} 
+                onChange={(e) => setDraft({ ...draft, validation_rules: e.target.value })} 
+              />
             </div>
           </div>
           <DialogFooter>
             {formError && <div className="text-sm text-destructive mr-auto">{formError}</div>}
-            <Button onClick={selectedField ? onUpdate : onCreate}><FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />{selectedField ? 'Save changes' : 'Create field'}</Button>
+            <Button onClick={selectedField ? onUpdate : onCreate}>
+              <FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />
+              {selectedField ? 'Save changes' : 'Create field'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -349,21 +326,28 @@ export default function CustomFieldsTab() {
             <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto p-1 border rounded-md">
               {categories.map((c: any) => (
                 <label key={c.id} className="flex items-center space-x-2 px-2 py-1">
-                  <input type="checkbox" checked={selectedCategoryIds.includes(c.id)} onChange={(e) => {
-                    setSelectedCategoryIds(prev => e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id));
-                  }} />
+                  <input 
+                    type="checkbox" 
+                    checked={selectedCategoryIds.includes(c.id)} 
+                    onChange={(e) => {
+                      setSelectedCategoryIds(prev => 
+                        e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id)
+                      );
+                    }} 
+                  />
                   <span className="text-sm">{c.name}</span>
                 </label>
               ))}
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={onAssign}><FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />Assign</Button>
+            <Button onClick={onAssign}>
+              <FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />
+              Assign
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </SettingsLayout>
   );
 }
-
-

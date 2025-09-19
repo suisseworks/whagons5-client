@@ -10,22 +10,16 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell } from "lucide-react";
+import { User, LogOut, Bell, Plus } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 
 
-// Cache key prefix for the user's avatar
-const AVATAR_CACHE_KEY = 'user_avatar_cache_';
-const AVATAR_CACHE_TIMESTAMP_KEY = 'user_avatar_timestamp_';
-const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
-
-interface CachedAvatar {
-    data: string;
-    timestamp: number;
-}
+// Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
     const { firebaseUser, user, userLoading } = useAuth();
@@ -70,97 +64,46 @@ function Header() {
     }, [location.pathname]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
-    const { currentWorkspaceName } = useMemo(() => {
+    const { currentWorkspaceName, currentWorkspaceId } = useMemo(() => {
         // Supports /workspace/:id and /workspace/all
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
         const allMatch = /\/workspace\/all$/.test(location.pathname);
-        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null };
-        if (allMatch) return { currentWorkspaceName: 'Everything' };
+        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null };
+        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null };
         const wid = parseInt(numMatch![1], 10);
         const ws = workspaces.find((w: any) => w.id === wid);
-        return { currentWorkspaceName: ws?.name || `Workspace ${wid}` };
+        return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid };
     }, [location.pathname, workspaces]);
+    const [openCreateTask, setOpenCreateTask] = useState(false);
 
 
-
-    const getCachedAvatar = useCallback((userId: string): CachedAvatar | null => {
-        try {
-            const cachedData = localStorage.getItem(AVATAR_CACHE_KEY + userId);
-            const cachedTimestamp = localStorage.getItem(AVATAR_CACHE_TIMESTAMP_KEY + userId);
-            
-            if (!cachedData || !cachedTimestamp) return null;
-            
-            const timestamp = parseInt(cachedTimestamp, 10);
-            const now = Date.now();
-            
-            if (now - timestamp > CACHE_DURATION) {
-                localStorage.removeItem(AVATAR_CACHE_KEY + userId);
-                localStorage.removeItem(AVATAR_CACHE_TIMESTAMP_KEY + userId);
-                return null;
-            }
-            
-            return {
-                data: cachedData,
-                timestamp: timestamp
-            };
-        } catch (error) {
-            return null;
-        }
-    }, []);
-
-    const setCachedAvatar = useCallback((userId: string, data: string) => {
-        try {
-            const timestamp = Date.now();
-            localStorage.setItem(AVATAR_CACHE_KEY + userId, data);
-            localStorage.setItem(AVATAR_CACHE_TIMESTAMP_KEY + userId, timestamp.toString());
-        } catch (error) {
-            setImageUrl(data);
-        }
-    }, []);
 
     const cacheImage = useCallback(async (url: string) => {
         if (!url || !firebaseUser?.uid) return;
-        
-        const cached = getCachedAvatar(firebaseUser.uid);
-        if (cached) {
-            setImageUrl(cached.data);
-            setImageError(false);
-            return;
-        }
 
         setIsLoading(true);
-        
         try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                if (response.status === 429) {
-                    setImageError(true);
-                    return;
-                }
-                throw new Error(`Failed to fetch image: ${response.status}`);
-            }
-            
-            const blob = await response.blob();
-            const reader = new FileReader();
-            
-            reader.onloadend = () => {
-                const base64data = reader.result as string;
-                setCachedAvatar(firebaseUser.uid, base64data);
-                setImageUrl(base64data);
+            // Try IDB cache first
+            const cached = await AvatarCache.getByAny([firebaseUser.uid, user?.google_uuid, user?.id]);
+            if (cached) {
+                setImageUrl(cached);
                 setImageError(false);
-            };
-            
-            reader.onerror = () => {
+                return;
+            }
+            // Fetch and populate cache
+            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, [user?.google_uuid, user?.id]);
+            if (dataUrl) {
+                setImageUrl(dataUrl);
+                setImageError(false);
+            } else {
                 setImageError(true);
-            };
-            
-            reader.readAsDataURL(blob);
+            }
         } catch (error) {
             setImageError(true);
         } finally {
             setIsLoading(false);
         }
-    }, [firebaseUser?.uid, getCachedAvatar, setCachedAvatar]);
+    }, [firebaseUser?.uid]);
 
     // Update avatar when user data changes
     useEffect(() => {
@@ -176,6 +119,9 @@ function Header() {
             setImageError(false);
         }
     }, [user, cacheImage]);
+
+
+        
 
     const handleImageError = () => {
         setImageError(true);
@@ -268,6 +214,16 @@ function Header() {
 
                 {/* Right: Actions */}
                 <div className="flex items-center space-x-2">
+                    {typeof currentWorkspaceId === 'number' && (
+                        <button
+                            className="h-9 px-3 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
+                            onClick={() => setOpenCreateTask(true)}
+                            title="Create Task"
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">New Task</span>
+                        </button>
+                    )}
                     <ModeToggle />
 
                     {/* Notifications */}
@@ -326,6 +282,10 @@ function Header() {
             </div>
 
         </header>
+
+        {typeof currentWorkspaceId === 'number' && (
+            <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={currentWorkspaceId} />
+        )}
 
         </>
     );

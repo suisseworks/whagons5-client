@@ -5,18 +5,21 @@ import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import 'ag-grid-enterprise';
 import { LicenseManager } from 'ag-grid-enterprise';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import { AppDispatch } from '@/store/store';
+import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 
 import type { User, Task } from '@/store/types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
+import HoverPopover from '@/pages/spaces/components/HoverPopover';
+import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
+import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 
 // Helper functions for user display
 const getUserInitials = (user: User): string => {
@@ -35,41 +38,11 @@ const getUserDisplayName = (user: User): string => {
 
 
 
-// Hover-controlled Popover wrapper
-const HoverPopover = ({ children, content }: { children: React.ReactNode; content: React.ReactNode }) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <div
-        onMouseEnter={() => {
-          console.log('Mouse entered');
-          setOpen(true)}}
-        onMouseLeave={() => {
-          console.log('Mouse left');
-          setOpen(false)}}
-        className="inline-flex"
-      >
-        <PopoverTrigger asChild>
-          <div>{children}</div>
-        </PopoverTrigger>
-      </div>
-      <PopoverContent side="top" align="center" className="w-auto min-w-[200px] p-4">
-        {content}
-      </PopoverContent>
-    </Popover>
-  );
-};
-
- 
 // Initialize dayjs plugins
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
 
-// Cache key prefix for user avatars in table
-const TABLE_AVATAR_CACHE_KEY = 'table_user_avatar_cache_';
-const TABLE_AVATAR_CACHE_TIMESTAMP_KEY = 'table_user_avatar_timestamp_';
-const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+// Avatar images are cached globally via AvatarCache (IndexedDB)
 
 const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
 if (AG_GRID_LICENSE) {
@@ -138,18 +111,16 @@ const WorkspaceTable = ({
       .catch(console.error);
   }, []);
 
-  // Generate cache key based on request parameters including workspaceId and search
-  const getCacheKey = useCallback((params: any) => {
-    return `${workspaceId}-${params.startRow}-${params.endRow}-${JSON.stringify(
-      params.filterModel || {}
-    )}-${JSON.stringify(params.sortModel || [])}-${searchText}`;
-  }, [workspaceId, searchText]);
+  // Removed unused getCacheKey helper
 
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const workspaces = useSelector((s: RootState) => (s as any).workspaces.value as any[]);
   const users = useSelector((s: RootState) => (s as any).users.value as User[]);
+  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
+  const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
+  const dispatch = useDispatch<AppDispatch>();
   const isAllWorkspaces = useMemo(() => workspaceId === 'all', [workspaceId]);
   const workspaceNumericId = useMemo(() => isAllWorkspaces ? null : Number(workspaceId), [workspaceId, isAllWorkspaces]);
   const currentWorkspace = useMemo(() => {
@@ -242,6 +213,53 @@ const WorkspaceTable = ({
     }
     return m;
   }, [globalStatuses]);
+  // Map: category_id -> status_transition_group_id
+  const categoryToGroup = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const c of categories || []) {
+      const id = Number((c as any).id);
+      const gid = Number((c as any).status_transition_group_id);
+      if (Number.isFinite(id) && Number.isFinite(gid)) m.set(id, gid);
+    }
+    return m;
+  }, [categories]);
+
+  // Map: group_id -> from_status -> Set(to_status)
+  const transitionsByGroupFrom = useMemo(() => {
+    const map = new Map<number, Map<number, Set<number>>>();
+    for (const tr of statusTransitions || []) {
+      const g = Number((tr as any).status_transition_group_id);
+      const from = Number((tr as any).from_status);
+      const to = Number((tr as any).to_status);
+      if (!Number.isFinite(g) || !Number.isFinite(from) || !Number.isFinite(to)) continue;
+      if (!map.has(g)) map.set(g, new Map());
+      const inner = map.get(g)!;
+      if (!inner.has(from)) inner.set(from, new Set());
+      inner.get(from)!.add(to);
+    }
+    return map;
+  }, [statusTransitions]);
+
+  const getAllowedNextStatuses = useCallback((task: any): number[] => {
+    const groupId = categoryToGroup.get(Number(task.category_id));
+    if (!groupId) return [];
+    const byFrom = transitionsByGroupFrom.get(groupId);
+    if (!byFrom) return [];
+    const set = byFrom.get(Number(task.status_id));
+    return set ? Array.from(set.values()) : [];
+  }, [categoryToGroup, transitionsByGroupFrom]);
+
+  const handleChangeStatus = useCallback(async (task: any, toStatusId: number): Promise<boolean> => {
+    if (!task || Number(task.status_id) === Number(toStatusId)) return true;
+    try {
+      await dispatch(updateTaskAsync({ id: Number(task.id), updates: { status_id: Number(toStatusId) } })).unwrap();
+      return true;
+    } catch (e) {
+      console.warn('Status change failed', e);
+      return false;
+    }
+  }, [dispatch]);
+
   const statusMapRef = useRef(statusMap);
   useEffect(() => { statusMapRef.current = statusMap; }, [statusMap]);
 
@@ -404,51 +422,33 @@ const WorkspaceTable = ({
 
 
 
-  // Cache management functions for user avatars
-  const getCachedAvatar = useCallback((userId: string): string | null => {
-    try {
-      const cachedData = localStorage.getItem(TABLE_AVATAR_CACHE_KEY + userId);
-      const cachedTimestamp = localStorage.getItem(TABLE_AVATAR_CACHE_TIMESTAMP_KEY + userId);
-
-      if (!cachedData || !cachedTimestamp) return null;
-
-      const timestamp = parseInt(cachedTimestamp, 10);
-      const now = Date.now();
-
-      if (now - timestamp > CACHE_DURATION) {
-        localStorage.removeItem(TABLE_AVATAR_CACHE_KEY + userId);
-        localStorage.removeItem(TABLE_AVATAR_CACHE_TIMESTAMP_KEY + userId);
-        return null;
-      }
-
-      return cachedData;
-    } catch (error) {
-      return null;
-    }
-  }, []);
-
-  const setCachedAvatar = useCallback((userId: string, data: string) => {
-    try {
-      const timestamp = Date.now();
-      localStorage.setItem(TABLE_AVATAR_CACHE_KEY + userId, data);
-      localStorage.setItem(TABLE_AVATAR_CACHE_TIMESTAMP_KEY + userId, timestamp.toString());
-    } catch (error) {
-      // If localStorage is full, just set the image URL directly
-      console.warn('Failed to cache avatar:', error);
-    }
-  }, []);
-
-  // Function to get cached or fresh avatar URL
-  const getAvatarSrc = useCallback((user: User): string | null => {
-    if (!user?.url_picture) return null;
-
-    // Try cache first
-    const cached = getCachedAvatar(user.id.toString());
-    if (cached) return cached;
-
-    // If not cached, return original URL (will be cached on load)
-    return user.url_picture;
-  }, [getCachedAvatar]);
+  // Per-cell avatar image component backed by global AvatarCache
+  const AvatarImg = ({ user }: { user: User }) => {
+    const [src, setSrc] = useState<string>('');
+    useEffect(() => {
+      let cancelled = false;
+      const run = async () => {
+        if (!user?.id) return;
+        // Read synchronously from cache first (no network)
+        const cached = await AvatarCache.getByAny([user.id, (user as any).google_uuid]);
+        if (!cancelled && cached) { setSrc(cached); return; }
+        // Only if no cache, trigger a single fetch with dedupe
+        if (user?.url_picture) {
+          const data = await AvatarCache.fetchAndCache(user.id, user.url_picture, [(user as any).google_uuid]);
+          if (!cancelled && data) setSrc(data);
+        }
+      };
+      run();
+      return () => { cancelled = true; };
+    }, [user?.id, user?.url_picture]);
+    return (
+      <AvatarImage
+        src={src}
+        alt={getUserDisplayName(user)}
+        onError={() => {}}
+      />
+    );
+  };
 
   // Function to format due date with dayjs
   const formatDueDate = useCallback((dateString: string | null): string => {
@@ -533,21 +533,14 @@ const WorkspaceTable = ({
           params.success(ids);
         },
         suppressMiniFilter: false,
-        // Ensure set filter list shows names instead of numeric IDs
         valueFormatter: (p: any) => {
           const meta: any = statusMap[p.value as number];
           return meta?.name || `#${p.value}`;
         },
       },
       cellRenderer: (p: any) => {
-        if (!statusesLoaded) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        if (p.value == null) {
+        const row = p.data;
+        if (!statusesLoaded || !row) {
           return (
             <div className="flex items-center h-full py-2">
               <span className="opacity-0">.</span>
@@ -562,30 +555,20 @@ const WorkspaceTable = ({
             </div>
           );
         }
-        const name = meta.name;
-        const color = meta?.color || '#6B7280';
-        const iconName = meta?.icon;
-        const icon = getStatusIcon(iconName);
-
+        const allowedNext = getAllowedNextStatuses(row);
         return (
-          <div className="flex items-center h-full py-2 gap-1 truncate">
-            {/* <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} /> */}
-            {icon && typeof icon === 'object' ? (
-              <FontAwesomeIcon
-                icon={icon}
-                className="text-sm"
-                style={{ color }}
-              />
-            ) : (
-              <span className="text-[10px] leading-none" style={{ color }}>●</span>
-            )}
-            <span className="text-xs font-medium truncate max-w-[110px]" title={name}>{name}</span>
-          </div>
+          <StatusCell
+            value={p.value}
+            statusMap={statusMap}
+            getStatusIcon={getStatusIcon}
+            allowedNext={allowedNext}
+            onChange={(to) => handleChangeStatus(row, to)}
+          />
         );
       },
-      width: 140,
-      minWidth: 90,
-      maxWidth: 160,
+      width: 160,
+      minWidth: 110,
+      maxWidth: 200,
     },
     // Priority column with badge
     {
@@ -705,7 +688,7 @@ const WorkspaceTable = ({
                     <div className="flex flex-col items-center gap-3"
                     >
                       <Avatar className="h-16 w-16 border-2 border-background">
-                        <AvatarImage src={user.url_picture || ''} alt={getUserDisplayName(user)} />
+                        <AvatarImg user={user} />
                         <AvatarFallback className="text-base font-medium">
                           {getUserInitials(user)}
                         </AvatarFallback>
@@ -717,21 +700,7 @@ const WorkspaceTable = ({
                   )}
                 >
                   <Avatar className="h-8 w-8 border border-background hover:border-primary transition-colors cursor-pointer">
-                    <AvatarImage
-                      src={getAvatarSrc(user) || ''}
-                      alt={getUserDisplayName(user)}
-                      onLoad={(e) => {
-                        // Cache the image when it loads successfully
-                        const img = e.target as HTMLImageElement;
-                        if (img.src && img.src !== user.url_picture && user.url_picture) {
-                          setCachedAvatar(user.id.toString(), img.src);
-                        }
-                      }}
-                      onError={(e) => {
-                        console.log('Avatar image failed to load for user:', user.name, e);
-                        // The AvatarFallback will automatically show
-                      }}
-                    />
+                    <AvatarImg user={user} />
                     <AvatarFallback className="text-xs">
                       {getUserInitials(user)}
                     </AvatarFallback>
@@ -953,13 +922,34 @@ const WorkspaceTable = ({
   );
 
   // Function to refresh the grid
-  const refreshGrid = useCallback(() => {
-    if (gridRef.current?.api && modulesLoaded) {
-      rowCache.current.clear();
-      // Keep existing datasource; refresh cache to avoid blanking the grid
-      gridRef.current.api.refreshInfiniteCache();
+  const refreshGrid = useCallback(async () => {
+    if (!modulesLoaded || !gridRef.current?.api) return;
+    if (useClientSide) {
+      // Recompute client rows from IndexedDB and update rowData
+      try {
+        const baseParams: any = { search: searchRef.current };
+        if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
+        // Provide lookup maps for richer local searching
+        baseParams.__statusMap = statusMapRef.current;
+        baseParams.__priorityMap = priorityMapRef.current;
+        baseParams.__spotMap = spotMapRef.current;
+        baseParams.__userMap = userMapRef.current;
+
+        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const totalFiltered = countResp?.rowCount ?? 0;
+        const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+        const rows = rowsResp?.rows || [];
+        setClientRows(rows);
+        gridRef.current.api.setGridOption('rowData', rows);
+        return;
+      } catch (e) {
+        console.warn('refreshGrid (client-side) failed', e);
+      }
     }
-  }, [modulesLoaded, rowCache]);
+    // Infinite row model refresh
+    rowCache.current.clear();
+    gridRef.current.api.refreshInfiniteCache();
+  }, [modulesLoaded, rowCache, useClientSide]);
 
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {

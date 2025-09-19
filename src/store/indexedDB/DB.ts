@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.7.0';
+const CURRENT_DB_VERSION = '1.8.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -165,6 +165,9 @@ export class DB {
           if (!db.objectStoreNames.contains('status_transitions')) {
             db.createObjectStore('status_transitions', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('status_transition_groups')) {
+            db.createObjectStore('status_transition_groups', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('task_tags')) {
             db.createObjectStore('task_tags', { keyPath: 'id' });
           }
@@ -240,6 +243,10 @@ export class DB {
           // Error Tracking
           if (!db.objectStoreNames.contains('exceptions')) {
             db.createObjectStore('exceptions', { keyPath: 'id' });
+          }
+          // Avatar image cache (base64 or blob references)
+          if (!db.objectStoreNames.contains('avatars')) {
+            db.createObjectStore('avatars', { keyPath: 'id' });
           }
           // Keys store for per-store Content Encryption Keys (CEKs)
           if (!db.objectStoreNames.contains('cache_keys')) {
@@ -436,7 +443,8 @@ export class DB {
       | 'config_logs'
       | 'task_attachments'
       | 'task_recurrences'
-      | 'exceptions',
+      | 'exceptions'
+      | 'avatars',
     mode: IDBTransactionMode = 'readonly'
   ) {
     if (!DB.inited) throw new Error('DB not initialized');
@@ -485,7 +493,8 @@ export class DB {
       | 'config_logs'
       | 'task_attachments'
       | 'task_recurrences'
-      | 'exceptions',
+      | 'exceptions'
+      | 'avatars',
     mode: IDBTransactionMode = 'readwrite'
   ) {
     if (!DB.inited) throw new Error('DB not initialized');
