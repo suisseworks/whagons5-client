@@ -23,11 +23,13 @@ export const addTaskAsync = createAsyncThunk(
         try {
             // Call API to create task
             const response = await api.post('/tasks', task);
-            const newTask = {
-                ...response.data.rows?.[0] || response.data,
-                created_at: response.data.created_at,
-                updated_at: response.data.updated_at
-            };
+            const payload = (response.data?.data ?? response.data?.row ?? response.data?.rows?.[0] ?? response.data) as any;
+            const newTask = ensureTaskDefaults({
+                ...payload,
+                id: (payload?.id ?? payload?.ID ?? payload?.Id),
+                created_at: payload?.created_at ?? response.data?.created_at ?? new Date().toISOString(),
+                updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
+            });
             
             // Update IndexedDB on success
             await TasksCache.addTask(newTask);
@@ -47,11 +49,13 @@ export const updateTaskAsync = createAsyncThunk(
         try {
             // Call API to update task using PATCH (only send updated fields)
             const response = await api.patch(`/tasks/${id}`, updates);
-            const updatedTask = {
-                ...response.data.rows?.[0] || response.data,
-                created_at: response.data.created_at,
-                updated_at: response.data.updated_at
-            };
+            const payload = (response.data?.data ?? response.data?.row ?? response.data?.rows?.[0] ?? response.data) as any;
+            const updatedTask = ensureTaskDefaults({
+                ...payload,
+                id: payload?.id ?? id,
+                created_at: payload?.created_at ?? response.data?.created_at ?? undefined,
+                updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
+            });
             
             // Update IndexedDB on success
             await TasksCache.updateTask(id.toString(), updatedTask);

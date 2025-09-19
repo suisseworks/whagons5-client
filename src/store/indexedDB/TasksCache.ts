@@ -117,8 +117,13 @@ export class TasksCache {
 
     public static async updateTask(id: string, task: Task) {
         if (!DB.inited) await DB.init();
-        await DB.delete('tasks', id);
-        await DB.put('tasks', task);
+        const idNum = Number(id);
+        const normalized: any = { ...task } as any;
+        if (normalized.id === undefined || normalized.id === null) {
+            normalized.id = Number.isFinite(idNum) ? idNum : id;
+        }
+        await DB.delete('tasks', normalized.id);
+        await DB.put('tasks', normalized);
         this._memTasks = null;
         this._memTasksStamp = 0;
         
@@ -128,7 +133,12 @@ export class TasksCache {
 
     public static async addTask(task: Task) {
         if (!DB.inited) await DB.init();
-        await DB.put('tasks', task);
+        const normalized: any = { ...task } as any;
+        if (normalized.id === undefined || normalized.id === null) {
+            // Use Date.now as temporary id if absolutely missing (shouldn't happen for server rows)
+            normalized.id = Date.now();
+        }
+        await DB.put('tasks', normalized);
         this._memTasks = null;
         this._memTasksStamp = 0;
         
@@ -430,6 +440,9 @@ export class TasksCache {
 
     // --- Integrity helpers ---
     private static hashTask(task: Task): string {
+        const normalizedUserIds = Array.isArray(task.user_ids) && task.user_ids.length
+            ? `[${[...task.user_ids].map(n => Number(n)).filter(n => Number.isFinite(n)).sort((a,b)=>a-b).join(',')}]`
+            : '';
         const row = [
             task.id,
             task.name || '',
@@ -441,6 +454,7 @@ export class TasksCache {
             task.spot_id || 0,
             task.status_id,
             task.priority_id,
+            normalizedUserIds,
             task.start_date ? new Date(task.start_date).getTime() : '',
             task.due_date ? new Date(task.due_date).getTime() : '',
             task.expected_duration,
@@ -448,8 +462,6 @@ export class TasksCache {
             task.resolution_date ? new Date(task.resolution_date).getTime() : '',
             task.work_duration,
             task.pause_duration,
-            // Include user_ids in hash for data integrity - sort for consistent hashing
-            task.user_ids ? JSON.stringify(task.user_ids.sort()) : '',
             new Date(task.updated_at).getTime()
         ].join('|');
         return sha256(row).toString(encHex);

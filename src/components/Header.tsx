@@ -16,17 +16,10 @@ import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 
 
-// Cache key prefix for the user's avatar
-const AVATAR_CACHE_KEY = 'user_avatar_cache_';
-const AVATAR_CACHE_TIMESTAMP_KEY = 'user_avatar_timestamp_';
-const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
-
-interface CachedAvatar {
-    data: string;
-    timestamp: number;
-}
+// Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
     const { firebaseUser, user, userLoading } = useAuth();
@@ -85,84 +78,32 @@ function Header() {
 
 
 
-    const getCachedAvatar = useCallback((userId: string): CachedAvatar | null => {
-        try {
-            const cachedData = localStorage.getItem(AVATAR_CACHE_KEY + userId);
-            const cachedTimestamp = localStorage.getItem(AVATAR_CACHE_TIMESTAMP_KEY + userId);
-            
-            if (!cachedData || !cachedTimestamp) return null;
-            
-            const timestamp = parseInt(cachedTimestamp, 10);
-            const now = Date.now();
-            
-            if (now - timestamp > CACHE_DURATION) {
-                localStorage.removeItem(AVATAR_CACHE_KEY + userId);
-                localStorage.removeItem(AVATAR_CACHE_TIMESTAMP_KEY + userId);
-                return null;
-            }
-            
-            return {
-                data: cachedData,
-                timestamp: timestamp
-            };
-        } catch (error) {
-            return null;
-        }
-    }, []);
-
-    const setCachedAvatar = useCallback((userId: string, data: string) => {
-        try {
-            const timestamp = Date.now();
-            localStorage.setItem(AVATAR_CACHE_KEY + userId, data);
-            localStorage.setItem(AVATAR_CACHE_TIMESTAMP_KEY + userId, timestamp.toString());
-        } catch (error) {
-            setImageUrl(data);
-        }
-    }, []);
-
     const cacheImage = useCallback(async (url: string) => {
         if (!url || !firebaseUser?.uid) return;
-        
-        const cached = getCachedAvatar(firebaseUser.uid);
-        if (cached) {
-            setImageUrl(cached.data);
-            setImageError(false);
-            return;
-        }
 
         setIsLoading(true);
-        
         try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                if (response.status === 429) {
-                    setImageError(true);
-                    return;
-                }
-                throw new Error(`Failed to fetch image: ${response.status}`);
-            }
-            
-            const blob = await response.blob();
-            const reader = new FileReader();
-            
-            reader.onloadend = () => {
-                const base64data = reader.result as string;
-                setCachedAvatar(firebaseUser.uid, base64data);
-                setImageUrl(base64data);
+            // Try IDB cache first
+            const cached = await AvatarCache.getByAny([firebaseUser.uid, user?.google_uuid, user?.id]);
+            if (cached) {
+                setImageUrl(cached);
                 setImageError(false);
-            };
-            
-            reader.onerror = () => {
+                return;
+            }
+            // Fetch and populate cache
+            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, [user?.google_uuid, user?.id]);
+            if (dataUrl) {
+                setImageUrl(dataUrl);
+                setImageError(false);
+            } else {
                 setImageError(true);
-            };
-            
-            reader.readAsDataURL(blob);
+            }
         } catch (error) {
             setImageError(true);
         } finally {
             setIsLoading(false);
         }
-    }, [firebaseUser?.uid, getCachedAvatar, setCachedAvatar]);
+    }, [firebaseUser?.uid]);
 
     // Update avatar when user data changes
     useEffect(() => {
@@ -178,6 +119,9 @@ function Header() {
             setImageError(false);
         }
     }, [user, cacheImage]);
+
+
+        
 
     const handleImageError = () => {
         setImageError(true);

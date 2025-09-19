@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addTaskAsync } from '@/store/reducers/tasksSlice';
-import { genericActions } from '@/store/genericSlices';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { iconService } from '@/database/iconService';
+import { Search } from 'lucide-react';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -43,13 +45,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const [nameTouched, setNameTouched] = useState(false);
   const [userQuery, setUserQuery] = useState('');
   const [spotQuery, setSpotQuery] = useState('');
+  const [categoryIcon, setCategoryIcon] = useState<any>(null);
 
   const categoryInitialStatusId = useMemo(() => {
-    if (!categoryId) return null;
-    const catStatuses = statuses.filter((s: any) => s.category_id === categoryId);
-    const initial = catStatuses.find((s: any) => s.initial === true);
-    return (initial || catStatuses[0])?.id || null;
-  }, [statuses, categoryId]);
+    // Statuses are global; pick the one marked initial, otherwise first available
+    const initial = (statuses || []).find((s: any) => s.initial === true);
+    return (initial || statuses[0])?.id || null;
+  }, [statuses]);
 
   const derivedTeamId = useMemo(() => {
     if (!categoryId) return null;
@@ -57,14 +59,45 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     return cat?.team_id || null;
   }, [workspaceCategories, categoryId]);
 
+  const currentCategory = useMemo(() => {
+    return categories.find((c: any) => c.id === categoryId);
+  }, [categories, categoryId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (currentCategory?.icon) {
+          const icon = await iconService.getIcon(currentCategory.icon);
+          if (!cancelled) setCategoryIcon(icon);
+        } else {
+          if (!cancelled) setCategoryIcon(null);
+        }
+      } catch {
+        if (!cancelled) setCategoryIcon(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentCategory?.icon]);
+
   const categoryPriorities = useMemo(() => {
     if (!categoryId) return [] as any[];
     return priorities.filter((p: any) => p.category_id === categoryId);
   }, [priorities, categoryId]);
 
+  // Keep selectedPriority derivation available for future inline display needs
+  // const selectedPriority = useMemo(() => {
+  //   return categoryPriorities.find((p: any) => p.id === priorityId) || null;
+  // }, [categoryPriorities, priorityId]);
+
   const workspaceTemplates = useMemo(() => {
-    return templates.filter((t: any) => t.workspace_id === workspaceId && t.enabled !== false);
-  }, [templates, workspaceId]);
+    // Templates don't include workspace_id directly; infer via category.workspace_id
+    return templates.filter((t: any) => {
+      if (t?.enabled === false) return false;
+      const cat = categories.find((c: any) => c.id === t.category_id);
+      return cat?.workspace_id === workspaceId;
+    });
+  }, [templates, categories, workspaceId]);
 
   const workspaceUsers = useMemo(() => {
     const list = users.filter((u: any) => !u.workspace_id || u.workspace_id === workspaceId);
@@ -104,6 +137,8 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         setTemplateId(firstTemplate.id);
         setCategoryId(firstTemplate.category_id || null);
         setPriorityId(firstTemplate.default_priority || null);
+        // Ensure name is auto-filled even if templateId does not change
+        setName(firstTemplate.name || '');
       } else {
         setTemplateId(null);
         // fall back to first category in workspace if no templates
@@ -122,11 +157,11 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         setCategoryId(t.category_id || null);
         setPriorityId(t.default_priority || null);
         if (!nameTouched) {
-          setName(t.name);
+          setName(t.name || '');
         }
       }
     }
-  }, [templateId, workspaceTemplates]);
+  }, [templateId, workspaceTemplates, nameTouched]);
 
   useEffect(() => {
     // When category changes without template default, set a reasonable default priority
@@ -142,14 +177,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const canSubmit = useMemo(() => {
     return Boolean(
       name.trim().length > 0 &&
-      templateId &&
       workspaceId &&
       categoryId &&
       derivedTeamId &&
       categoryInitialStatusId &&
       (priorityId || categoryPriorities.length === 0)
     );
-  }, [name, templateId, workspaceId, categoryId, derivedTeamId, categoryInitialStatusId, priorityId, categoryPriorities.length]);
+  }, [name, workspaceId, categoryId, derivedTeamId, categoryInitialStatusId, priorityId, categoryPriorities.length]);
 
   const handleSubmit = async () => {
     if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId) return;
@@ -175,22 +209,12 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         resolution_date: null,
         work_duration: 0,
         pause_duration: 0,
-        user_ids: null,
+        user_ids: (Array.isArray(selectedUserIds) && selectedUserIds.length > 0)
+          ? selectedUserIds.map((id) => parseInt(String(id), 10)).filter((n) => Number.isFinite(n))
+          : [],
       };
 
-      const created = await dispatch(addTaskAsync(payload)).unwrap();
-      // Optionally attach users via taskUsers if any selected
-      if (created?.id && Array.isArray(selectedUserIds) && selectedUserIds.length > 0) {
-        try {
-          await Promise.all(
-            selectedUserIds.map((uid) =>
-              dispatch((genericActions as any).taskUsers.addAsync({ task_id: created.id, user_id: uid }))
-            )
-          );
-        } catch (e) {
-          // Non-blocking
-        }
-      }
+      await dispatch(addTaskAsync(payload)).unwrap();
       onOpenChange(false);
     } catch (e) {
       // Error is handled by slice; keep dialog open for correction
@@ -201,13 +225,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[560px] sm:w-[600px] overflow-auto">
+      <SheetContent side="right" className="w-[560px] sm:w-[640px] overflow-auto">
         <SheetHeader>
           <SheetTitle>New Task</SheetTitle>
           <SheetDescription>Create a task from a template.</SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-5 px-4 sm:px-6 py-4">
           <div className="space-y-2">
             <Label>Template *</Label>
             <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
@@ -253,11 +277,17 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
           {categoryId && (
             <div className="space-y-1">
               <Label>Category</Label>
-              <div className="text-sm text-muted-foreground">
-                {(() => {
-                  const cat = categories.find((c: any) => c.id === categoryId);
-                  return cat?.name || `Category ${categoryId}`;
-                })()}
+              <div className="flex items-center gap-2 text-sm mt-1.5">
+                {categoryIcon && (
+                  <FontAwesomeIcon
+                    icon={categoryIcon}
+                    style={{ color: currentCategory?.color }}
+                    className="w-4 h-4 mr-1"
+                  />
+                )}
+                <span className="text-foreground">
+                  {currentCategory?.name || `Category ${categoryId}`}
+                </span>
               </div>
             </div>
           )}
@@ -270,7 +300,12 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
               </SelectTrigger>
               <SelectContent>
                 {categoryPriorities.map((p: any) => (
-                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                      <span>{p.name}</span>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -281,7 +316,10 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
 
           <div className="space-y-2">
             <Label>Spot</Label>
-            <Input placeholder="Search spots" value={spotQuery} onChange={(e) => setSpotQuery(e.target.value)} />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Search spots" value={spotQuery} onChange={(e) => setSpotQuery(e.target.value)} />
+            </div>
             <Select value={spotId ? String(spotId) : undefined} onValueChange={(v) => setSpotId(parseInt(v, 10))}>
               <SelectTrigger>
                 <SelectValue placeholder={workspaceSpots.length ? 'Select spot (optional)' : 'No spots available'} />
@@ -295,8 +333,8 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="users">Assignees</Label>
-            <Input placeholder="Search users" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} />
+            <Label htmlFor="users">Responsible</Label>
+            <Input placeholder="Search people" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} />
             <div className="max-h-44 overflow-auto border rounded-md p-2">
               {workspaceUsers.length === 0 && (
                 <div className="text-xs text-muted-foreground px-1 py-2">No users match.</div>
@@ -332,7 +370,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
             <textarea id="task-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" className="w-full min-h-[80px] px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" />
           </div>
 
-          <div className="pt-2 sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4">
+          <div className="pt-2 sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 px-4 sm:px-6">
             <div className="flex items-center justify-end gap-2 border-t pt-3">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
               <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
