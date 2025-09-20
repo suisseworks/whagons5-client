@@ -33,7 +33,7 @@
   --accent: oklch(0.68 0.12 195); /* Teal accent */
   --accent-foreground: oklch(1 0 0); /* White text on accent */
   --destructive: oklch(0.6 0.2 25); /* Keep red destructive */
-  --destructive-foreground: oklch(0.98 0.01 25);
+  --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.85 0.02 45); /* Darker border for better visibility */
   --input: oklch(0.98 0.01 45); /* Very light input background */
   --ring: oklch(0.72 0.12 195 / 0.35); /* Teal focus ring */
@@ -61,45 +61,45 @@
 }
 
 .dark {
-  --background: oklch(0.18 0.02 25); /* Lighter dark background, less harsh */
-  --foreground: oklch(0.99 0.005 45); /* Nearly pure white text for maximum contrast */
-  --card: oklch(0.22 0.03 25); /* Lighter dark cards */
-  --card-foreground: oklch(0.99 0.005 45); /* Nearly pure white card text */
-  --popover: oklch(0.22 0.03 25);
-  --popover-foreground: oklch(0.99 0.005 45); /* Nearly pure white popover text */
-  --primary: oklch(0.78 0.15 195); /* Brighter teal for dark mode */
-  --primary-foreground: oklch(1 0 0); /* White text on primary */
-  --secondary: oklch(0.28 0.06 45); /* Lighter secondary background */
-  --secondary-foreground: oklch(0.98 0.01 45); /* Nearly white secondary text */
-  --muted: oklch(0.25 0.04 45); /* Lighter muted background */
-  --muted-foreground: oklch(0.9 0.02 45); /* Much brighter muted text for maximum contrast */
-  --accent: oklch(0.74 0.14 210); /* Cyan-teal accent */
+  --background: oklch(0.16 0.02 255); /* Neutral deep dark */
+  --foreground: oklch(0.98 0 0); /* Neutral white text */
+  --card: oklch(0.19 0.02 255); /* Slightly raised card */
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.19 0.02 255);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.78 0.2 280); /* Distinct violet for dark mode */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.23 0.03 255); /* Neutral subtle surface */
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.22 0.02 255);
+  --muted-foreground: oklch(0.88 0.02 255);
+  --accent: oklch(0.76 0.16 210);
   --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.7 0.22 25); /* Keep red destructive */
-  --destructive-foreground: oklch(0.1 0.02 25);
-  --border: oklch(0.4 0.06 45); /* Lighter border for better visibility */
-  --input: oklch(0.28 0.05 45); /* Lighter input background */
-  --ring: oklch(0.78 0.15 195 / 0.45); /* Teal focus ring */
-  --chart-1: oklch(0.78 0.15 195); /* Teal */
-  --chart-2: oklch(0.74 0.14 210); /* Cyan */
-  --chart-3: oklch(0.7 0.12 230); /* Blue */
-  --chart-4: oklch(0.72 0.13 170); /* Green-teal */
-  --chart-5: oklch(0.76 0.14 260); /* Indigo */
-  
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.36 0.03 255);
+  --input: oklch(0.24 0.03 255);
+  --ring: oklch(0.8 0.17 205 / 0.5);
+  --chart-1: oklch(0.8 0.17 205);
+  --chart-2: oklch(0.76 0.16 210);
+  --chart-3: oklch(0.72 0.14 230);
+  --chart-4: oklch(0.74 0.13 170);
+  --chart-5: oklch(0.78 0.15 260);
+
   /* Dark sidebar palette */
-  --sidebar: #0b1440; /* Deep navy */
-  --sidebar-foreground: #e5e7eb; /* Light text */
-  --sidebar-primary: oklch(0.78 0.15 195); /* Teal highlights */
+  --sidebar: oklch(0.18 0.02 255); /* Match neutral dark background */
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: oklch(0.78 0.2 280);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.28 0.04 250); /* Lighter than sidebar for clear hover */
-  --sidebar-accent-foreground: #e5e7eb; /* Light text */
-  --sidebar-border: oklch(0.38 0.03 240); /* Slightly lighter border for definition */
-  --sidebar-ring: oklch(0.7 0.2 45 / 0.5);
-  
+  --sidebar-accent: oklch(0.26 0.03 255);
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: oklch(0.34 0.03 255);
+  --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
+
   /* Dark mode gradients */
-  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.15 195) 0%, oklch(0.74 0.14 210) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.25 0.03 220) 0%, oklch(0.28 0.04 240) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.74 0.14 210) 0%, oklch(0.7 0.12 230) 100%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.22 0.02 255) 0%, oklch(0.26 0.03 255) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.76 0.16 210) 0%, oklch(0.72 0.14 230) 100%);
 }
 
 @theme inline {

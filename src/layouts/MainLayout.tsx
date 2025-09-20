@@ -26,7 +26,7 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
       } as React.CSSProperties}
       >
         <div className="flex h-screen w-full overflow-hidden bg-background">
-          <AppSidebar />
+          <AppSidebar overlayOnExpand={false} />
           <SidebarRail />
           <SidebarInset className="flex flex-col">
             <Header />

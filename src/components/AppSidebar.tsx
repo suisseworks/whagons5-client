@@ -103,7 +103,7 @@ const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   );
 };
 
-export function AppSidebar() {
+export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boolean }) {
   const { state, setOpen, isMobile } = useSidebar();
   const location = useLocation();
   const pathname = location.pathname;
@@ -115,7 +115,7 @@ export function AppSidebar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
-  const [isPinned, setIsPinned] = useState(getPinnedState());
+  const [, setIsPinned] = useState(getPinnedState());
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const hoverOpenTimerRef = useRef<number | null>(null);
@@ -266,37 +266,35 @@ export function AppSidebar() {
   // Determine if we should show expanded content
   const showExpandedContent = !isCollapsed || isMobile;
 
+  // Hover handlers re-enabled for open/close without transform animations
   const handleMouseEnter = () => {
-    // Debounce hover-open to prevent flicker
     if (isMobile) return;
-    if (!isCollapsed) return;
+    if (state !== 'collapsed') return;
     if ((hoverCloseTimerRef.current as any)) {
       clearTimeout(hoverCloseTimerRef.current as any);
       hoverCloseTimerRef.current = null;
     }
     if (!(hoverOpenTimerRef.current as any)) {
       hoverOpenTimerRef.current = setTimeout(() => {
-        setOpen(true);
+        // open sidebar on hover in
+        try { setOpen(true); } catch {}
         hoverOpenTimerRef.current = null;
-      }, 150) as unknown as number;
+      }, 0) as unknown as number;
     }
   };
 
   const handleMouseLeave = () => {
-    // Debounce hover-close to prevent flicker when moving near the edge
     if (isMobile) return;
-    if (isPinned) return;
+    if (getPinnedState()) return;
     if (hoverOpenTimerRef.current as any) {
       clearTimeout(hoverOpenTimerRef.current as any);
       hoverOpenTimerRef.current = null;
     }
-    if (!isCollapsed) {
-      if (!(hoverCloseTimerRef.current as any)) {
-        hoverCloseTimerRef.current = setTimeout(() => {
-          setOpen(false);
-          hoverCloseTimerRef.current = null;
-        }, 300) as unknown as number;
-      }
+    if (!(hoverCloseTimerRef.current as any)) {
+      hoverCloseTimerRef.current = setTimeout(() => {
+        try { setOpen(false); } catch {}
+        hoverCloseTimerRef.current = null;
+      }, 100) as unknown as number;
     }
   };
 
@@ -313,19 +311,20 @@ export function AppSidebar() {
     <Sidebar
       collapsible="icon"
       className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground`}
+      overlayExpanded={overlayOnExpand && !getPinnedState()}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar transition-all duration-300 ${
+        className={`shadow-md bg-sidebar h-14 transition-colors duration-200 ${
           isCollapsed ? 'px-1' : ''
         }`}
       >
-        <div className="flex items-center justify-center w-full">
+        <div className="flex items-center justify-center w-full h-full">
           <Link
             to="/home"
             title="Home"
-            className={`flex items-center pt-3 pb-3 transition-all duration-300 ${
+            className={`flex items-center h-full transition-all duration-300 ${
               isCollapsed ? 'justify-center' : 'justify-center'
             }`}
           >
@@ -353,29 +352,29 @@ export function AppSidebar() {
         <SidebarGroup>
           {/* Everything workspace - above the Spaces dropdown */}
           {(!isCollapsed || isMobile) && (
-            <div className="px-3 py-2">
+            <div className="px-3">
               <Link
                 to={`/workspace/all`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${
                   pathname === `/workspace/all`
                     ? 'bg-primary/15 text-primary border-l-4 border-primary'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
               >
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                <span>
                   <Users className="w-4 h-4" />
                 </span>
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Everything</span>
+                <span>Everything</span>
               </Link>
             </div>
           )}
 
           {/* Show Everything icon when collapsed - DESKTOP ONLY */}
           {isCollapsed && !isMobile && (
-            <div className="px-2 py-2 flex justify-center">
+            <div className="px-2 flex justify-center">
               <Link
                 to={`/workspace/all`}
-                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                className={`flex items-center justify-center w-10 h-10 rounded text-xs font-medium transition-colors ${
                   pathname === `/workspace/all`
                     ? 'bg-primary/20 text-primary border border-primary/40'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -496,20 +495,20 @@ export function AppSidebar() {
                       <Link
                         key={`workspace-${workspace.id}`}
                         to={`/workspace/${workspace.id}`}
-                        className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-4 py-2 mx-2 ${
+                        className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-4 mx-2 ${
                           pathname === `/workspace/${workspace.id}`
                             ? 'bg-primary/15 text-primary border-l-4 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
                         } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                       >
-                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                        <span>
                           <FontAwesomeIcon
                             icon={getWorkspaceIcon(workspace.icon)}
                             style={{ color: workspace.color }}
                             className="w-4 h-4"
                           />
                         </span>
-                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">{workspace.name}</span>
+                        <span>{workspace.name}</span>
                       </Link>
                       );
                     })}
@@ -526,7 +525,7 @@ export function AppSidebar() {
                         <Link
                           key={`workspace-collapsed-${workspace.id}`}
                           to={`/workspace/${workspace.id}`}
-                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
                             pathname === `/workspace/${workspace.id}`
                               ? 'bg-primary/20 text-primary border border-primary/40'
                               : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -551,16 +550,16 @@ export function AppSidebar() {
             <div className="px-3 py-2">
               <Link
                 to={`/messages`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${
                   pathname === `/messages`
                     ? 'bg-primary/15 text-primary border-l-4 border-primary'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
               >
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                <span>
                   <MessageSquareMore className="w-4 h-4" />
                 </span>
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Messages</span>
+                <span>Messages</span>
               </Link>
             </div>
           )}
@@ -570,7 +569,7 @@ export function AppSidebar() {
             <div className="px-2 py-2 flex justify-center">
               <Link
                 to={`/messages`}
-                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
                   pathname === `/messages`
                     ? 'bg-primary/20 text-primary border border-primary/40'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -612,11 +611,11 @@ export function AppSidebar() {
                       isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
                   >
-                    <BarChart3 size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
+                    <BarChart3 size={20} className="w-5! h-5! p-[1px]" />
                     {showExpandedContent && (
-                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Analytics</span>
+                      <span className="ml-2">Analytics</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
@@ -645,11 +644,11 @@ export function AppSidebar() {
                       isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
                   >
-                    <Settings size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
+                    <Settings size={20} className="w-5! h-5! p-[1px]" />
                     {showExpandedContent && (
-                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Settings</span>
+                      <span className="ml-2">Settings</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
