@@ -68,6 +68,7 @@ const genericSliceConfigs = [
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','updated_at'] },
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','updated_at'] },
+    { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
 ];
 
@@ -117,6 +118,7 @@ export const {
     customFields,
     teams,
     templates,
+    messages,
     workspaces,
 } = genericSlices.slices;
 
@@ -172,6 +174,7 @@ export const genericEventNames = {
     customFields: genericSlices.slices.customFields.eventNames,
     teams: genericSlices.slices.teams.eventNames,
     templates: genericSlices.slices.templates.eventNames,
+    messages: genericSlices.slices.messages.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
 } as const;
 
@@ -218,5 +221,6 @@ export const genericActions = {
     customFields: genericSlices.slices.customFields.actions,
     teams: genericSlices.slices.teams.actions,
     templates: genericSlices.slices.templates.actions,
+    messages: genericSlices.slices.messages.actions,
     workspaces: genericSlices.slices.workspaces.actions,
 } as const;

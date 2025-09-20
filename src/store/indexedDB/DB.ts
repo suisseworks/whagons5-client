@@ -195,6 +195,9 @@ export class DB {
           if (!db.objectStoreNames.contains('templates')) {
             db.createObjectStore('templates', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('messages')) {
+            db.createObjectStore('messages', { keyPath: 'id' });
+          }
 
           // Custom Fields & Values
           if (!db.objectStoreNames.contains('spot_custom_fields')) {
