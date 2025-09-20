@@ -241,7 +241,7 @@ function Header() {
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                            <button className="flex items-center hover:opacity-80 transition-opacity">
                                 <Avatar className="h-8 w-8">
                                     {!imageError && imageUrl && !isLoading && (
                                         <AvatarImage 
@@ -254,9 +254,6 @@ function Header() {
                                         {isLoading ? '...' : getInitials()}
                                     </AvatarFallback>
                                 </Avatar>
-                                <span className="hidden sm:inline text-sm font-medium">
-                                    {getDisplayName()}
-                                </span>
                             </button>
                         </DropdownMenuTrigger>
 

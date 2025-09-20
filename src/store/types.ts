@@ -42,17 +42,23 @@ export interface Category {
 export interface Template {
     id: number;
     name: string;
-    description: string | null;
+    // New canonical columns per migration
     category_id: number;
-    team_id: number;
-    workspace_id: number;
-    default_priority: number;
-    default_duration: number;
-    instructions: string | null;
-    enabled: boolean;
+    priority_id: number | null;
+    sla_id: number | null;
+    default_spot_id?: number | null;
+    default_user_ids?: number[] | null;
+    // Legacy/previous fields kept optional for compatibility during transition
+    description?: string | null;
+    team_id?: number;
+    workspace_id?: number;
+    default_priority?: number;
+    default_duration?: number;
+    instructions?: string | null;
+    enabled?: boolean;
     created_at: string;
     updated_at: string;
-    deleted_at: string | null;
+    deleted_at?: string | null;
 }
 
 export interface Task {

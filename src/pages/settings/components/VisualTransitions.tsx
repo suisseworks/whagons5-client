@@ -155,14 +155,14 @@ export const VisualTransitions = memo(function VisualTransitions({
       >
         <svg className="absolute inset-0 w-full h-full" shapeRendering="geometricPrecision">
           <defs>
-            <marker id="arrow-blue" viewBox="0 0 12 12" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 12 6 L 0 12 z" fill="#3b82f6" />
+            <marker id="arrow-blue" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
             </marker>
-            <marker id="arrow-red" viewBox="0 0 12 12" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 12 6 L 0 12 z" fill="#ef4444" />
+            <marker id="arrow-red" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
             </marker>
-            <marker id="arrow-draft" viewBox="0 0 12 12" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 12 6 L 0 12 z" fill="#60a5fa" />
+            <marker id="arrow-draft" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa" />
             </marker>
           </defs>
           {transitions.map((t: any, i: number) => {

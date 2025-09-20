@@ -1,14 +1,22 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags, faBroom, faWrench, faSeedling, faTools, faHome, faCar, faUtensils, faLaptop, faBook, faBolt, faTree } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { Template, Task, Category, Team } from "@/store/types";
+import { Template, Task, Category } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -17,69 +25,35 @@ import {
   createActionsCellRenderer
 } from "../components";
 
-// Priority mapping
-const PRIORITY_MAP = {
-  1: { label: 'Low', color: '#6b7280' },
-  2: { label: 'Medium', color: '#f59e0b' },
-  3: { label: 'High', color: '#ef4444' },
-  4: { label: 'Critical', color: '#dc2626' }
-};
-
-// Custom cell renderer for template name with icon
+// Custom cell renderer for template name with description (no icon)
 const TemplateNameCellRenderer = (props: ICellRendererParams) => {
   const templateName = props.value;
-  
+  const description = (props.data as any)?.description as string | undefined;
+
   return (
-    <div className="flex items-center space-x-3 h-full">
-      <FontAwesomeIcon 
-        icon={faFileAlt} 
-        className="w-4 h-4"
-        style={{ color: '#3b82f6' }}
+    <div className="flex items-center h-full space-x-2">
+      <FontAwesomeIcon
+        icon={faFileAlt}
+        className="w-4 h-4 text-gray-300"
       />
-      <span>{templateName}</span>
+      <div className="flex flex-col justify-center">
+        <span className="leading-tight">{templateName}</span>
+        {description ? (
+          <span className="text-xs text-muted-foreground leading-snug line-clamp-2">{description}</span>
+        ) : null}
+      </div>
     </div>
-  );
-};
-
-// Custom cell renderer for enabled status
-const EnabledCellRenderer = (props: ICellRendererParams) => {
-  const isEnabled = props.value;
-  
-  return (
-    <Badge 
-      variant={isEnabled ? "default" : "secondary"} 
-      className={isEnabled ? "" : ""}
-    >
-      {isEnabled ? "Enabled" : "Disabled"}
-    </Badge>
-  );
-};
-
-// Custom cell renderer for priority
-const PriorityCellRenderer = (props: ICellRendererParams) => {
-  const priorityId = props.value;
-  const priority = PRIORITY_MAP[priorityId as keyof typeof PRIORITY_MAP];
-  
-  if (!priority) return null;
-  
-  return (
-    <Badge 
-      variant="outline" 
-      style={{ 
-        borderColor: priority.color,
-        color: priority.color 
-      }}
-    >
-      {priority.label}
-    </Badge>
   );
 };
 
 function Templates() {
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
-  const { value: teams } = useSelector((state: RootState) => state.teams);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const { value: priorities } = useSelector((state: RootState) => state.priorities);
+  const { value: slas } = useSelector((state: RootState) => state.slas);
+  const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
+  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
   
   // Use shared state management
   const {
@@ -107,8 +81,21 @@ function Templates() {
     handleCloseDeleteDialog
   } = useSettingsState<Template>({
     entityName: 'templates',
-    searchFields: ['name', 'description', 'instructions']
+    searchFields: ['name']
   });
+
+  // Local state for multi-select users
+  const [createUserIds, setCreateUserIds] = useState<number[]>([]);
+  const [editUserIds, setEditUserIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (isEditDialogOpen && editingTemplate) {
+      const ids = Array.isArray((editingTemplate as any).default_user_ids)
+        ? (editingTemplate as any).default_user_ids
+        : [];
+      setEditUserIds(ids);
+    }
+  }, [isEditDialogOpen, editingTemplate]);
 
   // Helper functions
   const getTemplateTaskCount = (templateId: number) => {
@@ -127,6 +114,53 @@ function Templates() {
     }
   };
 
+  // Derived maps
+  const priorityById = useMemo(() => {
+    const map = new Map<number, { name: string; color?: string | null }>();
+    (priorities as any[]).forEach((p: any) => map.set(Number(p.id), { name: p.name, color: p.color }));
+    return map;
+  }, [priorities]);
+
+  const slaById = useMemo(() => {
+    const map = new Map<number, any>();
+    (slas as any[]).forEach((s: any) => map.set(Number(s.id), s));
+    return map;
+  }, [slas]);
+
+  const spotById = useMemo(() => {
+    const map = new Map<number, any>();
+    (spots as any[]).forEach((s: any) => map.set(Number(s.id), s));
+    return map;
+  }, [spots]);
+
+  const userById = useMemo(() => {
+    const map = new Map<number, any>();
+    (users as any[]).forEach((u: any) => map.set(Number(u.id), u));
+    return map;
+  }, [users]);
+
+  // Helper to map FontAwesome class to icon
+  const mapIconClassToIcon = (iconClass?: string) => {
+    if (!iconClass) return faTags;
+    const parts = iconClass.split(' ');
+    const last = parts[parts.length - 1];
+    const iconMap: Record<string, any> = {
+      'fa-broom': faBroom,
+      'fa-wrench': faWrench,
+      'fa-seedling': faSeedling,
+      'fa-tree': faTree,
+      'fa-tools': faTools,
+      'fa-home': faHome,
+      'fa-car': faCar,
+      'fa-utensils': faUtensils,
+      'fa-laptop': faLaptop,
+      'fa-book': faBook,
+      'fa-bolt': faBolt,
+      'fa-tags': faTags,
+    };
+    return iconMap[last] || faTags;
+  };
+
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
     { 
@@ -136,43 +170,28 @@ function Templates() {
       minWidth: 200,
       cellRenderer: TemplateNameCellRenderer
     },
-    { 
-      field: 'description', 
-      headerName: 'Description',
-      flex: 2,
-      minWidth: 200
-    },
+    // Description removed per migration
     { 
       field: 'category_id', 
       headerName: 'Category',
-      width: 150,
+      width: 180,
       cellRenderer: (params: ICellRendererParams) => {
-        const categoryId = params.value;
-        const category = categories.find((c: any) => c.id === categoryId);
-        return category ? category.name : `Category ${categoryId}`;
-      },
-      sortable: true,
-      filter: true
-    },
-    { 
-      field: 'team_id', 
-      headerName: 'Team',
-      width: 150,
-      cellRenderer: (params: ICellRendererParams) => {
-        const teamId = params.value;
-        
-        if (!teamId) {
-          return <span className="text-muted-foreground">No Team</span>;
+        const categoryId = Number(params.value);
+        const category = (categories as any[]).find((c: any) => Number(c.id) === categoryId);
+        if (!category) {
+          return <span className="text-muted-foreground">Category {categoryId}</span>;
         }
-        
-        const team = teams.find((t: any) => t.id === teamId);
-        
+        const icon = mapIconClassToIcon(category.icon);
+        const bg = category.color || '#6b7280';
         return (
-          <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 min-w-[1.5rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-              {team?.name ? team.name.charAt(0).toUpperCase() : 'T'}
-            </div>
-            <span>{team?.name || `Team ${teamId}`}</span>
+          <div className="flex items-center h-full">
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ backgroundColor: bg, color: '#ffffff' }}
+            >
+              <FontAwesomeIcon icon={icon} className="w-3.5 h-3.5 mr-1" />
+              {category.name}
+            </span>
           </div>
         );
       },
@@ -180,30 +199,69 @@ function Templates() {
       filter: true
     },
     { 
-      field: 'default_priority', 
+      field: 'priority_id', 
       headerName: 'Priority',
-      width: 100,
-      cellRenderer: PriorityCellRenderer,
-      sortable: true,
-      filter: true
-    },
-    { 
-      field: 'default_duration', 
-      headerName: 'Duration (min)',
-      width: 120,
+      width: 130,
       cellRenderer: (params: ICellRendererParams) => {
-        return `${params.value} min`;
+        const pid = Number(params.value);
+        const p = priorityById.get(pid);
+        if (!p) return <span className="text-muted-foreground">—</span>;
+        return (
+          <Badge 
+            variant="outline" 
+            style={{ borderColor: p.color || '#6b7280', color: p.color || '#6b7280' }}
+          >
+            {p.name}
+          </Badge>
+        );
       },
       sortable: true,
       filter: true
     },
     { 
-      field: 'enabled', 
-      headerName: 'Status',
-      width: 100,
-      cellRenderer: EnabledCellRenderer,
+      field: 'sla_id', 
+      headerName: 'SLA',
+      width: 140,
+      editable: true,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: () => {
+        const values = [''].concat(Array.from(slaById.keys()).map((id) => String(id)));
+        return { values } as any;
+      },
+      cellRenderer: (params: ICellRendererParams) => {
+        const sid = Number(params.value);
+        const s = slaById.get(sid);
+        if (!s) return <span className="text-muted-foreground">—</span>;
+        const label = s.name || `${s.response_time ?? '?'} / ${s.resolution_time ?? '?' } min`;
+        return <span>{label}</span>;
+      },
       sortable: true,
       filter: true
+    },
+    { 
+      field: 'default_spot_id', 
+      headerName: 'Default Spot',
+      width: 160,
+      cellRenderer: (params: ICellRendererParams) => {
+        const sid = Number(params.value);
+        if (!sid) return <span className="text-muted-foreground">—</span>;
+        const spot = spotById.get(sid);
+        return <span>{spot?.name || `Spot ${sid}`}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
+      field: 'default_user_ids',
+      headerName: 'Default Users',
+      width: 150,
+      cellRenderer: (params: ICellRendererParams) => {
+        const arr = (params.value as any[]) || [];
+        if (!Array.isArray(arr) || arr.length === 0) return <span className="text-muted-foreground">—</span>;
+        return <Badge variant="secondary">{arr.length} user{arr.length !== 1 ? 's' : ''}</Badge>;
+      },
+      sortable: false,
+      filter: false
     },
     {
       field: 'actions',
@@ -218,24 +276,45 @@ function Templates() {
       resizable: false,
       pinned: 'right'
     }
-  ], [categories, teams, handleEdit, handleDeleteTemplate]);
+  ], [categories, priorityById, slaById, spotById, handleEdit, handleDeleteTemplate]);
 
   // Form handlers
+  const handleCellValueChanged = useCallback(async (event: any) => {
+    const field = event?.colDef?.field;
+    if (field !== 'sla_id') return;
+    const id = event?.data?.id;
+    if (!id) return;
+    const raw = event?.newValue as string | number | null | undefined;
+    const value = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+    try {
+      await updateItem(id, { sla_id: value } as any);
+    } catch (e) {
+      // revert UI if needed; AG Grid keeps the edited value, but store will overwrite on refresh
+    }
+  }, [updateItem]);
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
-    const templateData = {
+    const priorityStr = (formData.get('priority_id') as string) || '';
+    const slaStr = (formData.get('sla_id') as string) || '';
+    const templateData: any = {
       name: formData.get('name') as string,
-      description: formData.get('description') as string || null,
+      description: (formData.get('description') as string) || null,
       category_id: parseInt(formData.get('category_id') as string),
-      team_id: parseInt(formData.get('team_id') as string),
-      workspace_id: 1,
-      default_priority: parseInt(formData.get('default_priority') as string),
-      default_duration: parseInt(formData.get('default_duration') as string),
-      instructions: formData.get('instructions') as string || null,
-      enabled: formData.get('enabled') === 'on',
-      deleted_at: null
+      default_spot_id: (() => {
+        const v = formData.get('default_spot_id') as string;
+        return v ? parseInt(v) : null;
+      })(),
+      default_user_ids: (() => {
+        const vals = formData.getAll('default_user_ids');
+        const ids = vals.map((v) => parseInt(v as string, 10)).filter((n) => !Number.isNaN(n));
+        return ids.length ? ids : null;
+      })(),
+      instructions: (formData.get('instructions') as string) || null,
+      enabled: formData.get('enabled') === 'on'
     };
+    templateData.priority_id = priorityStr ? parseInt(priorityStr, 10) : null;
+    templateData.sla_id = slaStr ? parseInt(slaStr, 10) : null;
     await createItem(templateData);
   };
 
@@ -244,16 +323,26 @@ function Templates() {
     if (!editingTemplate) return;
     
     const formData = new FormData(e.target as HTMLFormElement);
-    const updates = {
+    const updates: any = {
       name: formData.get('name') as string,
-      description: formData.get('description') as string || null,
+      description: (formData.get('description') as string) || null,
       category_id: parseInt(formData.get('category_id') as string),
-      team_id: parseInt(formData.get('team_id') as string),
-      default_priority: parseInt(formData.get('default_priority') as string),
-      default_duration: parseInt(formData.get('default_duration') as string),
-      instructions: formData.get('instructions') as string || null,
+      default_spot_id: (() => {
+        const v = formData.get('default_spot_id') as string;
+        return v ? parseInt(v) : null;
+      })(),
+      default_user_ids: (() => {
+        const vals = formData.getAll('default_user_ids');
+        const ids = vals.map((v) => parseInt(v as string, 10)).filter((n) => !Number.isNaN(n));
+        return ids.length ? ids : null;
+      })(),
+      instructions: (formData.get('instructions') as string) || null,
       enabled: formData.get('enabled') === 'on'
     };
+    const priorityStrEdit = (formData.get('priority_id') as string) || '';
+    const slaStrEdit = (formData.get('sla_id') as string) || '';
+    updates.priority_id = priorityStrEdit ? parseInt(priorityStrEdit, 10) : null;
+    updates.sla_id = slaStrEdit ? parseInt(slaStrEdit, 10) : null;
     await updateItem(editingTemplate.id, updates);
   };
 
@@ -271,18 +360,20 @@ function Templates() {
           <Badge 
             variant="outline" 
             style={{ 
-              borderColor: PRIORITY_MAP[template.default_priority as keyof typeof PRIORITY_MAP]?.color,
-              color: PRIORITY_MAP[template.default_priority as keyof typeof PRIORITY_MAP]?.color 
+              borderColor: priorityById.get((template as any).priority_id)?.color || '#6b7280',
+              color: priorityById.get((template as any).priority_id)?.color || '#6b7280'
             }}
           >
-            {PRIORITY_MAP[template.default_priority as keyof typeof PRIORITY_MAP]?.label}
+            {priorityById.get((template as any).priority_id)?.name || 'Priority'}
           </Badge>
-          <Badge 
-            variant={template.enabled ? "default" : "secondary"} 
-            className="text-xs"
-          >
-            {template.enabled ? "Enabled" : "Disabled"}
-          </Badge>
+          {(template as any).default_spot_id && (
+            <Badge variant="secondary" className="text-xs">
+              {spotById.get((template as any).default_spot_id)?.name || `Spot ${(template as any).default_spot_id}`}
+            </Badge>
+          )}
+          {Array.isArray((template as any).default_user_ids) && (template as any).default_user_ids.length > 0 && (
+            <Badge variant="secondary" className="text-xs">{(template as any).default_user_ids.length} users</Badge>
+          )}
           <span className="text-xs text-muted-foreground">
             {getTemplateTaskCount(template.id)} task{getTemplateTaskCount(template.id) !== 1 ? 's' : ''}
           </span>
@@ -318,8 +409,8 @@ function Templates() {
         description: "Overview of your template management",
         items: [
           { label: "Total Templates", value: templates.length },
-          { label: "Enabled Templates", value: templates.filter((template: Template) => template.enabled).length },
-          { label: "Disabled Templates", value: templates.filter((template: Template) => !template.enabled).length }
+          { label: "With Default Spot", value: templates.filter((t: any) => t.default_spot_id).length },
+          { label: "With Default Users", value: templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length }
         ]
       }}
       headerActions={
@@ -333,6 +424,8 @@ function Templates() {
         rowData={filteredItems}
         columnDefs={colDefs}
         noRowsMessage="No templates found"
+        onRowDoubleClicked={handleEdit}
+        onCellValueChanged={handleCellValueChanged}
       />
 
       {/* Create Template Dialog */}
@@ -373,47 +466,118 @@ function Templates() {
             </select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="team" className="text-right">Team *</Label>
+            <Label htmlFor="default_spot_id" className="text-right">Default Spot</Label>
             <select
-              id="team"
-              name="team_id"
+              id="default_spot_id"
+              name="default_spot_id"
               className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              required
+              defaultValue=""
             >
-              <option value="">Select Team</option>
-              {teams.map((team: any) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
+              <option value="">None</option>
+              {(spots as any[]).map((s: any) => (
+                <option key={s.id} value={String(s.id)}>{s.name}</option>
               ))}
             </select>
           </div>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Default Users</Label>
+            <div className="col-span-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    {createUserIds.length ? (
+                      <div className="flex flex-wrap gap-1 items-center w-full">
+                        {createUserIds.map((id) => {
+                          const u: any = userById.get(id);
+                          const label = u?.name || u?.email || `User ${id}`;
+                          const initials = (u?.name || u?.email || 'U').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase();
+                          return (
+                            <span key={id} className="inline-flex items-center gap-1 rounded-md bg-secondary text-secondary-foreground px-2 py-1 text-xs">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px]">
+                                {initials}
+                              </span>
+                              <span className="truncate max-w-[140px]">{label}</span>
+                              <button
+                                type="button"
+                                className="ml-1 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setCreateUserIds((prev) => prev.filter((x) => x !== id));
+                                }}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Select users</span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[280px] max-h-64 overflow-auto">
+                  <DropdownMenuLabel>Select default users</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {(users as any[]).map((u: any) => {
+                    const checked = createUserIds.includes(u.id);
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={u.id}
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setCreateUserIds((prev) =>
+                            v ? [...prev, u.id] : prev.filter((id) => id !== u.id)
+                          );
+                        }}
+                      >
+                        {u.name || u.email || `User ${u.id}`}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Hidden inputs to submit as multi values */}
+              {createUserIds.map((id) => (
+                <input key={id} type="hidden" name="default_user_ids" value={String(id)} />
+              ))}
+            </div>
+          </div>
+          {/* Team removed per migration */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="priority" className="text-right">Default Priority</Label>
+            <Label htmlFor="priority" className="text-right">Priority</Label>
             <select
               id="priority"
-              name="default_priority"
+              name="priority_id"
               className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              defaultValue="2"
+              defaultValue=""
             >
-              {Object.entries(PRIORITY_MAP).map(([id, priority]) => (
-                <option key={id} value={id}>
-                  {priority.label}
+              <option value="">None</option>
+              {Array.from(priorityById.entries()).map(([id, priority]) => (
+                <option key={id} value={String(id)}>
+                  {priority.name}
                 </option>
               ))}
             </select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="duration" className="text-right">Default Duration (min)</Label>
-            <Input
-              type="number"
-              id="duration"
-              name="default_duration"
-              defaultValue="60"
-              className="col-span-3"
-              min="1"
-            />
+            <Label htmlFor="sla" className="text-right">SLA</Label>
+            <select
+              id="sla"
+              name="sla_id"
+              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              defaultValue=""
+            >
+              <option value="">None</option>
+              {Array.from(slaById.entries()).map(([id, sla]) => (
+                <option key={id} value={String(id)}>
+                  {sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`}
+                </option>
+              ))}
+            </select>
           </div>
+          {/* No duration field per migration */}
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="instructions" className="text-right pt-2">Instructions</Label>
             <textarea
@@ -468,7 +632,7 @@ function Templates() {
               <Input
                 id="edit-description"
                 name="description"
-                defaultValue={editingTemplate.description || ''}
+                defaultValue={(editingTemplate as any).description || ''}
                 className="col-span-3"
               />
             </div>
@@ -489,70 +653,126 @@ function Templates() {
                 ))}
               </select>
             </div>
+            {/* Team removed per migration */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-team" className="text-right">Team *</Label>
-              <select
-                id="edit-team"
-                name="team_id"
-                defaultValue={editingTemplate.team_id}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                required
-              >
-                <option value="">Select Team</option>
-                {teams.map((team: Team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-priority" className="text-right">Default Priority</Label>
+              <Label htmlFor="edit-priority" className="text-right">Priority</Label>
               <select
                 id="edit-priority"
-                name="default_priority"
-                defaultValue={editingTemplate.default_priority}
+                name="priority_id"
+                defaultValue={(editingTemplate as any).priority_id || ''}
                 className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               >
-                {Object.entries(PRIORITY_MAP).map(([id, priority]) => (
-                  <option key={id} value={id}>
-                    {priority.label}
+                <option value="">None</option>
+                {Array.from(priorityById.entries()).map(([id, priority]) => (
+                  <option key={id} value={String(id)}>
+                    {priority.name}
                   </option>
                 ))}
               </select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-duration" className="text-right">Default Duration (min)</Label>
-              <Input
-                type="number"
-                id="edit-duration"
-                name="default_duration"
-                defaultValue={editingTemplate.default_duration}
-                className="col-span-3"
-                min="1"
-              />
+              <Label htmlFor="edit-sla" className="text-right">SLA</Label>
+              <select
+                id="edit-sla"
+                name="sla_id"
+                defaultValue={(editingTemplate as any).sla_id || ''}
+                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              >
+                <option value="">None</option>
+                {Array.from(slaById.entries()).map(([id, sla]) => (
+                  <option key={id} value={String(id)}>
+                    {sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="edit-instructions" className="text-right pt-2">Instructions</Label>
               <textarea
                 id="edit-instructions"
                 name="instructions"
-                defaultValue={editingTemplate.instructions || ''}
+                defaultValue={(editingTemplate as any).instructions || ''}
                 className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
                 placeholder="Enter detailed instructions for tasks created from this template..."
               />
             </div>
+            {/* Removed duration, instructions, enabled per migration */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-enabled" className="text-right">Status</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="edit-enabled"
-                  name="enabled"
-                  defaultChecked={editingTemplate.enabled}
-                  className="rounded"
-                />
-                <Label htmlFor="edit-enabled" className="text-sm">Enabled</Label>
+              <Label htmlFor="edit-default-spot" className="text-right">Default Spot</Label>
+              <select
+                id="edit-default-spot"
+                name="default_spot_id"
+                defaultValue={(editingTemplate as any).default_spot_id || ''}
+                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              >
+                <option value="">None</option>
+                {(spots as any[]).map((s: any) => (
+                  <option key={s.id} value={String(s.id)}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Default Users</Label>
+              <div className="col-span-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    {editUserIds.length ? (
+                      <div className="flex flex-wrap gap-1 items-center w-full">
+                        {editUserIds.map((id) => {
+                          const u: any = userById.get(id);
+                          const label = u?.name || u?.email || `User ${id}`;
+                          const initials = (u?.name || u?.email || 'U').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase();
+                          return (
+                            <span key={id} className="inline-flex items-center gap-1 rounded-md bg-secondary text-secondary-foreground px-2 py-1 text-xs">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px]">
+                                {initials}
+                              </span>
+                              <span className="truncate max-w-[140px]">{label}</span>
+                              <button
+                                type="button"
+                                className="ml-1 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setEditUserIds((prev) => prev.filter((x) => x !== id));
+                                }}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">Select users</span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[280px] max-h-64 overflow-auto">
+                    <DropdownMenuLabel>Select default users</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {(users as any[]).map((u: any) => {
+                      const checked = editUserIds.includes(u.id);
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={u.id}
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setEditUserIds((prev) =>
+                              v ? [...prev, u.id] : prev.filter((id) => id !== u.id)
+                            );
+                          }}
+                        >
+                          {u.name || u.email || `User ${u.id}`}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {editUserIds.map((id) => (
+                  <input key={id} type="hidden" name="default_user_ids" value={String(id)} />
+                ))}
               </div>
             </div>
           </div>

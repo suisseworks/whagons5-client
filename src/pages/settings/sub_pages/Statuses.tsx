@@ -33,7 +33,7 @@ function Statuses() {
   const [selectedStatus, setSelectedStatus] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  const [transitionsView, setTransitionsView] = useState<'matrix' | 'visual'>('matrix');
+  const [transitionsView, setTransitionsView] = useState<'matrix' | 'visual'>('visual');
   const tenant = getCurrentTenant();
 
   // Dialog state
@@ -537,17 +537,17 @@ function Statuses() {
             <div className="ml-auto flex items-center gap-2">
               <Button
                 size="sm"
-                variant={transitionsView === 'matrix' ? 'default' : 'outline'}
-                onClick={() => setTransitionsView('matrix')}
-              >
-                Matrix
-              </Button>
-              <Button
-                size="sm"
                 variant={transitionsView === 'visual' ? 'default' : 'outline'}
                 onClick={() => setTransitionsView('visual')}
               >
                 Visual
+              </Button>
+              <Button
+                size="sm"
+                variant={transitionsView === 'matrix' ? 'default' : 'outline'}
+                onClick={() => setTransitionsView('matrix')}
+              >
+                Matrix
               </Button>
             </div>
       </div>

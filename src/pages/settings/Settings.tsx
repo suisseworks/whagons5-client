@@ -1,10 +1,10 @@
  
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
- 
+import { useSelector } from "react-redux";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+ 
 import { Separator } from "@/components/ui/separator";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
@@ -13,16 +13,23 @@ import {
   faLocationDot, 
   faUsers, 
   faUser, 
-  faSitemap 
+  faSitemap,
+  faArrowUpWideShort,
+  faGripVertical,
+  faStopwatch
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState, AppDispatch } from "@/store/store";
+import { RootState } from "@/store/store";
 import api from "@/api/whagonsApi";
 import { useState } from "react";
 
 function Settings() {
   const navigate = useNavigate();
   const [spotCount, setSpotCount] = useState<number | undefined>(undefined);
-
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [droppedId, setDroppedId] = useState<string | null>(null);
+  
   // Hydrate data (idempotent if already loaded)
 
 
@@ -74,6 +81,10 @@ function Settings() {
   const tasks = useSelector((s: RootState) => s.tasks.value);
   const workspaces = useSelector((s: RootState) => s.workspaces.value);
   const statuses = useSelector((s: RootState) => s.statuses.value);
+  const priorities = useSelector((s: RootState) => s.priorities.value);
+  const slas = useSelector((s: RootState) => s.slas.value);
+  const users = useSelector((s: RootState) => s.users.value);
+  const forms = useSelector((s: RootState) => s.forms.value);
 
   const counts = useMemo(() => {
     // Prefer authoritative count from workspaces.spots when present. The API may
@@ -107,9 +118,12 @@ function Settings() {
       teams: teams.length,
       spots: spotCount ?? (spotsFromWorkspaces > 0 ? spotsFromWorkspaces : spotsFromTasks),
       statuses: statuses.length,
-      users: undefined as number | undefined,
+      priorities: priorities.length,
+      slas: slas.length,
+      users: users.length,
+      forms: forms.length,
     };
-  }, [categories.length, templates.length, teams.length, tasks, workspaces, spotCount, statuses.length]);
+  }, [categories.length, templates.length, teams.length, tasks, workspaces, spotCount, statuses.length, priorities.length, slas.length, users.length, forms.length]);
 
   // Settings configuration data
   const settingsOptions = [
@@ -122,12 +136,36 @@ function Settings() {
       color: 'text-red-500'
     },
     {
+      id: 'slas',
+      title: 'SLAs',
+      icon: faStopwatch,
+      count: counts.slas,
+      description: 'Manage service level agreements',
+      color: 'text-teal-500'
+    },
+    {
+      id: 'priorities',
+      title: 'Priorities',
+      icon: faArrowUpWideShort,
+      count: counts.priorities,
+      description: 'Manage priority levels',
+      color: 'text-rose-500'
+    },
+    {
       id: 'statuses',
       title: 'Statuses',
       icon: faSitemap,
       count: counts.statuses,
       description: 'Manage statuses and transitions',
       color: 'text-amber-500'
+    },
+    {
+      id: 'forms',
+      title: 'Forms',
+      icon: faClipboardList,
+      count: counts.forms,
+      description: 'Manage forms and submissions',
+      color: 'text-pink-500'
     },
     {
       id: 'templates',
@@ -163,6 +201,55 @@ function Settings() {
     }
   ];
 
+  // Initialize and persist card order
+  useEffect(() => {
+    const storageKey = 'wh-settings-card-order-v1';
+    const reorderKey = 'wh-settings-reorder-mode-v1';
+    try {
+      const saved = localStorage.getItem(storageKey);
+      const defaultOrder = settingsOptions.map(s => s.id);
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        // Merge to include any new IDs while preserving saved order
+        const merged = Array.from(new Set([...parsed.filter(id => defaultOrder.includes(id)), ...defaultOrder]));
+        setCardOrder(merged);
+      } else {
+        setCardOrder(defaultOrder);
+      }
+      const savedReorder = localStorage.getItem(reorderKey);
+      if (savedReorder != null) {
+        // setReorderMode(savedReorder === 'true'); // This line is removed
+      }
+    } catch {
+      setCardOrder(settingsOptions.map(s => s.id));
+    }
+  }, []);
+
+  const orderedSettings = useMemo(() => {
+    if (!cardOrder.length) return settingsOptions;
+    const map = new Map(settingsOptions.map(s => [s.id, s] as const));
+    const ordered = cardOrder.map(id => map.get(id)).filter(Boolean) as typeof settingsOptions;
+    // Append any missing (shouldn't happen, but safe)
+    const missing = settingsOptions.filter(s => !cardOrder.includes(s.id));
+    return [...ordered, ...missing];
+  }, [settingsOptions, cardOrder]);
+
+  const saveOrder = (next: string[]) => {
+    setCardOrder(next);
+    try { localStorage.setItem('wh-settings-card-order-v1', JSON.stringify(next)); } catch {}
+  };
+
+  const handleSwap = (fromId: string, toId: string) => {
+    if (!fromId || !toId || fromId === toId) return;
+    const current = cardOrder.length ? cardOrder : settingsOptions.map(s => s.id);
+    const fromIdx = current.indexOf(fromId);
+    const toIdx = current.indexOf(toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const next = [...current];
+    [next[fromIdx], next[toIdx]] = [next[toIdx], next[fromIdx]];
+    saveOrder(next);
+  };
+
   const handleSettingClick = (settingId: string) => {
     console.log(`Clicked on ${settingId}`);
     
@@ -174,8 +261,17 @@ function Settings() {
       case 'templates':
         navigate('/settings/templates');
         break;
+      case 'forms':
+        navigate('/settings/forms');
+        break;
+      case 'priorities':
+        navigate('/settings/priorities');
+        break;
       case 'statuses':
         navigate('/settings/statuses');
+        break;
+      case 'slas':
+        navigate('/settings/slas');
         break;
       case 'spots':
         navigate('/settings/spots');
@@ -207,23 +303,63 @@ function Settings() {
       <Separator />
 
       {/* Settings Grid */}
+      <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {settingsOptions.map((setting) => (
+        {orderedSettings.map((setting) => (
           <Card
             key={setting.id}
-            className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] group"
-            onClick={() => handleSettingClick(setting.id)}
+            draggable
+            onDragStart={(e) => {
+              setDraggingId(setting.id);
+              try { e.dataTransfer.setData('text/plain', setting.id); } catch {}
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragEnd={() => setDraggingId(null)}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverId(setting.id); }}
+            onDragEnter={() => { setDragOverId(setting.id); }}
+            onDragLeave={(e) => {
+              // only clear if leaving the card container
+              if ((e.target as HTMLElement)?.closest('[data-card]') !== (e.currentTarget as HTMLElement)) return;
+              setDragOverId((prev) => (prev === setting.id ? null : prev));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const fromId = (() => { try { return e.dataTransfer.getData('text/plain'); } catch { return ''; } })();
+              handleSwap(fromId, setting.id);
+              setDraggingId(null);
+              setDragOverId(null);
+              setDroppedId(fromId);
+              setTimeout(() => setDroppedId((prev) => (prev === fromId ? null : prev)), 600);
+            }}
+            data-card
+            className={`cursor-pointer transition-all duration-200 group select-none ${
+              draggingId === setting.id
+                ? 'opacity-70 ring-2 ring-primary/40 cursor-grabbing'
+                : dragOverId === setting.id
+                  ? 'ring-2 ring-primary/60 border border-dashed'
+                  : 'hover:shadow-lg hover:scale-[1.02]'
+            } ${droppedId === setting.id ? 'ring-2 ring-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' : ''}`}
+            onClick={() => { if (!draggingId) handleSettingClick(setting.id); }}
           >
             <CardHeader className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
                   <FontAwesomeIcon icon={setting.icon} />
                 </div>
-                {setting.count !== undefined && (
-                  <Badge variant="secondary" className="font-bold">
-                    {setting.count}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {typeof setting.count !== 'undefined' && (
+                    <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
+                      {setting.count}
+                    </Badge>
+                  )}
+                  <div
+                    className={`transition flex items-center text-muted-foreground opacity-60 hover:opacity-100`}
+                    title="Drag to reorder"
+                    onMouseDown={(e) => { e.currentTarget.closest('[draggable="true"]')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }}
+                  >
+                    <FontAwesomeIcon icon={faGripVertical} className={`cursor-grab active:cursor-grabbing text-sm`} />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <CardTitle className="text-xl">{setting.title}</CardTitle>
@@ -237,7 +373,7 @@ function Settings() {
       
 
       
-       
+      
     </div>
   );
 }
