@@ -41,7 +41,7 @@
     "class-variance-authority": "^0.7.1",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.15",
-    "echarts": "^6.0.0",
+    "echarts": "^5.6.0",
     "echarts-for-react": "^3.0.2",
     "firebase": "^11.6.0",
     "lucide-react": "^0.503.0",
