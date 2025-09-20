@@ -11,6 +11,7 @@ import Stuff from '@/pages/stuff/Stuff';
 import Categories from '@/pages/settings/sub_pages/Categories';
 import CustomFieldsTab from '@/pages/settings/sub_pages/CustomFieldsTab';
 import Templates from '@/pages/settings/sub_pages/Templates';
+import Forms from '@/pages/settings/sub_pages/Forms';
 import Teams from '@/pages/settings/sub_pages/Teams';
 import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';
@@ -62,6 +63,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
+          <Route path="/settings/forms" element={<Forms />} />
           <Route path="/settings/teams" element={<Teams />} />
           <Route path="/settings/spots" element={<Spots />} />
           <Route path="/settings/spots/types" element={<SpotTypes />} />
