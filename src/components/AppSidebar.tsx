@@ -9,23 +9,22 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Workspace, workspacesSlice } from '@/store/reducers/workspacesSlice';
 import {
   Settings,
-  User,
   Users,
   Plus,
   ChevronDown,
   Briefcase,
+  BarChart3,
+  MessageSquareMore,
 } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
-import { AppDispatch, RootState } from '@/store';
-import { useEffect, useState } from 'react';
+import { RootState } from '@/store';
+import { useEffect, useMemo, useRef, useState } from 'react';
+// import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
@@ -44,6 +43,9 @@ import {
 } from './ui/dialog';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { iconService } from '@/database/iconService';
+import { Workspace } from '@/store/types';
 
 // Global pinned state management
 let isPinnedGlobal = false;
@@ -65,7 +67,6 @@ export const subscribeToPinnedState = (callback: (pinned: boolean) => void) => {
 };
 
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
-  const { toggleSidebar } = useSidebar();
   const [isPinned, setIsPinned] = useState(isPinnedGlobal);
 
   useEffect(() => {
@@ -108,24 +109,133 @@ export function AppSidebar() {
   const pathname = location.pathname;
   const isCollapsed = state === 'collapsed';
 
+  // Extract toggleSidebar to suppress unused warning
+  // const { toggleSidebar } = useSidebar();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
   const [isPinned, setIsPinned] = useState(getPinnedState());
+  const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
+  const [defaultIcon, setDefaultIcon] = useState<any>(null);
+  const hoverOpenTimerRef = useRef<number | null>(null);
+  const hoverCloseTimerRef = useRef<number | null>(null);
 
-  const dispatch = useDispatch<AppDispatch>();
+  // const dispatch = useDispatch<AppDispatch>();
+  // const { user } = useAuth(); // Currently not used, uncomment when needed
 
-  const { value: workspaces } = useSelector(
+  const workspacesState = useSelector(
     (state: RootState) => state.workspaces
   );
+  const { value: workspaces = [] } = workspacesState || {};
 
-  const { addWorkspace } = workspacesSlice.actions;
+  // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
+  const uniqueWorkspaces = useMemo(() => {
+    const map = new Map<string, Workspace>();
+    for (const w of workspaces) map.set(String(w.id), w);
+    return Array.from(map.values());
+  }, [workspaces]);
+
+  // Debug logging for workspaces state changes (only in development)
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('AppSidebar: Workspaces updated:', {
+        count: uniqueWorkspaces?.length || 0,
+        names: uniqueWorkspaces?.map((w: Workspace) => w.name) || []
+      });
+    }
+  }, [uniqueWorkspaces]);
+
+  // Note: clearError action not available in generic slices
 
   // Subscribe to pinned state changes
   useEffect(() => {
     const unsubscribe = subscribeToPinnedState(setIsPinned);
     return unsubscribe;
   }, []);
+
+  // Load default icon
+  useEffect(() => {
+    const loadDefaultIcon = async () => {
+      try {
+        const icon = await iconService.getIcon('building');
+        setDefaultIcon(icon);
+      } catch (error) {
+        console.error('Error loading default icon:', error);
+        // Set a fallback icon to prevent the component from not rendering
+        setDefaultIcon('fa-building');
+      }
+    };
+    loadDefaultIcon();
+  }, []);
+
+
+
+  // // Additional effect to check if workspaces data is loaded
+  // useEffect(() => {
+  //   if (workspacesState && workspacesState.value && workspacesState.value.length > 0) {
+  //     console.log('AppSidebar: Workspaces loaded successfully:', workspacesState.value.length);
+  //   } else if (workspacesState && workspacesState.loading) {
+  //     console.log('AppSidebar: Workspaces are loading...');
+  //   } else if (workspacesState && workspacesState.error) {
+  //     console.error('AppSidebar: Error loading workspaces:', workspacesState.error);
+  //   }
+  // }, [workspacesState]);
+
+  // Load workspace icons when workspaces change
+  useEffect(() => {
+    const loadWorkspaceIcons = async () => {
+      const iconNames = workspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
+      if (iconNames.length > 0) {
+        try {
+          const icons = await iconService.loadIcons(iconNames);
+          setWorkspaceIcons(icons);
+        } catch (error) {
+          console.error('Error loading workspace icons:', error);
+        }
+      }
+    };
+
+    loadWorkspaceIcons();
+  }, [workspaces]);
+
+  // Preload common icons on component mount
+  useEffect(() => {
+    iconService.preloadCommonIcons();
+  }, []);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverOpenTimerRef.current as any) {
+        clearTimeout(hoverOpenTimerRef.current as any);
+      }
+      if (hoverCloseTimerRef.current as any) {
+        clearTimeout(hoverCloseTimerRef.current as any);
+      }
+    };
+  }, []);
+
+  const getWorkspaceIcon = (iconName?: string) => {
+    if (!iconName || typeof iconName !== 'string') {
+      return defaultIcon;
+    }
+    
+    // Parse FontAwesome class format to get the actual icon name
+    // This matches the parsing logic in iconService
+    let parsedIconName = iconName;
+    
+    // Handle FontAwesome class format (fas fa-icon-name, far fa-icon-name, etc.)
+    const faClassMatch = iconName.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
+    if (faClassMatch) {
+      parsedIconName = faClassMatch[2]; // Return just the icon name part
+    } else if (iconName.startsWith('fa-')) {
+      // Handle fa-prefix format (fa-icon-name -> icon-name)
+      parsedIconName = iconName.substring(3);
+    }
+    
+    return workspaceIcons[parsedIconName] || defaultIcon;
+  };
 
   const handleAddWorkspace = () => {
     if (!workspaceName.trim() || !workspaceDescription.trim()) {
@@ -135,18 +245,16 @@ export function AppSidebar() {
       return;
     }
 
-    const newId = crypto.randomUUID();
-    const newWorkspace: Workspace = {
-      id: newId,
-      name: workspaceName,
-      // Use a path structure like /workspace/:id for routing
-      path: `/workspace/${newId}`,
-      description: workspaceDescription,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // Create workspace data in the format expected by the API
+    // const newWorkspaceData = {
+    //   name: workspaceName,
+    //   description: workspaceDescription,
+    //   type: 'PROJECT',
+    //   created_by: user?.id ? parseInt(user.id) : 0
+    // };
 
-    dispatch(addWorkspace(newWorkspace));
+    // TODO: Implement custom async thunk for adding workspaces
+    // dispatch(genericActions.workspaces.addWorkspaceAsync(newWorkspaceData as any));
 
     // Reset form and close modal
     setWorkspaceName('');
@@ -154,30 +262,57 @@ export function AppSidebar() {
     setIsModalOpen(false);
   };
 
-  useEffect(() => {
-    console.log(workspaces);
-  }, [workspaces]);
 
   // Determine if we should show expanded content
   const showExpandedContent = !isCollapsed || isMobile;
 
   const handleMouseEnter = () => {
-    if (isCollapsed) {
-      setOpen(true);
+    // Debounce hover-open to prevent flicker
+    if (isMobile) return;
+    if (!isCollapsed) return;
+    if ((hoverCloseTimerRef.current as any)) {
+      clearTimeout(hoverCloseTimerRef.current as any);
+      hoverCloseTimerRef.current = null;
+    }
+    if (!(hoverOpenTimerRef.current as any)) {
+      hoverOpenTimerRef.current = setTimeout(() => {
+        setOpen(true);
+        hoverOpenTimerRef.current = null;
+      }, 150) as unknown as number;
     }
   };
 
   const handleMouseLeave = () => {
-    // Only collapse if not pinned
-    if (!isCollapsed && !isPinned) {
-      setOpen(false);
+    // Debounce hover-close to prevent flicker when moving near the edge
+    if (isMobile) return;
+    if (isPinned) return;
+    if (hoverOpenTimerRef.current as any) {
+      clearTimeout(hoverOpenTimerRef.current as any);
+      hoverOpenTimerRef.current = null;
+    }
+    if (!isCollapsed) {
+      if (!(hoverCloseTimerRef.current as any)) {
+        hoverCloseTimerRef.current = setTimeout(() => {
+          setOpen(false);
+          hoverCloseTimerRef.current = null;
+        }, 300) as unknown as number;
+      }
     }
   };
+
+  // Don't render icons until default icon is loaded
+  // Temporarily commented out to debug workspace rendering
+  /*
+  if (!defaultIcon) {
+    console.log('AppSidebar: Default icon not loaded yet, skipping render');
+    return null;
+  }
+  */
 
   return (
     <Sidebar
       collapsible="icon"
-      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300`}
+      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -187,7 +322,9 @@ export function AppSidebar() {
         }`}
       >
         <div className="flex items-center justify-center w-full">
-          <div
+          <Link
+            to="/home"
+            title="Home"
             className={`flex items-center pt-3 pb-3 transition-all duration-300 ${
               isCollapsed ? 'justify-center' : 'justify-center'
             }`}
@@ -205,7 +342,7 @@ export function AppSidebar() {
                 Whagons
               </div>
             )}
-          </div>
+          </Link>
           {!isCollapsed && !isMobile && (
             <PinnedSidebarTrigger className="ml-2 text-primary hover:text-primary/80" />
           )}
@@ -214,6 +351,42 @@ export function AppSidebar() {
 
       <SidebarContent className="bg-sidebar">
         <SidebarGroup>
+          {/* Everything workspace - above the Spaces dropdown */}
+          {(!isCollapsed || isMobile) && (
+            <div className="px-3 py-2">
+              <Link
+                to={`/workspace/all`}
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
+                  pathname === `/workspace/all`
+                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+              >
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                  <Users className="w-4 h-4" />
+                </span>
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Everything</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Show Everything icon when collapsed - DESKTOP ONLY */}
+          {isCollapsed && !isMobile && (
+            <div className="px-2 py-2 flex justify-center">
+              <Link
+                to={`/workspace/all`}
+                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                  pathname === `/workspace/all`
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                }`}
+                title={'Everything'}
+              >
+                <Users className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+
           <Collapsible defaultOpen className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild className="text-sm font-normal">
@@ -223,7 +396,7 @@ export function AppSidebar() {
                   }`}
                 >
                   <CollapsibleTrigger
-                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
+                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
                       isCollapsed && !isMobile
                         ? 'flex-col justify-center ml-0 px-2'
                         : 'justify-start flex-1'
@@ -247,7 +420,12 @@ export function AppSidebar() {
                   {showExpandedContent && (
                     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent"
+                          title="Add Workspace"
+                        >
                           <Plus size={16} />
                           <span className="sr-only">Add Workspace</span>
                         </Button>
@@ -309,38 +487,57 @@ export function AppSidebar() {
               <CollapsibleContent>
                 {(!isCollapsed || isMobile) && (
                   <SidebarGroupContent className="pt-2 pl-1">
-                    {workspaces.map((workspace) => (
+
+                    {uniqueWorkspaces.map((workspace: Workspace) => {
+                      // Skip temporary optimistic items (negative IDs)
+                      if ((workspace.id as number) < 0) return null;
+
+                      return (
                       <Link
-                        key={workspace.id}
-                        to={workspace.path}
-                        className={`block rounded-md relative transition-colors px-4 py-2 mx-2 ${
-                          pathname === workspace.path
-                            ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent px-5'
-                        }`}
+                        key={`workspace-${workspace.id}`}
+                        to={`/workspace/${workspace.id}`}
+                        className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-4 py-2 mx-2 ${
+                          pathname === `/workspace/${workspace.id}`
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
+                        } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                       >
-                        {workspace.name}
+                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                          <FontAwesomeIcon
+                            icon={getWorkspaceIcon(workspace.icon)}
+                            style={{ color: workspace.color }}
+                            className="w-4 h-4"
+                          />
+                        </span>
+                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">{workspace.name}</span>
                       </Link>
-                    ))}
+                      );
+                    })}
                   </SidebarGroupContent>
                 )}
 
-                {/* Show workspace first letters when collapsed AND collapsible is open - DESKTOP ONLY */}
+                {/* Show workspace icons when collapsed AND collapsible is open - DESKTOP ONLY */}
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
-                    <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent/30">
-                      {workspaces.map((workspace) => (
+                    <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent">
+                      {uniqueWorkspaces
+                        .filter((workspace: Workspace) => (workspace.id as number) >= 0) // Skip temp items
+                        .map((workspace: Workspace) => (
                         <Link
-                          key={workspace.id}
-                          to={workspace.path}
-                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
-                            pathname === workspace.path
+                          key={`workspace-collapsed-${workspace.id}`}
+                          to={`/workspace/${workspace.id}`}
+                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                            pathname === `/workspace/${workspace.id}`
                               ? 'bg-primary/20 text-primary border border-primary/40'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                           }`}
                           title={workspace.name}
                         >
-                          {workspace.name.charAt(0).toUpperCase()}
+                          <FontAwesomeIcon
+                            icon={getWorkspaceIcon(workspace.icon)}
+                            style={{ color: workspace.color }}
+                            className="w-4 h-4"
+                          />
                         </Link>
                       ))}
                     </div>
@@ -349,9 +546,41 @@ export function AppSidebar() {
               </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
-          <SidebarGroupContent>
-            {/* Other content can go here if needed */}
-          </SidebarGroupContent>
+          {/* Messages link after Spaces */}
+          {(!isCollapsed || isMobile) && (
+            <div className="px-3 py-2">
+              <Link
+                to={`/messages`}
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
+                  pathname === `/messages`
+                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+              >
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
+                  <MessageSquareMore className="w-4 h-4" />
+                </span>
+                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Messages</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Show Messages icon when collapsed - DESKTOP ONLY */}
+          {isCollapsed && !isMobile && (
+            <div className="px-2 py-2 flex justify-center">
+              <Link
+                to={`/messages`}
+                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
+                  pathname === `/messages`
+                    ? 'bg-primary/20 text-primary border border-primary/40'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                }`}
+                title={'Messages'}
+              >
+                <MessageSquareMore className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
         </SidebarGroup>
       </SidebarContent>
 
@@ -362,31 +591,66 @@ export function AppSidebar() {
               <SidebarMenuItem className="pt-1 pb-1">
                 <SidebarMenuButton
                   asChild
+                  tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
+                  className={`rounded-md relative transition-colors ${
+                    isCollapsed && !isMobile
+                      ? `h-10 flex justify-center items-center ${
+                          pathname === '/analytics'
+                            ? 'bg-primary/10 text-primary border-2 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                      : `h-10 ${
+                          pathname === '/analytics'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                  }`}
+                >
+                  <Link
+                    to="/analytics"
+                    className={`${
+                      isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : 'flex items-center'
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                  >
+                    <BarChart3 size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
+                    {showExpandedContent && (
+                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Analytics</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem className="pt-1 pb-1">
+                <SidebarMenuButton
+                  asChild
                   tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
                   className={`rounded-md relative transition-colors ${
                     isCollapsed && !isMobile
                       ? `h-10 flex justify-center items-center ${
                           pathname === '/settings'
                             ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                       : `h-10 ${
                           pathname === '/settings'
-                            ? 'bg-primary/10 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
                   }`}
                 >
                   <Link
                     to="/settings"
-                    className={
+                    className={`${
                       isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
-                        : ''
-                    }
+                        : 'flex items-center'
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                   >
-                    <Settings size={20} className="w-5! h-5! p-[1px]" />
-                    {showExpandedContent && <span>Settings</span>}
+                    <Settings size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
+                    {showExpandedContent && (
+                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Settings</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

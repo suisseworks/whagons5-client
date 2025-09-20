@@ -11,6 +11,7 @@ import {
   sendEmailVerification
 } from 'firebase/auth';
 import { clearAuth } from '../../api/whagonsApi';
+import { DB } from '@/store/indexedDB/DB';
 
 
 // Google Sign-In
@@ -73,6 +74,12 @@ export const logout = async (): Promise<void> => {
       // Clear auth tokens from both memory and storage before signing out
       clearAuth();
       
+      // Best-effort: fully delete the current user's IndexedDB before signing out
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await DB.deleteDatabase(uid);
+      }
+
       await signOut(auth);
       
       //delete subdomain from local storage

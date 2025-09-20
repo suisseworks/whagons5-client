@@ -1,33 +1,26 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import { persistStore, persistReducer } from 'redux-persist';
-import { pizzaSlice } from "./reducers/pizzaSlice";
-import { workspacesSlice } from "./reducers/workspacesSlice";
-import createIdbStorage from '@piotr-cz/redux-persist-idb-storage'
+
+// Custom slice with advanced features (only tasks)
 import { tasksSlice } from "./reducers/tasksSlice";
 
-const persistConfig = {
-    key: 'root',
-    storage: createIdbStorage({ name: 'WhagonsAPP', storeName: 'redux' }),
-    version: 1,
-}
+// All other slices (30+ tables) handled by generic factory
+import { genericSlices } from "./genericSlices";
 
-const persistedReducer = persistReducer(persistConfig, 
-    combineReducers({
-        pizza: pizzaSlice.reducer,
-        workspaces: workspacesSlice.reducer,
-        tasks: tasksSlice.reducer
-    })
-)
+const rootReducer = combineReducers({
+    // Only custom slice with advanced features (tasks)
+    tasks: tasksSlice.reducer,
+
+    // All other slices (30+ tables) handled by generic factory
+    ...genericSlices.reducers,
+}) as any;
 
 const store = configureStore({
-    reducer: persistedReducer,
+    reducer: rootReducer,
     middleware: (getDefaultMiddleware) => getDefaultMiddleware({
         serializableCheck: false
     }),
 });
 
-const persistor = persistStore(store);
-
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-export { store, persistor };
+export { store };

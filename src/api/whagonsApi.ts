@@ -64,7 +64,7 @@ const setTokenForUser = (token: string, firebaseUid: string) => {
     uid: firebaseUid,
     timestamp: Date.now()
   };
-  setCookie('auth_token', btoa(JSON.stringify(tokenData)), 30 / (24 * 60)); // 30 minutes in days
+  setCookie('auth_token', btoa(JSON.stringify(tokenData)), 90); // 90 days
 };
 
 // Function to clear all stored tokens (for logout)
@@ -88,13 +88,7 @@ export const getTokenForUser = (firebaseUid: string): string | null => {
       return null;
     }
     
-    // Check if token is expired (30 minutes)
-    const expirationTime = tokenData.timestamp + (30 * 60 * 1000); // 30 minutes
-    if (Date.now() > expirationTime) {
-      console.log('Token expired, clearing token');
-      deleteCookie('auth_token');
-      return null;
-    }
+    // Token expiration is now handled by the backend only
     
     return deObfuscateToken(tokenData.token);
   } catch (error) {
@@ -107,6 +101,12 @@ export const getTokenForUser = (firebaseUid: string): string | null => {
 const getSubdomain = () => {
   //the default subdomain is nothing but once I can set it and get it from local storage
   return localStorage.getItem('whagons-subdomain') || '';
+};
+
+// Expose current tenant (domain prefix without trailing dot) for consumers like encryption AAD
+export const getCurrentTenant = (): string => {
+  const sd = getSubdomain();
+  return sd.endsWith('.') ? sd.slice(0, -1) : sd;
 };
 
 const setSubdomain = (subdomain: string) => {
@@ -139,7 +139,7 @@ export const updateAuthToken = (token: string) => {
   } else {
     console.warn('No Firebase user found when updating auth token');
     // Fallback to old method for edge cases
-    setCookie('auth_token', obfuscateToken(token), 30 / (24 * 60));
+    setCookie('auth_token', obfuscateToken(token), 90); // 90 days
   }
 };
 
@@ -216,6 +216,17 @@ const refreshToken = async () => {
   }
 };
 
+// Ensure only a single refresh is in-flight across concurrent 401s
+let inFlightRefresh: Promise<string> | null = null;
+const getSingleFlightRefreshToken = async (): Promise<string> => {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshToken().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+};
+
 // Function to clear auth state
 export const clearAuth = () => {
   delete api.defaults.headers.common['Authorization'];
@@ -249,7 +260,7 @@ api.interceptors.request.use(
     const currentSubdomain = getSubdomain();
     const correctBaseURL = `${PROTOCOL}://${currentSubdomain}${VITE_API_URL}/api`;
     
-    console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
+    // console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
     
     // Override the baseURL for this specific request
     config.baseURL = correctBaseURL;
@@ -313,7 +324,8 @@ api.interceptors.response.use(
         // console.log('originalRequest.url', originalRequest.url);
         // Clear stored token on 401 and get a fresh one
         deleteCookie('auth_token');
-        const newToken = await refreshToken();
+        // Single-flight refresh so concurrent 401s share the same /login
+        const newToken = await getSingleFlightRefreshToken();
 
         return api({
           ...originalRequest,

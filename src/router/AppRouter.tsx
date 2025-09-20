@@ -7,6 +7,8 @@ import SignUp from '@/pages/authentication/SignUp';
 import OnboardingRoute from './OnboardingRoute';
 
 export const AppRouter = () => {
+
+
   return (
     <Routes>
       <Route
