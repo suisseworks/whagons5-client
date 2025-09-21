@@ -19,115 +19,50 @@ import {
   faStopwatch
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import api from "@/api/whagonsApi";
 import { useState } from "react";
 import { createSwapy } from 'swapy';
 
 function Settings() {
   const navigate = useNavigate();
-  const [spotCount, setSpotCount] = useState<number | undefined>(undefined);
   const [cardOrder, setCardOrder] = useState<string[]>([]);
-  const [isSwapping, setIsSwapping] = useState<boolean>(false);
+  const [, setIsSwapping] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const swapyRef = useRef<ReturnType<typeof createSwapy> | null>(null);
   const draggingRef = useRef<boolean>(false);
   const [slotItemMap, setSlotItemMap] = useState<Array<[string, string]>>([]);
   const hydratedRef = useRef<boolean>(false);
+  const pointerStartRef = useRef<{x:number;y:number;t:number}|null>(null);
+  const didMoveRef = useRef<boolean>(false);
   
   // Hydrate data (idempotent if already loaded)
 
 
-  // Fetch authoritative spot count from backend
-  useEffect(() => {
-    let cancelled = false;
-    const fetchSpotCount = async () => {
-      // 1) Try integrity blocks API (most reliable and cheap for totals)
-      try {
-        for (const table of ['wh_spots']) {
-          try {
-            const r = await api.get('/integrity/blocks', { params: { table } });
-            const blocks = r?.data?.data || [];
-            if (Array.isArray(blocks) && blocks.length) {
-              const total = blocks.reduce((sum: number, b: any) => sum + (b?.row_count || 0), 0);
-              if (!cancelled && total > 0) { setSpotCount(total); return; }
-            }
-          } catch (_) { /* try next table name */ }
-        }
-      } catch (_) { /* fall through to REST fallback */ }
-
-      // 2) Fallback to REST list endpoint and rely on pagination.total if available
-      try {
-        const resp = await api.get('/spots', { params: { page: 1, per_page: 1 } });
-        const total = resp?.data?.pagination?.total
-          ?? resp?.data?.total
-          ?? resp?.data?.meta?.total
-          ?? (resp?.headers && (parseInt((resp.headers as any)['x-total-count']) || undefined));
-        if (!cancelled && typeof total === 'number') { setSpotCount(total); return; }
-      } catch (_) { /* ignore; will fallback to client-side derivations */ }
-
-      // 3) Final fallback: request a large page and count rows directly
-      try {
-        const resp = await api.get('/spots', { params: { page: 1, per_page: 1000 } });
-        const rows = Array.isArray(resp?.data?.data)
-          ? resp.data.data
-          : (Array.isArray(resp?.data?.rows) ? resp.data.rows : []);
-        if (!cancelled && Array.isArray(rows)) { setSpotCount(rows.length); return; }
-      } catch (_) { /* last resort: keep derived value */ }
-    };
-    fetchSpotCount();
-    return () => { cancelled = true; };
-  }, []);
+  // Spot count now derived from Redux slice hydrated in AuthProvider
 
   // Select from store
   const categories = useSelector((s: RootState) => s.categories.value);
   const templates = useSelector((s: RootState) => s.templates.value);
   const teams = useSelector((s: RootState) => s.teams.value);
-  const tasks = useSelector((s: RootState) => s.tasks.value);
-  const workspaces = useSelector((s: RootState) => s.workspaces.value);
   const statuses = useSelector((s: RootState) => s.statuses.value);
   const priorities = useSelector((s: RootState) => s.priorities.value);
   const slas = useSelector((s: RootState) => s.slas.value);
   const users = useSelector((s: RootState) => s.users.value);
   const forms = useSelector((s: RootState) => s.forms.value);
+  const spots = useSelector((s: RootState) => s.spots.value);
 
   const counts = useMemo(() => {
-    // Prefer authoritative count from workspaces.spots when present. The API may
-    // return spots either as an array or as a JSON-encoded string – handle both.
-    const spotsFromWorkspaces = workspaces.reduce((sum: number, w: any) => {
-      let length = 0;
-      const spotsVal = w?.spots;
-      if (Array.isArray(spotsVal)) {
-        length = spotsVal.length;
-      } else if (typeof spotsVal === 'string') {
-        try {
-          const parsed = JSON.parse(spotsVal);
-          if (Array.isArray(parsed)) length = parsed.length;
-        } catch { /* ignore parse errors */ }
-      }
-      return sum + length;
-    }, 0);
-
-    let spotsFromTasks = 0;
-    if (spotsFromWorkspaces === 0) {
-      const spotIds = new Set<number>();
-      for (const t of tasks) {
-        if (t.spot_id && t.spot_id > 0) spotIds.add(t.spot_id);
-      }
-      spotsFromTasks = spotIds.size;
-    }
-
     return {
       categories: categories.length,
       templates: templates.length,
       teams: teams.length,
-      spots: spotCount ?? (spotsFromWorkspaces > 0 ? spotsFromWorkspaces : spotsFromTasks),
+      spots: spots.length,
       statuses: statuses.length,
       priorities: priorities.length,
       slas: slas.length,
       users: users.length,
       forms: forms.length,
     };
-  }, [categories.length, templates.length, teams.length, tasks, workspaces, spotCount, statuses.length, priorities.length, slas.length, users.length, forms.length]);
+  }, [categories.length, templates.length, teams.length, spots.length, statuses.length, priorities.length, slas.length, users.length, forms.length]);
 
   // Settings configuration data
   const settingsOptions = [
@@ -315,7 +250,7 @@ function Settings() {
   }, []);
 
   const handleSettingClick = (settingId: string) => {
-    console.log(`Clicked on ${settingId}`);
+    // console.log(`Clicked on ${settingId}`);
     
     // Navigate to specific setting pages
     switch (settingId) {
@@ -378,8 +313,15 @@ function Settings() {
             <div data-swapy-item={itemId} className="h-full">
               <Card
                 className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                onMouseDown={(e) => { if (!isSwapping) e.preventDefault(); }}
-                onClick={(e) => { if (draggingRef.current || isSwapping) { e.preventDefault(); e.stopPropagation(); return; } handleSettingClick(setting.id); }}
+                onPointerDown={(e) => { pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                onPointerUp={(e) => {
+                  const s = pointerStartRef.current; pointerStartRef.current = null;
+                  if (!s) return;
+                  const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                  if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                    handleSettingClick(setting.id);
+                  }
+                }}
               >
                 <CardHeader className="space-y-4">
                   <div className="flex items-center justify-between">
