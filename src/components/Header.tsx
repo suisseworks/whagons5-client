@@ -256,11 +256,12 @@ function Header() {
                 <div className="flex items-center space-x-2">
                     {typeof currentWorkspaceId === 'number' && (
                         <button
-                            className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
+                            className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
                             onClick={() => setOpenCreateTask(true)}
                             title="Create Task"
                         >
-                            <Plus className="h-5 w-5" />
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Task
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9" />

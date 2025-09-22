@@ -62,15 +62,14 @@ export const Workspace = () => {
 
   return (
     <Tabs defaultValue="grid" className="w-full h-full flex flex-col" onValueChange={setActiveTab} value={activeTab}>
-      {/* Header row with search bar on left and tabs on right */}
-      <div className="flex items-center justify-between gap-4 mb-4">
+      <div className="flex items-center gap-6 mb-4">
         <Input
           placeholder="Search tasks..."
-          className="max-w-sm"
+          className="max-w-sm h-12"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        <TabsList className="h-12 flex-shrink-0">
+        <TabsList className="h-12 flex-shrink-0 w-fit">
           <TabsTrigger value="grid" className="flex items-center gap-2">
             <ClipboardList />
             Tasks

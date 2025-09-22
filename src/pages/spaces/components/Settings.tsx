@@ -304,7 +304,7 @@ function Settings() {
     }, [currentWorkspace, dispatch]);
 
   return (
-    <div className="h-full w-full p-4 flex flex-col">
+    <div className="h-full w-full p-4 pt-0 flex flex-col">
       <div className="mb-3 flex-shrink-0">
         <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
       </div>
