@@ -127,7 +127,7 @@ export function SettingsDialog({
                   {error}
                 </div>
               )}
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 {cancelText}
               </Button>
               <Button
@@ -151,7 +151,7 @@ export function SettingsDialog({
                 {error}
               </div>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
               {cancelText}
             </Button>
             <Button

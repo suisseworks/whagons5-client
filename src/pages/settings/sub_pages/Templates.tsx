@@ -2,9 +2,10 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt, faTags, faBroom, faWrench, faSeedling, faTools, faHome, faCar, faUtensils, faLaptop, faBook, faBolt, faTree } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Template, Task, Category } from "@/store/types";
+import { iconService } from '@/database/iconService';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,34 @@ import {
   CheckboxField
 } from "../components";
 import { MultiSelect } from "@/components/ui/multi-select";
+
+// Custom component for async icon loading in Templates
+const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
+  const [icon, setIcon] = useState<any>(faTags);
+
+  useEffect(() => {
+    const loadIcon = async () => {
+      if (!iconClass) {
+        setIcon(faTags);
+        return;
+      }
+
+      try {
+        const parts = iconClass.split(' ');
+        const last = parts[parts.length - 1]; // Get the last part (hat-wizard)
+        const loadedIcon = await iconService.getIcon(last);
+        setIcon(loadedIcon || faTags);
+      } catch (error) {
+        console.error('Error loading category icon:', error);
+        setIcon(faTags);
+      }
+    };
+
+    loadIcon();
+  }, [iconClass]);
+
+  return <FontAwesomeIcon icon={icon} className="w-3.5 h-3.5 mr-1" />;
+};
 
 // Custom cell renderer for template name with description (no icon)
 const TemplateNameCellRenderer = (props: ICellRendererParams) => {
@@ -83,12 +112,38 @@ function Templates() {
   const [createUserIds, setCreateUserIds] = useState<number[]>([]);
   const [editUserIds, setEditUserIds] = useState<number[]>([]);
 
+  // Local state for form values
+  const [createFormData, setCreateFormData] = useState({
+    category_id: '',
+    priority_id: '',
+    sla_id: '',
+    default_spot_id: '',
+    enabled: true
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    category_id: '',
+    priority_id: '',
+    sla_id: '',
+    default_spot_id: '',
+    enabled: true
+  });
+
   useEffect(() => {
     if (isEditDialogOpen && editingTemplate) {
       const ids = Array.isArray((editingTemplate as any).default_user_ids)
         ? (editingTemplate as any).default_user_ids
         : [];
       setEditUserIds(ids);
+
+      // Set form data values
+      setEditFormData({
+        category_id: editingTemplate.category_id?.toString() || '',
+        priority_id: (editingTemplate as any).priority_id?.toString() || '',
+        sla_id: (editingTemplate as any).sla_id?.toString() || '',
+        default_spot_id: (editingTemplate as any).default_spot_id?.toString() || '',
+        enabled: (editingTemplate as any).enabled !== false // Default to true if not set
+      });
     }
   }, [isEditDialogOpen, editingTemplate]);
 
@@ -129,27 +184,6 @@ function Templates() {
   }, [spots]);
 
 
-  // Helper to map FontAwesome class to icon
-  const mapIconClassToIcon = (iconClass?: string) => {
-    if (!iconClass) return faTags;
-    const parts = iconClass.split(' ');
-    const last = parts[parts.length - 1];
-    const iconMap: Record<string, any> = {
-      'fa-broom': faBroom,
-      'fa-wrench': faWrench,
-      'fa-seedling': faSeedling,
-      'fa-tree': faTree,
-      'fa-tools': faTools,
-      'fa-home': faHome,
-      'fa-car': faCar,
-      'fa-utensils': faUtensils,
-      'fa-laptop': faLaptop,
-      'fa-book': faBook,
-      'fa-bolt': faBolt,
-      'fa-tags': faTags,
-    };
-    return iconMap[last] || faTags;
-  };
 
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
@@ -171,15 +205,15 @@ function Templates() {
         if (!category) {
           return <span className="text-muted-foreground">Category {categoryId}</span>;
         }
-        const icon = mapIconClassToIcon(category.icon);
         const bg = category.color || '#6b7280';
+
         return (
           <div className="flex items-center h-full">
             <span
               className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
               style={{ backgroundColor: bg, color: '#ffffff' }}
             >
-              <FontAwesomeIcon icon={icon} className="w-3.5 h-3.5 mr-1" />
+              <CategoryIconRenderer iconClass={category.icon} />
               {category.name}
             </span>
           </div>
@@ -285,54 +319,86 @@ function Templates() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
-    const priorityStr = (formData.get('priority_id') as string) || '';
-    const slaStr = (formData.get('sla_id') as string) || '';
+
+    // Get form values
+    const name = formData.get('name') as string;
+    const description = (formData.get('description') as string) || null;
+    const instructions = (formData.get('instructions') as string) || null;
+    const enabled = formData.get('enabled') === 'on';
+
+    // Validate required fields
+    if (!name?.trim()) {
+      throw new Error('Template name is required');
+    }
+    if (!createFormData.category_id) {
+      throw new Error('Please select a category');
+    }
+
     const templateData: any = {
-      name: formData.get('name') as string,
-      description: (formData.get('description') as string) || null,
-      category_id: parseInt(formData.get('category_id') as string),
-      default_spot_id: (() => {
-        const v = formData.get('default_spot_id') as string;
-        return v ? parseInt(v) : null;
-      })(),
+      name: name.trim(),
+      description,
+      category_id: parseInt(createFormData.category_id),
+      priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
+      sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
+      default_spot_id: createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null,
       default_user_ids: (() => {
         const vals = formData.getAll('default_user_ids');
         const ids = vals.map((v) => parseInt(v as string, 10)).filter((n) => !Number.isNaN(n));
         return ids.length ? ids : null;
       })(),
-      instructions: (formData.get('instructions') as string) || null,
-      enabled: formData.get('enabled') === 'on'
+      instructions,
+      enabled
     };
-    templateData.priority_id = priorityStr ? parseInt(priorityStr, 10) : null;
-    templateData.sla_id = slaStr ? parseInt(slaStr, 10) : null;
+
     await createItem(templateData);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      category_id: '',
+      priority_id: '',
+      sla_id: '',
+      default_spot_id: '',
+      enabled: true
+    });
+    setCreateUserIds([]);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTemplate) return;
-    
+
     const formData = new FormData(e.target as HTMLFormElement);
+
+    // Get form values
+    const name = formData.get('name') as string;
+    const description = (formData.get('description') as string) || null;
+    const instructions = (formData.get('instructions') as string) || null;
+    const enabled = formData.get('enabled') === 'on';
+
+    // Validate required fields
+    if (!name?.trim()) {
+      throw new Error('Template name is required');
+    }
+    if (!editFormData.category_id) {
+      throw new Error('Please select a category');
+    }
+
     const updates: any = {
-      name: formData.get('name') as string,
-      description: (formData.get('description') as string) || null,
-      category_id: parseInt(formData.get('category_id') as string),
-      default_spot_id: (() => {
-        const v = formData.get('default_spot_id') as string;
-        return v ? parseInt(v) : null;
-      })(),
+      name: name.trim(),
+      description,
+      category_id: parseInt(editFormData.category_id),
+      priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
+      sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
+      default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null,
       default_user_ids: (() => {
         const vals = formData.getAll('default_user_ids');
         const ids = vals.map((v) => parseInt(v as string, 10)).filter((n) => !Number.isNaN(n));
         return ids.length ? ids : null;
       })(),
-      instructions: (formData.get('instructions') as string) || null,
-      enabled: formData.get('enabled') === 'on'
+      instructions,
+      enabled: editFormData.enabled
     };
-    const priorityStrEdit = (formData.get('priority_id') as string) || '';
-    const slaStrEdit = (formData.get('sla_id') as string) || '';
-    updates.priority_id = priorityStrEdit ? parseInt(priorityStrEdit, 10) : null;
-    updates.sla_id = slaStrEdit ? parseInt(slaStrEdit, 10) : null;
+
     await updateItem(editingTemplate.id, updates);
   };
 
@@ -421,7 +487,20 @@ function Templates() {
       {/* Create Template Dialog */}
       <SettingsDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            // Reset form data when closing create dialog
+            setCreateFormData({
+              category_id: '',
+              priority_id: '',
+              sla_id: '',
+              default_spot_id: '',
+              enabled: true
+            });
+            setCreateUserIds([]);
+          }
+        }}
         type="create"
         title="Add New Template"
         description="Create a new task template to standardize your workflows."
@@ -442,8 +521,8 @@ function Templates() {
           <SelectField
             id="category"
             label="Category"
-            value=""
-            onChange={() => {}}
+            value={createFormData.category_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, category_id: value }))}
             placeholder="Select Category"
             options={categories.map((category: Category) => ({
               value: category.id.toString(),
@@ -454,8 +533,8 @@ function Templates() {
           <SelectField
             id="default_spot_id"
             label="Default Spot"
-            value=""
-            onChange={() => {}}
+            value={createFormData.default_spot_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, default_spot_id: value }))}
             placeholder="None"
             options={(spots as any[]).map((s: any) => ({
               value: s.id.toString(),
@@ -532,7 +611,20 @@ function Templates() {
       {/* Edit Template Dialog */}
       <SettingsDialog
         open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            // Reset form data when closing edit dialog
+            setEditFormData({
+              category_id: '',
+              priority_id: '',
+              sla_id: '',
+              default_spot_id: '',
+              enabled: true
+            });
+            setEditUserIds([]);
+          }
+        }}
         type="edit"
         title="Edit Template"
         description="Update the template information."
@@ -565,8 +657,8 @@ function Templates() {
             <SelectField
               id="edit-category"
               label="Category"
-              value={editingTemplate.category_id.toString()}
-              onChange={() => {}}
+              value={editFormData.category_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, category_id: value }))}
               placeholder="Select Category"
               options={categories.map((category: Category) => ({
                 value: category.id.toString(),
@@ -578,8 +670,8 @@ function Templates() {
             <SelectField
               id="edit-priority"
               label="Priority"
-              value={(editingTemplate as any).priority_id?.toString() || ''}
-              onChange={() => {}}
+              value={editFormData.priority_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, priority_id: value }))}
               placeholder="None"
               options={Array.from(priorityById.entries()).map(([id, priority]) => ({
                 value: id.toString(),
@@ -589,8 +681,8 @@ function Templates() {
             <SelectField
               id="edit-sla"
               label="SLA"
-              value={(editingTemplate as any).sla_id?.toString() || ''}
-              onChange={() => {}}
+              value={editFormData.sla_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value }))}
               placeholder="None"
               options={Array.from(slaById.entries()).map(([id, sla]) => ({
                 value: id.toString(),
@@ -611,8 +703,8 @@ function Templates() {
             <SelectField
               id="edit-default-spot"
               label="Default Spot"
-              value={(editingTemplate as any).default_spot_id?.toString() || ''}
-              onChange={() => {}}
+              value={editFormData.default_spot_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, default_spot_id: value }))}
               placeholder="None"
               options={(spots as any[]).map((s: any) => ({
                 value: s.id.toString(),
@@ -633,6 +725,13 @@ function Templates() {
                 />
               </div>
             </div>
+            <CheckboxField
+              id="edit-enabled"
+              label="Enabled"
+              checked={editFormData.enabled}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
+              description="Enable this template"
+            />
           </div>
         )}
       </SettingsDialog>

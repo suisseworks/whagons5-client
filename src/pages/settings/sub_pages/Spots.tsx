@@ -1,14 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot, faPlus, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Spot } from "@/store/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -71,6 +69,43 @@ function Spots() {
     searchFields: ['name']
   });
 
+  // Form state for controlled components
+  const [createFormData, setCreateFormData] = useState<{
+    name: string;
+    spot_type_id: string;
+    parent_id: string;
+    is_branch: boolean;
+  }>({
+    name: '',
+    spot_type_id: '1',
+    parent_id: '',
+    is_branch: false
+  });
+
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    spot_type_id: string;
+    parent_id: string;
+    is_branch: boolean;
+  }>({
+    name: '',
+    spot_type_id: '1',
+    parent_id: '',
+    is_branch: false
+  });
+
+  // Update edit form data when editing spot changes
+  useEffect(() => {
+    if (editingSpot) {
+      setEditFormData({
+        name: editingSpot.name || '',
+        spot_type_id: editingSpot.spot_type_id?.toString() || '1',
+        parent_id: editingSpot.parent_id?.toString() || '',
+        is_branch: editingSpot.is_branch || false
+      });
+    }
+  }, [editingSpot]);
+
   // Helper functions
   const getSpotTaskCount = (spotId: number) => {
     return tasks.filter((task: any) => task.spot_id === spotId).length;
@@ -118,26 +153,33 @@ function Spots() {
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
+
     const spotData = {
-      name: formData.get('name') as string,
-      parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : null,
-      spot_type_id: parseInt(formData.get('spot_type_id') as string) || 1,
-      is_branch: formData.get('is_branch') === 'on'
+      name: createFormData.name,
+      parent_id: createFormData.parent_id ? parseInt(createFormData.parent_id) : null,
+      spot_type_id: parseInt(createFormData.spot_type_id) || 1,
+      is_branch: createFormData.is_branch
     };
     await createItem(spotData);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      spot_type_id: '1',
+      parent_id: '',
+      is_branch: false
+    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSpot) return;
-    
-    const formData = new FormData(e.target as HTMLFormElement);
+
     const updates = {
-      name: formData.get('name') as string,
-      parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : null,
-      spot_type_id: parseInt(formData.get('spot_type_id') as string) || 1,
-      is_branch: formData.get('is_branch') === 'on'
+      name: editFormData.name,
+      parent_id: editFormData.parent_id ? parseInt(editFormData.parent_id) : null,
+      spot_type_id: parseInt(editFormData.spot_type_id) || 1,
+      is_branch: editFormData.is_branch
     };
     await updateItem(editingSpot.id, updates);
   };
@@ -228,32 +270,32 @@ function Spots() {
         <div className="grid gap-4">
           <TextField
             id="name"
-            name="name"
             label="Name"
-            defaultValue=""
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="spot_type_id"
-            name="spot_type_id"
             label="Spot Type"
             type="number"
-            defaultValue="1"
+            value={createFormData.spot_type_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, spot_type_id: value }))}
             min="1"
           />
           <TextField
             id="parent_id"
-            name="parent_id"
             label="Parent ID"
             type="number"
-            defaultValue=""
+            value={createFormData.parent_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, parent_id: value }))}
             placeholder="Leave empty for root"
           />
           <CheckboxField
             id="is_branch"
-            name="is_branch"
             label="Is Branch"
-            defaultChecked={false}
+            checked={createFormData.is_branch}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_branch: checked }))}
             description="This is a branch location"
           />
         </div>
@@ -275,32 +317,32 @@ function Spots() {
           <div className="grid gap-4">
             <TextField
               id="edit-name"
-              name="name"
               label="Name"
-              defaultValue={editingSpot.name}
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <TextField
               id="edit-spot_type_id"
-              name="spot_type_id"
               label="Spot Type"
               type="number"
-              defaultValue={editingSpot.spot_type_id.toString()}
+              value={editFormData.spot_type_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, spot_type_id: value }))}
               min="1"
             />
             <TextField
               id="edit-parent_id"
-              name="parent_id"
               label="Parent ID"
               type="number"
-              defaultValue={editingSpot.parent_id?.toString() || ""}
+              value={editFormData.parent_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, parent_id: value }))}
               placeholder="Leave empty for root"
             />
             <CheckboxField
               id="edit-is_branch"
-              name="is_branch"
               label="Is Branch"
-              defaultChecked={editingSpot.is_branch}
+              checked={editFormData.is_branch}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_branch: checked }))}
               description="This is a branch location"
             />
           </div>

@@ -3,25 +3,17 @@ import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { 
-  faTags, 
+import {
+  faTags,
   faPlus,
-  faCubes,
-  faBroom,
-  faWrench,
-  faSeedling,
-  faTools,
-  faHome,
-  faCar,
-  faUtensils,
-  faLaptop,
-  faBook
+  faCubes
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Category, Task, Team, StatusTransitionGroup } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconService } from '@/database/iconService';
 import {
   SettingsLayout,
   SettingsGrid,
@@ -35,41 +27,53 @@ import {
   CheckboxField
 } from "../components";
 
+// Form data interface for edit form
+interface CategoryFormData {
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  enabled: boolean;
+  team_id: string;
+  status_transition_group_id: string;
+}
+
 // Custom cell renderer for category name with icon
 const CategoryNameCellRenderer = (props: ICellRendererParams) => {
+  const [icon, setIcon] = useState<any>(faTags);
   const categoryIcon = props.data?.icon;
   const categoryColor = props.data?.color || '#6B7280';
   const categoryName = props.value;
-  
-  if (!categoryIcon) {
-    return <span>{categoryName}</span>;
-  }
-  
-  // Parse FontAwesome icon class (e.g., "fas fa-broom")
-  const iconClasses = categoryIcon.split(' ');
-  const iconName = iconClasses[iconClasses.length - 1]; // Get the last part (fa-broom)
-  
-  // Map common FontAwesome icons to their equivalents
-  const iconMap: { [key: string]: any } = {
-    'fa-broom': faBroom,
-    'fa-wrench': faWrench,
-    'fa-seedling': faSeedling,
-    'fa-tools': faTools,
-    'fa-home': faHome,
-    'fa-car': faCar,
-    'fa-utensils': faUtensils,
-    'fa-laptop': faLaptop,
-    'fa-book': faBook,
-    'fa-tags': faTags,
-  };
-  
-  const icon = iconMap[iconName] || faTags;
-  
+
+  useEffect(() => {
+    const loadIcon = async () => {
+      if (!categoryIcon) {
+        setIcon(faTags);
+        return;
+      }
+
+      try {
+        // Parse FontAwesome icon class (e.g., "fas fa-hat-wizard")
+        const iconClasses = categoryIcon.split(' ');
+        const iconName = iconClasses[iconClasses.length - 1]; // Get the last part (hat-wizard)
+
+        // Use iconService to load the icon dynamically
+        const loadedIcon = await iconService.getIcon(iconName);
+        setIcon(loadedIcon || faTags);
+      } catch (error) {
+        console.error('Error loading category icon:', error);
+        setIcon(faTags);
+      }
+    };
+
+    loadIcon();
+  }, [categoryIcon]);
+
   return (
     <div className="flex items-center space-x-3 h-full">
-      <FontAwesomeIcon 
-        icon={icon} 
-        className="w-4 h-4" 
+      <FontAwesomeIcon
+        icon={icon}
+        className="w-4 h-4"
         style={{ color: categoryColor }}
       />
       <span>{categoryName}</span>
@@ -99,12 +103,6 @@ function Categories() {
   const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
   const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
 
-  // Load transition groups (for dropdowns and column rendering)
-  useEffect(() => {
-    dispatch(genericActions.statusTransitionGroups.getFromIndexedDB());
-    dispatch(genericActions.statusTransitionGroups.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-  
   // Use shared state management
   const {
     items: categories,
@@ -133,6 +131,49 @@ function Categories() {
     entityName: 'categories',
     searchFields: ['name', 'description']
   });
+
+  // Load transition groups (for dropdowns and column rendering)
+  useEffect(() => {
+    dispatch(genericActions.statusTransitionGroups.getFromIndexedDB());
+    dispatch(genericActions.statusTransitionGroups.fetchFromAPI({ per_page: 1000 }));
+  }, [dispatch]);
+
+  // Form state for create dialog
+  const [createFormData, setCreateFormData] = useState<CategoryFormData>({
+    name: '',
+    description: '',
+    color: '#4ECDC4',
+    icon: 'fas fa-tags',
+    enabled: true,
+    team_id: '',
+    status_transition_group_id: ''
+  });
+
+  // Form state for edit dialog
+  const [editFormData, setEditFormData] = useState<CategoryFormData>({
+    name: '',
+    description: '',
+    color: '#4ECDC4',
+    icon: 'fas fa-tags',
+    enabled: true,
+    team_id: '',
+    status_transition_group_id: ''
+  });
+
+  // Update edit form data when editing category changes
+  useEffect(() => {
+    if (editingCategory) {
+      setEditFormData({
+        name: editingCategory.name || '',
+        description: editingCategory.description || '',
+        color: editingCategory.color || '#4ECDC4',
+        icon: editingCategory.icon || 'fas fa-tags',
+        enabled: editingCategory.enabled ?? true,
+        team_id: editingCategory.team_id?.toString() || '',
+        status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
+      });
+    }
+  }, [editingCategory]);
 
   // Manage Fields dialog state
   const [isFieldsDialogOpen, setIsFieldsDialogOpen] = useState(false);
@@ -264,74 +305,91 @@ function Categories() {
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    
-    if (!formData.get('team_id')) {
+
+    if (!createFormData.team_id) {
       throw new Error('Please select a team for this category.');
     }
-    if (!formData.get('status_transition_group_id')) {
+    if (!createFormData.status_transition_group_id) {
       throw new Error('Please select a transition group for this category.');
     }
-    
+
     const categoryData = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      color: formData.get('color') as string,
-      icon: formData.get('icon') as string,
-      enabled: formData.get('enabled') === 'on',
-      team_id: parseInt(formData.get('team_id') as string),
+      name: createFormData.name,
+      description: createFormData.description,
+      color: createFormData.color,
+      icon: createFormData.icon,
+      enabled: createFormData.enabled,
+      team_id: parseInt(createFormData.team_id),
       workspace_id: 1,
       sla_id: 1,
-      status_transition_group_id: parseInt(formData.get('status_transition_group_id') as string),
+      status_transition_group_id: parseInt(createFormData.status_transition_group_id),
       deleted_at: null
     };
     await createItem(categoryData);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      description: '',
+      color: '#4ECDC4',
+      icon: 'fas fa-tags',
+      enabled: true,
+      team_id: '',
+      status_transition_group_id: ''
+    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCategory) return;
-    
-    const formData = new FormData(e.target as HTMLFormElement);
+
     const updates = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      color: formData.get('color') as string,
-      icon: formData.get('icon') as string,
-      enabled: formData.get('enabled') === 'on',
-      team_id: formData.get('team_id') ? parseInt(formData.get('team_id') as string) : 0,
+      name: editFormData.name,
+      description: editFormData.description,
+      color: editFormData.color,
+      icon: editFormData.icon,
+      enabled: editFormData.enabled,
+      team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
       workspace_id: 1,
       sla_id: 1,
-      status_transition_group_id: formData.get('status_transition_group_id') ? parseInt(formData.get('status_transition_group_id') as string) : undefined
+      status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined
     };
     await updateItem(editingCategory.id, updates);
   };
 
   // Render entity preview for delete dialog
   const renderCategoryPreview = (category: Category) => {
-    const iconClasses = category.icon?.split(' ');
-    const iconName = iconClasses?.[iconClasses.length - 1];
-    
-    const iconMap: { [key: string]: any } = {
-      'fa-broom': faBroom,
-      'fa-wrench': faWrench,
-      'fa-seedling': faSeedling,
-      'fa-tools': faTools,
-      'fa-home': faHome,
-      'fa-car': faCar,
-      'fa-utensils': faUtensils,
-      'fa-laptop': faLaptop,
-      'fa-book': faBook,
-      'fa-tags': faTags,
-    };
-    
-    const icon = iconMap[iconName] || faTags;
-    
+    const [icon, setIcon] = useState<any>(faTags);
+
+    useEffect(() => {
+      const loadIcon = async () => {
+        if (!category.icon) {
+          setIcon(faTags);
+          return;
+        }
+
+        try {
+          // Parse FontAwesome icon class (e.g., "fas fa-hat-wizard")
+          const iconClasses = category.icon.split(' ');
+          const iconName = iconClasses[iconClasses.length - 1]; // Get the last part (hat-wizard)
+
+          // Use iconService to load the icon dynamically
+          const loadedIcon = await iconService.getIcon(iconName);
+          setIcon(loadedIcon || faTags);
+        } catch (error) {
+          console.error('Error loading category preview icon:', error);
+          setIcon(faTags);
+        }
+      };
+
+      loadIcon();
+    }, [category.icon]);
+
     return (
       <div className="flex items-center space-x-3">
-        <FontAwesomeIcon 
-          icon={icon} 
-          className="w-5 h-5" 
+        <FontAwesomeIcon
+          icon={icon}
+          className="w-5 h-5"
           style={{ color: category.color }}
         />
         <div>
@@ -348,8 +406,8 @@ function Categories() {
                 </span>
               </div>
             )}
-            <Badge 
-              variant={category.enabled ? "default" : "secondary"} 
+            <Badge
+              variant={category.enabled ? "default" : "secondary"}
               className={`text-xs ${category.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
             >
               {category.enabled ? "Enabled" : "Disabled"}
@@ -434,37 +492,36 @@ function Categories() {
           <TextField
             id="name"
             label="Name"
-            defaultValue=""
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="description"
             label="Description"
-            defaultValue=""
+            value={createFormData.description}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, description: value }))}
           />
           <TextField
             id="color"
             label="Color"
             type="color"
-            defaultValue="#4ECDC4"
+            value={createFormData.color}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
           <IconPicker
             id="icon"
             label="Icon"
-            value="fas fa-tags"
-            onChange={(iconClass) => {
-              // This will be handled by the form submission
-              const iconInput = document.getElementById('icon-hidden') as HTMLInputElement;
-              if (iconInput) iconInput.value = iconClass;
-            }}
-            color="#4ECDC4"
+            value={createFormData.icon}
+            onChange={(iconClass) => setCreateFormData(prev => ({ ...prev, icon: iconClass }))}
+            color={createFormData.color}
             required
           />
-          <input type="hidden" id="icon-hidden" name="icon" defaultValue="fas fa-tags" />
           <SelectField
             id="team"
             label="Team"
-            defaultValue=""
+            value={createFormData.team_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, team_id: value }))}
             placeholder="No Team"
             options={teams.map((team: Team) => ({
               value: team.id.toString(),
@@ -475,7 +532,8 @@ function Categories() {
           <SelectField
             id="status-group"
             label="Transition Group"
-            defaultValue=""
+            value={createFormData.status_transition_group_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, status_transition_group_id: value }))}
             placeholder="Select group…"
             options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
               value: g.id.toString(),
@@ -485,9 +543,9 @@ function Categories() {
           />
           <CheckboxField
             id="enabled"
-            name="enabled"
             label="Status"
-            defaultChecked={true}
+            checked={createFormData.enabled}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, enabled: checked }))}
             description="Enabled"
           />
         </div>
@@ -505,72 +563,66 @@ function Categories() {
         error={formError}
         submitDisabled={isSubmitting || !editingCategory}
       >
-        {editingCategory && (
-          <div className="grid gap-4">
-            <TextField
-              id="edit-name"
-              label="Name"
-              value={editingCategory.name}
-              onChange={() => {}}
-              required
-            />
-            <TextField
-              id="edit-description"
-              label="Description"
-              value={editingCategory.description || ''}
-              onChange={() => {}}
-            />
-            <TextField
-              id="edit-color"
-              label="Color"
-              type="color"
-              value={editingCategory.color || '#4ECDC4'}
-              onChange={() => {}}
-            />
-            <IconPicker
-              id="edit-icon"
-              label="Icon"
-              value={editingCategory.icon || 'fas fa-tags'}
-              onChange={(iconClass) => {
-                const iconInput = document.getElementById('edit-icon-hidden') as HTMLInputElement;
-                if (iconInput) iconInput.value = iconClass;
-              }}
-              color={editingCategory.color || '#4ECDC4'}
-              required
-            />
-            <input type="hidden" id="edit-icon-hidden" name="icon" defaultValue={editingCategory.icon || 'fas fa-tags'} />
-            <SelectField
-              id="edit-team"
-              label="Team"
-              value={editingCategory.team_id?.toString() || ''}
-              onChange={() => {}}
-              placeholder="No Team"
-              options={teams.map((team: Team) => ({
-                value: team.id.toString(),
-                label: team.name
-              }))}
-            />
-            <SelectField
-              id="edit-status-group"
-              label="Transition Group"
-              value={editingCategory.status_transition_group_id?.toString() || ''}
-              onChange={() => {}}
-              placeholder="Select group…"
-              options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
-                value: g.id.toString(),
-                label: g.name
-              }))}
-              required
-            />
-            <CheckboxField
-              id="edit-enabled"
-              name="enabled"
-              label="Status"
-              defaultChecked={editingCategory.enabled}
-              description="Enabled"
-            />
-          </div>
-        )}
+        <div className="grid gap-4">
+          <TextField
+            id="edit-name"
+            label="Name"
+            value={editFormData.name}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+            required
+          />
+          <TextField
+            id="edit-description"
+            label="Description"
+            value={editFormData.description}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
+          />
+          <TextField
+            id="edit-color"
+            label="Color"
+            type="color"
+            value={editFormData.color}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
+          />
+          <IconPicker
+            id="edit-icon"
+            label="Icon"
+            value={editFormData.icon}
+            onChange={(iconClass) => setEditFormData(prev => ({ ...prev, icon: iconClass }))}
+            color={editFormData.color}
+            required
+          />
+          <SelectField
+            id="edit-team"
+            label="Team"
+            value={editFormData.team_id}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, team_id: value }))}
+            placeholder="No Team"
+            options={teams.map((team: Team) => ({
+              value: team.id.toString(),
+              label: team.name
+            }))}
+          />
+          <SelectField
+            id="edit-status-group"
+            label="Transition Group"
+            value={editFormData.status_transition_group_id}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, status_transition_group_id: value }))}
+            placeholder="Select group…"
+            options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
+              value: g.id.toString(),
+              label: g.name
+            }))}
+            required
+          />
+          <CheckboxField
+            id="edit-enabled"
+            label="Status"
+            checked={editFormData.enabled}
+            onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
+            description="Enabled"
+          />
+        </div>
       </SettingsDialog>
 
       {/* Delete Category Dialog */}

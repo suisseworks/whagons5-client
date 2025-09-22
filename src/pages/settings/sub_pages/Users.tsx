@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +81,37 @@ function Users() {
     entityName: 'users',
     searchFields: ['name', 'email']
   });
+
+  // Form state for controlled components
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    email: string;
+    team_id: string;
+    organization_name: string;
+    is_admin: boolean;
+    has_active_subscription: boolean;
+  }>({
+    name: '',
+    email: '',
+    team_id: '',
+    organization_name: '',
+    is_admin: false,
+    has_active_subscription: false
+  });
+
+  // Update form data when editing user changes
+  useEffect(() => {
+    if (editingUser) {
+      setEditFormData({
+        name: editingUser.name || '',
+        email: editingUser.email || '',
+        team_id: editingUser.team_id?.toString() || '',
+        organization_name: editingUser.organization_name || '',
+        is_admin: !!editingUser.is_admin,
+        has_active_subscription: !!editingUser.has_active_subscription
+      });
+    }
+  }, [editingUser]);
 
   // Ensure teams are fetched when opening create dialog (in case page loaded elsewhere first)
   useEffect(() => {
@@ -219,38 +250,63 @@ function Users() {
     </div>
   );
 
+  // Create form state
+  const [createFormData, setCreateFormData] = useState<{
+    name: string;
+    email: string;
+    team_id: string;
+    organization_name: string;
+    is_admin: boolean;
+    has_active_subscription: boolean;
+  }>({
+    name: '',
+    email: '',
+    team_id: '',
+    organization_name: '',
+    is_admin: false,
+    has_active_subscription: false
+  });
+
   // Create submit handler
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const data = new FormData(form);
+
     const payload: Omit<UserData, 'id' | 'created_at' | 'updated_at' | 'deleted_at'> = {
-      name: String(data.get('name') || ''),
-      email: String(data.get('email') || ''),
-      team_id: data.get('team_id') ? Number(data.get('team_id')) : null,
-      role_id: data.get('role_id') ? Number(data.get('role_id')) : null,
-      organization_name: (data.get('organization_name') as string) || null,
-      is_admin: data.get('is_admin') === 'on',
-      has_active_subscription: data.get('has_active_subscription') === 'on',
+      name: createFormData.name,
+      email: createFormData.email,
+      team_id: createFormData.team_id ? Number(createFormData.team_id) : null,
+      role_id: null, // Not used in this form
+      organization_name: createFormData.organization_name || null,
+      is_admin: createFormData.is_admin,
+      has_active_subscription: createFormData.has_active_subscription,
       url_picture: null
     };
     await createItem(payload as any);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      email: '',
+      team_id: '',
+      organization_name: '',
+      is_admin: false,
+      has_active_subscription: false
+    });
   };
 
   // Edit submit handler
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
-    const form = e.target as HTMLFormElement;
-    const data = new FormData(form);
+
     const updates: Partial<UserData> = {
-      name: String(data.get('name') || editingUser.name),
-      email: String(data.get('email') || editingUser.email),
-      team_id: data.get('team_id') ? Number(data.get('team_id')) : null,
-      role_id: data.get('role_id') ? Number(data.get('role_id')) : null,
-      organization_name: (data.get('organization_name') as string) || null,
-      is_admin: data.get('is_admin') === 'on',
-      has_active_subscription: data.get('has_active_subscription') === 'on'
+      name: editFormData.name,
+      email: editFormData.email,
+      team_id: editFormData.team_id ? Number(editFormData.team_id) : null,
+      role_id: null, // Not used in this form
+      organization_name: editFormData.organization_name || null,
+      is_admin: editFormData.is_admin,
+      has_active_subscription: editFormData.has_active_subscription
     };
     await updateItem(editingUser.id, updates);
   };
@@ -326,24 +382,24 @@ function Users() {
         <div className="grid gap-4">
           <TextField
             id="name"
-            name="name"
             label="Name"
-            defaultValue=""
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="email"
-            name="email"
             label="Email"
             type="email"
-            defaultValue=""
+            value={createFormData.email}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
             required
           />
           <SelectField
             id="team_id"
-            name="team_id"
             label="Team"
-            defaultValue=""
+            value={createFormData.team_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, team_id: value }))}
             placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
             options={teams.map((team: Team) => ({
               value: team.id.toString(),
@@ -352,22 +408,22 @@ function Users() {
           />
           <TextField
             id="organization_name"
-            name="organization_name"
             label="Organization"
-            defaultValue=""
+            value={createFormData.organization_name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
           />
           <CheckboxField
             id="is_admin"
-            name="is_admin"
             label="Admin"
-            defaultChecked={false}
+            checked={createFormData.is_admin}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
             description="Grant admin role"
           />
           <CheckboxField
             id="has_active_subscription"
-            name="has_active_subscription"
             label="Subscription"
-            defaultChecked={false}
+            checked={createFormData.has_active_subscription}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
             description="Active subscription"
           />
         </div>
@@ -389,24 +445,24 @@ function Users() {
           <div className="grid gap-4">
             <TextField
               id="edit-name"
-              name="name"
               label="Name"
-              defaultValue={editingUser.name}
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <TextField
               id="edit-email"
-              name="email"
               label="Email"
               type="email"
-              defaultValue={editingUser.email}
+              value={editFormData.email}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
               required
             />
             <SelectField
               id="edit-team_id"
-              name="team_id"
               label="Team"
-              defaultValue={editingUser.team_id?.toString() || ''}
+              value={editFormData.team_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, team_id: value }))}
               placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
               options={teams.map((team: Team) => ({
                 value: team.id.toString(),
@@ -415,22 +471,22 @@ function Users() {
             />
             <TextField
               id="edit-organization_name"
-              name="organization_name"
               label="Organization"
-              defaultValue={editingUser.organization_name ?? ''}
+              value={editFormData.organization_name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
             />
             <CheckboxField
               id="edit-is_admin"
-              name="is_admin"
               label="Admin"
-              defaultChecked={!!editingUser.is_admin}
+              checked={editFormData.is_admin}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
               description="Grant admin role"
             />
             <CheckboxField
               id="edit-has_active_subscription"
-              name="has_active_subscription"
               label="Subscription"
-              defaultChecked={!!editingUser.has_active_subscription}
+              checked={editFormData.has_active_subscription}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
               description="Active subscription"
             />
           </div>

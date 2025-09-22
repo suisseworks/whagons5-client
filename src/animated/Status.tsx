@@ -1,5 +1,5 @@
 import React from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence } from "motion/react"
 import { XCircle } from "lucide-react"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
@@ -44,7 +44,7 @@ const STATE_MAP: Record<Exclude<BadgeState, "custom">, StatusConfig> = {
 }
 
 // Small spring for snappy, delightful transitions
-const SPRING = { type: "spring", stiffness: 520, damping: 24, mass: 0.9 }
+const SPRING = { type: "spring" as const, stiffness: 520, damping: 24, mass: 0.9 }
 
 // --- Component --------------------------------------------------------------
 
