@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { faSpinner, faCheck, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { MultiStateBadge } from '@/animated/Status';
 
 type StatusMeta = { name: string; color?: string; icon?: string };
 
@@ -19,7 +19,7 @@ interface StatusCellProps {
 
 const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon, allowedNext, onChange }) => {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [animationState, setAnimationState] = useState<'custom' | 'processing' | 'success' | 'error'>('custom');
   const meta = statusMap[value];
   if (!meta) {
     return (
@@ -33,6 +33,15 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
   const iconName = meta?.icon;
   const icon = getStatusIcon(iconName);
 
+  // Create custom status config for the MultiStateBadge
+  const customStatusConfig = {
+    label: name,
+    icon: icon,
+    bg: "text-foreground",
+    glow: "",
+    color: color
+  };
+
   const items = useMemo(() => {
     return allowedNext
       .map((id) => ({ id, meta: statusMap[id] }))
@@ -45,29 +54,12 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <div
-                className="flex items-center h-full py-1 px-2 gap-1 truncate cursor-pointer rounded-md hover:bg-muted/60 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {icon && typeof icon === 'object' ? (
-                  <FontAwesomeIcon
-                    icon={icon}
-                    className="text-sm"
-                    style={{ color }}
-                  />
-                ) : (
-                  <span className="text-[10px] leading-none" style={{ color }}>●</span>
-                )}
-                <span className="text-xs font-medium truncate max-w-[120px]" title={name}>{name}</span>
-                {state === 'loading' && (
-                  <FontAwesomeIcon icon={faSpinner} spin className="text-[11px] ml-1 text-muted-foreground" />
-                )}
-                {state === 'success' && (
-                  <FontAwesomeIcon icon={faCheck} className="text-[11px] ml-1 text-green-600" />
-                )}
-                {state === 'error' && (
-                  <FontAwesomeIcon icon={faXmark} className="text-[11px] ml-1 text-red-600" />
-                )}
+              <div className="flex items-center h-full py-2">
+                <MultiStateBadge
+                  state={animationState}
+                  customStatus={customStatusConfig}
+                  className="cursor-pointer"
+                />
               </div>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -87,18 +79,18 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
                   e.stopPropagation();
                   setOpen(false);
                   try {
-                    setState('loading');
+                    setAnimationState('processing');
                     const ok = await onChange(id);
                     if (ok) {
-                      setState('success');
-                      setTimeout(() => setState('idle'), 1000);
+                      setAnimationState('success');
+                      setTimeout(() => setAnimationState('custom'), 1000);
                     } else {
-                      setState('error');
-                      setTimeout(() => setState('idle'), 1000);
+                      setAnimationState('error');
+                      setTimeout(() => setAnimationState('custom'), 1000);
                     }
                   } catch (_) {
-                    setState('error');
-                    setTimeout(() => setState('idle'), 1000);
+                    setAnimationState('error');
+                    setTimeout(() => setAnimationState('custom'), 1000);
                   }
                 }}
               >

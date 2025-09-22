@@ -1,26 +1,40 @@
+import { MultiStateBadge } from "@/animated/Status";
+import { Button } from "@/components/ui/button";
+import React from "react";
 
-import CheckboxAnimated from "@/animated/Checkbox";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useId, useState } from "react";
+type BadgeState = "start" | "processing" | "success" | "error"
 
 export default function TestPage() {
-  const [checked, setChecked] = useState(false);
-  const id = useId();
+  const [state, setState] = React.useState<BadgeState>("start")
+  const order: BadgeState[] = ["start", "processing", "success", "error"]
+
+  function cycle() {
+    setState((s) => order[(order.indexOf(s) + 1) % order.length])
+  }
 
   return (
-    <div className="p-6">
-      <label htmlFor={id} className="inline-flex items-center gap-3 cursor-pointer select-none">
-        <Checkbox
-          id={id}
-          checked={checked}
-          onCheckedChange={(checked) => setChecked(Boolean(checked))}
-        />
+    <div className="min-h-[60vh] w-full grid place-items-center p-8">
+      <div className="flex flex-col items-center gap-6">
+        <MultiStateBadge state={state} onClick={cycle} />
 
-        <CheckboxAnimated
-        />
+        <div className="flex items-center gap-2">
+          {order.map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={s === state ? "default" : "outline"}
+              onClick={() => setState(s)}
+              className="capitalize"
+            >
+              {s}
+            </Button>
+          ))}
+        </div>
 
-        <span className="text-sm">Accept terms</span>
-      </label>
+        <p className="text-xs text-muted-foreground">
+          Click the badge to cycle states
+        </p>
+      </div>
     </div>
-  );
+  )
 }
