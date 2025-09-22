@@ -17,6 +17,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -55,10 +56,24 @@ function Header() {
         };
         const acc: Array<{ label: string; to?: string }> = [];
         let path = '';
-        for (const seg of parts) {
-            path += `/${seg}`;
-            const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
-            acc.push({ label, to: path });
+
+        // Special handling for settings subpages
+        if (parts[0] === 'settings' && parts.length > 1) {
+            // For settings subpages, create breadcrumbs like: Settings > Subpage
+            acc.push({ label: 'Settings', to: '/settings' });
+            for (let i = 1; i < parts.length; i++) {
+                const seg = parts[i];
+                path += `/${seg}`;
+                const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+                acc.push({ label, to: `/settings${path}` });
+            }
+        } else {
+            // Regular breadcrumbs for non-settings pages
+            for (const seg of parts) {
+                path += `/${seg}`;
+                const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+                acc.push({ label, to: path });
+            }
         }
         return acc;
     }, [location.pathname]);
@@ -144,11 +159,11 @@ function Header() {
     if (!firebaseUser || userLoading) {
         return (
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex items-center space-x-4 p-4">
+                <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
-                        <div className="animate-pulse bg-gray-300 rounded-full h-8 w-8"></div>
-                        <span className="text-sm text-muted-foreground">Loading...</span>
+                        <div className="animate-pulse bg-gray-300 rounded-full h-6 w-6"></div>
+                        <span className="text-xs text-muted-foreground">Loading...</span>
                     </div>
                 </div>
             </header>
@@ -158,11 +173,11 @@ function Header() {
     if (!user) {
         return (
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex items-center space-x-4 p-4">
+                <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
-                        <div className="bg-gray-300 rounded-full h-8 w-8"></div>
-                        <span className="text-sm text-muted-foreground">User not found</span>
+                        <div className="bg-gray-300 rounded-full h-7 w-7"></div>
+                        <span className="text-xs text-muted-foreground">User not found</span>
                     </div>
                 </div>
             </header>
@@ -171,67 +186,91 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-1 shadow-md">
+        <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-0 shadow-md">
             {isMobile && (
-                <SidebarTrigger className='absolute left-2 top-5 z-1000 text-primary' />
+                <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center justify-between px-5 py-4">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
-                <div className="flex items-center space-x-3 min-w-0">
+                <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
-                        <h1 className="text-lg sm:text-xl font-semibold truncate max-w-[18rem]">
+                        <h1 className="text-lg sm:text-xl font-semibold truncate max-w-[20rem]">
                             {currentWorkspaceName}
                         </h1>
                     ) : isSettings ? (
-                        <h1 className="text-lg sm:text-xl font-semibold">
-                            Settings
-                        </h1>
+                        <Breadcrumb>
+                            <BreadcrumbList className="gap-1.5 sm:gap-2">
+                                {breadcrumbs.map((bc, idx) => (
+                                    <>
+                                    {idx > 0 && <BreadcrumbSeparator />}
+                                    <BreadcrumbItem key={idx}>
+                                        {idx < breadcrumbs.length - 1 ? (
+                                            <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
+                                                <Link to={bc.to || '#'} className="truncate max-w-[10rem]">
+                                                    {bc.label}
+                                                </Link>
+                                            </BreadcrumbLink>
+                                        ) : (
+                                            <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
+                                        )}
+                                    </BreadcrumbItem>
+                                    </>
+                                ))}
+                            </BreadcrumbList>
+                        </Breadcrumb>
                     ) : isAnalytics ? (
                         <h1 className="text-lg sm:text-xl font-semibold">
                             Analytics
                         </h1>
                     ) : (
-                        <nav className="hidden sm:flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Link to="/" className="hover:text-foreground">Home</Link>
-                            {breadcrumbs.map((bc, idx) => (
-                                <div key={idx} className="flex items-center space-x-2">
-                                    <span>›</span>
-                                    {idx < breadcrumbs.length - 1 ? (
-                                        <Link to={bc.to || '#'} className="hover:text-foreground truncate max-w-[10rem]">
-                                            {bc.label}
-                                        </Link>
-                                    ) : (
-                                        <span className="text-foreground truncate max-w-[10rem]">{bc.label}</span>
-                                    )}
-                                </div>
-                            ))}
-                        </nav>
+                        <Breadcrumb>
+                            <BreadcrumbList className="gap-1.5 sm:gap-2">
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
+                                        <Link to="/" className="truncate max-w-[6rem]">Home</Link>
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                {breadcrumbs.map((bc, idx) => (
+                                    <>
+                                    <BreadcrumbSeparator key={`sep-${idx}`} />
+                                    <BreadcrumbItem key={idx}>
+                                        {idx < breadcrumbs.length - 1 ? (
+                                            <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
+                                                <Link to={bc.to || '#'} className="truncate max-w-[10rem]">
+                                                    {bc.label}
+                                                </Link>
+                                            </BreadcrumbLink>
+                                        ) : (
+                                            <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
+                                        )}
+                                    </BreadcrumbItem>
+                                    </>
+                                ))}
+                            </BreadcrumbList>
+                        </Breadcrumb>
                     )}
                 </div>
-
-
 
                 {/* Right: Actions */}
                 <div className="flex items-center space-x-2">
                     {typeof currentWorkspaceId === 'number' && (
                         <button
-                            className="h-9 px-3 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
+                            className="h-9 w-9 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
                             onClick={() => setOpenCreateTask(true)}
                             title="Create Task"
                         >
-                            <Plus className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">New Task</span>
+                            <Plus className="h-5 w-5" />
                         </button>
                     )}
-                    <ModeToggle />
+                    <ModeToggle className="h-9 w-9" />
 
                     {/* Notifications */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent text-foreground relative">
                                 <Bell className="h-5 w-5" />
-                                <span className="absolute -top-1 -right-1 text-[10px] bg-primary text-primary-foreground rounded-full px-1">0</span>
+                                <span className="absolute bottom-0.5 left-0.5 bg-red-500 rounded-full w-2 h-2"></span>
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 p-2">
@@ -241,8 +280,8 @@ function Header() {
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center hover:opacity-80 transition-opacity">
-                                <Avatar className="h-8 w-8">
+                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:opacity-80 transition-opacity overflow-hidden">
+                                <Avatar className="h-9 w-9">
                                     {!imageError && imageUrl && !isLoading && (
                                         <AvatarImage 
                                             src={imageUrl} 
@@ -262,7 +301,7 @@ function Header() {
                                 console.log('Profile clicked');
                                 navigate('/profile');
                             }}>
-                                <User className="mr-2 h-4 w-4" />
+                                <User className="mr-2 h-3 w-3" />
                                 Profile
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -270,7 +309,7 @@ function Header() {
                                 console.log('Logout clicked');
                                 logout();
                             }}>
-                                <LogOut className="mr-2 h-4 w-4" />
+                                <LogOut className="mr-2 h-3 w-3" />
                                 Logout
                             </DropdownMenuItem>
                         </DropdownMenuContent>

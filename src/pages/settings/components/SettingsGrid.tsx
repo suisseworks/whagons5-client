@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
@@ -24,7 +24,7 @@ export function SettingsGrid<T = any>({
   rowData,
   columnDefs,
   onGridReady,
-  height = "400px",
+  height = "100%",
   className = "",
   noRowsMessage = "No data found",
   defaultColDef = {
@@ -45,6 +45,7 @@ export function SettingsGrid<T = any>({
     }
     onGridReady?.(params);
   }, [onGridReady]);
+
 
   // Handle window resize
   useEffect(() => {

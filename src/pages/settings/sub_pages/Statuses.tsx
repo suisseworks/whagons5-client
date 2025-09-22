@@ -18,6 +18,10 @@ import { faSitemap } from "@fortawesome/free-solid-svg-icons";
 import { StatusIcon } from "@/pages/settings/components/StatusIcon";
 import { VisualTransitions } from "@/pages/settings/components/VisualTransitions";
 import { getCurrentTenant } from "@/api/whagonsApi";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 function Statuses() {
   
@@ -36,6 +40,12 @@ function Statuses() {
   
   const [transitionsView, setTransitionsView] = useState<'matrix' | 'visual'>('visual');
   const tenant = getCurrentTenant();
+
+  // Dialog state for create/rename group (shadcn)
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [groupDialogMode, setGroupDialogMode] = useState<'create' | 'rename'>('create');
+  const [groupDialogName, setGroupDialogName] = useState<string>("");
+  const [deleteGroupOpen, setDeleteGroupOpen] = useState(false);
 
   // Dialog state
   const [createOpen, setCreateOpen] = useState(false);
@@ -211,6 +221,12 @@ function Statuses() {
     return set;
   }, [statusTransitions, selectedGroupId]);
 
+  // Selected group helper
+  const selectedGroup = useMemo(() => {
+    if (!selectedGroupId) return null;
+    return statusTransitionGroups.find((g: any) => Number(g.id) === Number(selectedGroupId)) || null;
+  }, [statusTransitionGroups, selectedGroupId]);
+
   // Filtered statuses for grid based on search query
   const filteredStatuses = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -242,24 +258,19 @@ function Statuses() {
     }
   };
 
-  const handleCreateGroup = () => {
-    const name = window.prompt('New group name');
-    if (!name) return;
-    dispatch(genericActions.statusTransitionGroups.addAsync({ name, description: '', is_default: false, is_active: true } as any));
+  const handleCreateGroup = (name: string) => {
+    if (!name.trim()) return;
+    dispatch(genericActions.statusTransitionGroups.addAsync({ name: name.trim(), description: '', is_default: false, is_active: true } as any));
   };
 
-  const handleRenameGroup = () => {
+  const handleRenameGroup = (name: string) => {
     if (!selectedGroupId) return;
-    const current = statusTransitionGroups.find((g: any) => g.id === selectedGroupId);
-    const name = window.prompt('Rename group', current?.name || '');
-    if (!name) return;
-    dispatch(genericActions.statusTransitionGroups.updateAsync({ id: selectedGroupId, updates: { name } }));
+    if (!name.trim()) return;
+    dispatch(genericActions.statusTransitionGroups.updateAsync({ id: selectedGroupId, updates: { name: name.trim() } }));
   };
 
   const handleDeleteGroup = () => {
     if (!selectedGroupId) return;
-    const ok = window.confirm('Delete this group and its transitions?');
-    if (!ok) return;
     dispatch(genericActions.statusTransitionGroups.removeAsync(selectedGroupId));
     setSelectedGroupId(null);
   };
@@ -271,12 +282,13 @@ function Statuses() {
       icon={faSitemap}
       iconColor="#f59e0b"
       backPath="/settings"
+      wrapChildrenFullHeight={activeTab === 'transitions'}
       search={{
         placeholder: "Search statuses...",
         value: searchQuery,
         onChange: setSearchQuery
       }}
-      statistics={{
+      statistics={activeTab === 'statuses' ? {
         title: "Status Overview",
         description: "Quick glance at your workflow setup",
         items: [
@@ -285,7 +297,7 @@ function Statuses() {
           { label: 'Transition Groups', value: statusTransitionGroups.length },
           { label: selectedGroupId ? 'Transitions (Selected Group)' : 'Transitions (All)', value: selectedGroupId ? transitionsByKey.size : statusTransitions.length }
         ]
-      }}
+      } : undefined}
       headerActions={
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => {
@@ -304,7 +316,7 @@ function Statuses() {
         </div>
       }
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
         <TabsList>
           <TabsTrigger value="statuses">Statuses</TabsTrigger>
           <TabsTrigger value="transitions">Transitions</TabsTrigger>
@@ -330,239 +342,275 @@ function Statuses() {
               setEditOpen(true);
             }}
           />
-
-          {/* Create Dialog */}
-          <SettingsDialog
-            open={createOpen}
-            onOpenChange={setCreateOpen}
-            type="create"
-            title="Create Status"
-            isSubmitting={isCreating}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!formName.trim()) { setFormError('Name is required'); return; }
-              setFormError(null);
-
-              (async () => {
-                try {
-                  setIsCreating(true);
-                  // Enforce single initial
-                  if (formInitial) {
-                    const currentInitial = statuses.find((s: any) => s.initial === true);
-                    if (currentInitial) {
-                      await dispatch(genericActions.statuses.updateAsync({ id: currentInitial.id, updates: { initial: false } }));
-                    }
-                  }
-
-                  const normalizedAction = (formAction || 'NONE').toUpperCase();
-                  if (!allowedActions.includes(normalizedAction as any)) { setFormError('Invalid action'); return; }
-                  const payload: any = {
-                    name: formName.trim(),
-                    action: normalizedAction,
-                    color: formColor,
-                    icon: formIcon,
-                    system: !!formSystem,
-                    initial: !!formInitial
-                  };
-                  const result: any = await dispatch(genericActions.statuses.addAsync(payload));
-                  if (result?.meta?.requestStatus === 'rejected') {
-                    setFormError(result?.payload || result?.error?.message || 'Failed to create');
-                    return;
-                  }
-                  setCreateOpen(false);
-                } finally {
-                  setIsCreating(false);
-                }
-              })();
-            }}
-            error={formError}
-          >
-            <TextField label="Name" value={formName} onChange={setFormName} required />
-            <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-            <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
-            <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
-            <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
-            <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
-          </SettingsDialog>
-
-          {/* Edit Dialog */}
-          <SettingsDialog
-            open={editOpen}
-            onOpenChange={setEditOpen}
-            type="edit"
-            title="Edit Status"
-            isSubmitting={isUpdating}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!selectedStatus) return;
-              if (!formName.trim()) { setFormError('Name is required'); return; }
-              setFormError(null);
-
-              (async () => {
-                try {
-                  setIsUpdating(true);
-                  // Enforce single initial
-                  if (formInitial) {
-                    const othersInitial = statuses.find((s: any) => s.initial === true && s.id !== selectedStatus.id);
-                    if (othersInitial) {
-                      await dispatch(genericActions.statuses.updateAsync({ id: othersInitial.id, updates: { initial: false } }));
-                    }
-                  }
-
-                  const normalizedAction = (formAction || selectedStatus?.action || 'NONE').toUpperCase();
-                  if (!allowedActions.includes(normalizedAction as any)) { setFormError('Invalid action'); return; }
-                  const updates: any = {
-                    name: formName.trim(),
-                    action: normalizedAction,
-                    color: formColor,
-                    icon: formIcon,
-                    system: !!formSystem,
-                    initial: !!formInitial
-                  };
-                  const result: any = await dispatch(genericActions.statuses.updateAsync({ id: selectedStatus.id, updates }));
-                  if (result?.meta?.requestStatus === 'rejected') {
-                    setFormError(result?.payload || result?.error?.message || 'Failed to update');
-                    return;
-                  }
-                  setEditOpen(false);
-                } finally {
-                  setIsUpdating(false);
-                }
-              })();
-            }}
-            error={formError}
-          >
-            <TextField label="Name" value={formName} onChange={setFormName} required />
-            <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-            <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
-            <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
-            <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
-            <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
-          </SettingsDialog>
-
-          {/* Delete Dialog */}
-          <SettingsDialog
-            open={deleteOpen}
-            onOpenChange={setDeleteOpen}
-            type="delete"
-            title="Delete Status"
-            entityName="status"
-            entityData={selectedStatus}
-            renderEntityPreview={(s: any) => (
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{s?.name}</div>
-                <span className="text-xs text-muted-foreground">{s?.action}</span>
-              </div>
-            )}
-            onConfirm={async () => {
-              if (!selectedStatus) return;
-              if (selectedStatus.system) { setFormError('System statuses cannot be deleted'); return; }
-              try {
-                setIsDeleting(true);
-                await dispatch(genericActions.statuses.removeAsync(selectedStatus.id));
-                setDeleteOpen(false);
-                setSelectedStatus(null);
-              } finally {
-                setIsDeleting(false);
-              }
-            }}
-          />
-        {/* toast removed */}
         </TabsContent>
 
-        <TabsContent value="transitions" className="space-y-4">
+        <TabsContent value="transitions" className="space-y-4 flex-1 min-h-0 flex flex-col">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-xl font-semibold mr-2">Transitions</h2>
-            <select
-              className="border rounded-md px-2 py-1 bg-background"
-              value={selectedGroupId ?? ''}
-              onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="" disabled>Select group…</option>
-              {statusTransitionGroups.map((g: any) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-            <Button size="sm" variant="secondary" onClick={handleCreateGroup}>New Group</Button>
-            <Button size="sm" variant="secondary" onClick={handleRenameGroup} disabled={!selectedGroupId}>Rename</Button>
-            <Button size="sm" variant="destructive" onClick={handleDeleteGroup} disabled={!selectedGroupId}>Delete</Button>
-            <div className="ml-auto flex items-center gap-2">
-              <Button
-                size="sm"
-                variant={transitionsView === 'visual' ? 'default' : 'outline'}
-                onClick={() => setTransitionsView('visual')}
-              >
-                Visual
-              </Button>
-              <Button
-                size="sm"
-                variant={transitionsView === 'matrix' ? 'default' : 'outline'}
-                onClick={() => setTransitionsView('matrix')}
-              >
-                Matrix
-              </Button>
+            <Select value={selectedGroupId ? String(selectedGroupId) : ''} onValueChange={(v) => setSelectedGroupId(v ? Number(v) : null)}>
+              <SelectTrigger size="sm" className="min-w-[180px]"><SelectValue placeholder="Select group…" /></SelectTrigger>
+              <SelectContent position="popper">
+                {statusTransitionGroups.map((g: any) => (
+                  <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen} modal={false}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="secondary" onClick={() => { setGroupDialogMode('create'); setGroupDialogName(''); }}>New Group</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{groupDialogMode === 'create' ? 'New Group' : 'Rename Group'}</DialogTitle>
+                </DialogHeader>
+                <DialogDescription>
+                  {groupDialogMode === 'create' ? 'Create a new status transition group.' : 'Rename the selected status transition group.'}
+                </DialogDescription>
+                <Input placeholder="Group name" value={groupDialogName} onChange={(e) => setGroupDialogName(e.target.value)} />
+                <DialogFooter>
+                  <Button onClick={() => setGroupDialogOpen(false)} variant="outline" size="sm">Cancel</Button>
+                  <Button size="sm" onClick={() => {
+                    if (groupDialogMode === 'create') handleCreateGroup(groupDialogName); else handleRenameGroup(groupDialogName);
+                    setGroupDialogOpen(false);
+                  }}>Save</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Button size="sm" variant="secondary" disabled={!selectedGroupId} onClick={() => {
+              const current = statusTransitionGroups.find((g: any) => g.id === selectedGroupId);
+              setGroupDialogMode('rename');
+              setGroupDialogName(current?.name || '');
+              setGroupDialogOpen(true);
+            }}>Rename</Button>
+            <Button size="sm" variant="destructive" onClick={() => setDeleteGroupOpen(true)} disabled={!selectedGroupId}>Delete</Button>
+
+            <Dialog open={deleteGroupOpen} onOpenChange={setDeleteGroupOpen} modal={false}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Group</DialogTitle>
+                </DialogHeader>
+                <DialogDescription>
+                  Deleting a group removes all transitions in it. This cannot be undone.
+                </DialogDescription>
+                <div className="space-y-2">
+                  <p>Are you sure you want to delete "{selectedGroup?.name}"?</p>
+                  <p className="text-sm text-muted-foreground">This will remove all transitions in this group. This action cannot be undone.</p>
+                </div>
+                <DialogFooter>
+                  <Button onClick={() => setDeleteGroupOpen(false)} variant="outline" size="sm">Cancel</Button>
+                  <Button size="sm" variant="destructive" onClick={() => { handleDeleteGroup(); setDeleteGroupOpen(false); }}>Delete</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Right-aligned view toggle tabs */}
+            <div className="ml-auto">
+              <Tabs value={transitionsView} onValueChange={(v: any) => setTransitionsView(v)}>
+                <TabsList>
+                  <TabsTrigger value="visual">Visual</TabsTrigger>
+                  <TabsTrigger value="matrix">Matrix</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
       </div>
+
           {transitionsView === 'matrix' ? (
-            <div className="overflow-auto">
-              <table className="min-w-max border-collapse">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 z-10 bg-background border p-2 text-left">From \\ To</th>
-                    {statuses.map((to: any) => (
-                      <th key={`to-${to.id}`} className="border p-2 whitespace-nowrap text-left">{to.name}</th>
+            <div className="flex-1 min-h-0 overflow-auto">
+              <div className="border rounded-lg bg-card shadow-sm">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b-2 bg-muted/50">
+                      <TableHead className="sticky left-0 z-10 bg-muted/50 border-r-2 font-semibold text-foreground min-w-[120px]">From \\ To</TableHead>
+                      {statuses.map((to: any) => (
+                        <TableHead key={`to-${to.id}`} className="whitespace-nowrap min-w-[100px] text-center font-semibold border-r last:border-r-0">
+                          <div className="flex flex-col items-center space-y-1">
+                            <StatusIcon icon={to.icon || 'fas fa-circle'} color={to.color || '#6B7280'} />
+                            <span className="text-xs font-medium">{to.name}</span>
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {statuses.map((from: any, rowIndex: number) => (
+                      <TableRow key={`from-${from.id}`} className={rowIndex % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                        <TableCell className="sticky left-0 z-10 bg-background border-r-2 font-medium whitespace-nowrap min-w-[120px] p-3">
+                          <div className="flex items-center space-x-2">
+                            <StatusIcon icon={from.icon || 'fas fa-circle'} color={from.color || '#6B7280'} />
+                            <span>{from.name}</span>
+                          </div>
+                        </TableCell>
+                        {statuses.map((to: any) => {
+                          const key = `${from.id}->${to.id}`;
+                          const checked = transitionsByKey.has(key);
+                          const disabled = from.id === to.id;
+                          return (
+                            <TableCell key={`cell-${from.id}-${to.id}`} className="text-center border-r last:border-r-0 p-2">
+                              <Checkbox
+                                disabled={disabled || !selectedGroupId}
+                                checked={checked}
+                                onCheckedChange={() => toggleTransition(from.id, to.id)}
+                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              />
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {statuses.map((from: any) => (
-                    <tr key={`from-${from.id}`}> 
-                      <td className="sticky left-0 z-10 bg-background border p-2 font-medium whitespace-nowrap">{from.name}</td>
-                      {statuses.map((to: any) => {
-                        const key = `${from.id}->${to.id}`;
-                        const checked = transitionsByKey.has(key);
-                        const disabled = from.id === to.id; // same-state transition off
-                        return (
-                          <td key={`cell-${from.id}-${to.id}`} className="border p-2 text-center">
-                            <Checkbox
-                              disabled={disabled || !selectedGroupId}
-                              checked={checked}
-                              onCheckedChange={() => toggleTransition(from.id, to.id)}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-    </div>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           ) : (
-            <div
-              className="rounded-md border p-4 overflow-auto"
-              style={{
-                // Subtle checkerboard background
-                backgroundColor: 'transparent',
-                backgroundImage:
-                  'linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%), ' +
-                  'linear-gradient(-45deg, rgba(0,0,0,0.05) 25%, transparent 25%), ' +
-                  'linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.05) 75%), ' +
-                  'linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.05) 75%)',
-                backgroundSize: '20px 20px',
-                backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-                minHeight: '520px'
-              }}
-            >
-              <VisualTransitions
-                statuses={statuses}
-                transitions={statusTransitions.filter((t: any) => selectedGroupId ? t.status_transition_group_id === selectedGroupId : true)}
-                onToggle={toggleTransition}
-                selectedGroupId={selectedGroupId}
-              />
+            <div className="flex-1 min-h-0 rounded-md overflow-hidden" style={{ minHeight: '520px' }}>
+              <div className="h-full w-full overflow-auto">
+                <VisualTransitions
+                  embedded
+                  statuses={statuses}
+                  transitions={statusTransitions.filter((t: any) => selectedGroupId ? t.status_transition_group_id === selectedGroupId : true)}
+                  onToggle={toggleTransition}
+                  selectedGroupId={selectedGroupId}
+                />
+              </div>
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Global dialogs (available on any tab) */}
+      <SettingsDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        type="create"
+        title="Create Status"
+        isSubmitting={isCreating}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!formName.trim()) { setFormError('Name is required'); return; }
+          setFormError(null);
+
+          (async () => {
+            try {
+              setIsCreating(true);
+              if (formInitial) {
+                const currentInitial = statuses.find((s: any) => s.initial === true);
+                if (currentInitial) {
+                  await dispatch(genericActions.statuses.updateAsync({ id: currentInitial.id, updates: { initial: false } }));
+                }
+              }
+
+              const normalizedAction = (formAction || 'NONE').toUpperCase();
+              if (!allowedActions.includes(normalizedAction as any)) { setFormError('Invalid action'); return; }
+              const payload: any = {
+                name: formName.trim(),
+                action: normalizedAction,
+                color: formColor,
+                icon: formIcon,
+                system: !!formSystem,
+                initial: !!formInitial
+              };
+              const result: any = await dispatch(genericActions.statuses.addAsync(payload));
+              if (result?.meta?.requestStatus === 'rejected') {
+                setFormError(result?.payload || result?.error?.message || 'Failed to create');
+                return;
+              }
+              setCreateOpen(false);
+            } finally {
+              setIsCreating(false);
+            }
+          })();
+        }}
+        error={formError}
+      >
+        <TextField label="Name" value={formName} onChange={setFormName} required />
+        <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+        <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
+        <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
+        <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
+        <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
+      </SettingsDialog>
+
+      <SettingsDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        type="edit"
+        title="Edit Status"
+        isSubmitting={isUpdating}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!selectedStatus) return;
+          if (!formName.trim()) { setFormError('Name is required'); return; }
+          setFormError(null);
+
+          (async () => {
+            try {
+              setIsUpdating(true);
+              if (formInitial) {
+                const othersInitial = statuses.find((s: any) => s.initial === true && s.id !== selectedStatus.id);
+                if (othersInitial) {
+                  await dispatch(genericActions.statuses.updateAsync({ id: othersInitial.id, updates: { initial: false } }));
+                }
+              }
+
+              const normalizedAction = (formAction || selectedStatus?.action || 'NONE').toUpperCase();
+              if (!allowedActions.includes(normalizedAction as any)) { setFormError('Invalid action'); return; }
+              const updates: any = {
+                name: formName.trim(),
+                action: normalizedAction,
+                color: formColor,
+                icon: formIcon,
+                system: !!formSystem,
+                initial: !!formInitial
+              };
+              const result: any = await dispatch(genericActions.statuses.updateAsync({ id: selectedStatus.id, updates }));
+              if (result?.meta?.requestStatus === 'rejected') {
+                setFormError(result?.payload || result?.error?.message || 'Failed to update');
+                return;
+              }
+              setEditOpen(false);
+            } finally {
+              setIsUpdating(false);
+            }
+          })();
+        }}
+        error={formError}
+      >
+        <TextField label="Name" value={formName} onChange={setFormName} required />
+        <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+        <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
+        <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
+        <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
+        <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
+      </SettingsDialog>
+
+      <SettingsDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        type="delete"
+        title="Delete Status"
+        entityName="status"
+        entityData={selectedStatus}
+        renderEntityPreview={(s: any) => (
+          <div className="flex items-center justify-between">
+            <div className="font-medium">{s?.name}</div>
+            <span className="text-xs text-muted-foreground">{s?.action}</span>
+          </div>
+        )}
+        onConfirm={async () => {
+          if (!selectedStatus) return;
+          if (selectedStatus.system) { setFormError('System statuses cannot be deleted'); return; }
+          try {
+            setIsDeleting(true);
+            await dispatch(genericActions.statuses.removeAsync(selectedStatus.id));
+            setDeleteOpen(false);
+            setSelectedStatus(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+      />
     </SettingsLayout>
   );
 }

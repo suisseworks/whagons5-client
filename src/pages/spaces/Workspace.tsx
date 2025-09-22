@@ -62,34 +62,24 @@ export const Workspace = () => {
 
   return (
     <Tabs defaultValue="grid" className="w-full h-full flex flex-col" onValueChange={setActiveTab} value={activeTab}>
-      <TabsList className="w-fit h-12 flex-shrink-0">
-        <TabsTrigger value="grid" className="flex items-center gap-2">
-          <ClipboardList />
-          Tasks
-        </TabsTrigger>
-        <TabsTrigger value="list" className="flex items-center gap-2">
-          <Settings />
-          Settings
-        </TabsTrigger>
-      </TabsList>
-      <div className="flex items-center gap-3 mb-3">
+      {/* Header row with search bar on left and tabs on right */}
+      <div className="flex items-center justify-between gap-4 mb-4">
         <Input
           placeholder="Search tasks..."
           className="max-w-sm"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        {/* Mobile FAB substitute: visible on small screens */}
-        {!isAllWorkspaces && !isNaN(Number(id)) && (
-          <button
-            className="ml-auto sm:hidden inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground"
-            onClick={() => setOpenCreateTask(true)}
-            title="Create Task"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New
-          </button>
-        )}
+        <TabsList className="h-12 flex-shrink-0">
+          <TabsTrigger value="grid" className="flex items-center gap-2">
+            <ClipboardList />
+            Tasks
+          </TabsTrigger>
+          <TabsTrigger value="list" className="flex items-center gap-2">
+            <Settings />
+            Settings
+          </TabsTrigger>
+        </TabsList>
       </div>
 
       <TabsContent

@@ -74,6 +74,29 @@ const DialogContent = React.forwardRef<
     return () => observer.disconnect()
   }, [])
 
+  // Ensure the app root never remains hidden/inert after dialogs open/close
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return
+    const root = document.getElementById('root') as HTMLElement | null
+    if (!root) return
+    const ensureRootVisible = () => {
+      if (root.hasAttribute('aria-hidden')) root.removeAttribute('aria-hidden')
+      if ((root as any).dataset && (root as any).dataset.ariaHidden) {
+        delete (root as any).dataset.ariaHidden
+      }
+      try {
+        ;(root as any).inert = false
+      } catch {}
+    }
+    ensureRootVisible()
+    const obs = new MutationObserver(() => ensureRootVisible())
+    obs.observe(root, { attributes: true, attributeFilter: ['aria-hidden', 'data-aria-hidden', 'inert'] })
+    return () => {
+      ensureRootVisible()
+      obs.disconnect()
+    }
+  }, [])
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />

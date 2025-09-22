@@ -1,16 +1,19 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTenant } from "@/api/whagonsApi";
+import { useTheme } from "@/providers/ThemeProvider";
 
 export const VisualTransitions = memo(function VisualTransitions({
   statuses,
   transitions,
   onToggle,
-  selectedGroupId
+  selectedGroupId,
+  embedded = false
 }: {
   statuses: any[];
   transitions: any[];
   onToggle: (fromId: number, toId: number) => void;
   selectedGroupId: number | null;
+  embedded?: boolean;
 }) {
   const nodeWidth = 160;
   const nodeHeight = 70;
@@ -121,18 +124,26 @@ export const VisualTransitions = memo(function VisualTransitions({
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
 
-  const patternColor = 'hsl(var(--foreground) / 0.04)';
+  // Use theme detection for proper checkerboard colors
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Different colors for light and dark modes
   const checkerBackgroundStyle = {
-    backgroundImage: `linear-gradient(45deg, ${patternColor} 25%, transparent 25%, transparent 75%, ${patternColor} 75%, ${patternColor}), linear-gradient(45deg, ${patternColor} 25%, transparent 25%, transparent 75%, ${patternColor} 75%, ${patternColor})`,
+    backgroundColor: isDarkMode ? '#1f2937' : '#fafafa',
+    backgroundImage: `
+      linear-gradient(45deg, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 25%, transparent 25%, transparent 75%, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 75%),
+      linear-gradient(45deg, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 25%, transparent 25%, transparent 75%, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 75%)
+    `,
     backgroundPosition: '0 0, 10px 10px',
     backgroundSize: '20px 20px'
   } as const;
 
   return (
-    <div className="border rounded-md p-4 overflow-auto" style={{ minHeight: 320 }}>
+    <div className={embedded ? "h-full w-full" : "border rounded-md p-5 overflow-auto"} style={embedded ? { ...checkerBackgroundStyle } : { minHeight: 320, ...checkerBackgroundStyle }}>
       <div
         className="relative"
-        style={{ width, height, ...checkerBackgroundStyle }}
+        style={embedded ? { width: `max(100%, ${width}px)`, height: `${height}px`, ...checkerBackgroundStyle } : { width, height, ...checkerBackgroundStyle }}
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={stopDrag}
@@ -308,7 +319,6 @@ export const VisualTransitions = memo(function VisualTransitions({
           </div>
         ))}
       </div>
-      <div className="text-xs text-muted-foreground mt-3">Tip: drag from one status to another to add a transition. Use the Matrix for bulk edits.</div>
     </div>
   );
 });

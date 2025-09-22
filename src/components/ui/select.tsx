@@ -59,7 +59,12 @@ function SelectContent({
     const nodes = Array.from(
       document.querySelectorAll<HTMLElement>("[data-slot='dialog-content']")
     )
-    return nodes.length ? nodes[nodes.length - 1] : undefined
+    // Prefer only visible, interactive dialog content containers
+    const visible = nodes.filter((n) => {
+      const ariaHidden = n.getAttribute('aria-hidden') === 'true' || (n as any).inert === true
+      return !ariaHidden && n.offsetParent !== null
+    })
+    return visible.length ? visible[visible.length - 1] : undefined
   }, [])
   return (
     <SelectPrimitive.Portal container={getNearestDialogContentContainer()}>

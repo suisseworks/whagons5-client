@@ -5,7 +5,6 @@ import { useSelector } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
  
-import { Separator } from "@/components/ui/separator";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faTags, 
@@ -287,19 +286,10 @@ function Settings() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="p-4 pt-0 space-y-4">
+      {/* Header (collapsed) */}
       <div className="space-y-2">
-        
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your application settings and configurations
-          </p>
-        </div>
       </div>
-
-      <Separator />
 
       {/* Settings Grid */}
       <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>

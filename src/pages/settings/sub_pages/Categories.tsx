@@ -427,14 +427,6 @@ function Categories() {
       description="Manage task categories and labels for better organization"
       icon={faTags}
       iconColor="#ef4444"
-      search={{
-        placeholder: "Search categories...",
-        value: searchQuery,
-        onChange: (value: string) => {
-          setSearchQuery(value);
-          handleSearch(value);
-        }
-      }}
       loading={{
         isLoading: loading,
         message: "Loading categories..."
@@ -475,6 +467,20 @@ function Categories() {
         rowSelection="single"
         onRowDoubleClicked={(row: any) => handleEdit(row)}
       />
+
+      {/* Search Input - Original Location */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search categories..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            handleSearch(e.target.value);
+          }}
+          className="w-full max-w-md px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+        />
+      </div>
 
       {/* Create Category Dialog */}
       <SettingsDialog

@@ -234,14 +234,6 @@ function Teams() {
       description="Organize and manage work teams for collaboration"
       icon={faUsers}
       iconColor="#8b5cf6"
-      search={{
-        placeholder: "Search teams...",
-        value: searchQuery,
-        onChange: (value: string) => {
-          setSearchQuery(value);
-          handleSearch(value);
-        }
-      }}
       loading={{
         isLoading: loading,
         message: "Loading teams..."

@@ -1,12 +1,9 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 export interface StatisticItem {
   label: string;
@@ -19,15 +16,13 @@ export interface SettingsLayoutProps {
   icon: IconDefinition;
   iconColor?: string;
   backPath?: string;
-  breadcrumbs?: Array<{ label: string; path?: string }>;
-  children: React.ReactNode;
-  headerActions?: React.ReactNode;
-  // Enhanced features
   search?: {
     placeholder?: string;
     value: string;
     onChange: (value: string) => void;
   };
+  children: React.ReactNode;
+  headerActions?: React.ReactNode;
   loading?: {
     isLoading: boolean;
     message?: string;
@@ -47,6 +42,8 @@ export interface SettingsLayoutProps {
   // Additional content sections
   beforeContent?: React.ReactNode;
   afterContent?: React.ReactNode;
+  // If true (default), children are wrapped to fill available height; when false, children size naturally
+  wrapChildrenFullHeight?: boolean;
 }
 
 export function SettingsLayout({
@@ -54,67 +51,41 @@ export function SettingsLayout({
   description,
   icon,
   iconColor,
-  backPath = '/settings',
-  breadcrumbs,
   children,
   headerActions,
-  search,
   loading,
   error,
   statistics,
   showGrid = false,
   gridComponent,
   beforeContent,
-  afterContent
+  afterContent,
+  wrapChildrenFullHeight = true
 }: SettingsLayoutProps) {
-  const navigate = useNavigate();
-
-  const handleBackClick = () => {
-    navigate(backPath);
-  };
 
   return (
-    <div className="p-6 space-y-6 bg-background min-h-screen">
-      {/* Header */}
-      <div className="space-y-2 py-6 border-b border-border">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <button
-            onClick={handleBackClick}
-            className="flex items-center space-x-1 hover:text-foreground hover:underline transition-colors cursor-pointer"
-          >
-            <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
-            <span>Settings</span>
-          </button>
-          {breadcrumbs && breadcrumbs.map((crumb, index) => (
-            <React.Fragment key={index}>
-              <span>{'>'}</span>
-              {crumb.path ? (
-                <button
-                  onClick={() => navigate(crumb.path!)}
-                  className="hover:text-foreground hover:underline transition-colors cursor-pointer"
-                >
-                  {crumb.label}
-                </button>
-              ) : (
-                <span>{crumb.label}</span>
-              )}
-            </React.Fragment>
-          ))}
-          <span>{'>'}</span>
-          <span className="text-foreground">{title}</span>
-        </nav>
+    <div className="h-full flex flex-col overflow-hidden space-y-3 bg-background">
+      {/* Title and Actions Row - No Breadcrumbs Here */}
+      <div className="py-2 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-3">
-              <FontAwesomeIcon 
-                icon={icon} 
-                className="text-2xl" 
-                style={iconColor ? { color: iconColor } : {}}
-              />
-              <h1 className="text-4xl font-extrabold tracking-tight">{title}</h1>
+          {/* Left: Title and Icon */}
+          <div className="flex items-center space-x-3">
+            <FontAwesomeIcon
+              icon={icon}
+              className="text-2xl"
+              style={iconColor ? { color: iconColor } : {}}
+            />
+            <div className="flex flex-col items-start">
+              <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+              {description && (
+                <p className="text-xs text-muted-foreground/70 leading-tight mt-0.5" title={description}>
+                  {description}
+                </p>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground/60 leading-relaxed">{description}</p>
           </div>
+
+          {/* Right: Actions */}
           <div className="flex items-center space-x-2">
             {headerActions && (
               <div>
@@ -126,21 +97,9 @@ export function SettingsLayout({
       </div>
 
       {/* Content */}
-      <div className="space-y-6">
+      <div className={`flex-1 min-h-0 flex flex-col ${wrapChildrenFullHeight ? 'overflow-hidden' : 'overflow-auto'} space-y-3`}>
         {beforeContent}
-        
-        {/* Search bar - always below header when provided */}
-        {search && !loading?.isLoading && !error && (
-          <div className="space-y-4">
-            <Input
-              placeholder={search.placeholder || "Search..."}
-              value={search.value}
-              onChange={(e) => search.onChange(e.target.value)}
-              className="w-full max-w-md"
-            />
-          </div>
-        )}
-        
+
         {loading?.isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex items-center space-x-2">
@@ -159,12 +118,22 @@ export function SettingsLayout({
           </div>
         ) : (
           <>
-            {showGrid && gridComponent && (
-              <div className="space-y-4">
-                {gridComponent}
-              </div>
-            )}
-            {children}
+            {/* Grid/content zone */}
+            <div className={`flex-1 min-h-0 ${wrapChildrenFullHeight ? 'overflow-hidden' : 'overflow-auto'}`}>
+              {showGrid && gridComponent ? (
+                <div className="h-full">
+                  {gridComponent}
+                </div>
+              ) : wrapChildrenFullHeight ? (
+                <div className="h-full">
+                  {children}
+                </div>
+              ) : (
+                <div className="">
+                  {children}
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -172,18 +141,17 @@ export function SettingsLayout({
 
         {statistics && !loading?.isLoading && !error && (
           <>
-            <Separator />
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">{statistics.title}</CardTitle>
+            <Card className="flex-shrink-0">
+              <CardHeader className="py-1">
+                <CardTitle className="text-sm">{statistics.title}</CardTitle>
                 {statistics.description && (
-                  <CardDescription className="text-muted-foreground/70">
+                  <CardDescription className="text-[11px] text-muted-foreground/70">
                     {statistics.description}
                   </CardDescription>
                 )}
               </CardHeader>
-              <CardContent>
-                <div className={`grid grid-cols-1 gap-4 ${
+              <CardContent className="py-2">
+                <div className={`grid grid-cols-1 gap-2 ${
                   statistics.items.length <= 3 
                     ? 'md:grid-cols-3' 
                     : statistics.items.length === 4 
@@ -192,8 +160,8 @@ export function SettingsLayout({
                 }`}>
                   {statistics.items.map((item, index) => (
                     <div key={index} className="text-center">
-                      <div className="text-2xl font-bold">{item.value}</div>
-                      <div className="text-sm text-muted-foreground">{item.label}</div>
+                      <div className="text-base font-semibold leading-none">{item.value}</div>
+                      <div className="text-[11px] text-muted-foreground mt-1">{item.label}</div>
                     </div>
                   ))}
                 </div>
