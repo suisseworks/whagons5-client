@@ -1,4 +1,4 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { useState, useCallback, useEffect } from "react";
 import { Users, Eye, Filter } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";

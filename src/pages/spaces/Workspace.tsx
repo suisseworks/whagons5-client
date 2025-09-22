@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useMatch, useLocation } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { ClipboardList, Settings, Plus } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';

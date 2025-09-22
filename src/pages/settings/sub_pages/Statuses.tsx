@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SettingsGrid } from "@/pages/settings/components/SettingsGrid";

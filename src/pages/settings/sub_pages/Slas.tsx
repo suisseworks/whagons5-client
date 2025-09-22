@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faStopwatch, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
 import {
   SettingsLayout,
   SettingsGrid,

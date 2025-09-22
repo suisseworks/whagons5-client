@@ -8,7 +8,7 @@ import { Form, FormVersion } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
