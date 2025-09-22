@@ -8,15 +8,14 @@ import { RootState } from "@/store/store";
 import { Team, Category, Task } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  ColorIndicatorCellRenderer
+  ColorIndicatorCellRenderer,
+  TextField
 } from "../components";
 
 // Custom cell renderer for team name with color indicator
@@ -255,35 +254,26 @@ function Teams() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <Input
-              id="name"
-              name="name"
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">Description</Label>
-            <Input
-              id="description"
-              name="description"
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="color" className="text-right">Color</Label>
-            <div className="col-span-3">
-              <input
-                id="color"
-                name="color"
-                type="color"
-                defaultValue="#4ECDC4"
-                className="h-9 w-16 p-0 border rounded"
-              />
-            </div>
-          </div>
+          <TextField
+            id="name"
+            label="Name"
+            value=""
+            onChange={() => {}}
+            required
+          />
+          <TextField
+            id="description"
+            label="Description"
+            value=""
+            onChange={() => {}}
+          />
+          <TextField
+            id="color"
+            label="Color"
+            type="color"
+            value="#4ECDC4"
+            onChange={() => {}}
+          />
         </div>
       </SettingsDialog>
 
@@ -301,37 +291,26 @@ function Teams() {
       >
         {editingTeam && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <Input
-                id="edit-name"
-                name="name"
-                defaultValue={editingTeam.name}
-                className="col-span-3"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">Description</Label>
-              <Input
-                id="edit-description"
-                name="description"
-                defaultValue={editingTeam.description || ''}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <div className="col-span-3">
-                <input
-                  id="edit-color"
-                  name="color"
-                  type="color"
-                  defaultValue={editingTeam.color || '#4ECDC4'}
-                  className="h-9 w-16 p-0 border rounded"
-                />
-              </div>
-            </div>
+            <TextField
+              id="edit-name"
+              label="Name"
+              value={editingTeam.name}
+              onChange={() => {}}
+              required
+            />
+            <TextField
+              id="edit-description"
+              label="Description"
+              value={editingTeam.description || ''}
+              onChange={() => {}}
+            />
+            <TextField
+              id="edit-color"
+              label="Color"
+              type="color"
+              value={editingTeam.color || '#4ECDC4'}
+              onChange={() => {}}
+            />
           </div>
         )}
       </SettingsDialog>

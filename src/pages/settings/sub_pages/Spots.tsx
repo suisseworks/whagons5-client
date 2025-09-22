@@ -9,14 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer
+  createActionsCellRenderer,
+  TextField,
+  CheckboxField
 } from "../components";
 
 // Custom cell renderer for spot name with type indicator
@@ -226,43 +226,36 @@ function Spots() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <Input id="name" name="name" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="spot_type_id" className="text-right">Spot Type</Label>
-            <Input 
-              id="spot_type_id" 
-              name="spot_type_id"
-              type="number" 
-              defaultValue="1"
-              className="col-span-3" 
-              min="1" 
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="parent_id" className="text-right">Parent ID</Label>
-            <Input 
-              id="parent_id" 
-              name="parent_id"
-              type="number" 
-              className="col-span-3" 
-              placeholder="Leave empty for root" 
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_branch" className="text-right">Is Branch</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input 
-                id="is_branch" 
-                name="is_branch"
-                type="checkbox" 
-                className="rounded" 
-              />
-              <Label htmlFor="is_branch" className="text-sm">This is a branch location</Label>
-            </div>
-          </div>
+          <TextField
+            id="name"
+            name="name"
+            label="Name"
+            defaultValue=""
+            required
+          />
+          <TextField
+            id="spot_type_id"
+            name="spot_type_id"
+            label="Spot Type"
+            type="number"
+            defaultValue="1"
+            min="1"
+          />
+          <TextField
+            id="parent_id"
+            name="parent_id"
+            label="Parent ID"
+            type="number"
+            defaultValue=""
+            placeholder="Leave empty for root"
+          />
+          <CheckboxField
+            id="is_branch"
+            name="is_branch"
+            label="Is Branch"
+            defaultChecked={false}
+            description="This is a branch location"
+          />
         </div>
       </SettingsDialog>
 
@@ -280,51 +273,36 @@ function Spots() {
       >
         {editingSpot && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <Input
-                id="edit-name"
-                name="name"
-                defaultValue={editingSpot.name}
-                className="col-span-3"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-spot_type_id" className="text-right">Spot Type</Label>
-              <Input
-                id="edit-spot_type_id"
-                name="spot_type_id"
-                type="number"
-                defaultValue={editingSpot.spot_type_id}
-                className="col-span-3"
-                min="1"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-parent_id" className="text-right">Parent ID</Label>
-              <Input
-                id="edit-parent_id"
-                name="parent_id"
-                type="number"
-                defaultValue={editingSpot.parent_id || ''}
-                className="col-span-3"
-                placeholder="Leave empty for root"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-is_branch" className="text-right">Is Branch</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input
-                  id="edit-is_branch"
-                  name="is_branch"
-                  type="checkbox"
-                  defaultChecked={editingSpot.is_branch}
-                  className="rounded"
-                />
-                <Label htmlFor="edit-is_branch" className="text-sm">This is a branch location</Label>
-              </div>
-            </div>
+            <TextField
+              id="edit-name"
+              name="name"
+              label="Name"
+              defaultValue={editingSpot.name}
+              required
+            />
+            <TextField
+              id="edit-spot_type_id"
+              name="spot_type_id"
+              label="Spot Type"
+              type="number"
+              defaultValue={editingSpot.spot_type_id.toString()}
+              min="1"
+            />
+            <TextField
+              id="edit-parent_id"
+              name="parent_id"
+              label="Parent ID"
+              type="number"
+              defaultValue={editingSpot.parent_id?.toString() || ""}
+              placeholder="Leave empty for root"
+            />
+            <CheckboxField
+              id="edit-is_branch"
+              name="is_branch"
+              label="Is Branch"
+              defaultChecked={editingSpot.is_branch}
+              description="This is a branch location"
+            />
           </div>
         )}
       </SettingsDialog>

@@ -6,14 +6,14 @@ import { faArrowUpWideShort, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  ColorIndicatorCellRenderer
+  ColorIndicatorCellRenderer,
+  TextField
 } from "../components";
 
 const PriorityNameCellRenderer = (props: ICellRendererParams) => {
@@ -173,18 +173,29 @@ function Priorities() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <input id="name" name="name" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="color" className="text-right">Color</Label>
-            <input id="color" name="color" type="color" defaultValue="#ef4444" className="col-span-3 h-9 w-16 p-0 border-0 bg-transparent" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="level" className="text-right">Level</Label>
-            <input id="level" name="level" type="number" min="0" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" placeholder="Optional numeric level" />
-          </div>
+          <TextField
+            id="name"
+            name="name"
+            label="Name"
+            defaultValue=""
+            required
+          />
+          <TextField
+            id="color"
+            name="color"
+            label="Color"
+            type="color"
+            defaultValue="#ef4444"
+          />
+          <TextField
+            id="level"
+            name="level"
+            label="Level"
+            type="number"
+            min="0"
+            defaultValue=""
+            placeholder="Optional numeric level"
+          />
         </div>
       </SettingsDialog>
 
@@ -202,18 +213,28 @@ function Priorities() {
       >
         {editingItem && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <input id="edit-name" name="name" defaultValue={editingItem.name} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <input id="edit-color" name="color" type="color" defaultValue={(editingItem.color as string) || "#ef4444"} className="col-span-3 h-9 w-16 p-0 border-0 bg-transparent" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-level" className="text-right">Level</Label>
-              <input id="edit-level" name="level" type="number" min="0" defaultValue={typeof editingItem.level === "number" ? editingItem.level : undefined} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
+            <TextField
+              id="edit-name"
+              name="name"
+              label="Name"
+              defaultValue={editingItem.name}
+              required
+            />
+            <TextField
+              id="edit-color"
+              name="color"
+              label="Color"
+              type="color"
+              defaultValue={(editingItem.color as string) || "#ef4444"}
+            />
+            <TextField
+              id="edit-level"
+              name="level"
+              label="Level"
+              type="number"
+              min="0"
+              defaultValue={typeof editingItem.level === "number" ? editingItem.level.toString() : ""}
+            />
           </div>
         )}
       </SettingsDialog>

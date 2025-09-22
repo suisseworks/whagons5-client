@@ -211,7 +211,7 @@ export function IconPicker({
       </div>
       
       {showDropdown && (
-        <div className="absolute top-full left-0 mt-2 w-96 bg-popover border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-96 bg-popover text-popover-foreground border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
           <div className="p-3">
             <Input
               placeholder="Search icons... (e.g., heart, user, star)"

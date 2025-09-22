@@ -22,6 +22,8 @@ import Slas from '@/pages/settings/sub_pages/Slas';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 import Messages from '@/pages/messages/Messages';
+import TestPage from '@/pages/Testpage';
+
 
 const pages = [
   { path: '/workspace/:id', component: <Workspace /> },
@@ -71,6 +73,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/statuses" element={<Statuses />} />
           <Route path="/settings/priorities" element={<Priorities />} />
           <Route path="/settings/slas" element={<Slas />} />
+          <Route path="/settings/test" element={<TestPage />} />
         </Routes>
       </MainLayout>
     </>

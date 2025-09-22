@@ -3,8 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { faUser } from "@fortawesome/free-solid-svg-icons";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
@@ -33,7 +31,10 @@ import {
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  AvatarCellRenderer
+  AvatarCellRenderer,
+  TextField,
+  SelectField,
+  CheckboxField
 } from "../components";
 
 function Users() {
@@ -323,48 +324,52 @@ function Users() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <Input id="name" name="name" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="email" className="text-right">Email *</Label>
-            <Input id="email" name="email" type="email" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="team_id" className="text-right">Team</Label>
-            <select
-              id="team_id"
-              name="team_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-            >
-              {teamsLoading && teams.length === 0 && (
-                <option value="" disabled>Loading…</option>
-              )}
-              <option value="">No Team</option>
-              {teams.map((team: Team) => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="organization_name" className="text-right">Organization</Label>
-            <Input id="organization_name" name="organization_name" className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_admin" className="text-right">Admin</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input type="checkbox" id="is_admin" name="is_admin" className="rounded" />
-              <Label htmlFor="is_admin" className="text-sm">Grant admin role</Label>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="has_active_subscription" className="text-right">Subscription</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input type="checkbox" id="has_active_subscription" name="has_active_subscription" className="rounded" />
-              <Label htmlFor="has_active_subscription" className="text-sm">Active subscription</Label>
-            </div>
-          </div>
+          <TextField
+            id="name"
+            name="name"
+            label="Name"
+            defaultValue=""
+            required
+          />
+          <TextField
+            id="email"
+            name="email"
+            label="Email"
+            type="email"
+            defaultValue=""
+            required
+          />
+          <SelectField
+            id="team_id"
+            name="team_id"
+            label="Team"
+            defaultValue=""
+            placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
+            options={teams.map((team: Team) => ({
+              value: team.id.toString(),
+              label: team.name
+            }))}
+          />
+          <TextField
+            id="organization_name"
+            name="organization_name"
+            label="Organization"
+            defaultValue=""
+          />
+          <CheckboxField
+            id="is_admin"
+            name="is_admin"
+            label="Admin"
+            defaultChecked={false}
+            description="Grant admin role"
+          />
+          <CheckboxField
+            id="has_active_subscription"
+            name="has_active_subscription"
+            label="Subscription"
+            defaultChecked={false}
+            description="Active subscription"
+          />
         </div>
       </SettingsDialog>
 
@@ -382,49 +387,52 @@ function Users() {
       >
         {editingUser && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <Input id="edit-name" name="name" defaultValue={editingUser.name} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-email" className="text-right">Email *</Label>
-              <Input id="edit-email" name="email" type="email" defaultValue={editingUser.email} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-team_id" className="text-right">Team</Label>
-              <select
-                id="edit-team_id"
-                name="team_id"
-                defaultValue={editingUser.team_id ?? ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                {teamsLoading && teams.length === 0 && (
-                  <option value="" disabled>Loading…</option>
-                )}
-                <option value="">No Team</option>
-                {teams.map((team: Team) => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-organization_name" className="text-right">Organization</Label>
-              <Input id="edit-organization_name" name="organization_name" defaultValue={editingUser.organization_name ?? ''} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-is_admin" className="text-right">Admin</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input type="checkbox" id="edit-is_admin" name="is_admin" defaultChecked={!!editingUser.is_admin} className="rounded" />
-                <Label htmlFor="edit-is_admin" className="text-sm">Grant admin role</Label>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-has_active_subscription" className="text-right">Subscription</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input type="checkbox" id="edit-has_active_subscription" name="has_active_subscription" defaultChecked={!!editingUser.has_active_subscription} className="rounded" />
-                <Label htmlFor="edit-has_active_subscription" className="text-sm">Active subscription</Label>
-              </div>
-            </div>
+            <TextField
+              id="edit-name"
+              name="name"
+              label="Name"
+              defaultValue={editingUser.name}
+              required
+            />
+            <TextField
+              id="edit-email"
+              name="email"
+              label="Email"
+              type="email"
+              defaultValue={editingUser.email}
+              required
+            />
+            <SelectField
+              id="edit-team_id"
+              name="team_id"
+              label="Team"
+              defaultValue={editingUser.team_id?.toString() || ''}
+              placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
+              options={teams.map((team: Team) => ({
+                value: team.id.toString(),
+                label: team.name
+              }))}
+            />
+            <TextField
+              id="edit-organization_name"
+              name="organization_name"
+              label="Organization"
+              defaultValue={editingUser.organization_name ?? ''}
+            />
+            <CheckboxField
+              id="edit-is_admin"
+              name="is_admin"
+              label="Admin"
+              defaultChecked={!!editingUser.is_admin}
+              description="Grant admin role"
+            />
+            <CheckboxField
+              id="edit-has_active_subscription"
+              name="has_active_subscription"
+              label="Subscription"
+              defaultChecked={!!editingUser.has_active_subscription}
+              description="Active subscription"
+            />
           </div>
         )}
       </SettingsDialog>

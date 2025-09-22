@@ -10,20 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer
+  createActionsCellRenderer,
+  SelectField,
+  CheckboxField
 } from "../components";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 // Custom cell renderer for template name with description (no icon)
 const TemplateNameCellRenderer = (props: ICellRendererParams) => {
@@ -133,11 +128,6 @@ function Templates() {
     return map;
   }, [spots]);
 
-  const userById = useMemo(() => {
-    const map = new Map<number, any>();
-    (users as any[]).forEach((u: any) => map.set(Number(u.id), u));
-    return map;
-  }, [users]);
 
   // Helper to map FontAwesome class to icon
   const mapIconClassToIcon = (iconClass?: string) => {
@@ -449,99 +439,41 @@ function Templates() {
             <Label htmlFor="description" className="text-right">Description</Label>
             <Input id="description" name="description" className="col-span-3" />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="category" className="text-right">Category *</Label>
-            <select
-              id="category"
-              name="category_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              required
-            >
-              <option value="">Select Category</option>
-              {categories.map((category: Category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="default_spot_id" className="text-right">Default Spot</Label>
-            <select
-              id="default_spot_id"
-              name="default_spot_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              defaultValue=""
-            >
-              <option value="">None</option>
-              {(spots as any[]).map((s: any) => (
-                <option key={s.id} value={String(s.id)}>{s.name}</option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            id="category"
+            label="Category"
+            value=""
+            onChange={() => {}}
+            placeholder="Select Category"
+            options={categories.map((category: Category) => ({
+              value: category.id.toString(),
+              label: category.name
+            }))}
+            required
+          />
+          <SelectField
+            id="default_spot_id"
+            label="Default Spot"
+            value=""
+            onChange={() => {}}
+            placeholder="None"
+            options={(spots as any[]).map((s: any) => ({
+              value: s.id.toString(),
+              label: s.name
+            }))}
+          />
           <div className="grid grid-cols-4 items-start gap-4">
             <Label className="text-right pt-2">Default Users</Label>
             <div className="col-span-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    {createUserIds.length ? (
-                      <div className="flex flex-wrap gap-1 items-center w-full">
-                        {createUserIds.map((id) => {
-                          const u: any = userById.get(id);
-                          const label = u?.name || u?.email || `User ${id}`;
-                          const initials = (u?.name || u?.email || 'U').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase();
-                          return (
-                            <span key={id} className="inline-flex items-center gap-1 rounded-md bg-secondary text-secondary-foreground px-2 py-1 text-xs">
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px]">
-                                {initials}
-                              </span>
-                              <span className="truncate max-w-[140px]">{label}</span>
-                              <button
-                                type="button"
-                                className="ml-1 text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setCreateUserIds((prev) => prev.filter((x) => x !== id));
-                                }}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Select users</span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[280px] max-h-64 overflow-auto">
-                  <DropdownMenuLabel>Select default users</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {(users as any[]).map((u: any) => {
-                    const checked = createUserIds.includes(u.id);
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={u.id}
-                        checked={checked}
-                        onCheckedChange={(v) => {
-                          setCreateUserIds((prev) =>
-                            v ? [...prev, u.id] : prev.filter((id) => id !== u.id)
-                          );
-                        }}
-                      >
-                        {u.name || u.email || `User ${u.id}`}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {/* Hidden inputs to submit as multi values */}
-              {createUserIds.map((id) => (
-                <input key={id} type="hidden" name="default_user_ids" value={String(id)} />
-              ))}
+              <MultiSelect
+                options={(users as any[]).map((u: any) => ({
+                  label: u.name || u.email || `User ${u.id}`,
+                  value: String(u.id)
+                }))}
+                onValueChange={(values: string[]) => setCreateUserIds(values.map((v: string) => Number(v)))}
+                defaultValue={createUserIds.map(id => String(id))}
+                placeholder="Select users"
+              />
             </div>
           </div>
           {/* Team removed per migration */}
@@ -587,19 +519,13 @@ function Templates() {
               placeholder="Enter detailed instructions for tasks created from this template..."
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="enabled" className="text-right">Status</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="enabled"
-                name="enabled"
-                defaultChecked
-                className="rounded"
-              />
-              <Label htmlFor="enabled" className="text-sm">Enabled</Label>
-            </div>
-          </div>
+          <CheckboxField
+            id="enabled"
+            name="enabled"
+            label="Status"
+            defaultChecked={true}
+            description="Enabled"
+          />
         </div>
       </SettingsDialog>
 
@@ -636,56 +562,41 @@ function Templates() {
                 className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-category" className="text-right">Category *</Label>
-              <select
-                id="edit-category"
-                name="category_id"
-                defaultValue={editingTemplate.category_id}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                required
-              >
-                <option value="">Select Category</option>
-                {categories.map((category: Category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              id="edit-category"
+              label="Category"
+              value={editingTemplate.category_id.toString()}
+              onChange={() => {}}
+              placeholder="Select Category"
+              options={categories.map((category: Category) => ({
+                value: category.id.toString(),
+                label: category.name
+              }))}
+              required
+            />
             {/* Team removed per migration */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-priority" className="text-right">Priority</Label>
-              <select
-                id="edit-priority"
-                name="priority_id"
-                defaultValue={(editingTemplate as any).priority_id || ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                <option value="">None</option>
-                {Array.from(priorityById.entries()).map(([id, priority]) => (
-                  <option key={id} value={String(id)}>
-                    {priority.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-sla" className="text-right">SLA</Label>
-              <select
-                id="edit-sla"
-                name="sla_id"
-                defaultValue={(editingTemplate as any).sla_id || ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                <option value="">None</option>
-                {Array.from(slaById.entries()).map(([id, sla]) => (
-                  <option key={id} value={String(id)}>
-                    {sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              id="edit-priority"
+              label="Priority"
+              value={(editingTemplate as any).priority_id?.toString() || ''}
+              onChange={() => {}}
+              placeholder="None"
+              options={Array.from(priorityById.entries()).map(([id, priority]) => ({
+                value: id.toString(),
+                label: priority.name
+              }))}
+            />
+            <SelectField
+              id="edit-sla"
+              label="SLA"
+              value={(editingTemplate as any).sla_id?.toString() || ''}
+              onChange={() => {}}
+              placeholder="None"
+              options={Array.from(slaById.entries()).map(([id, sla]) => ({
+                value: id.toString(),
+                label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`
+              }))}
+            />
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="edit-instructions" className="text-right pt-2">Instructions</Label>
               <textarea
@@ -697,82 +608,29 @@ function Templates() {
               />
             </div>
             {/* Removed duration, instructions, enabled per migration */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-default-spot" className="text-right">Default Spot</Label>
-              <select
-                id="edit-default-spot"
-                name="default_spot_id"
-                defaultValue={(editingTemplate as any).default_spot_id || ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                <option value="">None</option>
-                {(spots as any[]).map((s: any) => (
-                  <option key={s.id} value={String(s.id)}>{s.name}</option>
-                ))}
-              </select>
-            </div>
+            <SelectField
+              id="edit-default-spot"
+              label="Default Spot"
+              value={(editingTemplate as any).default_spot_id?.toString() || ''}
+              onChange={() => {}}
+              placeholder="None"
+              options={(spots as any[]).map((s: any) => ({
+                value: s.id.toString(),
+                label: s.name
+              }))}
+            />
             <div className="grid grid-cols-4 items-start gap-4">
               <Label className="text-right pt-2">Default Users</Label>
               <div className="col-span-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    {editUserIds.length ? (
-                      <div className="flex flex-wrap gap-1 items-center w-full">
-                        {editUserIds.map((id) => {
-                          const u: any = userById.get(id);
-                          const label = u?.name || u?.email || `User ${id}`;
-                          const initials = (u?.name || u?.email || 'U').split(' ').map((p: string) => p[0]).slice(0, 2).join('').toUpperCase();
-                          return (
-                            <span key={id} className="inline-flex items-center gap-1 rounded-md bg-secondary text-secondary-foreground px-2 py-1 text-xs">
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px]">
-                                {initials}
-                              </span>
-                              <span className="truncate max-w-[140px]">{label}</span>
-                              <button
-                                type="button"
-                                className="ml-1 text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setEditUserIds((prev) => prev.filter((x) => x !== id));
-                                }}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Select users</span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-[280px] max-h-64 overflow-auto">
-                    <DropdownMenuLabel>Select default users</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {(users as any[]).map((u: any) => {
-                      const checked = editUserIds.includes(u.id);
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={u.id}
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            setEditUserIds((prev) =>
-                              v ? [...prev, u.id] : prev.filter((id) => id !== u.id)
-                            );
-                          }}
-                        >
-                          {u.name || u.email || `User ${u.id}`}
-                        </DropdownMenuCheckboxItem>
-                      );
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                {editUserIds.map((id) => (
-                  <input key={id} type="hidden" name="default_user_ids" value={String(id)} />
-                ))}
+                <MultiSelect
+                  options={(users as any[]).map((u: any) => ({
+                    label: u.name || u.email || `User ${u.id}`,
+                    value: String(u.id)
+                  }))}
+                  onValueChange={(values: string[]) => setEditUserIds(values.map((v: string) => Number(v)))}
+                  defaultValue={editUserIds.map(id => String(id))}
+                  placeholder="Select users"
+                />
               </div>
             </div>
           </div>

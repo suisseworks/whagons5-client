@@ -22,8 +22,6 @@ import { Category, Task, Team, StatusTransitionGroup } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -31,7 +29,10 @@ import {
   useSettingsState,
   createActionsCellRenderer,
   IconPicker,
-  CategoryFieldsManager
+  CategoryFieldsManager,
+  TextField,
+  SelectField,
+  CheckboxField
 } from "../components";
 
 // Custom cell renderer for category name with icon
@@ -430,26 +431,23 @@ function Categories() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <Input id="name" name="name" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">Description</Label>
-            <Input id="description" name="description" className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="color" className="text-right">Color</Label>
-            <div className="col-span-3">
-              <input
-                type="color"
-                id="color"
-                name="color"
-                defaultValue="#4ECDC4"
-                className="h-9 w-16 p-0 border rounded"
-              />
-            </div>
-          </div>
+          <TextField
+            id="name"
+            label="Name"
+            defaultValue=""
+            required
+          />
+          <TextField
+            id="description"
+            label="Description"
+            defaultValue=""
+          />
+          <TextField
+            id="color"
+            label="Color"
+            type="color"
+            defaultValue="#4ECDC4"
+          />
           <IconPicker
             id="icon"
             label="Icon"
@@ -463,49 +461,35 @@ function Categories() {
             required
           />
           <input type="hidden" id="icon-hidden" name="icon" defaultValue="fas fa-tags" />
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="team" className="text-right">Team *</Label>
-            <select
-              id="team"
-              name="team_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              required
-            >
-              <option value="">No Team</option>
-              {teams.map((team: Team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="status-group" className="text-right">Transition Group *</Label>
-            <select
-              id="status-group"
-              name="status_transition_group_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              required
-            >
-              <option value="" disabled selected>Select group…</option>
-              {statusTransitionGroups.map((g: StatusTransitionGroup) => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="enabled" className="text-right">Status</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="enabled"
-                name="enabled"
-                defaultChecked
-                className="rounded"
-              />
-              <Label htmlFor="enabled" className="text-sm">Enabled</Label>
-            </div>
-          </div>
+          <SelectField
+            id="team"
+            label="Team"
+            defaultValue=""
+            placeholder="No Team"
+            options={teams.map((team: Team) => ({
+              value: team.id.toString(),
+              label: team.name
+            }))}
+            required
+          />
+          <SelectField
+            id="status-group"
+            label="Transition Group"
+            defaultValue=""
+            placeholder="Select group…"
+            options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
+              value: g.id.toString(),
+              label: g.name
+            }))}
+            required
+          />
+          <CheckboxField
+            id="enabled"
+            name="enabled"
+            label="Status"
+            defaultChecked={true}
+            description="Enabled"
+          />
         </div>
       </SettingsDialog>
 
@@ -523,37 +507,26 @@ function Categories() {
       >
         {editingCategory && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <Input
-                id="edit-name"
-                name="name"
-                defaultValue={editingCategory.name}
-                className="col-span-3"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">Description</Label>
-              <Input
-                id="edit-description"
-                name="description"
-                defaultValue={editingCategory.description || ''}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <div className="col-span-3">
-                <input
-                  type="color"
-                  id="edit-color"
-                  name="color"
-                  defaultValue={editingCategory.color || '#4ECDC4'}
-                  className="h-9 w-16 p-0 border rounded"
-                />
-              </div>
-            </div>
+            <TextField
+              id="edit-name"
+              label="Name"
+              value={editingCategory.name}
+              onChange={() => {}}
+              required
+            />
+            <TextField
+              id="edit-description"
+              label="Description"
+              value={editingCategory.description || ''}
+              onChange={() => {}}
+            />
+            <TextField
+              id="edit-color"
+              label="Color"
+              type="color"
+              value={editingCategory.color || '#4ECDC4'}
+              onChange={() => {}}
+            />
             <IconPicker
               id="edit-icon"
               label="Icon"
@@ -566,50 +539,36 @@ function Categories() {
               required
             />
             <input type="hidden" id="edit-icon-hidden" name="icon" defaultValue={editingCategory.icon || 'fas fa-tags'} />
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-team" className="text-right">Team</Label>
-              <select
-                id="edit-team"
-                name="team_id"
-                defaultValue={editingCategory.team_id || ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                <option value="">No Team</option>
-                {teams.map((team: Team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-status-group" className="text-right">Transition Group *</Label>
-              <select
-                id="edit-status-group"
-                name="status_transition_group_id"
-                defaultValue={editingCategory.status_transition_group_id || ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                required
-              >
-                <option value="" disabled>Select group…</option>
-                {statusTransitionGroups.map((g: StatusTransitionGroup) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-enabled" className="text-right">Status</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="edit-enabled"
-                  name="enabled"
-                  defaultChecked={editingCategory.enabled}
-                  className="rounded"
-                />
-                <Label htmlFor="edit-enabled" className="text-sm">Enabled</Label>
-              </div>
-            </div>
+            <SelectField
+              id="edit-team"
+              label="Team"
+              value={editingCategory.team_id?.toString() || ''}
+              onChange={() => {}}
+              placeholder="No Team"
+              options={teams.map((team: Team) => ({
+                value: team.id.toString(),
+                label: team.name
+              }))}
+            />
+            <SelectField
+              id="edit-status-group"
+              label="Transition Group"
+              value={editingCategory.status_transition_group_id?.toString() || ''}
+              onChange={() => {}}
+              placeholder="Select group…"
+              options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
+                value: g.id.toString(),
+                label: g.name
+              }))}
+              required
+            />
+            <CheckboxField
+              id="edit-enabled"
+              name="enabled"
+              label="Status"
+              defaultChecked={editingCategory.enabled}
+              description="Enabled"
+            />
           </div>
         )}
       </SettingsDialog>

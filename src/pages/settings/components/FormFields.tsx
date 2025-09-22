@@ -1,7 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ColorPicker, ColorPickerAlpha, ColorPickerFormat, ColorPickerHue, ColorPickerSelection, ColorPickerEyeDropper } from "@/components/ui/shadcn-io/color-picker";
+import Color, { ColorLike } from "color";
 
 export interface FormFieldProps {
   id?: string;
@@ -28,8 +34,10 @@ export function FormField({ id, label, required = false, className = "", childre
 export interface TextFieldProps {
   id?: string;
   label: string;
-  value: string;
-  onChange: (value: string) => void;
+  name?: string;
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
   placeholder?: string;
   required?: boolean;
   type?: "text" | "email" | "password" | "number" | "color" | "date" | "datetime-local";
@@ -38,10 +46,14 @@ export interface TextFieldProps {
   className?: string;
 }
 
+
+
 export function TextField({
   id,
   label,
+  name,
   value,
+  defaultValue,
   onChange,
   placeholder,
   required = false,
@@ -50,18 +62,78 @@ export function TextField({
   max,
   className = ""
 }: TextFieldProps) {
+  const isControlled = value !== undefined && onChange !== undefined;
+  const inputProps = isControlled
+    ? { value, onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value) }
+    : { defaultValue };
+
   return (
     <FormField id={id} label={label} required={required} className={className}>
-      <Input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        min={min}
-        max={max}
-      />
+      {type === "color" ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              id={id}
+              type="button"
+              className="h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              style={{ backgroundColor: isControlled ? value : defaultValue }}
+              aria-label="Open color picker"
+            />
+          </PopoverTrigger>
+          <PopoverContent
+            className=" w-72 pointer-events-auto select-text"
+            align="start"
+            side="top"
+            sideOffset={8}
+            avoidCollisions={false}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            {(() => {
+              const colorValue = isControlled ? value : defaultValue;
+              let realColor = new Color(colorValue);
+              let stringColor = realColor.toString();
+              return (
+                <ColorPicker
+                  className="max-w-xs rounded-md p-2"
+                  defaultValue={stringColor || "#000000"}
+                  onChange={(color : ColorLike) => {
+                    const colorInstance = new Color(color);
+                    const hex = colorInstance.hex();
+                    if (isControlled && onChange) {
+                      onChange(hex);
+                    }
+                  }}
+                >
+                  <div className="aspect-square w-full rounded-md border">
+                    <ColorPickerSelection className="h-full w-full" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <ColorPickerEyeDropper  />
+                    <div className="grid w-full gap-1">
+                      <ColorPickerHue  />
+                      <ColorPickerAlpha />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ColorPickerFormat />
+                  </div>
+                </ColorPicker>
+              );
+            })()}
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <Input
+          id={id}
+          name={name}
+          type={type}
+          {...inputProps}
+          placeholder={placeholder}
+          required={required}
+          min={min}
+          max={max}
+        />
+      )}
     </FormField>
   );
 }
@@ -88,7 +160,7 @@ export function TextAreaField({
   className = ""
 }: TextAreaFieldProps) {
   return (
-    <FormField id={id} label={label} required={required} className="items-start">
+    <FormField id={id} label={label} required={required} className={`items-start ${className}`}>
       <textarea
         id={id}
         value={value}
@@ -105,49 +177,97 @@ export function TextAreaField({
 export interface SelectFieldProps {
   id?: string;
   label: string;
-  value: string | number;
-  onChange: (value: string) => void;
+  name?: string;
+  value?: string | number;
+  defaultValue?: string | number;
+  onChange?: (value: string) => void;
   options: Array<{ value: string | number; label: string; disabled?: boolean }>;
   placeholder?: string;
   required?: boolean;
   className?: string;
+  multiple?: boolean;
+  valueArray?: (string | number)[];
+  defaultValueArray?: (string | number)[];
+  onChangeArray?: (values: (string | number)[]) => void;
 }
 
 export function SelectField({
   id,
   label,
+  name,
   value,
+  defaultValue,
   onChange,
   options,
   placeholder = "Select...",
   required = false,
-  className = ""
+  className = "",
+  multiple = false,
+  valueArray,
+  defaultValueArray,
+  onChangeArray
 }: SelectFieldProps) {
+  const isControlled = value !== undefined && onChange !== undefined;
+  const selectProps = isControlled
+    ? { value: String(value ?? ""), onValueChange: onChange }
+    : { defaultValue: String(defaultValue ?? "") };
+
+  // Handle multi-select case
+  if (multiple) {
+    const isArrayControlled = valueArray !== undefined && onChangeArray !== undefined;
+    const selectedValues = isArrayControlled ? valueArray : (defaultValueArray || []);
+    const selectedLabels = selectedValues.map(val =>
+      options.find(opt => opt.value === val)?.label || String(val)
+    ).join(", ") || placeholder;
+
+    return (
+      <FormField id={id} label={label} required={required} className={className}>
+        <Select>
+          <SelectTrigger id={id} aria-required={required} className="w-full">
+            <SelectValue placeholder={selectedValues.length ? selectedLabels : placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Hidden inputs for form submission */}
+        {selectedValues.map((val) => (
+          <input key={val} type="hidden" name={name} value={String(val)} />
+        ))}
+      </FormField>
+    );
+  }
+
   return (
     <FormField id={id} label={label} required={required} className={className}>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <Select {...selectProps}>
+        <SelectTrigger id={id} name={name} aria-required={required} className="w-full">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </FormField>
   );
 }
 
+
 export interface CheckboxFieldProps {
   id?: string;
   label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
+  name?: string;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onChange?: (checked: boolean) => void;
   description?: string;
   className?: string;
 }
@@ -155,23 +275,42 @@ export interface CheckboxFieldProps {
 export function CheckboxField({
   id,
   label,
+  name,
   checked,
+  defaultChecked,
   onChange,
   description,
   className = ""
 }: CheckboxFieldProps) {
+  const isControlled = checked !== undefined && onChange !== undefined;
+
+  // For uncontrolled checkboxes, we need to sync with a hidden input for form submission
+  const [uncontrolledChecked, setUncontrolledChecked] = useState(defaultChecked || false);
+
+  const handleUncontrolledChange = (checked: boolean) => {
+    setUncontrolledChecked(checked);
+  };
+
   return (
     <FormField id={id} label={label} className={className}>
       <div className="flex items-center space-x-2">
-        <input
-          type="checkbox"
+        <Checkbox
           id={id}
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          className="rounded"
+          checked={isControlled ? checked : uncontrolledChecked}
+          onCheckedChange={isControlled ? onChange : handleUncontrolledChange}
         />
+        {/* Hidden input for form submission */}
+        {name && (
+          <input
+            type="checkbox"
+            name={name}
+            checked={isControlled ? checked : uncontrolledChecked}
+            onChange={() => {}} // Controlled by the Checkbox above
+            style={{ display: 'none' }}
+          />
+        )}
         <Label htmlFor={id} className="text-sm">
-          {checked ? 'Enabled' : 'Disabled'}
+          {isControlled ? (checked ? 'Enabled' : 'Disabled') : 'Toggle'}
         </Label>
         {description && (
           <span className="text-xs text-muted-foreground ml-2">{description}</span>

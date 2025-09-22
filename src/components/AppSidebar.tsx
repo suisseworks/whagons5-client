@@ -417,18 +417,17 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   </CollapsibleTrigger>
 
                   {showExpandedContent && (
-                    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent"
-                          title="Add Workspace"
-                        >
-                          <Plus size={16} />
-                          <span className="sr-only">Add Workspace</span>
-                        </Button>
-                      </DialogTrigger>
+                  <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                    <DialogTrigger asChild>
+                      <button
+                        className="inline-flex items-center justify-center h-6 w-6 rounded-md text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        title="Add Workspace"
+                        type="button"
+                      >
+                        <Plus size={16} />
+                        <span className="sr-only">Add Workspace</span>
+                      </button>
+                    </DialogTrigger>
                       <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
                           <DialogTitle>Add New Workspace</DialogTitle>

@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
- 
+
 import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SettingsGrid } from "@/pages/settings/components/SettingsGrid";
 import type { ColDef } from "ag-grid-community";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { SettingsDialog } from "@/pages/settings/components/SettingsDialog";
-import { TextField, CheckboxField, FormField, SelectField } from "@/pages/settings/components/FormFields";
+import { TextField, CheckboxField, SelectField } from "@/pages/settings/components/FormFields";
 import { IconPicker } from "@/pages/settings/components/IconPicker";
 import { SettingsLayout, createActionsCellRenderer } from "@/pages/settings/components";
 import { faSitemap } from "@fortawesome/free-solid-svg-icons";
@@ -52,26 +53,13 @@ function Statuses() {
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [, setIsDeleting] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  // Toast removed
   // Backend enum values for status.action
   const allowedActions = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(t);
-  }, [toast]);
+  // Toast removed
 
-  // Hydrate data (idempotent)
-  useEffect(() => {
-    dispatch(genericActions.statuses.getFromIndexedDB());
-    dispatch(genericActions.statuses.fetchFromAPI({ per_page: 1000 }));
-    dispatch(genericActions.statusTransitions.getFromIndexedDB());
-    dispatch(genericActions.statusTransitions.fetchFromAPI({ per_page: 1000 }));
-    dispatch(genericActions.statusTransitionGroups.getFromIndexedDB());
-    dispatch(genericActions.statusTransitionGroups.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-
+  
   // Load persisted view and group, and save changes
   useEffect(() => {
     // Load view
@@ -126,7 +114,6 @@ function Statuses() {
 
   const handleDeleteClick = (row: any) => {
     if (row?.system) {
-      setToast({ type: 'error', message: 'System statuses cannot be deleted' });
       return;
     }
     setSelectedStatus(row);
@@ -173,7 +160,11 @@ function Statuses() {
           dispatch(genericActions.statuses.updateAsync({ id, updates: { initial: next } }));
         };
         return (
-          <input type="checkbox" disabled={disabled} checked={checked} onChange={onToggle} />
+          <Checkbox
+            disabled={disabled}
+            checked={checked}
+            onCheckedChange={onToggle}
+          />
         );
       }
     },
@@ -402,11 +393,9 @@ function Statuses() {
                   const result: any = await dispatch(genericActions.statuses.addAsync(payload));
                   if (result?.meta?.requestStatus === 'rejected') {
                     setFormError(result?.payload || result?.error?.message || 'Failed to create');
-                    setToast({ type: 'error', message: 'Failed to create status' });
                     return;
                   }
                   setCreateOpen(false);
-                  setToast({ type: 'success', message: 'Status created' });
                 } finally {
                   setIsCreating(false);
                 }
@@ -416,9 +405,7 @@ function Statuses() {
           >
             <TextField label="Name" value={formName} onChange={setFormName} required />
             <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-            <FormField label="Color">
-              <input type="color" value={formColor} onChange={(e) => setFormColor(e.target.value)} className="h-9 w-16 p-0 border rounded" />
-            </FormField>
+            <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
             <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
             <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
             <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
@@ -461,11 +448,9 @@ function Statuses() {
                   const result: any = await dispatch(genericActions.statuses.updateAsync({ id: selectedStatus.id, updates }));
                   if (result?.meta?.requestStatus === 'rejected') {
                     setFormError(result?.payload || result?.error?.message || 'Failed to update');
-                    setToast({ type: 'error', message: 'Failed to update status' });
                     return;
                   }
                   setEditOpen(false);
-                  setToast({ type: 'success', message: 'Status updated' });
                 } finally {
                   setIsUpdating(false);
                 }
@@ -475,9 +460,7 @@ function Statuses() {
           >
             <TextField label="Name" value={formName} onChange={setFormName} required />
             <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-            <FormField label="Color">
-              <input type="color" value={formColor} onChange={(e) => setFormColor(e.target.value)} className="h-9 w-16 p-0 border rounded" />
-            </FormField>
+            <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
             <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
             <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
             <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
@@ -505,17 +488,12 @@ function Statuses() {
                 await dispatch(genericActions.statuses.removeAsync(selectedStatus.id));
                 setDeleteOpen(false);
                 setSelectedStatus(null);
-                setToast({ type: 'success', message: 'Status deleted' });
               } finally {
                 setIsDeleting(false);
               }
             }}
           />
-        {toast && (
-          <div className={`fixed bottom-6 right-6 z-[9999] px-4 py-2 rounded shadow-md ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-            {toast.message}
-          </div>
-        )}
+        {/* toast removed */}
         </TabsContent>
 
         <TabsContent value="transitions" className="space-y-4">
@@ -572,11 +550,10 @@ function Statuses() {
                         const disabled = from.id === to.id; // same-state transition off
                         return (
                           <td key={`cell-${from.id}-${to.id}`} className="border p-2 text-center">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               disabled={disabled || !selectedGroupId}
                               checked={checked}
-                              onChange={() => toggleTransition(from.id, to.id)}
+                              onCheckedChange={() => toggleTransition(from.id, to.id)}
                             />
                           </td>
                         );

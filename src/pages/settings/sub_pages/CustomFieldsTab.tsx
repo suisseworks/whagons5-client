@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faEdit, faTrash, faCubes, faCheck, faLayerGroup, faGripVertical } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faCubes, faCheck, faLayerGroup, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { faArrowDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { genericActions } from '@/store/genericSlices';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { SettingsLayout } from "../components";
 
 type DraftField = {
@@ -47,7 +47,7 @@ export default function CustomFieldsTab() {
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // Toast removed
   const [draft, setDraft] = useState<DraftField>({ 
     name: "", 
     field_type: "text", 
@@ -171,10 +171,9 @@ export default function CustomFieldsTab() {
       await dispatch(genericActions.customFields.fetchFromAPI() as any);
       setOpen(false);
       setDraft({ name: "", field_type: "text", optionsText: "", isRequired: false, minLength: "", maxLength: "", minNumber: "", maxNumber: "", pattern: "" });
-      setToast({ message: 'Field created', type: 'success' });
+      // toast removed
     } catch (e: any) {
       setFormError(e?.message || 'Failed to create field.');
-      setToast({ message: 'Failed to create field', type: 'error' });
     } finally { setIsSaving(false); }
   };
 
@@ -197,11 +196,9 @@ export default function CustomFieldsTab() {
       await dispatch(genericActions.customFields.fetchFromAPI() as any);
       setOpen(false);
       setSelectedField(null);
-      setToast({ message: 'Field updated', type: 'success' });
     } catch (e: any) {
       const apiMsg = e?.message || (e?.errors ? JSON.stringify(e.errors) : '');
       setFormError(apiMsg || 'Failed to update field.');
-      setToast({ message: 'Failed to update field', type: 'error' });
     } finally { setIsSaving(false); }
   };
 
@@ -267,9 +264,8 @@ export default function CustomFieldsTab() {
       setIsDeleting(true);
       await dispatch(genericActions.customFields.removeAsync(f.id as any)).unwrap?.();
       await dispatch(genericActions.customFields.fetchFromAPI() as any);
-      setToast({ message: 'Field deleted', type: 'success' });
     } catch (_) {
-      setToast({ message: 'Failed to delete field', type: 'error' });
+      // best-effort
     } finally {
       setIsDeleting(false);
       setDeleteOpen(false);
@@ -481,17 +477,7 @@ export default function CustomFieldsTab() {
         </DialogContent>
       </Dialog>
 
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-[10000] px-3 py-2 rounded-md shadow-md text-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-          onAnimationEnd={() => {/* no-op */}}
-        >
-          {toast.message}
-        </div>
-      )}
-
-      {/* Auto-hide toast */}
-      {toast && (() => { setTimeout(() => setToast(null), 2000); return null; })()}
+      {/* toast removed */}
     </SettingsLayout>
   );
 }
