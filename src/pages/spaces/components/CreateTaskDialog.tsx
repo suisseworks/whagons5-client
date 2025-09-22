@@ -30,6 +30,9 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
   const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
   const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
+  const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
+
+  const currentWorkspace = workspaces.find((w: any) => w.id === workspaceId);
 
   const workspaceCategories = useMemo(() => categories.filter((c: any) => c.workspace_id === workspaceId), [categories, workspaceId]);
 
@@ -91,13 +94,17 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   // }, [categoryPriorities, priorityId]);
 
   const workspaceTemplates = useMemo(() => {
-    // Templates don't include workspace_id directly; infer via category.workspace_id
-    return templates.filter((t: any) => {
-      if (t?.enabled === false) return false;
-      const cat = categories.find((c: any) => c.id === t.category_id);
-      return cat?.workspace_id === workspaceId;
+    // Only show templates for workspaces of type "DEFAULT"
+    if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
+      return [];
+    }
+
+    // Templates are matched to workspace by category_id
+    return templates.filter((template: any) => {
+      if (template?.enabled === false) return false;
+      return template.category_id === currentWorkspace.category_id;
     });
-  }, [templates, categories, workspaceId]);
+  }, [templates, currentWorkspace]);
 
   const workspaceUsers = useMemo(() => {
     const list = users.filter((u: any) => !u.workspace_id || u.workspace_id === workspaceId);
@@ -236,7 +243,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
             <Label>Template *</Label>
             <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
               <SelectTrigger>
-                <SelectValue placeholder={workspaceTemplates.length ? 'Select template' : 'No templates available'} />
+                <SelectValue placeholder={
+                  !currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                    ? 'Templates only available for default workspaces'
+                    : workspaceTemplates.length
+                      ? 'Select template'
+                      : 'No templates available'
+                } />
               </SelectTrigger>
               <SelectContent>
                 {workspaceTemplates.map((t: any) => (
@@ -245,7 +258,12 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
               </SelectContent>
             </Select>
             {!workspaceTemplates.length && (
-              <div className="text-xs text-muted-foreground">No templates available in this workspace. Enable or create templates first.</div>
+              <div className="text-xs text-muted-foreground">
+                {!currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                  ? 'Templates are only available for default workspaces.'
+                  : 'No templates available in this workspace. Enable or create templates first.'
+                }
+              </div>
             )}
           </div>
 

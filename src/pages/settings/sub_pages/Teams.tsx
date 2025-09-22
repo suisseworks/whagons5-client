@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -61,6 +61,30 @@ function Teams() {
     entityName: 'teams',
     searchFields: ['name', 'description']
   });
+
+  // Local state for form values
+  const [createFormData, setCreateFormData] = useState({
+    name: '',
+    description: '',
+    color: '#4ECDC4'
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: '',
+    color: '#4ECDC4'
+  });
+
+  // Update edit form data when editing team changes
+  useEffect(() => {
+    if (editingTeam) {
+      setEditFormData({
+        name: editingTeam.name || '',
+        description: editingTeam.description || '',
+        color: editingTeam.color || '#4ECDC4'
+      });
+    }
+  }, [editingTeam]);
 
   // Helper functions for counts
   const getTeamCategoryCount = (teamId: number) => {
@@ -137,26 +161,44 @@ function Teams() {
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
+
+    // Validate required fields
+    if (!createFormData.name?.trim()) {
+      throw new Error('Team name is required');
+    }
+
     const teamData = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      color: formData.get('color') as string,
+      name: createFormData.name.trim(),
+      description: createFormData.description.trim(),
+      color: createFormData.color,
       deleted_at: null
     };
+
     await createItem(teamData);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      description: '',
+      color: '#4ECDC4'
+    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTeam) return;
-    
-    const formData = new FormData(e.target as HTMLFormElement);
+
+    // Validate required fields
+    if (!editFormData.name?.trim()) {
+      throw new Error('Team name is required');
+    }
+
     const updates = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      color: formData.get('color') as string
+      name: editFormData.name.trim(),
+      description: editFormData.description.trim(),
+      color: editFormData.color
     };
+
     await updateItem(editingTeam.id, updates);
   };
 
@@ -244,7 +286,17 @@ function Teams() {
       {/* Create Team Dialog */}
       <SettingsDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            // Reset form data when closing create dialog
+            setCreateFormData({
+              name: '',
+              description: '',
+              color: '#4ECDC4'
+            });
+          }
+        }}
         type="create"
         title="Add New Team"
         description="Create a new team to organize work and collaboration."
@@ -257,22 +309,22 @@ function Teams() {
           <TextField
             id="name"
             label="Name"
-            value=""
-            onChange={() => {}}
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="description"
             label="Description"
-            value=""
-            onChange={() => {}}
+            value={createFormData.description}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, description: value }))}
           />
           <TextField
             id="color"
             label="Color"
             type="color"
-            value="#4ECDC4"
-            onChange={() => {}}
+            value={createFormData.color}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
         </div>
       </SettingsDialog>
@@ -280,7 +332,17 @@ function Teams() {
       {/* Edit Team Dialog */}
       <SettingsDialog
         open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            // Reset form data when closing edit dialog
+            setEditFormData({
+              name: '',
+              description: '',
+              color: '#4ECDC4'
+            });
+          }
+        }}
         type="edit"
         title="Edit Team"
         description="Update the team information."
@@ -294,22 +356,22 @@ function Teams() {
             <TextField
               id="edit-name"
               label="Name"
-              value={editingTeam.name}
-              onChange={() => {}}
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <TextField
               id="edit-description"
               label="Description"
-              value={editingTeam.description || ''}
-              onChange={() => {}}
+              value={editFormData.description}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
             />
             <TextField
               id="edit-color"
               label="Color"
               type="color"
-              value={editingTeam.color || '#4ECDC4'}
-              onChange={() => {}}
+              value={editFormData.color}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
             />
           </div>
         )}

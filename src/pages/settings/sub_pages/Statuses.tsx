@@ -122,10 +122,10 @@ function Statuses() {
 
   // (Make Initial action removed by request)
 
-  // Columns for Statuses grid (read-only for now)
+  // Columns for Statuses grid
 
   const columns = useMemo<ColDef[]>(() => [
-    { headerName: "Name", field: "name", flex: 1, minWidth: 200, editable: (p: any) => !p?.data?.system, cellRenderer: (p: any) => {
+    { headerName: "Name", field: "name", flex: 1, minWidth: 200, cellRenderer: (p: any) => {
       const name = p?.value;
       const color = p?.data?.color || '#6B7280';
       const iconStr: string = p?.data?.icon || 'fas fa-circle';
@@ -136,7 +136,7 @@ function Statuses() {
         </div>
       );
     } },
-    { headerName: "Action", field: "action", flex: 1, minWidth: 140, editable: (p: any) => !p?.data?.system, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: allowedActions } },
+    { headerName: "Action", field: "action", flex: 1, minWidth: 140 },
     // Icon column removed; icon shown with color inside Name
     { headerName: "System", field: "system", width: 110 },
     {
@@ -328,32 +328,6 @@ function Statuses() {
               setFormSystem(!!row.system);
               setFormError(null);
               setEditOpen(true);
-            }}
-            onCellValueChanged={(e) => {
-              const id = e?.data?.id;
-              if (!id) return;
-              if (e?.data?.system) return; // protect system rows
-              const field = e?.colDef?.field as string;
-              let value = e?.newValue;
-              if (!field) return;
-              // Normalize inputs
-              if (field === 'name' || field === 'action' || field === 'icon') {
-                value = (value ?? '').toString();
-                if (field === 'icon' && value && !value.startsWith('fa')) {
-                  value = `fas fa-${value}`;
-                }
-                if (field === 'action') {
-                  value = value.toUpperCase();
-                  if (!allowedActions.includes(value)) return; // ignore invalid
-                }
-              }
-              if (field === 'color') {
-                const hex = (value ?? '').toString();
-                const isHex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex);
-                if (!isHex) return; // ignore invalid
-                value = hex;
-              }
-              dispatch(genericActions.statuses.updateAsync({ id, updates: { [field]: value } as any }));
             }}
           />
 

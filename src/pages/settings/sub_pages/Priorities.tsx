@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -54,6 +54,38 @@ function Priorities() {
     searchFields: ["name"]
   });
 
+  // Form state for controlled components
+  const [createFormData, setCreateFormData] = useState<{
+    name: string;
+    color: string;
+    level: string;
+  }>({
+    name: '',
+    color: '#ef4444',
+    level: ''
+  });
+
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    color: string;
+    level: string;
+  }>({
+    name: '',
+    color: '#ef4444',
+    level: ''
+  });
+
+  // Update edit form data when editing item changes
+  useEffect(() => {
+    if (editingItem) {
+      setEditFormData({
+        name: editingItem.name || '',
+        color: editingItem.color || '#ef4444',
+        level: editingItem.level?.toString() || ''
+      });
+    }
+  }, [editingItem]);
+
   const columns = useMemo<ColDef[]>(() => [
     {
       field: "name",
@@ -86,26 +118,33 @@ function Priorities() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+
     const data = {
-      name: String(formData.get("name") || ""),
-      color: String(formData.get("color") || "#6b7280"),
-      level: formData.get("level") ? parseInt(String(formData.get("level"))) : null
+      name: createFormData.name,
+      color: createFormData.color,
+      level: createFormData.level ? parseInt(createFormData.level) : null
     } as Omit<Priority, "id" | "created_at" | "updated_at">;
+
     await createItem(data as any);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      color: '#ef4444',
+      level: ''
+    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+
     const updates = {
-      name: String(formData.get("name") || editingItem.name),
-      color: String(formData.get("color") || editingItem.color || "#6b7280"),
-      level: formData.get("level") ? parseInt(String(formData.get("level"))) : editingItem.level ?? null
+      name: editFormData.name,
+      color: editFormData.color,
+      level: editFormData.level ? parseInt(editFormData.level) : editingItem.level ?? null
     } as Partial<Priority>;
+
     await updateItem(editingItem.id, updates);
   };
 
@@ -175,25 +214,25 @@ function Priorities() {
         <div className="grid gap-4">
           <TextField
             id="name"
-            name="name"
             label="Name"
-            defaultValue=""
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="color"
-            name="color"
             label="Color"
             type="color"
-            defaultValue="#ef4444"
+            value={createFormData.color}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
           <TextField
             id="level"
-            name="level"
             label="Level"
             type="number"
             min="0"
-            defaultValue=""
+            value={createFormData.level}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, level: value }))}
             placeholder="Optional numeric level"
           />
         </div>
@@ -215,25 +254,25 @@ function Priorities() {
           <div className="grid gap-4">
             <TextField
               id="edit-name"
-              name="name"
               label="Name"
-              defaultValue={editingItem.name}
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <TextField
               id="edit-color"
-              name="color"
               label="Color"
               type="color"
-              defaultValue={(editingItem.color as string) || "#ef4444"}
+              value={editFormData.color}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
             />
             <TextField
               id="edit-level"
-              name="level"
               label="Level"
               type="number"
               min="0"
-              defaultValue={typeof editingItem.level === "number" ? editingItem.level.toString() : ""}
+              value={editFormData.level}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, level: value }))}
             />
           </div>
         )}
