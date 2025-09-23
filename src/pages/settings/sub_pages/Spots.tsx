@@ -311,12 +311,12 @@ function Spots() {
         </div>
       }
     >
-      <Tabs defaultValue="main">
+      <Tabs defaultValue="main" className="flex-1 h-full flex flex-col">
         <TabsList>
           <TabsTrigger value="main">Spots</TabsTrigger>
           <TabsTrigger value="branches">Branches</TabsTrigger>
         </TabsList>
-        <TabsContent value="main">
+        <TabsContent value="main" className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
             rowData={searchableHierarchyData}
             columnDefs={colDefs}
@@ -325,9 +325,11 @@ function Spots() {
             rowSelection={rowSelection as any}
             noRowsMessage="No spots found"
             onRowDoubleClicked={handleEdit}
+            className="flex-1 min-h-0"
+            height="100%"
           />
         </TabsContent>
-        <TabsContent value="branches">
+        <TabsContent value="branches" className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
             rowData={filteredItems.filter((s: any) => s.is_branch)}
             columnDefs={colDefs}
@@ -336,6 +338,8 @@ function Spots() {
             rowSelection={rowSelection as any}
             noRowsMessage="No branches found"
             onRowDoubleClicked={handleEdit}
+            className="flex-1 min-h-0"
+            height="100%"
           />
         </TabsContent>
       </Tabs>

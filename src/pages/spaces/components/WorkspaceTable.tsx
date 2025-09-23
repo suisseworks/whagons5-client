@@ -203,12 +203,12 @@ const WorkspaceTable = ({
   const usersLoaded = !!(users && users.length > 0);
 
   const statusMap = useMemo(() => {
-    const m: Record<number, { name: string; color?: string; icon?: string }> = {};
+    const m: Record<number, { name: string; color?: string; icon?: string; action?: string }> = {};
     for (const st of globalStatuses || []) {
       const anySt: any = st as any;
       if (anySt && typeof anySt.id !== 'undefined') {
         const idNum = Number(anySt.id);
-        m[idNum] = { name: anySt.name || `Status ${idNum}` , color: anySt.color, icon: anySt.icon } as any;
+        m[idNum] = { name: anySt.name || `Status ${idNum}` , color: anySt.color, icon: anySt.icon, action: anySt.action } as any;
       }
     }
     return m;

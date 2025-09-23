@@ -230,19 +230,20 @@ function Categories() {
       minWidth: 150
     },
     // Fields column removed per request
-    { 
-      field: 'team_id', 
+    {
+      field: 'team_id',
       headerName: 'Team',
-      width: 180,
+      flex: 1.5,
+      minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
         const teamId = params.value;
-        
+
         if (!teamId) {
           return <span className="text-muted-foreground">No Team</span>;
         }
-        
+
         const team = teams.find((t: any) => t.id === teamId);
-        
+
         return (
           <div className="flex items-center space-x-2">
             <div className="w-6 h-6 min-w-[1.5rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
@@ -258,7 +259,8 @@ function Categories() {
     {
       field: 'status_transition_group_id',
       headerName: 'Transition Group',
-      width: 220,
+      flex: 1.5,
+      minWidth: 240,
       cellRenderer: (params: ICellRendererParams) => {
         const groupId = params.value as number | null | undefined;
         if (!groupId) {
@@ -270,10 +272,11 @@ function Categories() {
       sortable: true,
       filter: true
     },
-    { 
-      field: 'enabled', 
+    {
+      field: 'enabled',
       headerName: 'Status',
-      width: 100,
+      flex: 0.8,
+      minWidth: 120,
       cellRenderer: EnabledCellRenderer,
       sortable: true,
       filter: true

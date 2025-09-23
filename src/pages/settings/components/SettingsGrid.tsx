@@ -22,14 +22,15 @@ export interface SettingsGridProps<T = any> {
   autoGroupColumnDef?: ColDef;
   gridOptions?: any;
   quickFilterText?: string;
+  style?: React.CSSProperties;
 }
 
 export function SettingsGrid<T = any>({
   rowData,
   columnDefs,
   onGridReady,
-  height = "100%",
-  className = "",
+  height,
+  className,
   noRowsMessage = "No data found",
   defaultColDef = {
     sortable: true,
@@ -42,7 +43,8 @@ export function SettingsGrid<T = any>({
   onCellValueChanged,
   autoGroupColumnDef,
   gridOptions,
-  quickFilterText
+  quickFilterText,
+  style
 }: SettingsGridProps<T>) {
   const gridRef = useRef<AgGridReact>(null);
 
@@ -67,7 +69,10 @@ export function SettingsGrid<T = any>({
   }, []);
 
   return (
-    <div className={`ag-theme-quartz wh-settings-grid w-full ${className}`} style={{ height }}>
+    <div
+      className={`ag-theme-quartz wh-settings-grid w-full ${className ?? ""}`}
+      style={{ height: height ?? "100%", ...(style ?? {}) }}
+    >
       <AgGridReact
         ref={gridRef}
         rowData={rowData}
@@ -78,7 +83,10 @@ export function SettingsGrid<T = any>({
         animateRows={true}
         rowHeight={50}
         headerHeight={44}
-        defaultColDef={defaultColDef}
+        defaultColDef={{
+          ...defaultColDef,
+          resizable: true
+        }}
         onCellValueChanged={onCellValueChanged}
         autoGroupColumnDef={autoGroupColumnDef}
         {...(gridOptions || {})}

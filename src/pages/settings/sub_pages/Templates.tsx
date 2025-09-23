@@ -198,18 +198,19 @@ function Templates() {
 
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
-    { 
-      field: 'name', 
+    {
+      field: 'name',
       headerName: 'Template Name',
       flex: 2,
-      minWidth: 200,
+      minWidth: 250,
       cellRenderer: TemplateNameCellRenderer
     },
     // Description removed per migration
-    { 
-      field: 'category_id', 
+    {
+      field: 'category_id',
       headerName: 'Category',
-      width: 180,
+      flex: 1,
+      minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
         const categoryId = Number(params.value);
         const category = (categories as any[]).find((c: any) => Number(c.id) === categoryId);
@@ -233,17 +234,18 @@ function Templates() {
       sortable: true,
       filter: true
     },
-    { 
-      field: 'priority_id', 
+    {
+      field: 'priority_id',
       headerName: 'Priority',
-      width: 130,
+      flex: 0.8,
+      minWidth: 140,
       cellRenderer: (params: ICellRendererParams) => {
         const pid = Number(params.value);
         const p = priorityById.get(pid);
         if (!p) return <span className="text-muted-foreground">—</span>;
         return (
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             style={{ borderColor: p.color || '#6b7280', color: p.color || '#6b7280' }}
           >
             {p.name}
@@ -253,10 +255,11 @@ function Templates() {
       sortable: true,
       filter: true
     },
-    { 
-      field: 'sla_id', 
+    {
+      field: 'sla_id',
       headerName: 'SLA',
-      width: 140,
+      flex: 1,
+      minWidth: 160,
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: () => {
@@ -276,7 +279,8 @@ function Templates() {
     {
       field: 'expected_duration',
       headerName: 'Expected Duration',
-      width: 160,
+      flex: 0.8,
+      minWidth: 170,
       valueFormatter: (params: any) => {
         const v = params.value;
         if (v == null || v === '') return '—';
@@ -287,10 +291,11 @@ function Templates() {
       sortable: true,
       filter: true
     },
-    { 
-      field: 'default_spot_id', 
+    {
+      field: 'default_spot_id',
       headerName: 'Default Spot',
-      width: 160,
+      flex: 1,
+      minWidth: 170,
       cellRenderer: (params: ICellRendererParams) => {
         const sid = Number(params.value);
         if (!sid) return <span className="text-muted-foreground">—</span>;
@@ -303,7 +308,8 @@ function Templates() {
     {
       field: 'default_user_ids',
       headerName: 'Default Users',
-      width: 150,
+      flex: 0.8,
+      minWidth: 160,
       cellRenderer: (params: ICellRendererParams) => {
         const arr = (params.value as any[]) || [];
         if (!Array.isArray(arr) || arr.length === 0) return <span className="text-muted-foreground">—</span>;
@@ -315,7 +321,7 @@ function Templates() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 140,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDeleteTemplate

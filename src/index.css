@@ -305,6 +305,23 @@
     filter: saturate(1.05);
   }
 
+  /* Ensure grid containers have proper sizing */
+  .wh-settings-grid {
+    min-height: 400px;
+  }
+
+  /* Improve grid body scrolling */
+  .wh-settings-grid .ag-body-viewport {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
+
+  /* Ensure grid has proper minimum width for columns */
+  .wh-settings-grid .ag-header-viewport,
+  .wh-settings-grid .ag-body-viewport {
+    min-width: 100%;
+  }
+
   ::-webkit-scrollbar-track {
     background: var(--color-muted);
     border-radius: var(--radius-sm);

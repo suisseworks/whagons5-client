@@ -220,7 +220,7 @@ function Slas() {
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="slas">
+        <TabsContent value="slas" className="flex-1 min-h-0 flex flex-col">
           <div className="mt-4" />
           <div className="flex justify-between items-center mb-3">
             <div className="text-sm text-muted-foreground">Manage SLA definitions</div>
@@ -236,7 +236,7 @@ function Slas() {
           />
         </TabsContent>
 
-        <TabsContent value="alerts">
+        <TabsContent value="alerts" className="flex-1 min-h-0 flex flex-col">
           <div className="mt-4" />
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <div className="text-sm">SLA:</div>

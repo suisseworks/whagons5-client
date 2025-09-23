@@ -719,6 +719,11 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
                   >
                     <BarChart3 size={20} className="w-5! h-5! p-[1px]" />
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Analytics</span>
+                    ) : (
+                      <span className="ml-3 text-sm font-medium">Analytics</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -749,6 +754,11 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
                   >
                     <Settings size={20} className="w-5! h-5! p-[1px]" />
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Settings</span>
+                    ) : (
+                      <span className="ml-3 text-sm font-medium">Settings</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

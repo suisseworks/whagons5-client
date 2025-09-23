@@ -187,13 +187,17 @@ function Forms() {
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       statistics={undefined}
     >
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as any)}
+        className="flex-1 h-full flex flex-col"
+      >
         <TabsList>
           <TabsTrigger value="list">List</TabsTrigger>
           <TabsTrigger value="builder">Builder</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="list" className="space-y-4">
+        <TabsContent value="list" className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
             rowData={filteredItems}
             columnDefs={colDefs}
@@ -210,10 +214,12 @@ function Forms() {
             onGridReady={(params) => {
               params.api.setGridOption('context', { formVersions });
             }}
+            className="flex-1 min-h-0"
+            height="100%"
           />
         </TabsContent>
 
-        <TabsContent value="builder" className="space-y-4">
+        <TabsContent value="builder" className="space-y-4 flex-1 min-h-0 flex flex-col">
           <div className="rounded-lg border p-4 space-y-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="form-name" className="text-right">Form Name *</Label>

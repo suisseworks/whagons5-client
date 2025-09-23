@@ -128,34 +128,35 @@ function Users() {
   }, [isEditDialogOpen, dispatch]);
 
   const columnDefs = useMemo<ColDef[]>(() => ([
-    { 
-      field: 'id', 
+    {
+      field: 'id',
       headerName: 'ID',
-      width: 80 
+      width: 90
     },
-    { 
-      field: 'name', 
+    {
+      field: 'name',
       headerName: 'Name',
       flex: 2,
-      minWidth: 150, 
+      minWidth: 180,
       cellRenderer: (params: ICellRendererParams) => (
         <AvatarCellRenderer name={params.data?.name || ''} />
-      ) 
+      )
     },
-    { 
-      field: 'email', 
+    {
+      field: 'email',
       headerName: 'Email',
-      flex: 2,
-      minWidth: 200 
+      flex: 2.5,
+      minWidth: 220
     },
-    { 
-      field: 'team_id', 
+    {
+      field: 'team_id',
       headerName: 'Team',
-      width: 220,
+      flex: 2,
+      minWidth: 240,
       cellRenderer: (params: ICellRendererParams) => {
         const teamId = params.value;
         if (!teamId) return <span className="text-muted-foreground">No Team</span>;
-        
+
         const team = teams.find((t: Team) => t.id === teamId);
         if (!team) return <span className="text-muted-foreground">Team {teamId}</span>;
         const initial = (team.name || '').charAt(0).toUpperCase();
@@ -192,24 +193,26 @@ function Users() {
         );
       }
     },
-    { 
-      field: 'is_admin', 
+    {
+      field: 'is_admin',
       headerName: 'Role',
-      width: 120, 
-      cellRenderer: (params: ICellRendererParams) => 
-        params.value ? <Badge variant="default">Admin</Badge> : <Badge variant="outline">User</Badge> 
+      flex: 0.8,
+      minWidth: 130,
+      cellRenderer: (params: ICellRendererParams) =>
+        params.value ? <Badge variant="default">Admin</Badge> : <Badge variant="outline">User</Badge>
     },
-    { 
-      field: 'has_active_subscription', 
+    {
+      field: 'has_active_subscription',
       headerName: 'Subscription',
-      width: 130, 
-      cellRenderer: (params: ICellRendererParams) => 
-        params.value ? <Badge variant="default" className="bg-green-500">Active</Badge> : <Badge variant="destructive">Inactive</Badge> 
+      flex: 1,
+      minWidth: 150,
+      cellRenderer: (params: ICellRendererParams) =>
+        params.value ? <Badge variant="default" className="bg-green-500">Active</Badge> : <Badge variant="destructive">Inactive</Badge>
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 140,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete
