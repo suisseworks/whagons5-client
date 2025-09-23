@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect } from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import 'ag-grid-enterprise';
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -14,10 +15,13 @@ export interface SettingsGridProps<T = any> {
   className?: string;
   noRowsMessage?: string;
   defaultColDef?: ColDef;
-  rowSelection?: 'single' | 'multiple';
+  rowSelection?: 'single' | 'multiple' | any; // allow object config per example
   onSelectionChanged?: (selectedRows: T[]) => void;
   onRowDoubleClicked?: (row: T) => void;
   onCellValueChanged?: (event: any) => void;
+  autoGroupColumnDef?: ColDef;
+  gridOptions?: any;
+  quickFilterText?: string;
 }
 
 export function SettingsGrid<T = any>({
@@ -35,7 +39,10 @@ export function SettingsGrid<T = any>({
   rowSelection,
   onSelectionChanged,
   onRowDoubleClicked,
-  onCellValueChanged
+  onCellValueChanged,
+  autoGroupColumnDef,
+  gridOptions,
+  quickFilterText
 }: SettingsGridProps<T>) {
   const gridRef = useRef<AgGridReact>(null);
 
@@ -72,6 +79,9 @@ export function SettingsGrid<T = any>({
         headerHeight={44}
         defaultColDef={defaultColDef}
         onCellValueChanged={onCellValueChanged}
+        autoGroupColumnDef={autoGroupColumnDef}
+        {...(gridOptions || {})}
+        quickFilterText={quickFilterText}
         onSelectionChanged={() => {
           if (gridRef.current?.api && onSelectionChanged) {
             const selected = gridRef.current.api.getSelectedRows() as T[];

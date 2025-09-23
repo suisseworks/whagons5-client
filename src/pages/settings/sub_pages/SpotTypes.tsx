@@ -12,12 +12,13 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer
+  createActionsCellRenderer,
+  ColorIndicatorCellRenderer
 } from "../components";
 import { AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 
-type SpotType = { id: number; name: string; description?: string | null };
+type SpotType = { id: number; name: string; description?: string | null; color?: string | null };
 
 function SpotTypes() {
   const dispatch = useDispatch<AppDispatch>();
@@ -55,9 +56,28 @@ function SpotTypes() {
     dispatch(genericActions.spotTypes.fetchFromAPI({ per_page: 1000 }));
   }, [dispatch]);
 
+  const SpotTypeNameCellRenderer = (params: any) => {
+    const name = params.data?.name as string;
+    const color = (params.data?.color as string) || '#6b7280';
+    return (
+      <ColorIndicatorCellRenderer value={name} name={name} color={color} />
+    );
+  };
+
+  const ColorSwatchCellRenderer = (params: any) => {
+    const color = (params.data?.color as string) || '#6b7280';
+    return (
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 rounded-sm border" style={{ backgroundColor: color }} />
+        <span className="text-xs text-muted-foreground">{color}</span>
+      </div>
+    );
+  };
+
   const colDefs = useMemo<ColDef[]>(() => [
-    { field: 'name', headerName: 'Name', flex: 2, minWidth: 180 },
+    { field: 'name', headerName: 'Name', flex: 2, minWidth: 180, cellRenderer: SpotTypeNameCellRenderer },
     { field: 'description', headerName: 'Description', flex: 3, minWidth: 220 },
+    { field: 'color', headerName: 'Color', width: 160, cellRenderer: ColorSwatchCellRenderer },
     {
       field: 'actions', headerName: 'Actions', width: 120,
       cellRenderer: createActionsCellRenderer({ onEdit: handleEdit, onDelete: handleDelete }),
@@ -70,7 +90,8 @@ function SpotTypes() {
     const form = new FormData(e.target as HTMLFormElement);
     const payload = {
       name: String(form.get('name') || ''),
-      description: String(form.get('description') || '') || null
+      description: String(form.get('description') || '') || null,
+      color: String(form.get('color') || '#10b981')
     } as any;
     await createItem(payload);
   };
@@ -81,7 +102,8 @@ function SpotTypes() {
     const form = new FormData(e.target as HTMLFormElement);
     const updates = {
       name: String(form.get('name') || ''),
-      description: String(form.get('description') || '') || null
+      description: String(form.get('description') || '') || null,
+      color: String(form.get('color') || (editingItem as any).color || '#10b981')
     } as any;
     await updateItem((editingItem as any).id, updates);
   };
@@ -127,6 +149,10 @@ function SpotTypes() {
             <Label htmlFor="description" className="text-right">Description</Label>
             <Input id="description" name="description" className="col-span-3" />
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="color" className="text-right">Color</Label>
+            <Input id="color" name="color" type="color" defaultValue="#10b981" className="col-span-3 h-9 p-1" />
+          </div>
         </div>
       </SettingsDialog>
 
@@ -149,6 +175,10 @@ function SpotTypes() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-description" className="text-right">Description</Label>
               <Input id="edit-description" name="description" defaultValue={(editingItem as any).description || ''} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-color" className="text-right">Color</Label>
+              <Input id="edit-color" name="color" type="color" defaultValue={(editingItem as any).color || '#10b981'} className="col-span-3 h-9 p-1" />
             </div>
           </div>
         )}

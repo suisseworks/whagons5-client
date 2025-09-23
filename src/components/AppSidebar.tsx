@@ -13,12 +13,12 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Settings,
-  Users,
   Plus,
   ChevronDown,
   Briefcase,
   BarChart3,
   MessageSquareMore,
+  Layers,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -46,6 +46,8 @@ import { Input } from './ui/input';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
+import { messageBoardsService } from '@/pages/messages/messageBoards';
+import CreateBoardDialog from '@/pages/messages/CreateBoardDialog';
 
 // Global pinned state management
 let isPinnedGlobal = false;
@@ -120,6 +122,9 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
+  const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
+  const [createBoardOpen, setCreateBoardOpen] = useState(false);
+  const [workspaceOrderIds, setWorkspaceOrderIds] = useState<string[]>([]);
 
   // const dispatch = useDispatch<AppDispatch>();
   // const { user } = useAuth(); // Currently not used, uncomment when needed
@@ -203,6 +208,58 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   useEffect(() => {
     iconService.preloadCommonIcons();
   }, []);
+
+  // Load message boards
+  useEffect(() => {
+    const load = () => { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch {} };
+    load();
+    const onUpdate = () => load();
+    window.addEventListener('wh-boards-updated', onUpdate);
+    return () => window.removeEventListener('wh-boards-updated', onUpdate);
+  }, []);
+
+  // Workspace ordering persistence (local only)
+  const WS_ORDER_STORAGE = 'wh-workspace-order';
+  const loadWorkspaceOrder = (): string[] => {
+    try {
+      const raw = localStorage.getItem(WS_ORDER_STORAGE);
+      if (!raw) return [];
+      const ids = JSON.parse(raw);
+      return Array.isArray(ids) ? ids.map((x: any) => String(x)) : [];
+    } catch {
+      return [];
+    }
+  };
+  const saveWorkspaceOrder = (ids: string[]) => {
+    try { localStorage.setItem(WS_ORDER_STORAGE, JSON.stringify(ids)); } catch {}
+  };
+
+  // Initialize/repair order when workspaces change
+  useEffect(() => {
+    const existingIds = uniqueWorkspaces.map((w: Workspace) => String(w.id));
+    const saved = loadWorkspaceOrder().filter((id) => existingIds.includes(id));
+    const missing = existingIds.filter((id) => !saved.includes(id));
+    const next = [...saved, ...missing];
+    setWorkspaceOrderIds(next);
+    saveWorkspaceOrder(next);
+  }, [uniqueWorkspaces]);
+
+  const orderedWorkspaces = useMemo(() => {
+    if (!workspaceOrderIds.length) return uniqueWorkspaces;
+    const byId = new Map(uniqueWorkspaces.map((w: Workspace) => [String(w.id), w]));
+    const ordered: Workspace[] = [];
+    for (const id of workspaceOrderIds) {
+      const w = byId.get(id);
+      if (w) ordered.push(w);
+    }
+    // Append any new ones not in order yet
+    for (const w of uniqueWorkspaces) {
+      if (!workspaceOrderIds.includes(String(w.id))) ordered.push(w);
+    }
+    return ordered;
+  }, [uniqueWorkspaces, workspaceOrderIds]);
+
+
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -322,7 +379,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       >
         <div className="flex items-center justify-center w-full h-full">
           <Link
-            to="/home"
+            to="/welcome"
             title="Home"
             className={`flex items-center h-full transition-all duration-300 ${
               isCollapsed ? 'justify-center' : 'justify-center'
@@ -362,7 +419,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
               >
                 <span>
-                  <Users className="w-4 h-4" />
+                  <Layers className="w-5 h-5 text-[#27C1A7]" />
                 </span>
                 <span>Everything</span>
               </Link>
@@ -381,7 +438,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 }`}
                 title={'Everything'}
               >
-                <Users className="w-4 h-4" />
+                <Layers className="w-5 h-5 text-[#27C1A7]" />
               </Link>
             </div>
           )}
@@ -486,29 +543,33 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 {(!isCollapsed || isMobile) && (
                   <SidebarGroupContent className="pt-2 pl-1">
 
-                    {uniqueWorkspaces.map((workspace: Workspace) => {
+                    {orderedWorkspaces.map((workspace: Workspace) => {
                       // Skip temporary optimistic items (negative IDs)
                       if ((workspace.id as number) < 0) return null;
 
                       return (
-                      <Link
+                      <div
                         key={`workspace-${workspace.id}`}
-                        to={`/workspace/${workspace.id}`}
-                        className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-4 mx-2 ${
-                          pathname === `/workspace/${workspace.id}`
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
-                        } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                        className="flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-4 mx-2"
                       >
-                        <span>
-                          <FontAwesomeIcon
-                            icon={getWorkspaceIcon(workspace.icon)}
-                            style={{ color: workspace.color }}
-                            className="w-4 h-4"
-                          />
-                        </span>
-                        <span>{workspace.name}</span>
-                      </Link>
+                        <Link
+                          to={`/workspace/${workspace.id}`}
+                          className={`flex-1 group flex items-center space-x-2 rounded-md transition-colors h-10 -mx-4 px-4 ${
+                            pathname === `/workspace/${workspace.id}`
+                              ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
+                          } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                        >
+                          <span>
+                            <FontAwesomeIcon
+                              icon={getWorkspaceIcon(workspace.icon)}
+                              style={{ color: workspace.color }}
+                              className="w-4 h-4"
+                            />
+                          </span>
+                          <span className="truncate">{workspace.name}</span>
+                        </Link>
+                      </div>
                       );
                     })}
                   </SidebarGroupContent>
@@ -518,7 +579,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 {isCollapsed && !isMobile && (
                   <SidebarGroupContent className="pt-2">
                     <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent">
-                      {uniqueWorkspaces
+                      {orderedWorkspaces
                         .filter((workspace: Workspace) => (workspace.id as number) >= 0) // Skip temp items
                         .map((workspace: Workspace) => (
                         <Link
@@ -544,41 +605,86 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
-          {/* Messages link after Spaces */}
-          {(!isCollapsed || isMobile) && (
-            <div className="px-3 py-2">
-              <Link
-                to={`/messages`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${
-                  pathname === `/messages`
-                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-              >
-                <span>
-                  <MessageSquareMore className="w-4 h-4" />
-                </span>
-                <span>Messages</span>
-              </Link>
-            </div>
-          )}
+          {/* Messages & Boards (collapsible like Spaces) */}
+          <Collapsible defaultOpen className="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild className="text-sm font-normal">
+                <div
+                  className={`flex items-center w-full pr-3 transition-all duration-300 ${
+                    isCollapsed ? 'justify-center px-0' : 'justify-between'
+                  }`}
+                >
+                  <CollapsibleTrigger
+                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
+                      isCollapsed && !isMobile
+                        ? 'flex-col justify-center ml-0 px-2'
+                        : 'justify-start flex-1'
+                    }`}
+                  >
+                    {isCollapsed && !isMobile ? (
+                      <div className="flex flex-col items-center">
+                        <MessageSquareMore className="text-sidebar-foreground w-5 h-5 mb-1" />
+                      </div>
+                    ) : (
+                      <>
+                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
+                        <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
+                          <MessageSquareMore className="w-4 h-4 mr-2" />
+                          Messages
+                        </span>
+                      </>
+                    )}
+                  </CollapsibleTrigger>
 
-          {/* Show Messages icon when collapsed - DESKTOP ONLY */}
-          {isCollapsed && !isMobile && (
-            <div className="px-2 py-2 flex justify-center">
-              <Link
-                to={`/messages`}
-                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
-                  pathname === `/messages`
-                    ? 'bg-primary/20 text-primary border border-primary/40'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                }`}
-                title={'Messages'}
-              >
-                <MessageSquareMore className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
+                  {showExpandedContent && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="New Board" onClick={() => setCreateBoardOpen(true)}>
+                      <Plus size={16} />
+                    </Button>
+                  )}
+                </div>
+              </SidebarGroupLabel>
+
+              <CollapsibleContent>
+                {(!isCollapsed || isMobile) && (
+                  <div className="px-3 py-2">
+                    <Link
+                      to={`/messages`}
+                      className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${
+                        pathname === `/messages`
+                          ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                    >
+                      <span>
+                        <MessageSquareMore className="w-4 h-4" />
+                      </span>
+                      <span>All Messages</span>
+                    </Link>
+                  </div>
+                )}
+
+                {(!isCollapsed || isMobile) && boards.length > 0 && (
+                  <div className="px-3 py-1 space-y-1">
+                    {boards.map((b) => (
+                      <div
+                        key={`mb-${b.id}`}
+                        className="flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-9 px-3"
+                      >
+                        <Link
+                          to={`/messages/board/${b.id}`}
+                          className={`flex-1 group flex items-center space-x-2 rounded-md transition-colors h-9 -mx-3 px-3 ${
+                            pathname === `/messages/board/${b.id}` ? 'bg-primary/15 text-primary border-l-4 border-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          }`}
+                        >
+                          <span className="truncate">{b.name}</span>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         </SidebarGroup>
       </SidebarContent>
 
@@ -613,9 +719,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
                   >
                     <BarChart3 size={20} className="w-5! h-5! p-[1px]" />
-                    {showExpandedContent && (
-                      <span className="ml-2">Analytics</span>
-                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -646,15 +749,14 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
                   >
                     <Settings size={20} className="w-5! h-5! p-[1px]" />
-                    {showExpandedContent && (
-                      <span className="ml-2">Settings</span>
-                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <CreateBoardDialog open={createBoardOpen} onOpenChange={(o) => { setCreateBoardOpen(o); if (!o) { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch {} } }} />
 
         {showExpandedContent && (
           <div className="px-2 py-1 text-xs text-muted-foreground">

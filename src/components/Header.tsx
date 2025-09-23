@@ -193,7 +193,7 @@ function Header() {
                         </h1>
                     ) : (
                         <nav className="hidden sm:flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Link to="/" className="hover:text-foreground">Home</Link>
+                            <Link to="/welcome" className="hover:text-foreground">Home</Link>
                             {breadcrumbs.map((bc, idx) => (
                                 <div key={idx} className="flex items-center space-x-2">
                                     <span>›</span>
