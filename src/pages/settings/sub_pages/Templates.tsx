@@ -118,6 +118,7 @@ function Templates() {
     priority_id: '',
     sla_id: '',
     default_spot_id: '',
+    expected_duration: '',
     enabled: true
   });
 
@@ -126,6 +127,7 @@ function Templates() {
     priority_id: '',
     sla_id: '',
     default_spot_id: '',
+    expected_duration: '',
     enabled: true
   });
 
@@ -142,12 +144,21 @@ function Templates() {
         priority_id: (editingTemplate as any).priority_id?.toString() || '',
         sla_id: (editingTemplate as any).sla_id?.toString() || '',
         default_spot_id: (editingTemplate as any).default_spot_id?.toString() || '',
+        expected_duration: (editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : '',
         enabled: (editingTemplate as any).enabled !== false // Default to true if not set
       });
     }
   }, [isEditDialogOpen, editingTemplate]);
 
   // Helper functions
+  const minutesToHHMM = (totalMinutes: number | null | undefined) => {
+    if (totalMinutes == null || !Number.isFinite(totalMinutes) || Number(totalMinutes) <= 0) return '';
+    const hours = Math.floor(Number(totalMinutes) / 60);
+    const minutes = Number(totalMinutes) % 60;
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
   const getTemplateTaskCount = (templateId: number) => {
     return tasks.filter((task: Task) => task.template_id === templateId).length;
   };
@@ -262,6 +273,20 @@ function Templates() {
       sortable: true,
       filter: true
     },
+    {
+      field: 'expected_duration',
+      headerName: 'Expected Duration',
+      width: 160,
+      valueFormatter: (params: any) => {
+        const v = params.value;
+        if (v == null || v === '') return '—';
+        const n = Number(v);
+        if (!Number.isFinite(n) || n <= 0) return '—';
+        return minutesToHHMM(n) || '—';
+      },
+      sortable: true,
+      filter: true
+    },
     { 
       field: 'default_spot_id', 
       headerName: 'Default Spot',
@@ -325,6 +350,7 @@ function Templates() {
     const description = (formData.get('description') as string) || null;
     const instructions = (formData.get('instructions') as string) || null;
     const enabled = formData.get('enabled') === 'on';
+    const expectedDurationRaw = formData.get('expected_duration') as string;
 
     // Validate required fields
     if (!name?.trim()) {
@@ -347,6 +373,7 @@ function Templates() {
         return ids.length ? ids : null;
       })(),
       instructions,
+      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : null; })(),
       enabled
     };
 
@@ -358,6 +385,7 @@ function Templates() {
       priority_id: '',
       sla_id: '',
       default_spot_id: '',
+      expected_duration: '',
       enabled: true
     });
     setCreateUserIds([]);
@@ -373,7 +401,8 @@ function Templates() {
     const name = formData.get('name') as string;
     const description = (formData.get('description') as string) || null;
     const instructions = (formData.get('instructions') as string) || null;
-    const enabled = formData.get('enabled') === 'on';
+    // enabled state handled via editFormData.enabled
+    const expectedDurationRaw = formData.get('expected_duration') as string;
 
     // Validate required fields
     if (!name?.trim()) {
@@ -396,6 +425,7 @@ function Templates() {
         return ids.length ? ids : null;
       })(),
       instructions,
+      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : null; })(),
       enabled: editFormData.enabled
     };
 
@@ -422,6 +452,9 @@ function Templates() {
           >
             {priorityById.get((template as any).priority_id)?.name || 'Priority'}
           </Badge>
+          {((template as any).expected_duration ?? null) ? (
+            <Badge variant="secondary" className="text-xs">{minutesToHHMM((template as any).expected_duration)}</Badge>
+          ) : null}
           {(template as any).default_spot_id && (
             <Badge variant="secondary" className="text-xs">
               {spotById.get((template as any).default_spot_id)?.name || `Spot ${(template as any).default_spot_id}`}
@@ -466,7 +499,8 @@ function Templates() {
         items: [
           { label: "Total Templates", value: templates.length },
           { label: "With Default Spot", value: templates.filter((t: any) => t.default_spot_id).length },
-          { label: "With Default Users", value: templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length }
+          { label: "With Default Users", value: templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length },
+          { label: "With Expected Duration", value: templates.filter((t: any) => (t.expected_duration ?? 0) > 0).length }
         ]
       }}
       headerActions={
@@ -496,6 +530,7 @@ function Templates() {
               priority_id: '',
               sla_id: '',
               default_spot_id: '',
+              expected_duration: '',
               enabled: true
             });
             setCreateUserIds([]);
@@ -518,6 +553,10 @@ function Templates() {
             <Label htmlFor="description" className="text-right">Description</Label>
             <Input id="description" name="description" className="col-span-3" />
           </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="expected_duration" className="text-right">Expected Duration (min)</Label>
+          <Input id="expected_duration" name="expected_duration" type="number" min="0" step="1" placeholder="e.g. 90" className="col-span-3" />
+        </div>
           <SelectField
             id="category"
             label="Category"
@@ -620,6 +659,7 @@ function Templates() {
               priority_id: '',
               sla_id: '',
               default_spot_id: '',
+              expected_duration: '',
               enabled: true
             });
             setEditUserIds([]);
@@ -651,6 +691,18 @@ function Templates() {
                 id="edit-description"
                 name="description"
                 defaultValue={(editingTemplate as any).description || ''}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="edit-expected_duration" className="text-right">Expected Duration (min)</Label>
+              <Input
+                id="edit-expected_duration"
+                name="expected_duration"
+              type="number"
+              min="0"
+              step="1"
+              defaultValue={(editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : ''}
                 className="col-span-3"
               />
             </div>

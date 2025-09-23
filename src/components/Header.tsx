@@ -228,7 +228,7 @@ function Header() {
                             <BreadcrumbList className="gap-1.5 sm:gap-2">
                                 <BreadcrumbItem>
                                     <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
-                                        <Link to="/" className="truncate max-w-[6rem]">Home</Link>
+                                        <Link to="/welcome" className="truncate max-w-[6rem]">Home</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 {breadcrumbs.map((bc, idx) => (

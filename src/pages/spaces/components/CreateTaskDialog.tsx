@@ -210,7 +210,8 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         due_date: dueDate || null,
         expected_duration: (() => {
           const t = workspaceTemplates.find((x: any) => x.id === templateId);
-          return t?.default_duration ?? 0;
+          const v = t?.expected_duration ?? t?.default_duration ?? 0;
+          return Number.isFinite(v) ? v : 0;
         })(),
         response_date: null,
         resolution_date: null,
@@ -276,7 +277,16 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                 )}
                 {(() => { const t = workspaceTemplates.find((x: any) => x.id === templateId); const team = teams.find((tm: any) => tm.id === t?.team_id); return t?.team_id ? (<Badge variant="secondary">Team: {team?.name || t.team_id}</Badge>) : null; })()}
                 {(() => { const p = priorities.find((x: any) => x.id === priorityId); return priorityId ? (<Badge variant="secondary">Priority: {p?.name || priorityId}</Badge>) : null; })()}
-                {(() => { const t = workspaceTemplates.find((x: any) => x.id === templateId); return t?.default_duration ? (<Badge variant="secondary">Duration: {t.default_duration} min</Badge>) : null; })()}
+                {(() => {
+                  const t = workspaceTemplates.find((x: any) => x.id === templateId);
+                  const d = t?.expected_duration ?? t?.default_duration;
+                  if (!d || !Number.isFinite(d) || d <= 0) return null;
+                  const hours = Math.floor(Number(d) / 60);
+                  const minutes = Number(d) % 60;
+                  const hh = String(hours).padStart(2, '0');
+                  const mm = String(minutes).padStart(2, '0');
+                  return (<Badge variant="secondary">Duration: {hh}:{mm}</Badge>);
+                })()}
                 {(() => { const sid = categoryInitialStatusId; if (!sid) return null; const st = statuses.find((s: any) => s.id === sid); return (<Badge variant="secondary">Initial Status: {st?.name || sid}</Badge>); })()}
               </div>
             </div>

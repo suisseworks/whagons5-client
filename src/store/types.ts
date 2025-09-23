@@ -48,6 +48,7 @@ export interface Template {
     sla_id: number | null;
     default_spot_id?: number | null;
     default_user_ids?: number[] | null;
+    expected_duration?: number | null;
     // Legacy/previous fields kept optional for compatibility during transition
     description?: string | null;
     team_id?: number;

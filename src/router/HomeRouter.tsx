@@ -51,7 +51,8 @@ export const HomeRoutes = () => {
       <MainLayout>
         <AllPages />
         <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/" element={<Navigate to="/welcome" replace />} />
+          <Route path="/welcome" element={<Home />} />
           <Route path="/home" element={<Home />} />
           <Route path="/tasks" element={<Workspace />} />
           {/* <Route path="/workspace/:id" element={<Workspace />} />
@@ -62,6 +63,7 @@ export const HomeRoutes = () => {
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/messages/board/:id" element={<Messages />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />

@@ -41,7 +41,7 @@ const genericSliceConfigs = [
     { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','sla_id','category_id','updated_at'] },
     { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','parent_id','spot_type_id','is_branch','updated_at'] },
     { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','updated_at'] },
-    { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','updated_at'] },
+    { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','color','updated_at'] },
     { name: 'statusTransitions', table: 'wh_status_transitions', endpoint: '/status-transitions', store: 'status_transitions', hashFields: ['id','status_transition_group_id','from_status','to_status','initial','updated_at'] },
     { name: 'statusTransitionGroups', table: 'wh_status_transition_groups', endpoint: '/status-transition-groups', store: 'status_transition_groups', hashFields: ['id','name','description','is_default','is_active','updated_at'] },
 

@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot, faPlus, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
+import { RootState, AppDispatch } from "@/store/store";
+import { genericActions } from "@/store/genericSlices";
 import { Spot } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -14,8 +15,11 @@ import {
   useSettingsState,
   createActionsCellRenderer,
   TextField,
-  CheckboxField
+  CheckboxField,
+  SelectField
 } from "../components";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
+import { Badge } from "@/components/ui/badge";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -37,8 +41,17 @@ const SpotNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Spots() {
+  const dispatch = useDispatch<AppDispatch>();
   // Redux state for related data
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const { value: spotTypes } = useSelector((state: RootState) => (state as any).spotTypes || { value: [] });
+
+  // Hydrate spot types for dropdown (fast IndexedDB, then API refresh)
+  useEffect(() => {
+    // Some app shells may already hydrate; harmless to call again
+    dispatch(genericActions.spotTypes.getFromIndexedDB());
+    dispatch(genericActions.spotTypes.fetchFromAPI({ per_page: 1000 }));
+  }, [dispatch]);
   
   // Use shared state management
   const {
@@ -68,6 +81,33 @@ function Spots() {
     entityName: 'spots',
     searchFields: ['name']
   });
+
+  // Enhanced spots data with hierarchy information for row grouping
+  const hierarchyData = useMemo(() => {
+    // Create a map for quick parent lookup
+    const spotById = new Map<number, Spot>();
+    spots.forEach(spot => spotById.set(spot.id, spot));
+
+    // Create enhanced data with hierarchy information
+    return spots.map(spot => ({
+      ...spot,
+      // Add display fields for hierarchy
+      spot_type_name: (spotTypes as any[]).find((t) => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`,
+      parent_name: spot.parent_id ? (spotById.get(spot.parent_id)?.name ?? `Spot ${spot.parent_id}`) : 'Root'
+    }));
+  }, [spots, spotTypes]);
+
+  // Apply search to hierarchy data
+  const searchableHierarchyData = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return hierarchyData;
+    }
+    return hierarchyData.filter(spot =>
+      spot.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [hierarchyData, searchQuery]);
+
+
 
   // Form state for controlled components
   const [createFormData, setCreateFormData] = useState<{
@@ -111,44 +151,65 @@ function Spots() {
     return tasks.filter((task: any) => task.spot_id === spotId).length;
   };
 
-  // Column definitions for AG Grid
+  // Column definitions for AG Grid with row grouping
   const colDefs = useMemo<ColDef[]>(() => [
-    { 
-      field: 'name', 
-      headerName: 'Spot', 
-      flex: 2, 
-      minWidth: 200, 
-      cellRenderer: SpotNameCellRenderer 
-    },
-    // Type column removed per request (no corresponding DB field)
     {
-      field: 'spot_type_id', 
-      headerName: 'Spot Type', 
-      width: 120,
-      valueFormatter: (p) => `Type ${p.value}`
+      field: 'name',
+      headerName: 'Spot',
+      flex: 2,
+      minWidth: 200,
+      cellRenderer: SpotNameCellRenderer
     },
     {
-      field: 'parent_id', 
-      headerName: 'Parent', 
+      field: 'spot_type_name',
+      headerName: 'Spot Type',
       width: 120,
-      valueFormatter: (p) => p.value ? `Spot ${p.value}` : 'Root'
+      valueFormatter: (p) => p.value || 'Unknown'
+    },
+    {
+      field: 'parent_name',
+      headerName: 'Parent',
+      width: 120,
+      rowGroup: true, // Enable row grouping on this column
+      hide: true // Hide the column but use it for grouping
     },
     // Tasks column removed per request
     // Updated column removed per request
     {
-      field: 'actions', 
-      headerName: 'Actions', 
+      field: 'actions',
+      headerName: 'Actions',
       width: 120,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete
       }),
-      sortable: false, 
-      filter: false, 
-      resizable: false, 
+      sortable: false,
+      filter: false,
+      resizable: false,
       pinned: 'right'
     }
-  ], [getSpotTaskCount, handleEdit, handleDelete]);
+  ], [handleEdit, handleDelete, spotTypes]);
+
+  // Grid options for row grouping with hierarchical selection (align with example)
+  const gridOptions = useMemo(() => ({
+    rowGroupPanelShow: 'always',
+    groupDefaultExpanded: 1,
+    animateRows: true,
+    getRowId: (params: any) => String(params.data.id),
+    suppressRowClickSelection: true,
+  }), []);
+
+  const autoGroupColumnDef = useMemo(() => ({
+    headerName: 'Hierarchy',
+    minWidth: 250,
+    field: 'name',
+    cellRenderer: 'agGroupCellRenderer',
+  }), []);
+
+  const rowSelection = useMemo(() => ({
+    mode: 'multiRow',
+    groupSelects: 'filteredDescendants' as const,
+  }), []);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -193,7 +254,7 @@ function Spots() {
       <div>
         <div className="font-medium">{spot.name}</div>
         <div className="text-sm text-muted-foreground">
-          {spot.is_branch ? 'Branch' : 'Location'} • Type {spot.spot_type_id}
+          {spot.is_branch ? 'Branch' : 'Location'} • {(spotTypes as any[]).find(t => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`}
           {spot.parent_id && ` • Parent: Spot ${spot.parent_id}`}
         </div>
         <div className="flex items-center space-x-2 mt-1">
@@ -206,7 +267,7 @@ function Spots() {
   return (
     <SettingsLayout
       title="Spots"
-      description="Set up locations and spot management"
+      description="Set up hierarchical locations and spot management with row grouping"
       icon={faLocationDot}
       iconColor="#10b981"
       search={{
@@ -227,11 +288,12 @@ function Spots() {
       } : undefined}
       statistics={{
         title: "Spot Statistics",
-        description: "Overview of your locations",
+        description: "Overview of your hierarchical locations",
         items: [
           { label: "Total Spots", value: spots.length },
           { label: "Total Tasks", value: tasks.length },
-          { label: "Avg Tasks/Spot", value: spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0 }
+          { label: "Avg Tasks/Spot", value: spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0 },
+          { label: "Root Spots", value: spots.filter(s => !s.parent_id).length }
         ]
       }}
       headerActions={
@@ -249,13 +311,37 @@ function Spots() {
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={colDefs}
-        noRowsMessage="No spots found"
-      />
+      <Tabs defaultValue="main">
+        <TabsList>
+          <TabsTrigger value="main">Spots</TabsTrigger>
+          <TabsTrigger value="branches">Branches</TabsTrigger>
+        </TabsList>
+        <TabsContent value="main">
+          <SettingsGrid
+            rowData={searchableHierarchyData}
+            columnDefs={colDefs}
+            gridOptions={gridOptions}
+            autoGroupColumnDef={autoGroupColumnDef}
+            rowSelection={rowSelection as any}
+            noRowsMessage="No spots found"
+            onRowDoubleClicked={handleEdit}
+          />
+        </TabsContent>
+        <TabsContent value="branches">
+          <SettingsGrid
+            rowData={filteredItems.filter((s: any) => s.is_branch)}
+            columnDefs={colDefs}
+            gridOptions={gridOptions}
+            autoGroupColumnDef={autoGroupColumnDef}
+            rowSelection={rowSelection as any}
+            noRowsMessage="No branches found"
+            onRowDoubleClicked={handleEdit}
+          />
+        </TabsContent>
+      </Tabs>
 
-      {/* Create Spot Dialog */}
+      {/* Create Spot Dialog */
+      }
       <SettingsDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
@@ -275,13 +361,14 @@ function Spots() {
             onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
-          <TextField
+          <SelectField
             id="spot_type_id"
             label="Spot Type"
-            type="number"
             value={createFormData.spot_type_id}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, spot_type_id: value }))}
-            min="1"
+            options={(spotTypes as any[]).map((st) => ({ value: st.id, label: st.name }))}
+            placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
+            required
           />
           <TextField
             id="parent_id"
@@ -322,13 +409,14 @@ function Spots() {
               onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
-            <TextField
+            <SelectField
               id="edit-spot_type_id"
               label="Spot Type"
-              type="number"
               value={editFormData.spot_type_id}
               onChange={(value) => setEditFormData(prev => ({ ...prev, spot_type_id: value }))}
-              min="1"
+              options={(spotTypes as any[]).map((st) => ({ value: st.id, label: st.name }))}
+              placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
+              required
             />
             <TextField
               id="edit-parent_id"
