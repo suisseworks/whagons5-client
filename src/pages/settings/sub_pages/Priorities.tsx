@@ -13,7 +13,8 @@ import {
   useSettingsState,
   createActionsCellRenderer,
   ColorIndicatorCellRenderer,
-  TextField
+  TextField,
+  SelectField
 } from "../components";
 
 const PriorityNameCellRenderer = (props: ICellRendererParams) => {
@@ -26,6 +27,7 @@ const PriorityNameCellRenderer = (props: ICellRendererParams) => {
 
 function Priorities() {
   const { value: priorities } = useSelector((state: RootState) => state.priorities);
+  const { value: categories } = useSelector((state: RootState) => state.categories);
 
   const {
     filteredItems,
@@ -58,21 +60,21 @@ function Priorities() {
   const [createFormData, setCreateFormData] = useState<{
     name: string;
     color: string;
-    level: string;
+    category_id: string;
   }>({
     name: '',
     color: '#ef4444',
-    level: ''
+    category_id: ''
   });
 
   const [editFormData, setEditFormData] = useState<{
     name: string;
     color: string;
-    level: string;
+    category_id: string;
   }>({
     name: '',
     color: '#ef4444',
-    level: ''
+    category_id: ''
   });
 
   // Update edit form data when editing item changes
@@ -81,7 +83,7 @@ function Priorities() {
       setEditFormData({
         name: editingItem.name || '',
         color: editingItem.color || '#ef4444',
-        level: editingItem.level?.toString() || ''
+        category_id: editingItem.category_id?.toString() || ''
       });
     }
   }, [editingItem]);
@@ -95,9 +97,32 @@ function Priorities() {
       cellRenderer: PriorityNameCellRenderer
     },
     {
-      field: "level",
-      headerName: "Level",
-      width: 100,
+      colId: "category_name",
+      headerName: "Category",
+      flex: 2,
+      minWidth: 200,
+      rowGroup: true,
+      rowGroupIndex: 0,
+      valueGetter: (params: any) => {
+        const catId = params.data?.category_id as number | null | undefined;
+        if (!catId) return 'Unassigned';
+        const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
+        return cat?.name || 'Unassigned';
+      },
+      cellRenderer: (params: ICellRendererParams) => {
+        const catId = params.data?.category_id as number | null | undefined;
+        if (!catId) {
+          return <span className="text-muted-foreground">Unassigned</span>;
+        }
+        const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
+        if (!cat) {
+          return <span className="text-muted-foreground">Unassigned</span>;
+        }
+        return (
+          <ColorIndicatorCellRenderer value={cat.name} name={cat.name} color={cat.color || "#6b7280"} />
+        );
+      },
+      comparator: (a: any, b: any) => String(a || '').localeCompare(String(b || '')),
       sortable: true,
       filter: true
     },
@@ -114,7 +139,7 @@ function Priorities() {
       resizable: false,
       pinned: "right"
     }
-  ], [handleEdit, handleDelete]);
+  ], [handleEdit, handleDelete, categories]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +147,7 @@ function Priorities() {
     const data = {
       name: createFormData.name,
       color: createFormData.color,
-      level: createFormData.level ? parseInt(createFormData.level) : null
+      category_id: createFormData.category_id ? parseInt(createFormData.category_id) : null
     } as Omit<Priority, "id" | "created_at" | "updated_at">;
 
     await createItem(data as any);
@@ -131,7 +156,7 @@ function Priorities() {
     setCreateFormData({
       name: '',
       color: '#ef4444',
-      level: ''
+      category_id: ''
     });
   };
 
@@ -142,7 +167,7 @@ function Priorities() {
     const updates = {
       name: editFormData.name,
       color: editFormData.color,
-      level: editFormData.level ? parseInt(editFormData.level) : editingItem.level ?? null
+      category_id: editFormData.category_id ? parseInt(editFormData.category_id) : editingItem.category_id ?? null
     } as Partial<Priority>;
 
     await updateItem(editingItem.id, updates);
@@ -170,14 +195,6 @@ function Priorities() {
       icon={faArrowUpWideShort}
       iconColor="#ef4444"
       backPath="/settings"
-      search={{
-        placeholder: "Search priorities...",
-        value: searchQuery,
-        onChange: (value: string) => {
-          setSearchQuery(value);
-          handleSearch(value);
-        }
-      }}
       loading={{ isLoading: loading, message: "Loading priorities..." }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       statistics={{
@@ -196,6 +213,10 @@ function Priorities() {
       <SettingsGrid
         rowData={filteredItems}
         columnDefs={columns}
+        gridOptions={{
+          groupDisplayType: 'groupRows',
+          groupDefaultExpanded: -1
+        }}
         noRowsMessage="No priorities found"
       />
 
@@ -226,14 +247,13 @@ function Priorities() {
             value={createFormData.color}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
-          <TextField
-            id="level"
-            label="Level"
-            type="number"
-            min="0"
-            value={createFormData.level}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, level: value }))}
-            placeholder="Optional numeric level"
+          <SelectField
+            id="category"
+            label="Category"
+            value={createFormData.category_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, category_id: value }))}
+            placeholder="Unassigned"
+            options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
           />
         </div>
       </SettingsDialog>
@@ -266,13 +286,13 @@ function Priorities() {
               value={editFormData.color}
               onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
             />
-            <TextField
-              id="edit-level"
-              label="Level"
-              type="number"
-              min="0"
-              value={editFormData.level}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, level: value }))}
+            <SelectField
+              id="edit-category"
+              label="Category"
+              value={editFormData.category_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, category_id: value }))}
+              placeholder="Unassigned"
+              options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
             />
           </div>
         )}

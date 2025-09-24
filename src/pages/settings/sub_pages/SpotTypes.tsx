@@ -64,20 +64,9 @@ function SpotTypes() {
     );
   };
 
-  const ColorSwatchCellRenderer = (params: any) => {
-    const color = (params.data?.color as string) || '#6b7280';
-    return (
-      <div className="flex items-center gap-2">
-        <div className="w-4 h-4 rounded-sm border" style={{ backgroundColor: color }} />
-        <span className="text-xs text-muted-foreground">{color}</span>
-      </div>
-    );
-  };
-
   const colDefs = useMemo<ColDef[]>(() => [
     { field: 'name', headerName: 'Name', flex: 2, minWidth: 180, cellRenderer: SpotTypeNameCellRenderer },
     { field: 'description', headerName: 'Description', flex: 3, minWidth: 220 },
-    { field: 'color', headerName: 'Color', width: 160, cellRenderer: ColorSwatchCellRenderer },
     {
       field: 'actions', headerName: 'Actions', width: 120,
       cellRenderer: createActionsCellRenderer({ onEdit: handleEdit, onDelete: handleDelete }),
@@ -115,9 +104,6 @@ function SpotTypes() {
       icon={faLayerGroup}
       iconColor="#6366f1"
       backPath="/settings/spots"
-      breadcrumbs={[
-        { label: 'Spots', path: '/settings/spots' }
-      ]}
       search={{ placeholder: 'Search spot types...', value: searchQuery, onChange: (v: string) => { setSearchQuery(v); handleSearch(v); } }}
       loading={{ isLoading: loading, message: 'Loading spot types...' }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
@@ -129,7 +115,12 @@ function SpotTypes() {
         </Button>
       }
     >
-      <SettingsGrid rowData={filteredItems} columnDefs={colDefs} noRowsMessage="No spot types found" />
+      <SettingsGrid
+        rowData={filteredItems}
+        columnDefs={colDefs}
+        noRowsMessage="No spot types found"
+        onRowDoubleClicked={handleEdit}
+      />
 
       <SettingsDialog
         open={isCreateDialogOpen}

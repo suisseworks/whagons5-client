@@ -2,10 +2,10 @@ import { useRef, useCallback, useEffect } from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
-import 'ag-grid-enterprise';
+import { RowGroupingModule, TreeDataModule } from 'ag-grid-enterprise';
 
-// Register AG Grid modules
-ModuleRegistry.registerModules([AllCommunityModule]);
+// Register AG Grid modules (community + enterprise needed for grouping/tree)
+ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataModule]);
 
 export interface SettingsGridProps<T = any> {
   rowData: T[];
@@ -98,8 +98,8 @@ export function SettingsGrid<T = any>({
           }
         }}
         onRowDoubleClicked={(event: any) => {
-          if (onRowDoubleClicked) {
-            onRowDoubleClicked(event?.data as T);
+          if (onRowDoubleClicked && event?.data) {
+            onRowDoubleClicked(event.data as T);
           }
         }}
         noRowsOverlayComponent={() => (

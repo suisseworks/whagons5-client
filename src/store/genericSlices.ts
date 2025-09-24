@@ -64,7 +64,7 @@ const genericSliceConfigs = [
 
     // Core Entities (converted from custom to generic)
     { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','updated_at'] },
-    { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-field-assignments', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
+    { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-custom-fields', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','updated_at'] },
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','updated_at'] },

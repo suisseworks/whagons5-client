@@ -16,10 +16,10 @@ import {
   createActionsCellRenderer,
   TextField,
   CheckboxField,
-  SelectField
+  SelectField,
+  ColorIndicatorCellRenderer
 } from "../components";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
-import { Badge } from "@/components/ui/badge";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -56,7 +56,6 @@ function Spots() {
   // Use shared state management
   const {
     items: spots,
-    filteredItems,
     loading,
     error,
     searchQuery,
@@ -82,18 +81,29 @@ function Spots() {
     searchFields: ['name']
   });
 
-  // Enhanced spots data with hierarchy information for row grouping
+  // Enhanced spots data with hierarchy path for tree data
   const hierarchyData = useMemo(() => {
-    // Create a map for quick parent lookup
     const spotById = new Map<number, Spot>();
     spots.forEach(spot => spotById.set(spot.id, spot));
 
-    // Create enhanced data with hierarchy information
+    const buildPath = (spot: Spot) => {
+      const path: string[] = [];
+      let current: Spot | undefined = spot;
+      const visited = new Set<number>();
+      while (current) {
+        if (visited.has(current.id)) break; // guard against cycles
+        visited.add(current.id);
+        path.unshift(current.name || `Spot ${current.id}`);
+        current = current.parent_id ? spotById.get(current.parent_id) : undefined;
+      }
+      return path;
+    };
+
     return spots.map(spot => ({
       ...spot,
-      // Add display fields for hierarchy
       spot_type_name: (spotTypes as any[]).find((t) => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`,
-      parent_name: spot.parent_id ? (spotById.get(spot.parent_id)?.name ?? `Spot ${spot.parent_id}`) : 'Root'
+      spot_type_color: (spotTypes as any[]).find((t) => t.id === spot.spot_type_id)?.color ?? undefined,
+      hierarchyPath: buildPath(spot)
     }));
   }, [spots, spotTypes]);
 
@@ -121,6 +131,20 @@ function Spots() {
     parent_id: '',
     is_branch: false
   });
+
+  // Dropdown options for parent spot selection
+  const ROOT_VALUE = '__ROOT__';
+  const parentSpotOptions = useMemo(() => {
+    return [
+      { value: ROOT_VALUE, label: 'Root' },
+      ...spots.map((s) => ({ value: String(s.id), label: s.name }))
+    ];
+  }, [spots]);
+
+  const editParentSpotOptions = useMemo(() => {
+    if (!editingSpot) return parentSpotOptions;
+    return parentSpotOptions.filter((opt) => opt.value === '' || opt.value !== String(editingSpot.id));
+  }, [parentSpotOptions, editingSpot]);
 
   const [editFormData, setEditFormData] = useState<{
     name: string;
@@ -151,27 +175,26 @@ function Spots() {
     return tasks.filter((task: any) => task.spot_id === spotId).length;
   };
 
-  // Column definitions for AG Grid with row grouping
+  // Column definitions for AG Grid (tree data)
   const colDefs = useMemo<ColDef[]>(() => [
     {
-      field: 'name',
       headerName: 'Spot',
+      field: 'name',
       flex: 2,
-      minWidth: 200,
-      cellRenderer: SpotNameCellRenderer
+      minWidth: 280,
+      cellRenderer: 'agGroupCellRenderer',
+      cellRendererParams: {
+        suppressCount: true,
+        innerRenderer: SpotNameCellRenderer
+      },
+      rowDrag: true
     },
     {
-      field: 'spot_type_name',
       headerName: 'Spot Type',
-      width: 120,
-      valueFormatter: (p) => p.value || 'Unknown'
-    },
-    {
-      field: 'parent_name',
-      headerName: 'Parent',
-      width: 120,
-      rowGroup: true, // Enable row grouping on this column
-      hide: true // Hide the column but use it for grouping
+      field: 'spot_type_name',
+      width: 160,
+      cellRenderer: ColorIndicatorCellRenderer as any,
+      cellRendererParams: (p: any) => ({ name: p.data?.spot_type_name, color: p.data?.spot_type_color })
     },
     // Tasks column removed per request
     // Updated column removed per request
@@ -190,26 +213,77 @@ function Spots() {
     }
   ], [handleEdit, handleDelete, spotTypes]);
 
-  // Grid options for row grouping with hierarchical selection (align with example)
+  // Grid options for tree data with hierarchical selection
   const gridOptions = useMemo(() => ({
-    rowGroupPanelShow: 'always',
+    treeData: true,
+    getDataPath: (data: any) => data.hierarchyPath,
     groupDefaultExpanded: 1,
     animateRows: true,
-    getRowId: (params: any) => String(params.data.id),
+    getRowId: (params: any) => params?.data?.id != null ? String(params.data.id) : undefined,
     suppressRowClickSelection: true,
-  }), []);
+    rowDragManaged: true,
+    onCellDoubleClicked: (params: any) => {
+      if (params?.colDef?.field === 'spot_type_color' && params?.data?.spot_type_id) {
+        const type = (spotTypes as any[]).find((t) => t.id === params.data.spot_type_id);
+        if (type) {
+          setEditingSpotType({ id: type.id, name: type.name });
+          setEditingSpotTypeColor(type.color || '#000000');
+          setIsEditSpotTypeOpen(true);
+        }
+      }
+    },
+    onRowDragEnd: async (event: any) => {
+      const dragged = event?.node?.data;
+      if (!dragged) return;
+      const overNode = event?.overNode;
+      const newParentId: number | null = overNode?.data?.id ?? null;
+      if (newParentId === dragged.id) return; // cannot parent to self
 
-  const autoGroupColumnDef = useMemo(() => ({
-    headerName: 'Hierarchy',
-    minWidth: 250,
-    field: 'name',
-    cellRenderer: 'agGroupCellRenderer',
-  }), []);
+      // Build quick lookup for cycle prevention
+      const spotById = new Map<number, Spot>(spots.map(s => [s.id, s]));
+      const isDescendantOf = (childId: number, ancestorId: number): boolean => {
+        let current = spotById.get(childId)?.parent_id ?? null;
+        const visited = new Set<number>();
+        while (current != null) {
+          if (current === ancestorId) return true;
+          if (visited.has(current)) break; // guard
+          visited.add(current);
+          current = spotById.get(current)?.parent_id ?? null;
+        }
+        return false;
+      };
+
+      if (newParentId != null && isDescendantOf(newParentId, dragged.id)) {
+        return; // prevent cycles
+      }
+
+      // Only update if parent actually changed
+      const currentParent = spotById.get(dragged.id)?.parent_id ?? null;
+      if (currentParent !== newParentId) {
+        await updateItem(dragged.id, { parent_id: newParentId });
+      }
+    }
+  }), [spotTypes, spots, updateItem]);
+
+  // No auto group column; first column renders the hierarchy
 
   const rowSelection = useMemo(() => ({
     mode: 'multiRow',
     groupSelects: 'filteredDescendants' as const,
   }), []);
+
+  // Spot Type quick edit dialog state
+  const [isEditSpotTypeOpen, setIsEditSpotTypeOpen] = useState(false);
+  const [editingSpotType, setEditingSpotType] = useState<{ id: number; name: string } | null>(null);
+  const [editingSpotTypeColor, setEditingSpotTypeColor] = useState<string>("#000000");
+
+  const handleUpdateSpotType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSpotType) return;
+    await dispatch((genericActions as any).spotTypes.updateAsync({ id: editingSpotType.id, updates: { color: editingSpotTypeColor } }));
+    setIsEditSpotTypeOpen(false);
+    setEditingSpotType(null);
+  };
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -321,7 +395,6 @@ function Spots() {
             rowData={searchableHierarchyData}
             columnDefs={colDefs}
             gridOptions={gridOptions}
-            autoGroupColumnDef={autoGroupColumnDef}
             rowSelection={rowSelection as any}
             noRowsMessage="No spots found"
             onRowDoubleClicked={handleEdit}
@@ -331,10 +404,9 @@ function Spots() {
         </TabsContent>
         <TabsContent value="branches" className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
-            rowData={filteredItems.filter((s: any) => s.is_branch)}
+            rowData={searchableHierarchyData.filter((s: any) => s.is_branch)}
             columnDefs={colDefs}
             gridOptions={gridOptions}
-            autoGroupColumnDef={autoGroupColumnDef}
             rowSelection={rowSelection as any}
             noRowsMessage="No branches found"
             onRowDoubleClicked={handleEdit}
@@ -374,14 +446,14 @@ function Spots() {
             placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
             required
           />
-          <TextField
-            id="parent_id"
-            label="Parent ID"
-            type="number"
-            value={createFormData.parent_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, parent_id: value }))}
-            placeholder="Leave empty for root"
-          />
+            <SelectField
+              id="parent_id"
+              label="Parent Spot"
+              value={createFormData.parent_id || ROOT_VALUE}
+              onChange={(value) => setCreateFormData(prev => ({ ...prev, parent_id: value === ROOT_VALUE ? '' : value }))}
+              options={parentSpotOptions}
+              placeholder="None (Root)"
+            />
           <CheckboxField
             id="is_branch"
             label="Is Branch"
@@ -422,13 +494,13 @@ function Spots() {
               placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
               required
             />
-            <TextField
+            <SelectField
               id="edit-parent_id"
-              label="Parent ID"
-              type="number"
-              value={editFormData.parent_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, parent_id: value }))}
-              placeholder="Leave empty for root"
+              label="Parent Spot"
+              value={editFormData.parent_id || ROOT_VALUE}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, parent_id: value === ROOT_VALUE ? '' : value }))}
+              options={editParentSpotOptions}
+              placeholder="None (Root)"
             />
             <CheckboxField
               id="edit-is_branch"
@@ -436,6 +508,39 @@ function Spots() {
               checked={editFormData.is_branch}
               onChange={(checked) => setEditFormData(prev => ({ ...prev, is_branch: checked }))}
               description="This is a branch location"
+            />
+          </div>
+        )}
+      </SettingsDialog>
+
+      {/* Edit Spot Type Color Dialog */}
+      <SettingsDialog
+        open={isEditSpotTypeOpen}
+        onOpenChange={setIsEditSpotTypeOpen}
+        type="edit"
+        title={editingSpotType ? `Edit Spot Type: ${editingSpotType.name}` : 'Edit Spot Type'}
+        description="Update the spot type color."
+        onSubmit={handleUpdateSpotType}
+        isSubmitting={isSubmitting}
+        error={formError}
+        submitDisabled={!editingSpotType}
+      >
+        {editingSpotType && (
+          <div className="grid gap-4">
+            <TextField
+              id="edit-spot-type-name"
+              label="Name"
+              value={editingSpotType.name}
+              onChange={(value) => setEditingSpotType(prev => prev ? { ...prev, name: value } : prev)}
+              required
+            />
+            <TextField
+              id="edit-spot-type-color"
+              label="Color"
+              type="color"
+              value={editingSpotTypeColor}
+              onChange={(value) => setEditingSpotTypeColor(value)}
+              required
             />
           </div>
         )}

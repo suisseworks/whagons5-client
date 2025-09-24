@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { faArrowDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { genericActions } from '@/store/genericSlices';
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { SettingsLayout } from "../components";
+import { createSwapy } from 'swapy';
 
 type DraftField = {
   id?: number;
@@ -62,11 +63,12 @@ export default function CustomFieldsTab() {
   const [selectedField, setSelectedField] = useState<any | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
-  const [dragId, setDragId] = useState<number | null>(null);
-  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  // Swapy-based reordering; no manual drag state needed
   const ORDER_KEY = 'wh-custom-fields-order-v1';
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const swapyRef = useRef<ReturnType<typeof createSwapy> | null>(null);
 
   const UI_TO_DB_TYPE: Record<string, string> = useMemo(() => ({
     text: 'TEXT',
@@ -135,6 +137,53 @@ export default function CustomFieldsTab() {
     };
     return matched.slice().sort((a: any, b: any) => indexOfId(a.id) - indexOfId(b.id));
   }, [fields, search, order]);
+
+  // Initialize Swapy for drag-and-drop reordering of cards
+  useEffect(() => {
+    // Only enable reordering when not filtering; otherwise the DOM subset
+    // may not reflect the full order and persistence gets confusing
+    if (!containerRef.current) return;
+    if (search && search.trim().length > 0) {
+      swapyRef.current?.destroy?.();
+      swapyRef.current = null;
+      return;
+    }
+
+    const container = containerRef.current;
+    const slotEls = container.querySelectorAll('[data-swapy-slot]');
+    if (slotEls.length < 2) {
+      swapyRef.current?.destroy?.();
+      swapyRef.current = null;
+      return;
+    }
+
+    // Destroy previous instance before creating a new one
+    swapyRef.current?.destroy?.();
+    const instance = createSwapy(container, {});
+    swapyRef.current = instance;
+
+    const offEnd = (instance as any).onSwapEnd?.(() => {
+      // After swap, read DOM to compute new order and persist
+      try {
+        const els = Array.from(container.querySelectorAll('[data-swapy-slot]')) as HTMLElement[];
+        const nextIds: number[] = [];
+        for (const el of els) {
+          const itemEl = el.querySelector('[data-swapy-item]') as HTMLElement | null;
+          const iid = itemEl?.getAttribute('data-swapy-item');
+          if (iid != null) nextIds.push(Number(iid));
+        }
+        if (nextIds.length) {
+          persistOrder(nextIds);
+        }
+      } catch {}
+    });
+
+    return () => {
+      try { offEnd?.(); } catch {}
+      try { instance.destroy(); } catch {}
+      swapyRef.current = null;
+    };
+  }, [filtered.length, search]);
 
   const buildValidationArray = (d: DraftField): string[] => {
     const rules: string[] = [];
@@ -295,54 +344,45 @@ export default function CustomFieldsTab() {
         </Button>
       }
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div 
+        ref={containerRef}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+      >
         {filtered.map((f: any) => (
-          <Card key={f.id} className={`group p-0 ${dragOverId === f.id ? 'ring-2 ring-primary/40' : ''}`} draggable
-            onDragStart={() => setDragId(Number(f.id))}
-            onDragOver={(e) => { e.preventDefault(); setDragOverId(Number(f.id)); }}
-            onDrop={() => {
-              if (dragId != null && dragId !== Number(f.id)) {
-                const ids = order.slice();
-                const from = ids.indexOf(dragId);
-                const to = ids.indexOf(Number(f.id));
-                if (from !== -1 && to !== -1) {
-                  ids.splice(from, 1);
-                  ids.splice(to, 0, dragId);
-                  persistOrder(ids);
-                }
-              }
-              setDragId(null); setDragOverId(null);
-            }}
-            onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-            onDoubleClick={() => openEdit(f)}
-          >
-            <div className="flex items-center justify-between px-3 py-2 cursor-pointer" title="Double click to edit">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab transition-colors"><FontAwesomeIcon icon={faGripVertical} className="w-3.5 h-3.5" /></span>
-                  <CardTitle className="text-base font-semibold tracking-tight truncate">{f.name || '(Unnamed field)'}</CardTitle>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                    {(() => {
-                      const uiType = DB_TO_UI_TYPE[String(f.field_type || '').toUpperCase()] || String(f.field_type || '').toLowerCase();
-                      const label = (TYPES.find(t => t.id === uiType)?.label) || uiType;
-                      return label;
-                    })()}
-                  </span>
+          <div key={f.id} data-swapy-slot={String(f.id)} className="h-full">
+            <div data-swapy-item={String(f.id)} className="h-full">
+              <Card className={`group p-0`} 
+                onDoubleClick={() => openEdit(f)}
+              >
+                <div className="flex items-center justify-between px-3 py-2 cursor-pointer" title="Double click to edit">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab transition-colors"><FontAwesomeIcon icon={faGripVertical} className="w-3.5 h-3.5" /></span>
+                      <CardTitle className="text-base font-semibold tracking-tight truncate">{f.name || '(Unnamed field)'}</CardTitle>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {(() => {
+                          const uiType = DB_TO_UI_TYPE[String(f.field_type || '').toUpperCase()] || String(f.field_type || '').toLowerCase();
+                          const label = (TYPES.find(t => t.id === uiType)?.label) || uiType;
+                          return label;
+                        })()}
+                      </span>
+                    </div>
+                    {f.description && (
+                      <CardDescription className="truncate text-xs mt-0.5 text-muted-foreground/80">{f.description}</CardDescription>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 ml-3 shrink-0">
+                    {/* Edit button removed; double-click card to edit */}
+                    <Button size="sm" variant="ghost" className="h-7 px-2 opacity-70 hover:opacity-100 text-muted-foreground" onClick={() => openAssign(f)}>
+                      <FontAwesomeIcon icon={faLayerGroup} className="w-3 h-3 mr-1" />
+                      Assign
+                    </Button>
+                    {/* Delete moved into edit dialog */}
+                  </div>
                 </div>
-                {f.description && (
-                  <CardDescription className="truncate text-xs mt-0.5 text-muted-foreground/80">{f.description}</CardDescription>
-                )}
-              </div>
-              <div className="flex items-center gap-1 ml-3 shrink-0">
-                {/* Edit button removed; double-click card to edit */}
-                <Button size="sm" variant="ghost" className="h-7 px-2 opacity-70 hover:opacity-100 text-muted-foreground" onClick={() => openAssign(f)}>
-                  <FontAwesomeIcon icon={faLayerGroup} className="w-3 h-3 mr-1" />
-                  Assign
-                </Button>
-                {/* Delete moved into edit dialog */}
-              </div>
+              </Card>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 

@@ -282,7 +282,7 @@ function Header() {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:opacity-80 transition-opacity overflow-hidden">
-                                <Avatar className="h-9 w-9">
+                                <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
                                     {!imageError && imageUrl && !isLoading && (
                                         <AvatarImage 
                                             src={imageUrl} 
@@ -290,7 +290,7 @@ function Header() {
                                             alt={getDisplayName()}
                                         />
                                     )}
-                                    <AvatarFallback>
+                                    <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
                                         {isLoading ? '...' : getInitials()}
                                     </AvatarFallback>
                                 </Avatar>

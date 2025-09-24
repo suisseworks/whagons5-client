@@ -9,6 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
@@ -19,6 +20,7 @@ import {
   BarChart3,
   MessageSquareMore,
   Layers,
+  Plug,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -606,7 +608,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             </SidebarGroup>
           </Collapsible>
           {/* Messages & Boards (collapsible like Spaces) */}
-          <Collapsible defaultOpen className="group/collapsible">
+          <Collapsible defaultOpen={false} className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild className="text-sm font-normal">
                 <div
@@ -689,6 +691,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       </SidebarContent>
 
       <SidebarFooter className="bg-sidebar border-t border-sidebar-border">
+        {/* Section: Analytics & Plugins */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -727,6 +730,51 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem className="pt-1 pb-1">
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Plugins' : undefined}
+                  className={`rounded-md relative transition-colors ${
+                    isCollapsed && !isMobile
+                      ? `h-10 flex justify-center items-center ${
+                          pathname === '/plugins'
+                            ? 'bg-primary/10 text-primary border-2 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                      : `h-10 ${
+                          pathname === '/plugins'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                  }`}
+                >
+                  <Link
+                    to="/plugins"
+                    className={`${
+                      isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : 'flex items-center'
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
+                  >
+                    <Plug size={20} className="w-5! h-5! p-[1px]" />
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Plugins</span>
+                    ) : (
+                      <span className="ml-3 text-sm font-medium">Plugins</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        {/* Section: Settings */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
               <SidebarMenuItem className="pt-1 pb-1">
                 <SidebarMenuButton
                   asChild
