@@ -15,7 +15,6 @@ import {
   Settings,
   Plus,
   ChevronDown,
-  Briefcase,
   BarChart3,
   MessageSquareMore,
   Layers,
@@ -30,24 +29,15 @@ import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from '@/components/ui/collapsible';
+} from '@/components/animate-ui/primitives/radix/collapsible';
 import WhagonsCheck from '@/assets/WhagonsCheck';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
 import { messageBoardsService } from '@/pages/messages/messageBoards';
 import CreateBoardDialog from '@/pages/messages/CreateBoardDialog';
+import AppSidebarWorkspaces from './AppSidebarWorkspaces';
+import AppSidebarDummy from './AppSidebarDummy';
 
 // Global pinned state management
 let isPinnedGlobal = false;
@@ -114,9 +104,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Extract toggleSidebar to suppress unused warning
   // const { toggleSidebar } = useSidebar();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [workspaceDescription, setWorkspaceDescription] = useState('');
   const [, setIsPinned] = useState(getPinnedState());
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
@@ -124,10 +111,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const hoverCloseTimerRef = useRef<number | null>(null);
   const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
   const [createBoardOpen, setCreateBoardOpen] = useState(false);
-  const [workspaceOrderIds, setWorkspaceOrderIds] = useState<string[]>([]);
-
-  // const dispatch = useDispatch<AppDispatch>();
-  // const { user } = useAuth(); // Currently not used, uncomment when needed
 
   const workspacesState = useSelector(
     (state: RootState) => state.workspaces
@@ -176,16 +159,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
 
 
 
-  // // Additional effect to check if workspaces data is loaded
-  // useEffect(() => {
-  //   if (workspacesState && workspacesState.value && workspacesState.value.length > 0) {
-  //     console.log('AppSidebar: Workspaces loaded successfully:', workspacesState.value.length);
-  //   } else if (workspacesState && workspacesState.loading) {
-  //     console.log('AppSidebar: Workspaces are loading...');
-  //   } else if (workspacesState && workspacesState.error) {
-  //     console.error('AppSidebar: Error loading workspaces:', workspacesState.error);
-  //   }
-  // }, [workspacesState]);
 
   // Load workspace icons when workspaces change
   useEffect(() => {
@@ -211,55 +184,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
 
   // Load message boards
   useEffect(() => {
-    const load = () => { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch {} };
+    const load = () => { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch { } };
     load();
     const onUpdate = () => load();
     window.addEventListener('wh-boards-updated', onUpdate);
     return () => window.removeEventListener('wh-boards-updated', onUpdate);
   }, []);
-
-  // Workspace ordering persistence (local only)
-  const WS_ORDER_STORAGE = 'wh-workspace-order';
-  const loadWorkspaceOrder = (): string[] => {
-    try {
-      const raw = localStorage.getItem(WS_ORDER_STORAGE);
-      if (!raw) return [];
-      const ids = JSON.parse(raw);
-      return Array.isArray(ids) ? ids.map((x: any) => String(x)) : [];
-    } catch {
-      return [];
-    }
-  };
-  const saveWorkspaceOrder = (ids: string[]) => {
-    try { localStorage.setItem(WS_ORDER_STORAGE, JSON.stringify(ids)); } catch {}
-  };
-
-  // Initialize/repair order when workspaces change
-  useEffect(() => {
-    const existingIds = uniqueWorkspaces.map((w: Workspace) => String(w.id));
-    const saved = loadWorkspaceOrder().filter((id) => existingIds.includes(id));
-    const missing = existingIds.filter((id) => !saved.includes(id));
-    const next = [...saved, ...missing];
-    setWorkspaceOrderIds(next);
-    saveWorkspaceOrder(next);
-  }, [uniqueWorkspaces]);
-
-  const orderedWorkspaces = useMemo(() => {
-    if (!workspaceOrderIds.length) return uniqueWorkspaces;
-    const byId = new Map(uniqueWorkspaces.map((w: Workspace) => [String(w.id), w]));
-    const ordered: Workspace[] = [];
-    for (const id of workspaceOrderIds) {
-      const w = byId.get(id);
-      if (w) ordered.push(w);
-    }
-    // Append any new ones not in order yet
-    for (const w of uniqueWorkspaces) {
-      if (!workspaceOrderIds.includes(String(w.id))) ordered.push(w);
-    }
-    return ordered;
-  }, [uniqueWorkspaces, workspaceOrderIds]);
-
-
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -294,32 +224,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     return workspaceIcons[parsedIconName] || defaultIcon;
   };
 
-  const handleAddWorkspace = () => {
-    if (!workspaceName.trim() || !workspaceDescription.trim()) {
-      // Basic validation: Ensure fields are not empty
-      // You might want to add more robust validation/feedback
-      alert('Please enter both name and description.');
-      return;
-    }
-
-    // Create workspace data in the format expected by the API
-    // const newWorkspaceData = {
-    //   name: workspaceName,
-    //   description: workspaceDescription,
-    //   type: 'PROJECT',
-    //   created_by: user?.id ? parseInt(user.id) : 0
-    // };
-
-    // TODO: Implement custom async thunk for adding workspaces
-    // dispatch(genericActions.workspaces.addWorkspaceAsync(newWorkspaceData as any));
-
-    // Reset form and close modal
-    setWorkspaceName('');
-    setWorkspaceDescription('');
-    setIsModalOpen(false);
-  };
-
-
   // Determine if we should show expanded content
   const showExpandedContent = !isCollapsed || isMobile;
 
@@ -334,7 +238,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     if (!(hoverOpenTimerRef.current as any)) {
       hoverOpenTimerRef.current = setTimeout(() => {
         // open sidebar on hover in
-        try { setOpen(true); } catch {}
+        try { setOpen(true); } catch { }
         hoverOpenTimerRef.current = null;
       }, 0) as unknown as number;
     }
@@ -349,7 +253,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     }
     if (!(hoverCloseTimerRef.current as any)) {
       hoverCloseTimerRef.current = setTimeout(() => {
-        try { setOpen(false); } catch {}
+        try { setOpen(false); } catch { }
         hoverCloseTimerRef.current = null;
       }, 100) as unknown as number;
     }
@@ -373,16 +277,14 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar h-14 transition-colors duration-200 ${
-          isCollapsed ? 'px-1' : ''
+        className={`shadow-md bg-sidebar h-14 transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
         }`}
       >
         <div className="flex items-center justify-center w-full h-full">
           <Link
             to="/welcome"
             title="Home"
-            className={`flex items-center h-full transition-all duration-300 ${
-              isCollapsed ? 'justify-center' : 'justify-center'
+            className={`flex items-center h-full transition-all duration-300 ${isCollapsed ? 'justify-center' : 'justify-center'
             }`}
           >
             <WhagonsCheck
@@ -412,8 +314,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <div className="px-3">
               <Link
                 to={`/workspace/all`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${
-                  pathname === `/workspace/all`
+                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${pathname === `/workspace/all`
                     ? 'bg-primary/15 text-primary border-l-4 border-primary'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
@@ -431,8 +332,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <div className="px-2 flex justify-center">
               <Link
                 to={`/workspace/all`}
-                className={`flex items-center justify-center w-10 h-10 rounded text-xs font-medium transition-colors ${
-                  pathname === `/workspace/all`
+                className={`flex items-center justify-center w-10 h-10 rounded text-xs font-medium transition-colors ${pathname === `/workspace/all`
                     ? 'bg-primary/20 text-primary border border-primary/40'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 }`}
@@ -443,180 +343,21 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             </div>
           )}
 
-          <Collapsible defaultOpen className="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild className="text-sm font-normal">
-                <div
-                  className={`flex items-center w-full pr-3 transition-all duration-300 ${
-                    isCollapsed ? 'justify-center px-0' : 'justify-between'
-                  }`}
-                >
-                  <CollapsibleTrigger
-                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
-                      isCollapsed && !isMobile
-                        ? 'flex-col justify-center ml-0 px-2'
-                        : 'justify-start flex-1'
-                    }`}
-                  >
-                    {isCollapsed && !isMobile ? (
-                      <div className="flex flex-col items-center">
-                        <Briefcase className="text-sidebar-foreground w-5 h-5 mb-1" />
-                      </div>
-                    ) : (
-                      <>
-                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
-                        <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
-                          <Briefcase className="w-4 h-4 mr-2" />
-                          Spaces
-                        </span>
-                      </>
-                    )}
-                  </CollapsibleTrigger>
-
-                  {showExpandedContent && (
-                  <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                    <DialogTrigger asChild>
-                      <button
-                        className="inline-flex items-center justify-center h-6 w-6 rounded-md text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        title="Add Workspace"
-                        type="button"
-                      >
-                        <Plus size={16} />
-                        <span className="sr-only">Add Workspace</span>
-                      </button>
-                    </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Add New Workspace</DialogTitle>
-                          <DialogDescription>
-                            Enter the details for your new workspace. Click save
-                            when you're done.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                              Name
-                            </Label>
-                            <Input
-                              id="name"
-                              value={workspaceName}
-                              onChange={(e) => setWorkspaceName(e.target.value)}
-                              className="col-span-3"
-                              placeholder="e.g., Project Phoenix"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="description" className="text-right">
-                              Description
-                            </Label>
-                            <Input
-                              id="description"
-                              value={workspaceDescription}
-                              onChange={(e) =>
-                                setWorkspaceDescription(e.target.value)
-                              }
-                              className="col-span-3"
-                              placeholder="e.g., For managing project tasks"
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsModalOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" onClick={handleAddWorkspace}>
-                            Save Workspace
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </SidebarGroupLabel>
-
-              <CollapsibleContent>
-                {(!isCollapsed || isMobile) && (
-                  <SidebarGroupContent className="pt-2 pl-1">
-
-                    {orderedWorkspaces.map((workspace: Workspace) => {
-                      // Skip temporary optimistic items (negative IDs)
-                      if ((workspace.id as number) < 0) return null;
-
-                      return (
-                      <div
-                        key={`workspace-${workspace.id}`}
-                        className="flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-4 mx-2"
-                      >
-                        <Link
-                          to={`/workspace/${workspace.id}`}
-                          className={`flex-1 group flex items-center space-x-2 rounded-md transition-colors h-10 -mx-4 px-4 ${
-                            pathname === `/workspace/${workspace.id}`
-                              ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
-                          } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-                        >
-                          <span>
-                            <FontAwesomeIcon
-                              icon={getWorkspaceIcon(workspace.icon)}
-                              style={{ color: workspace.color }}
-                              className="w-4 h-4"
-                            />
-                          </span>
-                          <span className="truncate">{workspace.name}</span>
-                        </Link>
-                      </div>
-                      );
-                    })}
-                  </SidebarGroupContent>
-                )}
-
-                {/* Show workspace icons when collapsed AND collapsible is open - DESKTOP ONLY */}
-                {isCollapsed && !isMobile && (
-                  <SidebarGroupContent className="pt-2">
-                    <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent">
-                      {orderedWorkspaces
-                        .filter((workspace: Workspace) => (workspace.id as number) >= 0) // Skip temp items
-                        .map((workspace: Workspace) => (
-                        <Link
-                          key={`workspace-collapsed-${workspace.id}`}
-                          to={`/workspace/${workspace.id}`}
-                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors ${
-                            pathname === `/workspace/${workspace.id}`
-                              ? 'bg-primary/20 text-primary border border-primary/40'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                          }`}
-                          title={workspace.name}
-                        >
-                          <FontAwesomeIcon
-                            icon={getWorkspaceIcon(workspace.icon)}
-                            style={{ color: workspace.color }}
-                            className="w-4 h-4"
-                          />
-                        </Link>
-                      ))}
-                    </div>
-                  </SidebarGroupContent>
-                )}
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
+            <AppSidebarWorkspaces
+              workspaces={uniqueWorkspaces}
+              pathname={pathname}
+              getWorkspaceIcon={getWorkspaceIcon}
+            />
           {/* Messages & Boards (collapsible like Spaces) */}
           <Collapsible defaultOpen className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild className="text-sm font-normal">
                 <div
-                  className={`flex items-center w-full pr-3 transition-all duration-300 ${
-                    isCollapsed ? 'justify-center px-0' : 'justify-between'
+                  className={`flex items-center w-full pr-3 transition-all duration-300 ${isCollapsed ? 'justify-center px-0' : 'justify-between'
                   }`}
                 >
                   <CollapsibleTrigger
-                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
-                      isCollapsed && !isMobile
+                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${isCollapsed && !isMobile
                         ? 'flex-col justify-center ml-0 px-2'
                         : 'justify-start flex-1'
                     }`}
@@ -637,20 +378,24 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   </CollapsibleTrigger>
 
                   {showExpandedContent && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="New Board" onClick={() => setCreateBoardOpen(true)}>
+                    <Button 
+                    // variant="ghost" 
+                    // size="icon" 
+                    className="h-6 w-6" 
+                    title="New Board" 
+                    onClick={() => setCreateBoardOpen(true)}>
                       <Plus size={16} />
                     </Button>
                   )}
                 </div>
               </SidebarGroupLabel>
 
-              <CollapsibleContent>
+              <CollapsibleContent forceMount>
                 {(!isCollapsed || isMobile) && (
                   <div className="px-3 py-2">
                     <Link
                       to={`/messages`}
-                      className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${
-                        pathname === `/messages`
+                      className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${pathname === `/messages`
                           ? 'bg-primary/15 text-primary border-l-4 border-primary'
                           : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                       } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
@@ -672,8 +417,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                       >
                         <Link
                           to={`/messages/board/${b.id}`}
-                          className={`flex-1 group flex items-center space-x-2 rounded-md transition-colors h-9 -mx-3 px-3 ${
-                            pathname === `/messages/board/${b.id}` ? 'bg-primary/15 text-primary border-l-4 border-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          className={`flex-1 group flex items-center space-x-2 rounded-md transition-colors h-9 -mx-3 px-3 ${pathname === `/messages/board/${b.id}` ? 'bg-primary/15 text-primary border-l-4 border-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                           }`}
                         >
                           <span className="truncate">{b.name}</span>
@@ -685,6 +429,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               </CollapsibleContent>
             </SidebarGroup>
           </Collapsible>
+
+          {/* <AppSidebarDummy /> */}
         </SidebarGroup>
       </SidebarContent>
 
@@ -696,15 +442,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 <SidebarMenuButton
                   asChild
                   tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
-                  className={`rounded-md relative transition-colors ${
-                    isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${
-                          pathname === '/analytics'
+                  className={`rounded-md relative transition-colors ${isCollapsed && !isMobile
+                      ? `h-10 flex justify-center items-center ${pathname === '/analytics'
                             ? 'bg-primary/10 text-primary border-2 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
-                      : `h-10 ${
-                          pathname === '/analytics'
+                      : `h-10 ${pathname === '/analytics'
                             ? 'bg-primary/15 text-primary border-l-4 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
@@ -712,8 +455,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 >
                   <Link
                     to="/analytics"
-                    className={`${
-                      isCollapsed && !isMobile
+                    className={`${isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
                     } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
@@ -731,15 +473,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 <SidebarMenuButton
                   asChild
                   tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
-                  className={`rounded-md relative transition-colors ${
-                    isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${
-                          pathname === '/settings'
+                  className={`rounded-md relative transition-colors ${isCollapsed && !isMobile
+                      ? `h-10 flex justify-center items-center ${pathname === '/settings'
                             ? 'bg-primary/10 text-primary border-2 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
-                      : `h-10 ${
-                          pathname === '/settings'
+                      : `h-10 ${pathname === '/settings'
                             ? 'bg-primary/15 text-primary border-l-4 border-primary'
                             : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                         }`
@@ -747,8 +486,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 >
                   <Link
                     to="/settings"
-                    className={`${
-                      isCollapsed && !isMobile
+                    className={`${isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
                     } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
@@ -766,7 +504,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <CreateBoardDialog open={createBoardOpen} onOpenChange={(o) => { setCreateBoardOpen(o); if (!o) { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch {} } }} />
+        <CreateBoardDialog open={createBoardOpen} onOpenChange={(o) => { setCreateBoardOpen(o); if (!o) { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch { } } }} />
 
         {showExpandedContent && (
           <div className="px-2 py-1 text-xs text-muted-foreground">
