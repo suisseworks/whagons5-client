@@ -390,7 +390,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 </div>
               </SidebarGroupLabel>
 
-              <CollapsibleContent forceMount>
+              <CollapsibleContent keepRendered>
                 {(!isCollapsed || isMobile) && (
                   <div className="px-3 py-2">
                     <Link
