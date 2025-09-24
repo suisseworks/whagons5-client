@@ -114,7 +114,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             'priorities',
             'slas',
             'spots',
-            'users'
+            'users',
+            'forms',
+            'workflows',
           ] as const;
           const caches: GenericCache[] = coreKeys.map((k) => genericCaches[k]);
           await GenericCache.validateMultiple(caches);

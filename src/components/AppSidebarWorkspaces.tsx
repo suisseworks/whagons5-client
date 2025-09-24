@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Plus,
   ChevronDown,
-  Briefcase,  
+  Briefcase,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -116,7 +116,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
 
   const swapyRef = useRef<Swapy | null>(null);
   const workspaceContainerRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {utils.dynamicSwapy(swapyRef.current, localWorkspaces, 'id', workspaceSlotItemMap, setWorkspaceSlotItemMap);}, [localWorkspaces]);
+  useEffect(() => { utils.dynamicSwapy(swapyRef.current, localWorkspaces, 'id', workspaceSlotItemMap, setWorkspaceSlotItemMap); }, [localWorkspaces]);
 
 
 
@@ -136,25 +136,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
 
     swapyRef.current = instance;
 
-    // let rafId: number | null = null;
-
-    // const applyPendingSlotMap = () => {
-    //   if (!pendingSlotItemMapRef.current) return;
-    //   setWorkspaceSlotItemMap(pendingSlotItemMapRef.current);
-    //   pendingSlotItemMapRef.current = null;
-    // };
-
-    // const scheduleApplyPendingSlotMap = () => {
-    //   if (rafId !== null) return;
-    //   rafId = requestAnimationFrame(() => {
-    //     applyPendingSlotMap();
-    //     rafId = null;
-    //   });
-    // };
-
     instance.onSwap?.((event) => {
-      // pendingSlotItemMapRef.current = event.newSlotItemMap.asArray;
-      // scheduleApplyPendingSlotMap();
 
       setWorkspaceSlotItemMap(event.newSlotItemMap.asArray);
     });
@@ -291,11 +273,10 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                   <div data-swapy-slot={slotId} key={slotId}>
                     {item && (
                       <div
-                        className={`rounded-md relative ${
-                          collapsed
+                        className={`rounded-md relative ${collapsed
                             ? 'flex items-center justify-center h-8 w-8 mx-0'
                             : 'flex items-center space-x-2 overflow-hidden h-10 px-4 mx-2'
-                        }`}
+                          }`}
                         data-swapy-item={itemId}
                         key={itemId}
                       >
@@ -303,19 +284,16 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                           to={`/workspace/${itemId}`}
                           data-workspace-id={String(itemId)}
                           onDragStart={(event) => event.preventDefault()}
-                          className={`group flex items-center  rounded-md ${
-                            collapsed
-                              ? `justify-center w-full h-full text-xs font-medium ${
-                                  pathname === `/workspace/${itemId}`
-                                    ? 'bg-primary/20 text-primary border border-primary/40'
-                                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                                }`
-                              : `flex-1 space-x-2 h-10 -mx-4 px-4 ${
-                                  pathname === `/workspace/${itemId}`
-                                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
-                                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 `
-                          }`}
+                          className={`group flex items-center  rounded-md ${collapsed
+                              ? `justify-center w-full h-full text-xs font-medium ${pathname === `/workspace/${itemId}`
+                                ? 'bg-primary/20 text-primary border border-primary/40'
+                                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                              }`
+                              : `flex-1 space-x-2 h-10 -mx-4 px-4 ${pathname === `/workspace/${itemId}`
+                                ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
+                              } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 `
+                            }`}
                         >
                           <span className="flex items-center justify-center">
                             <FontAwesomeIcon
