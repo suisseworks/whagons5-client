@@ -65,6 +65,8 @@ function Settings() {
   const users = useSelector((s: RootState) => s.users.value);
   const forms = useSelector((s: RootState) => s.forms.value);
   const spots = useSelector((s: RootState) => s.spots.value);
+  const didMoveRef = useRef(false);
+  const pointerStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
   // const workflows = useSelector((s: RootState) => s.workflows.value);
 
   const counts = useMemo(() => {
@@ -316,24 +318,24 @@ function Settings() {
                   <div data-swapy-item={itemId} key={itemId} className="h-full">
                     <Card
                       className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                    // onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                    // onPointerMove={(e) => {
-                    //   const s = pointerStartRef.current;
-                    //   if (!s) return;
-                    //   const dx = Math.abs(e.clientX - s.x);
-                    //   const dy = Math.abs(e.clientY - s.y);
-                    //   if (dx > 3 || dy > 3) {
-                    //     didMoveRef.current = true;
-                    //   }
-                    // }}
-                    // onPointerUp={(e) => {
-                    //   const s = pointerStartRef.current; pointerStartRef.current = null;
-                    //   if (!s) return;
-                    //   const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                    //   if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                    //     handleSettingClick(item.id);
-                    //   }
-                    // }}
+                    onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                    onPointerMove={(e) => {
+                      const s = pointerStartRef.current;
+                      if (!s) return;
+                      const dx = Math.abs(e.clientX - s.x);
+                      const dy = Math.abs(e.clientY - s.y);
+                      if (dx > 3 || dy > 3) {
+                        didMoveRef.current = true;
+                      }
+                    }}
+                    onPointerUp={(e) => {
+                      const s = pointerStartRef.current; pointerStartRef.current = null;
+                      if (!s) return;
+                      const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                      if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                        handleSettingClick(item.id);
+                      }
+                    }}
                     >
                       <CardHeader className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -374,24 +376,24 @@ function Settings() {
                   <div data-swapy-item={itemId} key={itemId} className="h-full">
                     <Card
                       className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                    // onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                    // onPointerMove={(e) => {
-                    //   const s = pointerStartRef.current;
-                    //   if (!s) return;
-                    //   const dx = Math.abs(e.clientX - s.x);
-                    //   const dy = Math.abs(e.clientY - s.y);
-                    //   if (dx > 3 || dy > 3) {
-                    //     didMoveRef.current = true;
-                    //   }
-                    // }}
-                    // onPointerUp={(e) => {
-                    //   const s = pointerStartRef.current; pointerStartRef.current = null;
-                    //   if (!s) return;
-                    //   const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                    //   if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                    //     handleSettingClick(item.id);
-                    //   }
-                    // }}
+                    onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                    onPointerMove={(e) => {
+                      const s = pointerStartRef.current;
+                      if (!s) return;
+                      const dx = Math.abs(e.clientX - s.x);
+                      const dy = Math.abs(e.clientY - s.y);
+                      if (dx > 3 || dy > 3) {
+                        didMoveRef.current = true;
+                      }
+                    }}
+                    onPointerUp={(e) => {
+                      const s = pointerStartRef.current; pointerStartRef.current = null;
+                      if (!s) return;
+                      const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                      if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                        handleSettingClick(item.id);
+                      }
+                    }}
                     >
                       <CardHeader className="space-y-4">
                         <div className="flex items-center justify-between">
