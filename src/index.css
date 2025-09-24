@@ -385,3 +385,28 @@
     background: oklch(0.18 0.04 177.71);
   }
 }
+
+
+/* Keyframes for slide out to left with spring bounce */
+@keyframes slideOutLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    display: block;
+  }
+  40% {
+    opacity: 0.7;
+    transform: translateX(-30%);
+  }
+  70% {
+    opacity: 0.3;
+    transform: translateX(-120%); /* Overshoot */
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-100%); /* Bounce back */
+    display: none;
+  }
+}
+
+
