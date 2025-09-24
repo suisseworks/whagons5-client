@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faBriefcase, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faPlus } from '@fortawesome/free-solid-svg-icons';
+
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
@@ -26,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Workspace } from '@/store/types';
 import { createSwapy, SlotItemMapArray, Swapy, utils } from 'swapy';
+import { faBriefcase } from '@fortawesome/pro-regular-svg-icons';
 
 const WS_ORDER_STORAGE = 'wh-workspace-order';
 
