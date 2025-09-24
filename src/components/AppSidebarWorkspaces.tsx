@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+  Plus,
+  ChevronDown,
+  Briefcase,  
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +31,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Workspace } from '@/store/types';
 import { createSwapy, SlotItemMapArray, Swapy, utils } from 'swapy';
-import { faBriefcase } from '@fortawesome/pro-regular-svg-icons';
 
 const WS_ORDER_STORAGE = 'wh-workspace-order';
 
@@ -205,16 +208,13 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
             >
               {collapsed ? (
                 <div className="flex flex-col items-center">
-                  <FontAwesomeIcon className="text-sidebar-foreground w-5 h-5 mb-1" icon={faBriefcase} />
+                  <Briefcase className="text-sidebar-foreground w-5 h-5 mb-1" />
                 </div>
               ) : (
                 <>
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    className=" ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground"
-                  />
+                  <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
                   <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
-                    <FontAwesomeIcon icon={faBriefcase} className="w-4 h-4 mr-2" />
+                    <Briefcase className="w-4 h-4 mr-2" />
                     Spaces
                   </span>
                 </>
@@ -231,7 +231,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                   type="button"
                   onClick={() => setIsModalOpen(true)}
                 >
-                  <FontAwesomeIcon icon={faPlus} />
+                  <Plus />
                   <span className="sr-only">Add Workspace</span>
                 </Button>
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

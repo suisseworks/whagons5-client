@@ -57,7 +57,6 @@ export const Workspace = () => {
       gridControls.start({
         opacity: 0.3,
         transition: { duration: 0.2, repeat: 1, repeatType: "reverse", ease: "easeInOut" }
-
       });
 
     }
