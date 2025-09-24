@@ -15,17 +15,21 @@ import {
   faSitemap,
   faArrowUpWideShort,
   faGripVertical,
-  faStopwatch
+  faStopwatch,
+  faDiagramProject
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useState } from "react";
 import { createSwapy } from 'swapy';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 
 function Settings() {
   const navigate = useNavigate();
   const [cardOrder, setCardOrder] = useState<string[]>([]);
   const [, setIsSwapping] = useState<boolean>(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [tab, setTab] = useState<string>('basics');
+  const basicsContainerRef = useRef<HTMLDivElement | null>(null);
+  const advancedContainerRef = useRef<HTMLDivElement | null>(null);
   const swapyRef = useRef<ReturnType<typeof createSwapy> | null>(null);
   const draggingRef = useRef<boolean>(false);
   const [slotItemMap, setSlotItemMap] = useState<Array<[string, string]>>([]);
@@ -106,6 +110,13 @@ function Settings() {
       color: 'text-pink-500'
     },
     {
+      id: 'workflows',
+      title: 'Workflows',
+      icon: faDiagramProject,
+      description: 'Design and automate workflows',
+      color: 'text-cyan-500'
+    },
+    {
       id: 'templates',
       title: 'Templates',
       icon: faClipboardList,
@@ -176,6 +187,24 @@ function Settings() {
     }
   }, []);
 
+  // Ensure newly added settings (e.g., Workflows) are included in order/slots
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const ids = settingsOptions.map(s => s.id);
+    // Ensure slotIdsRef includes all ids
+    const missingInSlots = ids.filter(id => !slotIdsRef.current.includes(id));
+    if (missingInSlots.length) {
+      slotIdsRef.current = Array.from(new Set([...slotIdsRef.current, ...ids]));
+    }
+    // Ensure cardOrder includes all ids
+    const missingInOrder = ids.filter(id => !cardOrder.includes(id));
+    if (missingInOrder.length) {
+      const next = [...cardOrder, ...missingInOrder];
+      setCardOrder(next);
+      try { localStorage.setItem('wh-settings-card-order-v1', JSON.stringify(next)); } catch {}
+    }
+  }, [settingsOptions, cardOrder]);
+
   const defaultOrder = useMemo(() => settingsOptions.map(s => s.id), [settingsOptions]);
   const slotIds = slotIdsRef.current.length ? slotIdsRef.current : defaultOrder;
   const currentItemOrder = cardOrder.length ? cardOrder : defaultOrder;
@@ -193,6 +222,21 @@ function Settings() {
     return map;
   }, [slotItemMap, slotIds.join(','), currentItemOrder.join(',')]);
 
+  // Inverse mapping for rendering subsets per tab
+  const itemToSlot = useMemo(() => {
+    const inverse = new Map<string, string>();
+    for (const [slotId, itemId] of slotToItem.entries()) {
+      inverse.set(itemId, slotId);
+    }
+    return inverse;
+  }, [slotToItem]);
+
+  // Tab groupings
+  const advancedSet = useMemo(() => new Set<string>(['slas', 'forms', 'workflows']), []);
+  const basicsSet = useMemo(() => {
+    return new Set<string>(settingsOptions.map(s => s.id).filter(id => !advancedSet.has(id)));
+  }, [settingsOptions, advancedSet]);
+
   // Do not auto-override slotItemMap after hydration; it is the source of truth
 
   const saveOrder = (next: string[]) => {
@@ -202,51 +246,70 @@ function Settings() {
 
   // Initialize Swapy for drag-and-drop reordering
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
 
-    // Destroy any previous instance (defensive on fast refresh)
-    swapyRef.current?.destroy?.();
+    const setup = () => {
+      const container = tab === 'basics' ? basicsContainerRef.current : advancedContainerRef.current;
+      if (!container) {
+        requestAnimationFrame(() => { if (!cancelled) setup(); });
+        return;
+      }
+      const slotEls = container.querySelectorAll('[data-swapy-slot]');
+      if (slotEls.length < 2) {
+        requestAnimationFrame(() => { if (!cancelled) setup(); });
+        return;
+      }
 
-    const instance = createSwapy(container, {
-      // Default Swapy behavior with animations and DOM swapping
-    });
-    swapyRef.current = instance;
+      // Destroy any previous instance (defensive on fast refresh)
+      swapyRef.current?.destroy?.();
 
-    // helper removed; we read DOM in onSwapEnd
-
-    // Track swapping lifecycle and only persist order on end
-    const offBefore = (instance as any).onBeforeSwap?.(() => true);
-    const offStart = (instance as any).onSwapStart?.(() => { draggingRef.current = true; setIsSwapping(true); });
-    const offEnd = (instance as any).onSwapEnd?.(() => {
-      // Read the definitive DOM state after Swapy completes
-      requestAnimationFrame(() => {
-        try {
-          const slotEls = Array.from(container.querySelectorAll('[data-swapy-slot]')) as HTMLElement[];
-          const map = new Map<string, string>();
-          for (const el of slotEls) {
-            const sid = el.getAttribute('data-swapy-slot') || '';
-            const itemEl = el.querySelector('[data-swapy-item]') as HTMLElement | null;
-            const iid = itemEl?.getAttribute('data-swapy-item');
-            if (sid && iid) map.set(sid, iid);
-          }
-          const nextOrder: string[] = slotIdsRef.current.map((sid) => map.get(sid) || sid);
-          saveOrder(nextOrder);
-        } finally {
-          draggingRef.current = false;
-          setIsSwapping(false);
-        }
+      const instance = createSwapy(container, {
+        // Default Swapy behavior with animations and DOM swapping
       });
-    });
+      swapyRef.current = instance;
+
+      // Track swapping lifecycle and only persist order on end
+      const offBefore = (instance as any).onBeforeSwap?.(() => true);
+      const offStart = (instance as any).onSwapStart?.(() => { draggingRef.current = true; didMoveRef.current = true; setIsSwapping(true); });
+      const offEnd = (instance as any).onSwapEnd?.(() => {
+        // Read the definitive DOM state after Swapy completes
+        requestAnimationFrame(() => {
+          try {
+            const slotEls = Array.from(container.querySelectorAll('[data-swapy-slot]')) as HTMLElement[];
+            const map = new Map<string, string>();
+            for (const el of slotEls) {
+              const sid = el.getAttribute('data-swapy-slot') || '';
+              const itemEl = el.querySelector('[data-swapy-item]') as HTMLElement | null;
+              const iid = itemEl?.getAttribute('data-swapy-item');
+              if (sid && iid) map.set(sid, iid);
+            }
+            const nextOrder: string[] = slotIdsRef.current.map((sid) => map.get(sid) || (slotToItem.get(sid) ?? sid));
+            saveOrder(nextOrder);
+          } finally {
+            draggingRef.current = false;
+            didMoveRef.current = false;
+            setIsSwapping(false);
+          }
+        });
+      });
+
+      cleanup = () => {
+        try { offBefore?.(); } catch {}
+        try { offStart?.(); } catch {}
+        try { offEnd?.(); } catch {}
+        try { instance.destroy(); } catch {}
+        swapyRef.current = null;
+      };
+    };
+
+    setup();
 
     return () => {
-      try { offBefore?.(); } catch {}
-      try { offStart?.(); } catch {}
-      try { offEnd?.(); } catch {}
-      try { instance.destroy(); } catch {}
-      swapyRef.current = null;
+      cancelled = true;
+      cleanup?.();
     };
-  }, []);
+  }, [tab]);
 
   const handleSettingClick = (settingId: string) => {
     // console.log(`Clicked on ${settingId}`);
@@ -271,6 +334,9 @@ function Settings() {
       case 'slas':
         navigate('/settings/slas');
         break;
+      case 'workflows':
+        navigate('/settings/workflows');
+        break;
       case 'spots':
         navigate('/settings/spots');
         break;
@@ -291,55 +357,132 @@ function Settings() {
       <div className="space-y-2">
       </div>
 
-      {/* Settings Grid */}
-      <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
-      <div ref={containerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {slotIds.map((slotId) => {
-          const itemId = slotToItem.get(slotId) ?? slotId;
-          const setting = settingsById.get(itemId);
-          if (!setting) return null;
-          return (
-          <div key={slotId} data-swapy-slot={slotId} className="h-full">
-            <div data-swapy-item={itemId} className="h-full">
-              <Card
-                className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                onPointerDown={(e) => { pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                onPointerUp={(e) => {
-                  const s = pointerStartRef.current; pointerStartRef.current = null;
-                  if (!s) return;
-                  const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                  if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                    handleSettingClick(setting.id);
-                  }
-                }}
-              >
-                <CardHeader className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
-                      <FontAwesomeIcon icon={setting.icon} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {typeof setting.count !== 'undefined' && (
-                        <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
-                          {setting.count}
-                        </Badge>
-                      )}
-                      <div className={`transition flex items-center text-muted-foreground opacity-60 hover:opacity-100`} title="Drag to reorder">
-                        <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
-                      </div>
-                    </div>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="basics">Basics</TabsTrigger>
+          <TabsTrigger value="advanced">Advanced</TabsTrigger>
+        </TabsList>
+
+        <div className="text-sm text-muted-foreground mt-2">Drag cards to reorder.</div>
+
+        <TabsContent value="basics">
+          <div ref={basicsContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {currentItemOrder.filter((itemId) => basicsSet.has(itemId)).map((itemId) => {
+              const slotId = itemToSlot.get(itemId) ?? itemId;
+              const setting = settingsById.get(itemId);
+              if (!setting) return null;
+              return (
+                <div key={slotId} data-swapy-slot={slotId} className="h-full">
+                  <div data-swapy-item={itemId} className="h-full">
+                    <Card
+                      className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
+                      onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                      onPointerMove={(e) => {
+                        const s = pointerStartRef.current;
+                        if (!s) return;
+                        const dx = Math.abs(e.clientX - s.x);
+                        const dy = Math.abs(e.clientY - s.y);
+                        if (dx > 3 || dy > 3) {
+                          didMoveRef.current = true;
+                        }
+                      }}
+                      onPointerUp={(e) => {
+                        const s = pointerStartRef.current; pointerStartRef.current = null;
+                        if (!s) return;
+                        const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                        if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                          handleSettingClick(setting.id);
+                        }
+                      }}
+                    >
+                      <CardHeader className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
+                            <FontAwesomeIcon icon={setting.icon} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {typeof setting.count !== 'undefined' && (
+                              <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
+                                {setting.count}
+                              </Badge>
+                            )}
+                            <div className={`transition flex items-center text-muted-foreground opacity-60 hover:opacity-100 cursor-grab active:cursor-grabbing`} title="Drag to reorder">
+                              <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <CardTitle className="text-xl">{setting.title}</CardTitle>
+                          <CardDescription>{setting.description}</CardDescription>
+                        </div>
+                      </CardHeader>
+                    </Card>
                   </div>
-                  <div className="space-y-2">
-                    <CardTitle className="text-xl">{setting.title}</CardTitle>
-                    <CardDescription>{setting.description}</CardDescription>
-                  </div>
-                </CardHeader>
-              </Card>
-            </div>
+                </div>
+              );
+            })}
           </div>
-          );
-        })}
-      </div>
+        </TabsContent>
+
+        <TabsContent value="advanced">
+          <div ref={advancedContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {currentItemOrder.filter((itemId) => advancedSet.has(itemId)).map((itemId) => {
+              const slotId = itemToSlot.get(itemId) ?? itemId;
+              const setting = settingsById.get(itemId);
+              if (!setting) return null;
+              return (
+                <div key={slotId} data-swapy-slot={slotId} className="h-full">
+                  <div data-swapy-item={itemId} className="h-full">
+                    <Card
+                      className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
+                      onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                      onPointerMove={(e) => {
+                        const s = pointerStartRef.current;
+                        if (!s) return;
+                        const dx = Math.abs(e.clientX - s.x);
+                        const dy = Math.abs(e.clientY - s.y);
+                        if (dx > 3 || dy > 3) {
+                          didMoveRef.current = true;
+                        }
+                      }}
+                      onPointerUp={(e) => {
+                        const s = pointerStartRef.current; pointerStartRef.current = null;
+                        if (!s) return;
+                        const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                        if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                          handleSettingClick(setting.id);
+                        }
+                      }}
+                    >
+                      <CardHeader className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
+                            <FontAwesomeIcon icon={setting.icon} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {typeof setting.count !== 'undefined' && (
+                              <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
+                                {setting.count}
+                              </Badge>
+                            )}
+                            <div className={`transition flex items-center text-muted-foreground opacity-60 hover:opacity-100 cursor-grab active:cursor-grabbing`} title="Drag to reorder">
+                              <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <CardTitle className="text-xl">{setting.title}</CardTitle>
+                          <CardDescription>{setting.description}</CardDescription>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       
 

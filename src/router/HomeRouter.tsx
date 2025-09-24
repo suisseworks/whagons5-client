@@ -19,10 +19,12 @@ import Users from '@/pages/settings/sub_pages/Users';
 import Statuses from '@/pages/settings/sub_pages/Statuses';
 import Priorities from '@/pages/settings/sub_pages/Priorities';
 import Slas from '@/pages/settings/sub_pages/Slas';
+import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 import Messages from '@/pages/messages/Messages';
 import TestPage from '@/pages/Testpage';
+import Plugins from '@/pages/Plugins';
 
 
 const pages = [
@@ -62,6 +64,7 @@ export const HomeRoutes = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/plugins" element={<Plugins />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/messages/board/:id" element={<Messages />} />
           <Route path="/settings/categories" element={<Categories />} />
@@ -75,6 +78,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/statuses" element={<Statuses />} />
           <Route path="/settings/priorities" element={<Priorities />} />
           <Route path="/settings/slas" element={<Slas />} />
+          <Route path="/settings/workflows" element={<Workflows />} />
           <Route path="/settings/test" element={<TestPage />} />
         </Routes>
       </MainLayout>

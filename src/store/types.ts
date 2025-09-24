@@ -105,6 +105,8 @@ export interface Priority {
     name: string;
     color?: string | null;
     level?: number | null;
+    category_id?: number | null;
+    sla_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
 }

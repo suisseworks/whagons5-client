@@ -182,7 +182,9 @@ function Categories() {
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};
     (categoryFieldAssignments as any[]).forEach((a) => {
-      map[a.category_id] = (map[a.category_id] || 0) + 1;
+      const cid = Number((a as any)?.category_id ?? (a as any)?.categoryId);
+      if (!Number.isFinite(cid)) return;
+      map[cid] = (map[cid] || 0) + 1;
     });
     return map;
   }, [categoryFieldAssignments]);
@@ -293,7 +295,27 @@ function Categories() {
           label: 'Fields',
           variant: 'outline',
           onClick: openManageFields,
-          className: 'p-1 h-7'
+          className: 'p-1 h-7 relative',
+          // @ts-ignore allow badge inside button
+          renderExtra: (row: any) => {
+            const count = assignmentCountByCategory[Number(row?.id)] || 0;
+            // Reserve space for the badge to keep Edit/Delete aligned across rows
+            return (
+              <span className="ml-2 inline-flex items-center justify-center w-[1.25rem] h-[1.25rem]">
+                {count ? (
+                  <span
+                    className="inline-flex items-center justify-center text-[11px] font-semibold leading-none w-[1.125rem] h-[1.125rem] rounded-full bg-amber-500 text-amber-950 ring-1 ring-amber-600/60 shadow-sm"
+                    title={`${count} custom field${count !== 1 ? 's' : ''}`}
+                    aria-label={`${count} custom field${count !== 1 ? 's' : ''}`}
+                  >
+                    {count}
+                  </span>
+                ) : (
+                  <span className="w-[1.125rem] h-[1.125rem]" aria-hidden="true" />
+                )}
+              </span>
+            );
+          }
         }],
         onEdit: handleEdit,
         onDelete: handleDeleteCategory

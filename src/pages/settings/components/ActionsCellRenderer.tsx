@@ -12,6 +12,7 @@ export interface ActionButton {
   onClick: (data: any) => void;
   className?: string;
   disabled?: (data: any) => boolean;
+  renderExtra?: (data: any) => React.ReactNode;
 }
 
 export interface ActionsCellRendererProps extends ICellRendererParams {
@@ -70,6 +71,9 @@ export function ActionsCellRenderer({
         >
           <FontAwesomeIcon icon={action.icon} className="w-3 h-3" />
           {action.label && <span className="ml-1">{action.label}</span>}
+          {action.renderExtra ? (
+            <span className="ml-2">{action.renderExtra(data)}</span>
+          ) : null}
         </Button>
       ))}
     </div>

@@ -97,6 +97,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 
         try {
+          // Disable encryption for small reference stores that must be writable immediately
+          // Avoids losing rows when CEK is not yet provisioned at first run
+          DB.setEncryptionForStore('category_field_assignments', false);
+          DB.setEncryptionForStore('custom_fields', false);
+
           // Validate only core keys, then refresh those slices
           const coreKeys = [
             'workspaces',

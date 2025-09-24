@@ -21,22 +21,56 @@ function Home() {
     'https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1920&q=80',
     // City skyline at dusk
     'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80',
+    // Forest path in autumn
+    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80',
+    // Mountain lake reflection
+    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
+    // Desert dunes at sunset
+    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80',
+    // Northern lights aurora
+    'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?auto=format&fit=crop&w=1920&q=80',
+    // Misty morning mountains
+    'https://images.unsplash.com/photo-1464822759844-d150f39ac1a2?auto=format&fit=crop&w=1920&q=80',
+    // Ocean waves crashing
+    'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&w=1920&q=80',
+    // Starry night sky
+    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
+    // Zen garden stones
+    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1920&q=80',
   ], []);
   const quotes = useMemo(() => [
     'Build momentum. One small step at a time.',
     'Clarity comes from action, not thought.',
     'Start where you are. Use what you have. Do what you can.',
     'Focus on progress, not perfection.',
+    'The journey of a thousand miles begins with a single step.',
+    'Done is better than perfect.',
+    'What you do today can improve all your tomorrows.',
+    'Success is the sum of small efforts, repeated day in and day out.',
+    'Your future self will thank you for starting today.',
+    'Small daily improvements lead to stunning results.',
+    'The only way to do great work is to love what you do.',
+    'Focus on being productive instead of busy.',
+    'Every expert was once a beginner.',
+    'The best time to start was yesterday. The next best time is now.',
+    'You don\'t have to be great to start, but you have to start to be great.',
+    'Action is the foundational key to all success.',
+    'Motivation gets you started. Habit keeps you going.',
+    'The difference between ordinary and extraordinary is that little extra.',
+    'Your only limit is you.',
+    'Dream big. Start small. Act now.',
   ], []);
   const [bgIndex, setBgIndex] = useState(0);
   const [quoteIndex, setQuoteIndex] = useState(0);
 
   useEffect(() => {
+    // Randomize background and quote on every page load
+    setBgIndex(Math.floor(Math.random() * backgroundImages.length));
+    setQuoteIndex(Math.floor(Math.random() * quotes.length));
+
     const params = new URLSearchParams(location.search);
     if (params.has('welcome') || location.pathname === '/welcome') {
       setShowWelcome(true);
-      setBgIndex(Math.floor(Math.random() * backgroundImages.length));
-      setQuoteIndex(Math.floor(Math.random() * quotes.length));
     }
   }, [location.pathname, location.search, backgroundImages.length, quotes.length]);
 
