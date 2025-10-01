@@ -6,17 +6,46 @@ import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import { Input } from '@/components/ui/input';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import { AnimatePresence, motion, useAnimation } from 'motion/react';
 
 export const Workspace = () => {
   const match = useMatch('/workspace/:id');
   const id = (match && (match.params as any)?.id) as string | undefined;
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('grid');
+  const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(new Set(['list']));
   // State to store the fetched data
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
   const [openCreateTask, setOpenCreateTask] = useState(false);
+
+
+  const gridControls = useAnimation();
+
+
+  useEffect(() => {
+    const newHiddenTabs = new Set(['list', 'grid']);
+    newHiddenTabs.delete(activeTab);
+    setHiddenTabs(newHiddenTabs);
+
+
+
+    if (activeTab === 'grid') {
+      gridControls.start({ x: 0 });
+    } else {
+      gridControls.start({
+        x: "-80vw",
+        transition: {
+          type: "spring",
+          stiffness: 100,
+          damping: 10
+        }
+      });
+    }
+  }, [activeTab]);
+
+  //
 
   // Clear cache when workspace ID changes
   useEffect(() => {
@@ -24,6 +53,15 @@ export const Workspace = () => {
       console.log(`Switching to workspace ${id}, clearing cache`);
       rowCache.current.clear();
     }
+    if (activeTab === 'grid') {
+      gridControls.start({
+        opacity: 0.3,
+        transition: { duration: 0.2, repeat: 1, repeatType: "reverse", ease: "easeInOut" }
+      });
+
+    }
+
+
   }, [id]);
 
   // Debug logging
@@ -61,7 +99,7 @@ export const Workspace = () => {
 
 
   return (
-    <Tabs defaultValue="grid" className="w-full h-full flex flex-col" onValueChange={setActiveTab} value={activeTab}>
+    <Tabs defaultValue="grid" className="w-full h-full flex flex-colr" onValueChange={setActiveTab} value={activeTab}>
       <div className="flex items-center gap-6 mb-4">
         <Input
           placeholder="Search tasks..."
@@ -80,18 +118,34 @@ export const Workspace = () => {
           </TabsTrigger>
         </TabsList>
       </div>
+      <AnimatePresence mode="sync">
 
-      <TabsContent
-        forceMount
-        className='flex-1 h-0'
-        value="grid"
-        style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
-      >
-        <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
-      </TabsContent>
-      <TabsContent value="list" className="flex-1 h-0">
-        <SettingsComponent />
-      </TabsContent>
+        <div className='flex h-full'>
+          <TabsContent
+            forceMount
+            // className='flex-1 h-0'
+            value="grid"
+            style={{ display: hiddenTabs.has('grid') ? 'none' : 'block' }}
+          >
+            <motion.div
+              className='flex-1 h-full'
+              animate={gridControls}
+            >
+              <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="list" className="flex-1 h-0">
+            <motion.div
+              exit={{ x: "-80vw" }}
+              initial={{ x: "80vw" }}
+              animate={{ x: 0 }}
+            >
+              <SettingsComponent />
+            </motion.div>
+          </TabsContent>
+        </div>
+      </AnimatePresence>
       {/* Floating Action Button for mobile (bottom-right) */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (
         <>

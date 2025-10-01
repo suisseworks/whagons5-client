@@ -7,7 +7,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { ThemeProvider } from '@/providers/ThemeProvider';
-import React, { ReactNode, useEffect, useState } from 'react';
+import React, { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Define sidebar width constants to keep them in sync

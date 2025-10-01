@@ -8,6 +8,7 @@ import { genericActions } from '@/store/genericSlices';
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";
+import { AnimatePresence, motion, useAnimation } from "motion/react";
 
 // Simplified module loading
 const loadRequiredModules = async () => {
@@ -62,6 +63,7 @@ interface WorkspaceInfo {
 
 function Settings() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [prevActiveTab, setPrevActiveTab] = useState('overview');
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const [workspaceOverview, setWorkspaceOverview] = useState<WorkspaceOverview | null>(null);
   const [workspaceFilters, setWorkspaceFilters] = useState<WorkspaceFilters | null>(null);
@@ -73,6 +75,8 @@ function Settings() {
   const location = useLocation();
   const params = useParams<{ id: string }>();
   // Using async actions for workspace operations
+
+  const overViewControls = useAnimation();
 
   // Get current workspace from Redux store
   const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
@@ -110,6 +114,31 @@ function Settings() {
       })
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    console.log('activeTab', activeTab);
+    console.log('prevActiveTab', prevActiveTab);
+
+    if (activeTab === 'overview' && prevActiveTab != 'overview') {
+      overViewControls.start({
+        x: ["-80vw", 0],
+        transition: {
+          duration: 0.25,
+          type: 'spring',
+          stiffness: 350,
+          damping: 18
+        }
+
+      }
+
+      );
+    } else if (activeTab === 'overview' && prevActiveTab === 'overview') {
+      overViewControls.start({ //set initial state
+        x: "0",
+      });
+    }
+
+  }, [activeTab]);
 
   // Load categories on component mount
   useEffect(() => {
@@ -270,38 +299,38 @@ function Settings() {
   // Update workspace info in Redux store
   const handleUpdateWorkspace = useCallback((updates: Partial<WorkspaceInfo>) => {
     if (!currentWorkspace) return;
-    
+
     // Generate dynamic description based on name if no description is provided
     let finalUpdates = { ...updates };
-    
+
     // If updating name and no description is explicitly provided, generate one
     if (updates.name && !updates.description) {
       // Check if current workspace has a description or if it's empty/default
-      const hasCustomDescription = currentWorkspace.description && 
+      const hasCustomDescription = currentWorkspace.description &&
         !currentWorkspace.description.includes(`Main development workspace for ${currentWorkspace.name}`);
-      
+
       // Only auto-generate if there's no custom description
       if (!hasCustomDescription) {
         finalUpdates.description = `Main development workspace for ${updates.name}`;
       }
     }
-    
+
     // If no description is provided and current workspace has no description, generate one
     if (!finalUpdates.description && !currentWorkspace.description) {
       finalUpdates.description = `Main development workspace for ${finalUpdates.name || currentWorkspace.name}`;
     }
-    
+
     const updatedWorkspace = {
       ...currentWorkspace,
       ...finalUpdates,
       updatedAt: new Date().toISOString()
     };
-    
-          dispatch(genericActions.workspaces.updateAsync({
-            id: currentWorkspace.id,
-            updates: updatedWorkspace
-          }));
-    }, [currentWorkspace, dispatch]);
+
+    dispatch(genericActions.workspaces.updateAsync({
+      id: currentWorkspace.id,
+      updates: updatedWorkspace
+    }));
+  }, [currentWorkspace, dispatch]);
 
   return (
     <div className="h-full w-full p-4 pt-0 flex flex-col">
@@ -309,7 +338,13 @@ function Settings() {
         <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
+      <Tabs value={activeTab} onValueChange={(value) => {
+        //  console.log('activeTab', value);
+        //  console.log('prevActiveTab', activeTab);
+        setPrevActiveTab(activeTab);
+        setActiveTab(value);
+
+      }} className="w-full h-full flex flex-col">
         <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <Eye className="w-4 h-4" />
@@ -324,36 +359,58 @@ function Settings() {
             <span>Creation</span>
           </TabsTrigger>
         </TabsList>
+        {/* Single AnimatePresence for tab content with conditional rendering */}
+        {activeTab === 'overview' && (
+          <motion.div
+            className="mt-4 flex-1"
+            key="overview"
+            animate={overViewControls}
+          >
+            <OverviewTab
+              workspaceOverview={workspaceOverview}
+              workspaceInfo={workspaceInfo}
+              workspaceId={currentWorkspace?.id || null}
+              workspaceTeams={currentWorkspace?.teams || null}
+              workspaceType={currentWorkspace?.type || null}
+              loading={loading}
+              onTeamClick={handleTeamClick}
+              onUpdateWorkspace={handleUpdateWorkspace}
+            />
+          </motion.div>
+        )}
 
-        <TabsContent value="overview" className="mt-4 flex-1">
-          <OverviewTab
-            workspaceOverview={workspaceOverview}
-            workspaceInfo={workspaceInfo}
-            workspaceId={currentWorkspace?.id || null}
-            workspaceTeams={currentWorkspace?.teams || null}
-            workspaceType={currentWorkspace?.type || null}
-            loading={loading}
-            onTeamClick={handleTeamClick}
-            onUpdateWorkspace={handleUpdateWorkspace}
-          />
-        </TabsContent>
+        {activeTab === 'users' && (
+          <motion.div
+            className="mt-4 flex-1 h-full"
+            key="users"
+            exit={{ x: prevActiveTab === 'overview' ? "-80vw" : "80vw" }}
+            initial={{ x: prevActiveTab === 'overview' ? "80vw" : "-80vw" }}
+            animate={{ x: 0 }}
+          >
+            <UsersTab
+              modulesLoaded={modulesLoaded}
+              selectedTeamFilter={selectedTeamFilter}
+              onClearTeamFilter={handleClearTeamFilter}
+            />
+          </motion.div>
+        )}
 
-        <TabsContent value="users" className="mt-4 flex-1 min-h-0">
-          <UsersTab
-            modulesLoaded={modulesLoaded}
-            selectedTeamFilter={selectedTeamFilter}
-            onClearTeamFilter={handleClearTeamFilter}
-          />
-        </TabsContent>
-
-        <TabsContent value="filters" className="mt-4 flex-1 min-h-0">
-          <CreationTab
-            modulesLoaded={modulesLoaded}
-            workspaceFilters={workspaceFilters}
-            filtersLoading={filtersLoading}
-            onToggleCategory={handleToggleCategory}
-          />
-        </TabsContent>
+        {activeTab === 'filters' && (
+          <motion.div
+            className="mt-4 flex-1 h-full"
+            key="filters"
+            exit={{ x: "-80vw" }}
+            initial={{ x: "80vw" }}
+            animate={{ x: 0 }}
+          >
+            <CreationTab
+              modulesLoaded={modulesLoaded}
+              workspaceFilters={workspaceFilters}
+              filtersLoading={filtersLoading}
+              onToggleCategory={handleToggleCategory}
+            />
+          </motion.div>
+        )}
       </Tabs>
     </div>
   );

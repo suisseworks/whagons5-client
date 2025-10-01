@@ -99,8 +99,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           // Disable encryption for small reference stores that must be writable immediately
           // Avoids losing rows when CEK is not yet provisioned at first run
-          DB.setEncryptionForStore('category_field_assignments', false);
-          DB.setEncryptionForStore('custom_fields', false);
+          // DB.setEncryptionForStore('category_field_assignments', false);
+          // DB.setEncryptionForStore('custom_fields', false);
 
           // Validate only core keys, then refresh those slices
           const coreKeys = [
@@ -114,13 +114,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             'priorities',
             'slas',
             'spots',
-            'users'
+            'users',
+            'forms',
+            'workflows',
           ] as const;
-          const caches: GenericCache[] = coreKeys.map((k) => genericCaches[k]);
+          const caches: GenericCache[] = coreKeys
+            .map((k) => (genericCaches as any)[k])
+            .filter((c: any): c is GenericCache => !!c);
           await GenericCache.validateMultiple(caches);
 
           for (const key of coreKeys) {
-            await dispatch((genericActions as any)[key].getFromIndexedDB());
+            const actions = (genericActions as any)[key];
+            if (actions?.getFromIndexedDB) {
+              await dispatch(actions.getFromIndexedDB());
+            } else {
+              console.warn('AuthProvider: missing generic actions for key', key);
+            }
           }
         } catch (e) {
           console.warn('AuthProvider: cache validate failed', e);
