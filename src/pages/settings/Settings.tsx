@@ -16,7 +16,7 @@ import {
   faArrowUpWideShort,
   faGripVertical,
   faStopwatch,
-  faDiagramProject
+  faCog
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useState } from "react";
@@ -340,7 +340,7 @@ function Settings() {
                       <CardHeader className="space-y-4">
                         <div className="flex items-center justify-between">
                           <div className={`text-4xl ${item.color} group-hover:scale-110 transition-transform duration-200`}>
-                            <FontAwesomeIcon icon={item.icon} />
+                            <FontAwesomeIcon icon={item.icon || faCog} />
                           </div>
                           <div className="flex items-center gap-2">
                             {typeof item.count !== 'undefined' && (
@@ -398,7 +398,7 @@ function Settings() {
                       <CardHeader className="space-y-4">
                         <div className="flex items-center justify-between">
                           <div className={`text-4xl ${item.color} group-hover:scale-110 transition-transform duration-200`}>
-                            <FontAwesomeIcon icon={item.icon} />
+                            <FontAwesomeIcon icon={item.icon || faCog} />
                           </div>
                           <div className="flex items-center gap-2">
                             {typeof item.count !== 'undefined' && (

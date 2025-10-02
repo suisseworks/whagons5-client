@@ -11,7 +11,7 @@ import Stuff from '@/pages/stuff/Stuff';
 import Categories from '@/pages/settings/sub_pages/Categories';
 import CustomFieldsTab from '@/pages/settings/sub_pages/CustomFieldsTab';
 import Templates from '@/pages/settings/sub_pages/Templates';
-import Forms from '@/pages/settings/sub_pages/Forms';
+import Forms from '@/pages/settings/sub_pages/forms';
 import Teams from '@/pages/settings/sub_pages/Teams';
 import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';

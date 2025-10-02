@@ -2,13 +2,37 @@ import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faFloppyDisk, faRotate } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Form, FormVersion } from "@/store/types";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
+
+// Extended types for form builder
+interface FormBuilderSchema {
+  fields: Array<{
+    id: number;
+    type: 'text' | 'textarea' | 'select' | 'checkbox';
+    label: string;
+    placeholder?: string;
+    required?: boolean;
+    options?: string[];
+  }>;
+  form_id?: number;
+  title?: string;
+  description?: string;
+}
+
+interface BuilderMeta {
+  name: string;
+  description: string;
+  is_active: boolean;
+}
+
+// Extended Form interface to include properties used in the component
+interface ExtendedForm extends Omit<Form, 'is_active'> {
+  description?: string;
+  is_active?: boolean;
+  created_by?: number;
+}
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
@@ -19,9 +43,11 @@ import {
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer
-} from "../components";
-import FormBuilder from "../components/FormBuilder";
+} from "../../components";
+import FormBuilder from "./components/FormBuilder";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
 
 // Simple renderer for form name with version badge
 const FormNameCellRenderer = (props: ICellRendererParams) => {
@@ -74,8 +100,8 @@ function Forms() {
   // Tabs and selection state
   const [activeTab, setActiveTab] = useState<'list' | 'builder'>('list');
   const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
-  const selectedForm = useMemo(() => forms.find(f => f.id === selectedFormId) || null, [forms, selectedFormId]);
-  const [builderMeta, setBuilderMeta] = useState<{ name: string; description: string; is_active: boolean }>({ name: '', description: '', is_active: true });
+  const selectedForm = useMemo(() => forms.find((f: Form) => f.id === selectedFormId) || null, [forms, selectedFormId]);
+  const [builderMeta, setBuilderMeta] = useState<BuilderMeta>({ name: '', description: '', is_active: true });
 
   // Column defs
   const colDefs = useMemo<ColDef[]>(() => [
@@ -107,8 +133,8 @@ function Forms() {
           setSelectedFormId(item.id);
           setBuilderMeta({
             name: item.name,
-            description: (item as any).description || '',
-            is_active: !!(item as any).is_active
+            description: (item as ExtendedForm).description || '',
+            is_active: !!(item as ExtendedForm).is_active
           });
           setActiveTab('builder');
         },
@@ -126,35 +152,43 @@ function Forms() {
     if (selectedForm) {
       await updateItem(selectedForm.id, {
         name: builderMeta.name,
-        description: builderMeta.description || null,
+        description: builderMeta.description || undefined,
         is_active: builderMeta.is_active
-      } as any);
+      } as ExtendedForm);
     } else {
-      const payload: any = {
+      const payload: ExtendedForm = {
         name: builderMeta.name,
-        description: builderMeta.description || null,
+        description: builderMeta.description || undefined,
+        id: 0, // Will be set by the server
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       // Server requires created_by
-      if (authUser?.id) payload.created_by = authUser.id;
+      if (authUser?.id) payload.created_by = Number(authUser.id);
       const saved = await dispatch(genericActions.forms.addAsync(payload)).unwrap();
-      setSelectedFormId((saved as any).id);
+      setSelectedFormId((saved as ExtendedForm).id);
     }
   }, [selectedForm, builderMeta, updateItem, dispatch, authUser]);
 
   // Builder state (per-session draft). In a full impl., this would link to formVersions.
-  const [builderSchema, setBuilderSchema] = useState<any>({ fields: [] });
+  const [builderSchema, setBuilderSchema] = useState<FormBuilderSchema>({ fields: [], title: '', description: '' });
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (selectedForm) {
-      setBuilderSchema((prev: any) => prev?.form_id === selectedForm.id ? prev : { fields: [], form_id: selectedForm.id });
+      setBuilderSchema((prev: FormBuilderSchema) => prev?.form_id === selectedForm.id ? prev : {
+        fields: [],
+        form_id: selectedForm.id,
+        title: selectedForm.name,
+        description: (selectedForm as ExtendedForm).description || ''
+      });
       setBuilderMeta({
         name: selectedForm.name,
-        description: (selectedForm as any).description || '',
-        is_active: !!(selectedForm as any).is_active
+        description: (selectedForm as ExtendedForm).description || '',
+        is_active: !!(selectedForm as ExtendedForm).is_active
       });
     } else {
-      setBuilderSchema({ fields: [] });
+      setBuilderSchema({ fields: [], title: '', description: '' });
       setBuilderMeta({ name: '', description: '', is_active: true });
     }
   }, [selectedForm]);
@@ -189,7 +223,7 @@ function Forms() {
     >
       <Tabs
         value={activeTab}
-        onValueChange={(v) => setActiveTab(v as any)}
+        onValueChange={(v: string) => setActiveTab(v as 'list' | 'builder')}
         className="flex-1 h-full flex flex-col"
       >
         <TabsList>
@@ -206,12 +240,12 @@ function Forms() {
               setSelectedFormId(item.id);
               setBuilderMeta({
                 name: item.name,
-                description: (item as any).description || '',
-                is_active: !!(item as any).is_active
+                description: (item as ExtendedForm).description || '',
+                is_active: !!(item as ExtendedForm).is_active
               });
               setActiveTab('builder');
             }}
-            onGridReady={(params) => {
+            onGridReady={(params: any) => {
               params.api.setGridOption('context', { formVersions });
             }}
             className="flex-1 min-h-0"
@@ -219,32 +253,15 @@ function Forms() {
           />
         </TabsContent>
 
-        <TabsContent value="builder" className="space-y-4 flex-1 min-h-0 flex flex-col">
-          <div className="rounded-lg border p-4 space-y-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="form-name" className="text-right">Form Name *</Label>
-              <Input id="form-name" value={builderMeta.name} onChange={(e) => setBuilderMeta({ ...builderMeta, name: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="form-desc" className="text-right">Description</Label>
-              <Input id="form-desc" value={builderMeta.description} onChange={(e) => setBuilderMeta({ ...builderMeta, description: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="form-active" className="text-right">Active</Label>
-              <div className="col-span-3 flex items-center gap-2">
-                <input type="checkbox" id="form-active" checked={builderMeta.is_active} onChange={(e) => setBuilderMeta({ ...builderMeta, is_active: e.target.checked })} className="rounded" />
-                <Label htmlFor="form-active" className="text-sm">Enabled</Label>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
+        <TabsContent value="builder" className="space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto">
+          {/* Header with form info and action buttons */}
+          <div className="flex items-center justify-between pb-4 border-b">
             <div className="text-sm text-muted-foreground">
               {selectedForm ? `Editing: ${selectedForm.name}` : 'Creating a new form'}
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" type="button" onClick={async () => { await updateFormMeta(); saveDraft(); }} disabled={!builderMeta.name.trim()}>
-                <FontAwesomeIcon icon={faFloppyDisk} className="mr-2" />Save draft
+              <Button size="sm" variant="outline" type="button" onClick={() => setIsPreviewOpen(true)}>
+                Preview
               </Button>
               <Button size="sm" variant="secondary" type="button" onClick={async () => { await updateFormMeta(); publish(); }} disabled={!builderMeta.name.trim()}>
                 Publish
@@ -252,13 +269,24 @@ function Forms() {
             </div>
           </div>
 
-          <FormBuilder
-            schema={builderSchema}
-            onChange={setBuilderSchema}
-            onSaveDraft={saveDraft}
-            onPublish={publish}
-            onPreview={() => setIsPreviewOpen(true)}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <FormBuilder
+              schema={builderSchema}
+              onChange={(newSchema) => {
+                setBuilderSchema(newSchema);
+                // Update the builderMeta when title/description changes
+                if (newSchema.title !== undefined) {
+                  setBuilderMeta(prev => ({ ...prev, name: newSchema.title || '' }));
+                }
+                if (newSchema.description !== undefined) {
+                  setBuilderMeta(prev => ({ ...prev, description: newSchema.description || '' }));
+                }
+              }}
+              onSaveDraft={saveDraft}
+              onPublish={publish}
+              onPreview={() => setIsPreviewOpen(true)}
+            />
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -280,7 +308,7 @@ function Forms() {
             <FontAwesomeIcon icon={faClipboardList} className="text-pink-500" />
             <div>
               <div className="font-medium">{f.name}</div>
-              <div className="text-sm text-muted-foreground">{(f as any).description}</div>
+              <div className="text-sm text-muted-foreground">{(f as ExtendedForm).description}</div>
             </div>
           </div>
         )}
@@ -288,35 +316,52 @@ function Forms() {
 
       {/* Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Form preview</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {(builderSchema.fields || []).map((f: any) => (
-              <div key={f.id} className="space-y-1">
-                <div className="text-sm font-medium">{f.label}{f.required ? ' *' : ''}</div>
-                {f.type === 'text' && (
-                  <input className="w-full px-3 py-2 border rounded text-sm" placeholder={f.placeholder || ''} />
-                )}
-                {f.type === 'textarea' && (
-                  <textarea className="w-full px-3 py-2 border rounded text-sm" placeholder={f.placeholder || ''} />
-                )}
-                {f.type === 'select' && (
-                  <select className="w-full px-3 py-2 border rounded text-sm">
-                    {(f.options || []).map((opt: string, i: number) => (
-                      <option key={i}>{opt}</option>
-                    ))}
-                  </select>
-                )}
-                {f.type === 'checkbox' && (
-                  <label className="inline-flex items-center gap-2 text-sm">
-                    <input type="checkbox" />
-                    {f.label}
-                  </label>
-                )}
+          <div className="space-y-6">
+            {/* Form Header */}
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold">{builderSchema.title || 'Untitled form'}</h1>
+              {builderSchema.description && (
+                <p className="text-muted-foreground">{builderSchema.description}</p>
+              )}
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-4">
+              {(builderSchema.fields || []).map((f: any) => (
+                <div key={f.id} className="space-y-1">
+                  <div className="text-sm font-medium">{f.label}{f.required ? ' *' : ''}</div>
+                  {f.type === 'text' && (
+                    <input className="w-full px-3 py-2 border rounded text-sm" placeholder={f.placeholder || ''} />
+                  )}
+                  {f.type === 'textarea' && (
+                    <textarea className="w-full px-3 py-2 border rounded text-sm" placeholder={f.placeholder || ''} />
+                  )}
+                  {f.type === 'select' && (
+                    <select className="w-full px-3 py-2 border rounded text-sm">
+                      {(f.options || []).map((opt: string, i: number) => (
+                        <option key={i}>{opt}</option>
+                      ))}
+                    </select>
+                  )}
+                  {f.type === 'checkbox' && (
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input type="checkbox" />
+                      {f.label}
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {(!builderSchema.fields || builderSchema.fields.length === 0) && (
+              <div className="text-center text-muted-foreground py-8">
+                No fields added yet
               </div>
-            ))}
+            )}
           </div>
         </DialogContent>
       </Dialog>
