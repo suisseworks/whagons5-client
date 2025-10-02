@@ -493,13 +493,6 @@ const WorkspaceTable = ({
 
   const columnDefs = useMemo(() => ([
     {
-      field: 'id',
-      headerName: 'ID',
-      filter: false,
-      maxWidth: 90
-    },
-  
-    {
       field: 'name',
       headerName: 'Task',
       flex: 2.5,
@@ -511,7 +504,7 @@ const WorkspaceTable = ({
           <div className="flex flex-col gap-1 h-full justify-center py-2">
             <div className="font-semibold text-base text-foreground">{name}</div>
             {description && (
-              <div className="text-sm text-muted-foreground line-clamp-2">{description}</div>
+              <div className="text-xs text-muted-foreground/70 truncate">{description}</div>
             )}
           </div>
         );
@@ -827,16 +820,6 @@ const WorkspaceTable = ({
       },
       width: 150,
     },
-    { 
-      field: 'work_duration', 
-      headerName: 'Work (min)', 
-      filter: false, 
-      width: 120
-    },
-    { field: 'pause_duration', 
-      headerName: 'Pause (min)', 
-      filter: false, 
-      width: 120 },
   ]), [statusMap, statuses, priorityMap, priorities, spotMap, spots, getUserNames, getUsersFromIds, getStatusIcon, formatDueDate]);
   const defaultColDef = useMemo(() => {
     return {
@@ -1020,7 +1003,7 @@ const WorkspaceTable = ({
   }
 
   return (
-    <div style={containerStyle} className="ag-theme-quartz h-full w-full">
+    <div style={containerStyle} className="ag-theme-quartz wh-workspace-grid h-full w-full">
       <div style={gridStyle}>
         <Suspense fallback={<div>Loading AgGridReact...</div>}>
           <AgGridReact

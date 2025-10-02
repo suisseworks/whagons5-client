@@ -183,7 +183,7 @@ export function MultiStateBadge({ state, onClick, className = "", label, customS
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: 4, filter: "blur(4px)" }}
             transition={{ duration: 0.16 }}
-            className="block text-xs font-medium tracking-wide"
+            className="block text-sm font-semibold tracking-wide"
           >
             {label ?? cfg.label}
           </motion.span>
