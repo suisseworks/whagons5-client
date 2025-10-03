@@ -31,6 +31,8 @@ function Statuses() {
   const statuses = useSelector((s: RootState) => s.statuses.value) as any[];
   const statusTransitions = useSelector((s: RootState) => s.statusTransitions.value) as any[];
   const statusTransitionGroups = useSelector((s: RootState) => s.statusTransitionGroups.value) as any[];
+  const statusApprovalConfigs = useSelector((s: RootState) => (s as any).statusApprovalConfig?.value ?? []) as any[];
+  const approvalTemplates = useSelector((s: RootState) => (s as any).approvalTemplates?.value ?? []) as any[];
 
   // Local UI state
   const [activeTab, setActiveTab] = useState<string>("statuses");
@@ -67,11 +69,32 @@ function Statuses() {
   // Backend enum values for status.action
   const allowedActions = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
 
+  // Approvals form state
+  const [apHasContext, setApHasContext] = useState(false);
+  const [apAutoAdvance, setApAutoAdvance] = useState(true);
+  const [apNextOnApprove, setApNextOnApprove] = useState<number | null>(null);
+  const [apNextOnReject, setApNextOnReject] = useState<number | null>(null);
+  const [apNextOnTimeout, setApNextOnTimeout] = useState<number | null>(null);
+  const [apBlocksEditing, setApBlocksEditing] = useState(false);
+  const [apBlocksDeletion, setApBlocksDeletion] = useState(false);
+  const [apBlocksReassign, setApBlocksReassign] = useState(false);
+  const [apDefaultType, setApDefaultType] = useState<'all' | 'single' | 'majority' | 'sequential'>('all');
+  const [apMinApprovers, setApMinApprovers] = useState<number | ''>('');
+  const [apTimeoutHours, setApTimeoutHours] = useState<number | ''>('');
+  const [apSaving, setApSaving] = useState(false);
+  const [apError, setApError] = useState<string | null>(null);
+
   // Toast removed
 
   
   // Load persisted view and group, and save changes
   useEffect(() => {
+    // Ensure approvals slices are hydrated
+    dispatch((genericActions as any).statusApprovalConfig?.getFromIndexedDB?.());
+    dispatch((genericActions as any).statusApprovalConfig?.fetchFromAPI?.());
+    dispatch((genericActions as any).approvalTemplates?.getFromIndexedDB?.());
+    dispatch((genericActions as any).approvalTemplates?.fetchFromAPI?.());
+
     // Load view
     const vk = `wh_status_view:${tenant || 'default'}`;
     const vv = localStorage.getItem(vk);
@@ -108,6 +131,76 @@ function Statuses() {
   }, [selectedGroupId, tenant]);
 
   // back navigation removed from header; using SettingsLayout's backPath
+
+  // Sync approvals form when status selection changes or configs load
+  useEffect(() => {
+    if (!selectedStatus) return;
+    const cfg = statusApprovalConfigs.find((c: any) => Number(c.status_id) === Number(selectedStatus.id));
+    if (!cfg) {
+      setApHasContext(false);
+      setApAutoAdvance(true);
+      setApNextOnApprove(null);
+      setApNextOnReject(null);
+      setApNextOnTimeout(null);
+      setApBlocksEditing(false);
+      setApBlocksDeletion(false);
+      setApBlocksReassign(false);
+      setApDefaultType('all');
+      setApMinApprovers('');
+      setApTimeoutHours('');
+      setApError(null);
+      return;
+    }
+    setApHasContext(!!cfg.has_approval_context);
+    setApAutoAdvance(!!cfg.auto_advance);
+    setApNextOnApprove(cfg.next_status_on_approve ?? null);
+    setApNextOnReject(cfg.next_status_on_reject ?? null);
+    setApNextOnTimeout(cfg.next_status_on_timeout ?? null);
+    setApBlocksEditing(!!cfg.blocks_editing);
+    setApBlocksDeletion(!!cfg.blocks_deletion);
+    setApBlocksReassign(!!cfg.blocks_reassignment);
+    const ac = cfg.approval_config || {};
+    setApDefaultType((ac.default_type as any) || 'all');
+    setApMinApprovers(typeof ac.min_approvers === 'number' ? ac.min_approvers : '');
+    setApTimeoutHours(typeof ac.timeout_hours === 'number' ? ac.timeout_hours : '');
+    setApError(null);
+  }, [selectedStatus, statusApprovalConfigs]);
+
+  const handleSaveApproval = async () => {
+    if (!selectedStatus) return;
+    setApSaving(true);
+    setApError(null);
+    try {
+      const existing = statusApprovalConfigs.find((c: any) => Number(c.status_id) === Number(selectedStatus.id));
+      const updates: any = {
+        status_id: selectedStatus.id,
+        has_approval_context: apHasContext,
+        auto_advance: apAutoAdvance,
+        next_status_on_approve: apNextOnApprove || null,
+        next_status_on_reject: apNextOnReject || null,
+        next_status_on_timeout: apNextOnTimeout || null,
+        blocks_editing: apBlocksEditing,
+        blocks_deletion: apBlocksDeletion,
+        blocks_reassignment: apBlocksReassign,
+        approval_config: {
+          default_type: apDefaultType,
+          ...(apMinApprovers !== '' ? { min_approvers: Number(apMinApprovers) } : {}),
+          ...(apTimeoutHours !== '' ? { timeout_hours: Number(apTimeoutHours) } : {}),
+        }
+      };
+      let res: any;
+      if (existing) {
+        res = await dispatch((genericActions as any).statusApprovalConfig.updateAsync({ id: existing.id, updates }));
+      } else {
+        res = await dispatch((genericActions as any).statusApprovalConfig.addAsync(updates));
+      }
+      if (res?.meta?.requestStatus === 'rejected') {
+        setApError(res?.payload || res?.error?.message || 'Failed to save');
+      }
+    } finally {
+      setApSaving(false);
+    }
+  };
 
   // Action handlers for kebab menu
   const handleEditClick = (row: any) => {
@@ -320,6 +413,7 @@ function Statuses() {
         <TabsList>
           <TabsTrigger value="statuses">Statuses</TabsTrigger>
           <TabsTrigger value="transitions">Transitions</TabsTrigger>
+          <TabsTrigger value="approvals">Approvals</TabsTrigger>
         </TabsList>
 
         <TabsContent value="statuses" className="space-y-4">
@@ -477,6 +571,138 @@ function Statuses() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="approvals" className="space-y-4">
+          <div className="border rounded-lg p-4 bg-card">
+            <div className="flex items-center gap-3 mb-3">
+              <h2 className="text-xl font-semibold">Status Approvals</h2>
+              {selectedStatus ? (
+                <div className="text-sm text-muted-foreground">Editing: <span className="font-medium">{selectedStatus.name}</span></div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Select a status above to configure approvals</div>
+              )}
+              <div className="ml-auto">
+                <Button size="sm" disabled={!selectedStatus || apSaving} onClick={handleSaveApproval}>
+                  {apSaving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Checkbox checked={apHasContext} onCheckedChange={(v: any) => setApHasContext(!!v)} />
+                  <div>
+                    <div className="font-medium">Enable approvals on this status</div>
+                    <div className="text-sm text-muted-foreground">When tasks enter this status, an approval flow will be started.</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Checkbox checked={apAutoAdvance} onCheckedChange={(v: any) => setApAutoAdvance(!!v)} disabled={!apHasContext} />
+                  <div>
+                    <div className="font-medium">Auto-advance after approval</div>
+                    <div className="text-sm text-muted-foreground">Automatically move to the configured next status when approved.</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-sm font-medium mb-1">Next on approve</div>
+                    <Select value={apNextOnApprove ? String(apNextOnApprove) : ''} onValueChange={(v) => setApNextOnApprove(v ? Number(v) : null)} disabled={!apHasContext}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
+                      <SelectContent position="popper">
+                        {statuses.map((s: any) => (
+                          <SelectItem key={`appr-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Next on reject</div>
+                    <Select value={apNextOnReject ? String(apNextOnReject) : ''} onValueChange={(v) => setApNextOnReject(v ? Number(v) : null)} disabled={!apHasContext}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
+                      <SelectContent position="popper">
+                        {statuses.map((s: any) => (
+                          <SelectItem key={`rej-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Next on timeout</div>
+                    <Select value={apNextOnTimeout ? String(apNextOnTimeout) : ''} onValueChange={(v) => setApNextOnTimeout(v ? Number(v) : null)} disabled={!apHasContext}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
+                      <SelectContent position="popper">
+                        {statuses.map((s: any) => (
+                          <SelectItem key={`tout-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-sm font-medium mb-1">Default type</div>
+                    <Select value={apDefaultType} onValueChange={(v: any) => setApDefaultType(v)} disabled={!apHasContext}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent position="popper">
+                        {['all','single','majority','sequential'].map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Min approvers</div>
+                    <Input type="number" value={apMinApprovers} onChange={(e) => setApMinApprovers(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Timeout (hours)</div>
+                    <Input type="number" value={apTimeoutHours} onChange={(e) => setApTimeoutHours(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={apBlocksEditing} onCheckedChange={(v: any) => setApBlocksEditing(!!v)} disabled={!apHasContext} />
+                    <span className="text-sm">Block editing</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={apBlocksDeletion} onCheckedChange={(v: any) => setApBlocksDeletion(!!v)} disabled={!apHasContext} />
+                    <span className="text-sm">Block deletion</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={apBlocksReassign} onCheckedChange={(v: any) => setApBlocksReassign(!!v)} disabled={!apHasContext} />
+                    <span className="text-sm">Block reassignment</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="font-medium mb-1">Approval templates</div>
+                  <div className="text-sm text-muted-foreground mb-2">Templates are resolved by task category at runtime (default per category). You can manage templates in Settings → Templates. No explicit link is required here.</div>
+                  <div className="rounded border p-3 max-h-56 overflow-auto">
+                    {approvalTemplates.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No templates available.</div>
+                    ) : (
+                      <ul className="text-sm list-disc pl-5 space-y-1">
+                        {approvalTemplates.map((t: any) => (
+                          <li key={`tpl-${t.id}`}>{t.name}{t.is_default ? ' (default)' : ''}{t.category_id ? ` — category #${t.category_id}` : ''}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                {apError && <div className="text-sm text-red-600">{apError}</div>}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
       </Tabs>
 
       {/* Global dialogs (available on any tab) */}

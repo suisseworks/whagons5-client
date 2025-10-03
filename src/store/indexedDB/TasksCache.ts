@@ -455,10 +455,18 @@ export class TasksCache {
             task.status_id,
             task.priority_id,
             normalizedUserIds,
+            // approval_metadata (JSON as text, COALESCE null -> '')
+            (task as any).approval_metadata ? JSON.stringify((task as any).approval_metadata) : '',
+            // approval_metadata_updated_at (UTC epoch ms, COALESCE null -> '')
+            (task as any).approval_metadata_updated_at ? new Date((task as any).approval_metadata_updated_at).getTime() : '',
+            // start_date (UTC epoch ms, COALESCE null -> '')
             task.start_date ? new Date(task.start_date).getTime() : '',
+            // due_date (UTC epoch ms, COALESCE null -> '')
             task.due_date ? new Date(task.due_date).getTime() : '',
             task.expected_duration,
+            // response_date (UTC epoch ms, COALESCE null -> '')
             task.response_date ? new Date(task.response_date).getTime() : '',
+            // resolution_date (UTC epoch ms, COALESCE null -> '')
             task.resolution_date ? new Date(task.resolution_date).getTime() : '',
             task.work_duration,
             task.pause_duration,
