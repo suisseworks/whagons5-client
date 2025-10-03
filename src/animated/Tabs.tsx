@@ -12,7 +12,7 @@ function Tabs({
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex flex-col gap-2 min-h-0", className)}
       {...props}
     />
   );
@@ -117,7 +117,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     data-slot="tabs-content"
-    className={cn("flex-1 outline-none mt-2", className)}
+    className={cn("flex-1 min-h-0 flex flex-col outline-none mt-2", className)}
     {...props}
   />
 ));

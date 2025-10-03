@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Type, AlignLeft, List, CheckSquare } from "lucide-react";
 import { BuilderSchemaField } from "./FormBuilder";
 
 interface AddFieldToolbarProps {
@@ -7,15 +8,15 @@ interface AddFieldToolbarProps {
 
 export function AddFieldToolbar({ onAddField }: AddFieldToolbarProps) {
   const fieldTypes = [
-    { type: 'text' as const, label: 'Short answer', icon: 'T' },
-    { type: 'textarea' as const, label: 'Paragraph', icon: '¶' },
-    { type: 'select' as const, label: 'Multiple choice', icon: '○' },
-    { type: 'checkbox' as const, label: 'Checkbox', icon: '☑' },
+    { type: 'text' as const, label: 'Short answer', icon: Type },
+    { type: 'textarea' as const, label: 'Paragraph', icon: AlignLeft },
+    { type: 'select' as const, label: 'Multiple choice', icon: List },
+    { type: 'checkbox' as const, label: 'Checkbox', icon: CheckSquare },
   ];
 
   return (
-    <div className="flex flex-col gap-1 p-2 bg-background rounded-lg border border-border shadow-sm">
-      {fieldTypes.map(({ type, label, icon }) => (
+    <div className="flex flex-col gap-1 bg-background rounded-lg border border-border shadow-sm">
+      {fieldTypes.map(({ type, label, icon: Icon }) => (
         <Button
           key={type}
           variant="ghost"
@@ -24,9 +25,7 @@ export function AddFieldToolbar({ onAddField }: AddFieldToolbarProps) {
           className="w-10 h-10 hover:bg-muted"
           title={label}
         >
-          <span className="w-5 h-5 flex items-center justify-center text-sm font-mono">
-            {icon}
-          </span>
+          <Icon className="w-6 h-6" />
         </Button>
       ))}
     </div>
