@@ -1,8 +1,8 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
-import { useState, useCallback, useEffect } from "react";
+import { UrlTabs } from "@/components/ui/url-tabs";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Users, Eye, Filter } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
 import { genericActions } from '@/store/genericSlices';
 import OverviewTab from "./OverviewTab";
@@ -61,9 +61,9 @@ interface WorkspaceInfo {
   description: string;
 }
 
-function Settings() {
-  const [activeTab, setActiveTab] = useState('overview');
+function Settings({ workspaceId }: { workspaceId?: string }) {
   const [prevActiveTab, setPrevActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('overview');
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const [workspaceOverview, setWorkspaceOverview] = useState<WorkspaceOverview | null>(null);
   const [workspaceFilters, setWorkspaceFilters] = useState<WorkspaceFilters | null>(null);
@@ -73,27 +73,42 @@ function Settings() {
 
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
-  const params = useParams<{ id: string }>();
   // Using async actions for workspace operations
 
   const overViewControls = useAnimation();
 
-  // Get current workspace from Redux store
+  // Get current workspace from Redux store (slice only; no fetching)
   const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
 
   // Get categories from Redux store
   const { value: categories } = useSelector((state: RootState) => (state as any).categories as { value: any[] });
 
-  // Find workspace by ID from URL params or fallback to first workspace
-  const currentWorkspace = params.id
-    ? workspaces.find((workspace: any) => workspace.id.toString() === params.id)
-    : workspaces.length > 0 ? workspaces[0] : null;
+  // Find workspace by ID from prop or fallback to first workspace
+  const currentWorkspace = useMemo(() => {
+    // If no workspaces loaded yet, return null
+    if (workspaces.length === 0) {
+      return null;
+    }
+
+    if (!workspaceId || workspaceId === 'all') {
+      return workspaces[0];
+    }
+
+    // Try to find workspace by ID (handle both string and number IDs)
+    const workspaceIdNum = isNaN(Number(workspaceId)) ? workspaceId : Number(workspaceId);
+    return workspaces.find((workspace: any) =>
+      workspace.id === workspaceIdNum ||
+      workspace.id === workspaceId ||
+      workspace.id.toString() === workspaceId
+    ) || null;
+  }, [workspaceId, workspaces]);
 
   // Debug logging
   console.log('Workspace matching debug:', {
-    paramsId: params.id,
+    workspaceId,
+    workspaceIdType: typeof workspaceId,
     workspacesLength: workspaces.length,
-    workspaceIds: workspaces.map((w: any) => ({ id: w.id, name: w.name })),
+    workspaceIds: workspaces.map((w: any) => ({ id: w.id, idType: typeof w.id, name: w.name })),
     currentWorkspace: currentWorkspace ? { id: currentWorkspace.id, name: currentWorkspace.name } : null,
     pathname: location.pathname
   });
@@ -140,19 +155,6 @@ function Settings() {
 
   }, [activeTab]);
 
-  // Load categories on component mount
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        // Fetch categories from the API
-        await dispatch(genericActions.categories.fetchAsync()).unwrap();
-      } catch (error) {
-        console.error('Failed to fetch categories:', error);
-      }
-    };
-
-    loadCategories();
-  }, [dispatch]);
 
   // Fetch workspace overview data
   useEffect(() => {
@@ -332,86 +334,153 @@ function Settings() {
     }));
   }, [currentWorkspace, dispatch]);
 
+  // Define tabs for URL persistence
+  const settingsTabs = [
+    {
+      value: 'overview',
+      label: (
+        <div className="flex items-center space-x-2">
+          <Eye className="w-4 h-4" />
+          <span>Overview</span>
+        </div>
+      ),
+      content: (
+        <motion.div
+          className="mt-4 flex-1"
+          key="overview"
+          animate={overViewControls}
+        >
+          <OverviewTab
+            workspaceOverview={workspaceOverview}
+            workspaceInfo={workspaceInfo}
+            workspaceId={currentWorkspace?.id || null}
+            workspaceTeams={currentWorkspace?.teams || null}
+            workspaceType={currentWorkspace?.type || null}
+            loading={loading}
+            onTeamClick={handleTeamClick}
+            onUpdateWorkspace={handleUpdateWorkspace}
+          />
+        </motion.div>
+      )
+    },
+    {
+      value: 'users',
+      label: (
+        <div className="flex items-center space-x-2">
+          <Users className="w-4 h-4" />
+          <span>Users</span>
+        </div>
+      ),
+      content: (
+        <motion.div
+          className="mt-4 flex-1 h-full"
+          key="users"
+          exit={{ x: prevActiveTab === 'overview' ? "-80vw" : "80vw" }}
+          initial={{ x: prevActiveTab === 'overview' ? "80vw" : "-80vw" }}
+          animate={{ x: 0 }}
+        >
+          <UsersTab
+            modulesLoaded={modulesLoaded}
+            selectedTeamFilter={selectedTeamFilter}
+            onClearTeamFilter={handleClearTeamFilter}
+          />
+        </motion.div>
+      )
+    },
+    {
+      value: 'filters',
+      label: (
+        <div className="flex items-center space-x-2">
+          <Filter className="w-4 h-4" />
+          <span>Creation</span>
+        </div>
+      ),
+      content: (
+        <motion.div
+          className="mt-4 flex-1 h-full"
+          key="filters"
+          exit={{ x: "-80vw" }}
+          initial={{ x: "80vw" }}
+          animate={{ x: 0 }}
+        >
+          <CreationTab
+            modulesLoaded={modulesLoaded}
+            workspaceFilters={workspaceFilters}
+            filtersLoading={filtersLoading}
+            onToggleCategory={handleToggleCategory}
+          />
+        </motion.div>
+      )
+    }
+  ];
+
+  // If no workspaceId is provided, this is being used as the main settings page
+  if (!workspaceId) {
+    return (
+      <div className="p-4 pt-0 space-y-4">
+        <div className="space-y-2">
+          <h1 className="text-xl font-bold text-foreground">Settings</h1>
+          <p className="text-sm text-muted-foreground">Manage your application settings and preferences.</p>
+        </div>
+        {/* Main settings content would go here */}
+        <div className="text-center text-muted-foreground">
+          Main settings page - workspace-specific settings are shown when accessed from a workspace.
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while workspaces are being loaded
+  if (workspaces.length === 0) {
+    return (
+      <div className="h-full w-full p-4 pt-0 flex flex-col">
+        <div className="mb-3 flex-shrink-0">
+          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+            <p className="text-sm text-muted-foreground">Loading workspace...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if workspace not found after loading
+  if (!currentWorkspace) {
+    return (
+      <div className="h-full w-full p-4 pt-0 flex flex-col">
+        <div className="mb-3 flex-shrink-0">
+          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
+            <p className="text-gray-600 mt-2">ID: "{workspaceId}" - Please check the URL and try again.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full p-4 pt-0 flex flex-col">
       <div className="mb-3 flex-shrink-0">
         <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => {
-        //  console.log('activeTab', value);
-        //  console.log('prevActiveTab', activeTab);
-        setPrevActiveTab(activeTab);
-        setActiveTab(value);
-
-      }} className="w-full h-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
-          <TabsTrigger value="overview" className="flex items-center space-x-2">
-            <Eye className="w-4 h-4" />
-            <span>Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center space-x-2">
-            <Users className="w-4 h-4" />
-            <span>Users</span>
-          </TabsTrigger>
-          <TabsTrigger value="filters" className="flex items-center space-x-2">
-            <Filter className="w-4 h-4" />
-            <span>Creation</span>
-          </TabsTrigger>
-        </TabsList>
-        {/* Single AnimatePresence for tab content with conditional rendering */}
-        {activeTab === 'overview' && (
-          <motion.div
-            className="mt-4 flex-1"
-            key="overview"
-            animate={overViewControls}
-          >
-            <OverviewTab
-              workspaceOverview={workspaceOverview}
-              workspaceInfo={workspaceInfo}
-              workspaceId={currentWorkspace?.id || null}
-              workspaceTeams={currentWorkspace?.teams || null}
-              workspaceType={currentWorkspace?.type || null}
-              loading={loading}
-              onTeamClick={handleTeamClick}
-              onUpdateWorkspace={handleUpdateWorkspace}
-            />
-          </motion.div>
-        )}
-
-        {activeTab === 'users' && (
-          <motion.div
-            className="mt-4 flex-1 h-full"
-            key="users"
-            exit={{ x: prevActiveTab === 'overview' ? "-80vw" : "80vw" }}
-            initial={{ x: prevActiveTab === 'overview' ? "80vw" : "-80vw" }}
-            animate={{ x: 0 }}
-          >
-            <UsersTab
-              modulesLoaded={modulesLoaded}
-              selectedTeamFilter={selectedTeamFilter}
-              onClearTeamFilter={handleClearTeamFilter}
-            />
-          </motion.div>
-        )}
-
-        {activeTab === 'filters' && (
-          <motion.div
-            className="mt-4 flex-1 h-full"
-            key="filters"
-            exit={{ x: "-80vw" }}
-            initial={{ x: "80vw" }}
-            animate={{ x: 0 }}
-          >
-            <CreationTab
-              modulesLoaded={modulesLoaded}
-              workspaceFilters={workspaceFilters}
-              filtersLoading={filtersLoading}
-              onToggleCategory={handleToggleCategory}
-            />
-          </motion.div>
-        )}
-      </Tabs>
+      <UrlTabs
+        tabs={settingsTabs}
+        defaultValue="overview"
+        basePath={`/workspace/${workspaceId}/settings`}
+        pathMap={{ overview: '', users: '/users', filters: '/creation' }}
+        className="w-full h-full flex flex-col"
+        onValueChange={(value) => {
+          setPrevActiveTab(activeTab);
+          setActiveTab(value);
+        }}
+      />
     </div>
   );
 }

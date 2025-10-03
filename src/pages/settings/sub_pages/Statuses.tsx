@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SettingsGrid } from "@/pages/settings/components/SettingsGrid";
@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/animated/Tabs";
 
 function Statuses() {
   
@@ -89,13 +90,7 @@ function Statuses() {
   
   // Load persisted view and group, and save changes
   useEffect(() => {
-    // Ensure approvals slices are hydrated
-    dispatch((genericActions as any).statusApprovalConfig?.getFromIndexedDB?.());
-    dispatch((genericActions as any).statusApprovalConfig?.fetchFromAPI?.());
-    dispatch((genericActions as any).approvalTemplates?.getFromIndexedDB?.());
-    dispatch((genericActions as any).approvalTemplates?.fetchFromAPI?.());
-
-    // Load view
+    // Only read persisted view; do not fetch slices here
     const vk = `wh_status_view:${tenant || 'default'}`;
     const vv = localStorage.getItem(vk);
     if (vv === 'matrix' || vv === 'visual') setTransitionsView(vv);
@@ -368,55 +363,13 @@ function Statuses() {
     setSelectedGroupId(null);
   };
 
-  return (
-    <SettingsLayout
-      title="Statuses"
-      description="Manage global statuses and transition rules"
-      icon={faSitemap}
-      iconColor="#f59e0b"
-      backPath="/settings"
-      wrapChildrenFullHeight={activeTab === 'transitions'}
-      search={{
-        placeholder: "Search statuses...",
-        value: searchQuery,
-        onChange: setSearchQuery
-      }}
-      statistics={activeTab === 'statuses' ? {
-        title: "Status Overview",
-        description: "Quick glance at your workflow setup",
-        items: [
-          { label: 'Total Statuses', value: statuses.length },
-          { label: 'System Statuses', value: statuses.filter((s: any) => !!s.system).length },
-          { label: 'Transition Groups', value: statusTransitionGroups.length },
-          { label: selectedGroupId ? 'Transitions (Selected Group)' : 'Transitions (All)', value: selectedGroupId ? transitionsByKey.size : statusTransitions.length }
-        ]
-      } : undefined}
-      headerActions={
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => {
-            setFormName("");
-            setFormAction("");
-            setFormColor("#888888");
-            setFormIcon("fas fa-circle");
-            setFormInitial(false);
-            setFormSystem(false);
-            setFormError(null);
-            setCreateOpen(true);
-          }}>
-            <FontAwesomeIcon icon={faPlus} className="mr-2" />
-            Add Status
-          </Button>
-        </div>
-      }
-    >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-        <TabsList>
-          <TabsTrigger value="statuses">Statuses</TabsTrigger>
-          <TabsTrigger value="transitions">Transitions</TabsTrigger>
-          <TabsTrigger value="approvals">Approvals</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="statuses" className="space-y-4">
+  // Define tabs for URL persistence
+  const statusesTabs = [
+    {
+      value: 'statuses',
+      label: 'Statuses',
+      content: (
+        <div className="space-y-4">
           <SettingsGrid
             rowData={filteredStatuses}
             columnDefs={columns}
@@ -436,9 +389,14 @@ function Statuses() {
               setEditOpen(true);
             }}
           />
-        </TabsContent>
-
-        <TabsContent value="transitions" className="space-y-4 flex-1 min-h-0 flex flex-col">
+        </div>
+      )
+    },
+    {
+      value: 'transitions',
+      label: 'Transitions',
+      content: (
+        <div className="space-y-4 flex-1 min-h-0 flex flex-col">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-xl font-semibold mr-2">Transitions</h2>
             <Select value={selectedGroupId ? String(selectedGroupId) : ''} onValueChange={(v) => setSelectedGroupId(v ? Number(v) : null)}>
@@ -508,7 +466,7 @@ function Statuses() {
                 </TabsList>
               </Tabs>
             </div>
-      </div>
+          </div>
 
           {transitionsView === 'matrix' ? (
             <div className="flex-1 min-h-0 overflow-auto">
@@ -570,9 +528,14 @@ function Statuses() {
               </div>
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="approvals" className="space-y-4">
+        </div>
+      )
+    },
+    {
+      value: 'approvals',
+      label: 'Approvals',
+      content: (
+        <div className="space-y-4">
           <div className="border rounded-lg p-4 bg-card">
             <div className="flex items-center gap-3 mb-3">
               <h2 className="text-xl font-semibold">Status Approvals</h2>
@@ -701,9 +664,59 @@ function Statuses() {
               </div>
             </div>
           </div>
-        </TabsContent>
+        </div>
+      )
+    }
+  ];
 
-      </Tabs>
+  return (
+    <SettingsLayout
+      title="Statuses"
+      description="Manage global statuses and transition rules"
+      icon={faSitemap}
+      iconColor="#f59e0b"
+      backPath="/settings"
+      wrapChildrenFullHeight={activeTab === 'transitions'}
+      search={{
+        placeholder: "Search statuses...",
+        value: searchQuery,
+        onChange: setSearchQuery
+      }}
+      statistics={activeTab === 'statuses' ? {
+        title: "Status Overview",
+        description: "Quick glance at your workflow setup",
+        items: [
+          { label: 'Total Statuses', value: statuses.length },
+          { label: 'System Statuses', value: statuses.filter((s: any) => !!s.system).length },
+          { label: 'Transition Groups', value: statusTransitionGroups.length },
+          { label: selectedGroupId ? 'Transitions (Selected Group)' : 'Transitions (All)', value: selectedGroupId ? transitionsByKey.size : statusTransitions.length }
+        ]
+      } : undefined}
+      headerActions={
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => {
+            setFormName("");
+            setFormAction("");
+            setFormColor("#888888");
+            setFormIcon("fas fa-circle");
+            setFormInitial(false);
+            setFormSystem(false);
+            setFormError(null);
+            setCreateOpen(true);
+          }}>
+            <FontAwesomeIcon icon={faPlus} className="mr-2" />
+            Add Status
+          </Button>
+        </div>
+      }
+    >
+      <UrlTabs
+        tabs={statusesTabs}
+        defaultValue="statuses"
+        basePath="/settings/statuses"
+        className="h-full flex flex-col"
+        onValueChange={setActiveTab}
+      />
 
       {/* Global dialogs (available on any tab) */}
       <SettingsDialog

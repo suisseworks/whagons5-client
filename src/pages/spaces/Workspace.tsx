@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { useMatch, useLocation } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
+import { useLocation } from 'react-router-dom';
+import { UrlTabs } from '@/components/ui/url-tabs';
 import { ClipboardList, Settings, Plus } from 'lucide-react';
 import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
@@ -9,12 +9,17 @@ import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { AnimatePresence, motion, useAnimation } from 'motion/react';
 
 export const Workspace = () => {
-  const match = useMatch('/workspace/:id');
-  const id = (match && (match.params as any)?.id) as string | undefined;
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState('grid');
-  const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(new Set(['list']));
+
+  // Extract workspace ID from the current path
+  const getWorkspaceIdFromPath = (pathname: string): string | undefined => {
+    const match = pathname.match(/\/workspace\/([^/?]+)/);
+    return match ? match[1] : undefined;
+  };
+
+  const id = getWorkspaceIdFromPath(location.pathname);
   // State to store the fetched data
+  const [activeTab, setActiveTab] = useState('grid');
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
@@ -24,13 +29,8 @@ export const Workspace = () => {
   const gridControls = useAnimation();
 
 
+  // Handle grid animation based on current tab
   useEffect(() => {
-    const newHiddenTabs = new Set(['list', 'grid']);
-    newHiddenTabs.delete(activeTab);
-    setHiddenTabs(newHiddenTabs);
-
-
-
     if (activeTab === 'grid') {
       gridControls.start({ x: 0 });
     } else {
@@ -43,7 +43,7 @@ export const Workspace = () => {
         }
       });
     }
-  }, [activeTab]);
+  }, [activeTab, gridControls]);
 
   //
 
@@ -58,11 +58,8 @@ export const Workspace = () => {
         opacity: 0.3,
         transition: { duration: 0.2, repeat: 1, repeatType: "reverse", ease: "easeInOut" }
       });
-
     }
-
-
-  }, [id]);
+  }, [id, location.pathname]);
 
   // Debug logging
   console.log('Workspace component - id:', id, 'typeof:', typeof id);
@@ -98,8 +95,47 @@ export const Workspace = () => {
   }
 
 
+  // Define tabs for URL persistence
+  const workspaceTabs = [
+    {
+      value: 'grid',
+      label: (
+        <div className="flex items-center gap-2">
+          <ClipboardList />
+          Tasks
+        </div>
+      ),
+      content: (
+        <motion.div
+          className='flex-1 h-full'
+          animate={gridControls}
+        >
+          <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
+        </motion.div>
+      )
+    },
+    {
+      value: 'list',
+      label: (
+        <div className="flex items-center gap-2">
+          <Settings />
+          Settings
+        </div>
+      ),
+      content: (
+        <motion.div
+          exit={{ x: "-80vw" }}
+          initial={{ x: "80vw" }}
+          animate={{ x: 0 }}
+        >
+          <SettingsComponent workspaceId={id} />
+        </motion.div>
+      )
+    }
+  ];
+
   return (
-    <Tabs defaultValue="grid" className="w-full h-full flex flex-colr" onValueChange={setActiveTab} value={activeTab}>
+    <div className="w-full h-full flex flex-col">
       <div className="flex items-center gap-6 mb-4">
         <Input
           placeholder="Search tasks..."
@@ -107,45 +143,19 @@ export const Workspace = () => {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        <TabsList className="h-12 flex-shrink-0 w-fit">
-          <TabsTrigger value="grid" className="flex items-center gap-2">
-            <ClipboardList />
-            Tasks
-          </TabsTrigger>
-          <TabsTrigger value="list" className="flex items-center gap-2">
-            <Settings />
-            Settings
-          </TabsTrigger>
-        </TabsList>
       </div>
-      <AnimatePresence mode="sync">
 
-        <div className='flex h-full'>
-          <TabsContent
-            forceMount
-            // className='flex-1 h-0'
-            value="grid"
-            style={{ display: hiddenTabs.has('grid') ? 'none' : 'block' }}
-          >
-            <motion.div
-              className='flex-1 h-full'
-              animate={gridControls}
-            >
-              <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
-            </motion.div>
-          </TabsContent>
+      <div className='flex h-full'>
+        <UrlTabs
+          tabs={workspaceTabs}
+          defaultValue="grid"
+          basePath={`/workspace/${id}`}
+          pathMap={{ grid: '', list: '/settings' }}
+          className="w-full h-full flex flex-col"
+          onValueChange={setActiveTab}
+        />
+      </div>
 
-          <TabsContent value="list" className="flex-1 h-0">
-            <motion.div
-              exit={{ x: "-80vw" }}
-              initial={{ x: "80vw" }}
-              animate={{ x: 0 }}
-            >
-              <SettingsComponent />
-            </motion.div>
-          </TabsContent>
-        </div>
-      </AnimatePresence>
       {/* Floating Action Button for mobile (bottom-right) */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (
         <>
@@ -159,7 +169,7 @@ export const Workspace = () => {
           <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
         </>
       )}
-    </Tabs>
+    </div>
 
 
   );

@@ -21,7 +21,7 @@ import {
 import { RootState } from "@/store/store";
 import { useState } from "react";
 import { createSwapy, SlotItemMapArray, Swapy, utils } from 'swapy';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
+import { UrlTabs } from "@/components/ui/url-tabs";
 
 
 const STORAGE_KEYS = {
@@ -293,49 +293,43 @@ function Settings() {
     }
   };
 
-  return (
-    <div className="p-4 pt-0 space-y-4">
-      {/* Header (collapsed) */}
-      <div className="space-y-2">
-      </div>
-
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="basics">Basics</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced</TabsTrigger>
-        </TabsList>
-
-        <div className="text-sm text-muted-foreground mt-2">Drag cards to reorder.</div>
-
-        <TabsContent value="basics">
-          <div 
-          data-swapy-container="basic"
-          ref={basicContainerRef} 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  // Define tabs for URL persistence
+  const mainSettingsTabs = [
+    {
+      value: 'basics',
+      label: 'Basics',
+      content: (
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
+          <div
+            data-swapy-container="basic"
+            ref={basicContainerRef}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          >
             {basicSettingsItems.map(({ slotId, itemId, item }) => (
               <div key={slotId} data-swapy-slot={slotId} className="h-full">
                 {item && (
                   <div data-swapy-item={itemId} key={itemId} className="h-full">
                     <Card
                       className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                    onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                    onPointerMove={(e) => {
-                      const s = pointerStartRef.current;
-                      if (!s) return;
-                      const dx = Math.abs(e.clientX - s.x);
-                      const dy = Math.abs(e.clientY - s.y);
-                      if (dx > 3 || dy > 3) {
-                        didMoveRef.current = true;
-                      }
-                    }}
-                    onPointerUp={(e) => {
-                      const s = pointerStartRef.current; pointerStartRef.current = null;
-                      if (!s) return;
-                      const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                      if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                        handleSettingClick(item.id);
-                      }
-                    }}
+                      onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                      onPointerMove={(e) => {
+                        const s = pointerStartRef.current;
+                        if (!s) return;
+                        const dx = Math.abs(e.clientX - s.x);
+                        const dy = Math.abs(e.clientY - s.y);
+                        if (dx > 3 || dy > 3) {
+                          didMoveRef.current = true;
+                        }
+                      }}
+                      onPointerUp={(e) => {
+                        const s = pointerStartRef.current; pointerStartRef.current = null;
+                        if (!s) return;
+                        const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                        if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                          handleSettingClick(item.id);
+                        }
+                      }}
                     >
                       <CardHeader className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -364,36 +358,44 @@ function Settings() {
               </div>
             ))}
           </div>
-        </TabsContent>
-
-        <TabsContent value="advanced">
-          <div 
-          data-swapy-container="advanced"
-          ref={advancedContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        </div>
+      )
+    },
+    {
+      value: 'advanced',
+      label: 'Advanced',
+      content: (
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
+          <div
+            data-swapy-container="advanced"
+            ref={advancedContainerRef}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          >
             {advancedSettingsItems.map(({ slotId, itemId, item }) => (
               <div key={slotId} data-swapy-slot={slotId} className="h-full">
                 {item && (
                   <div data-swapy-item={itemId} key={itemId} className="h-full">
                     <Card
                       className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                    onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                    onPointerMove={(e) => {
-                      const s = pointerStartRef.current;
-                      if (!s) return;
-                      const dx = Math.abs(e.clientX - s.x);
-                      const dy = Math.abs(e.clientY - s.y);
-                      if (dx > 3 || dy > 3) {
-                        didMoveRef.current = true;
-                      }
-                    }}
-                    onPointerUp={(e) => {
-                      const s = pointerStartRef.current; pointerStartRef.current = null;
-                      if (!s) return;
-                      const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                      if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                        handleSettingClick(item.id);
-                      }
-                    }}
+                      onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
+                      onPointerMove={(e) => {
+                        const s = pointerStartRef.current;
+                        if (!s) return;
+                        const dx = Math.abs(e.clientX - s.x);
+                        const dy = Math.abs(e.clientY - s.y);
+                        if (dx > 3 || dy > 3) {
+                          didMoveRef.current = true;
+                        }
+                      }}
+                      onPointerUp={(e) => {
+                        const s = pointerStartRef.current; pointerStartRef.current = null;
+                        if (!s) return;
+                        const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
+                        if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
+                          handleSettingClick(item.id);
+                        }
+                      }}
                     >
                       <CardHeader className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -422,8 +424,23 @@ function Settings() {
               </div>
             ))}
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <div className="p-4 pt-0 space-y-4">
+      {/* Header (collapsed) */}
+      <div className="space-y-2">
+      </div>
+
+      <UrlTabs
+        tabs={mainSettingsTabs}
+        defaultValue="basics"
+        basePath="/settings"
+        onValueChange={setTab}
+      />
 
 
 

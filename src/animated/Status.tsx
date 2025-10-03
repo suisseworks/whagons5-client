@@ -1,5 +1,5 @@
 import React from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion, AnimatePresence, MotionConfig } from "motion/react"
 import { XCircle } from "lucide-react"
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 
@@ -51,29 +51,34 @@ const SPRING = { type: "spring" as const, stiffness: 520, damping: 24, mass: 0.9
 // Inline animated SVG spinner (smooth rotating dash)
 function AnimatedSpinner() {
   return (
-    <motion.svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      initial={false}
-    >
-      <motion.circle
-        cx="12"
-        cy="12"
-        r="9"
-        vectorEffect="non-scaling-stroke"
-        pathLength={1}
-        style={{ strokeDasharray: "0.3 0.7" }}
-        animate={{ strokeDashoffset: [0, -1] }}
+    <MotionConfig>
+      <motion.svg
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        initial={{ rotate: 0 }}
+        animate={{ rotate: 360 }}
         transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-      />
-    </motion.svg>
+      >
+        <motion.circle
+          cx="12"
+          cy="12"
+          r="9"
+          vectorEffect="non-scaling-stroke"
+          pathLength={1}
+          style={{ strokeDasharray: "0.3 0.7" }}
+          initial={{ strokeDashoffset: 0 }}
+          animate={{ strokeDashoffset: -1 }}
+          transition={{ repeat: Infinity, repeatType: "loop", duration: 0.8, ease: "linear" }}
+        />
+      </motion.svg>
+    </MotionConfig>
   )
 }
 
@@ -110,10 +115,59 @@ interface MultiStateBadgeProps {
   onClick?: () => void
   className?: string
   label?: string // override label if desired
-  customStatus?: StatusConfig // for custom status states
+  customStatus?: StatusConfig // for predefined custom status states
+  customComponent?: React.ReactNode // for entirely custom React components
 }
 
-export function MultiStateBadge({ state, onClick, className = "", label, customStatus }: MultiStateBadgeProps) {
+export function MultiStateBadge({ state, onClick, className = "", label, customStatus, customComponent }: MultiStateBadgeProps) {
+  // If custom state and customComponent is provided, render it directly
+  if (state === "custom" && customComponent) {
+    return (
+      <motion.div
+        className={["relative inline-flex items-center gap-2", className].join(" ")}
+        layout="size"
+        transition={SPRING}
+      >
+        {onClick ? (
+          <motion.button
+            type="button"
+            onClick={onClick}
+            className="relative inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
+            layout="size"
+            transition={SPRING}
+            whileTap={{ scale: 0.98 }}
+          >
+            {customComponent}
+            {label && (
+              <motion.div layout="size" transition={SPRING} className="relative inline-flex overflow-hidden">
+                <motion.span
+                  layout
+                  className="block text-xs font-medium tracking-wide"
+                >
+                  {label}
+                </motion.span>
+              </motion.div>
+            )}
+          </motion.button>
+        ) : (
+          <>
+            {customComponent}
+            {label && (
+              <motion.div layout="size" transition={SPRING} className="relative inline-flex overflow-hidden">
+                <motion.span
+                  layout
+                  className="block text-xs font-medium tracking-wide"
+                >
+                  {label}
+                </motion.span>
+              </motion.div>
+            )}
+          </>
+        )}
+      </motion.div>
+    )
+  }
+
   const cfg = state === "custom" ? customStatus : STATE_MAP[state]
   if (!cfg) return null
 
@@ -133,7 +187,6 @@ export function MultiStateBadge({ state, onClick, className = "", label, customS
       whileTap={{ scale: 0.98 }}
       aria-busy={state === "processing"}
     >
-      {/* Soft glow that morphs between states */}
       {state !== "custom" && (
         <motion.span
           className={["absolute inset-0 rounded-full pointer-events-none", cfg.glow].join(" ")}
@@ -142,8 +195,7 @@ export function MultiStateBadge({ state, onClick, className = "", label, customS
         />
       )}
 
-            {/* Icon / Indicator */}
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait">
         <motion.span
           key={state + "-icon"}
           className="inline-flex"
@@ -159,7 +211,7 @@ export function MultiStateBadge({ state, onClick, className = "", label, customS
             <AnimatedSpinner />
           ) : cfg.icon ? (
             // Check if it's a FontAwesome icon object or React component
-            typeof cfg.icon === 'object' && cfg.icon.iconName ? (
+            typeof cfg.icon === 'object' && (cfg.icon as any).iconName ? (
               <FontAwesomeIcon
                 icon={cfg.icon}
                 className="h-3.5 w-3.5"
@@ -167,12 +219,14 @@ export function MultiStateBadge({ state, onClick, className = "", label, customS
               />
             ) : React.isValidElement(cfg.icon) ? (
               cfg.icon
-            ) : null
+            ) : (
+              // Assume it's a React component type
+              React.createElement(cfg.icon as any, { className: "h-3.5 w-3.5" })
+            )
           ) : null}
         </motion.span>
       </AnimatePresence>
 
-      {/* Label (crossfades + springy width) */}
       <span className="sr-only">Status:</span>
       <motion.div layout="size" transition={SPRING} className="relative inline-flex overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>

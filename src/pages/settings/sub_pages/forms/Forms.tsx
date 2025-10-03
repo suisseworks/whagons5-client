@@ -47,7 +47,7 @@ import {
 import FormBuilder from "./components/FormBuilder";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
+import { UrlTabs } from "@/components/ui/url-tabs";
 
 // Simple renderer for form name with version badge
 const FormNameCellRenderer = (props: ICellRendererParams) => {
@@ -203,35 +203,13 @@ function Forms() {
     console.log('publish', builderSchema);
   }, [builderSchema]);
 
-  return (
-    <SettingsLayout
-      title="Forms"
-      description="Manage forms and build beautiful, structured inputs with a visual builder"
-      icon={faClipboardList}
-      iconColor="#ec4899"
-      search={{
-        placeholder: "Search forms...",
-        value: searchQuery,
-        onChange: (value: string) => {
-          setSearchQuery(value);
-          handleSearch(value);
-        }
-      }}
-      loading={{ isLoading: loading, message: "Loading forms..." }}
-      error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
-      statistics={undefined}
-    >
-      <Tabs
-        value={activeTab}
-        onValueChange={(v: string) => setActiveTab(v as 'list' | 'builder')}
-        className="flex-1 h-full flex flex-col"
-      >
-        <TabsList>
-          <TabsTrigger value="list">List</TabsTrigger>
-          <TabsTrigger value="builder">Builder</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="flex-1 min-h-0 flex flex-col space-y-4">
+  // Define tabs for URL persistence
+  const formsTabs = [
+    {
+      value: 'list',
+      label: 'List',
+      content: (
+        <div className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
             rowData={filteredItems}
             columnDefs={colDefs}
@@ -251,9 +229,14 @@ function Forms() {
             className="flex-1 min-h-0"
             height="100%"
           />
-        </TabsContent>
-
-        <TabsContent value="builder" className="space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto">
+        </div>
+      )
+    },
+    {
+      value: 'builder',
+      label: 'Builder',
+      content: (
+        <div className="space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto">
           {/* Header with form info and action buttons */}
           <div className="flex items-center justify-between pb-4 border-b">
             <div className="text-sm text-muted-foreground">
@@ -287,8 +270,36 @@ function Forms() {
               onPreview={() => setIsPreviewOpen(true)}
             />
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <SettingsLayout
+      title="Forms"
+      description="Manage forms and build beautiful, structured inputs with a visual builder"
+      icon={faClipboardList}
+      iconColor="#ec4899"
+      search={{
+        placeholder: "Search forms...",
+        value: searchQuery,
+        onChange: (value: string) => {
+          setSearchQuery(value);
+          handleSearch(value);
+        }
+      }}
+      loading={{ isLoading: loading, message: "Loading forms..." }}
+      error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
+      statistics={undefined}
+    >
+      <UrlTabs
+        tabs={formsTabs}
+        defaultValue="list"
+        basePath="/settings/forms"
+        className="flex-1 h-full flex flex-col"
+        onValueChange={(v: string) => setActiveTab(v as 'list' | 'builder')}
+      />
 
       {/* Delete Confirmation */}
       <SettingsDialog

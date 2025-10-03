@@ -1,7 +1,7 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { logout } from "@/pages/authentication/auth";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import {
     DropdownMenu,
@@ -18,12 +18,13 @@ import { RootState } from "@/store/store";
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { MultiStateBadge } from "@/animated/Status";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
-    const { firebaseUser, user, userLoading } = useAuth();
+    const { firebaseUser, user, userLoading, hydrating } = useAuth();
     const { isMobile } = useSidebar();
     const navigate = useNavigate();
     const location = useLocation();
@@ -90,6 +91,36 @@ function Header() {
         return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid };
     }, [location.pathname, workspaces]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
+
+    // Hydration status badge: processing while hydrating, success briefly when done, hidden otherwise
+    const [hydrationState, setHydrationState] = useState<"start" | "processing" | "success" | "error" | "custom">("custom");
+    const prevHydrating = useRef(false);
+    useEffect(() => {
+        if (hydrating) {
+            setHydrationState("processing");
+        } else {
+            if (prevHydrating.current) {
+                setHydrationState("success");
+                const t = setTimeout(() => setHydrationState("custom"), 1200);
+                return () => clearTimeout(t);
+            } else {
+                setHydrationState("custom");
+            }
+        }
+        prevHydrating.current = hydrating;
+    }, [hydrating]);
+
+    const hydrationBadge = useMemo(() => {
+        if (hydrationState === "custom") return null;
+        const label = hydrationState === "processing" ? "Syncing" : (hydrationState === "success" ? "Synced" : undefined);
+        return (
+            <MultiStateBadge
+                state={hydrationState}
+                label={label}
+                className="h-6 px-2 py-1 text-xs"
+            />
+        );
+    }, [hydrationState]);
 
 
 
@@ -195,9 +226,12 @@ function Header() {
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
-                        <h1 className="text-lg sm:text-xl font-semibold truncate max-w-[20rem]">
-                            {currentWorkspaceName}
-                        </h1>
+                        <div className="flex items-center space-x-2">
+                            <h1 className="text-lg sm:text-xl font-semibold truncate max-w-[20rem]">
+                                {currentWorkspaceName}
+                            </h1>
+                            {hydrationBadge}
+                        </div>
                     ) : isSettings ? (
                         <Breadcrumb>
                             <BreadcrumbList className="gap-1.5 sm:gap-2">
@@ -220,10 +254,12 @@ function Header() {
                             </BreadcrumbList>
                         </Breadcrumb>
                     ) : isAnalytics ? (
-                        <h1 className="text-lg sm:text-xl font-semibold">
-                            Analytics
-                        </h1>
+                        <div className="flex items-center space-x-2">
+                            <h1 className="text-lg sm:text-xl font-semibold">Analytics</h1>
+                            {hydrationBadge}
+                        </div>
                     ) : (
+                        <div className="flex items-center space-x-2">
                         <Breadcrumb>
                             <BreadcrumbList className="gap-1.5 sm:gap-2">
                                 <BreadcrumbItem>
@@ -249,6 +285,8 @@ function Header() {
                                 ))}
                             </BreadcrumbList>
                         </Breadcrumb>
+                        {hydrationBadge}
+                        </div>
                     )}
                 </div>
 

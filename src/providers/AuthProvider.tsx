@@ -11,7 +11,7 @@ import { User } from '../types/user';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
 // Custom slice with advanced features (tasks only)
-// import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
+import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 
 // Generic slices actions (handles all other tables)
 import { genericActions, genericCaches } from '@/store/genericSlices';
@@ -32,6 +32,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   userLoading: boolean;
+  hydrating: boolean;
   refetchUser: () => Promise<void>;
 }
 
@@ -48,6 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [userLoading, setUserLoading] = useState<boolean>(false);
+  const [hydrating, setHydrating] = useState<boolean>(false);
   const dispatch = useDispatch<AppDispatch>();
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
@@ -76,91 +78,116 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userData);
         // console.log('AuthContext: User data loaded successfully');
 
-        if (!userData?.tenant_domain_prefix) {
-          return;
-        }
-        console.log(firebaseUser.uid)
-        let result = await DB.init(firebaseUser.uid);
-        console.log('DB.init: result', result);
-        if (!result) {
-          console.warn('DB failed to initialize, deferring cache hydration');
-          return;
-        }
-
-        // Explicitly wait for DB readiness to avoid races during first login
-        const ready = await DB.whenReady();
-        if (!ready) {
-          console.warn('DB not ready after init, deferring cache hydration');
-          return;
-        }
-
-
-
-        try {
-          // Disable encryption for small reference stores that must be writable immediately
-          // Avoids losing rows when CEK is not yet provisioned at first run
-          // DB.setEncryptionForStore('category_field_assignments', false);
-          // DB.setEncryptionForStore('custom_fields', false);
-
-          // Validate only core keys, then refresh those slices
-          const coreKeys = [
-            'workspaces',
-            'teams',
-            'categories',
-            'templates',
-            'statuses',
-            'statusTransitions',
-            'statusTransitionGroups',
-            'priorities',
-            'slas',
-            'spots',
-            'users',
-            'forms',
-            'workflows',
-          ] as const;
-          const caches: GenericCache[] = coreKeys
-            .map((k) => (genericCaches as any)[k])
-            .filter((c: any): c is GenericCache => !!c);
-          await GenericCache.validateMultiple(caches);
-
-          for (const key of coreKeys) {
-            const actions = (genericActions as any)[key];
-            if (actions?.getFromIndexedDB) {
-              await dispatch(actions.getFromIndexedDB());
-            } else {
-              console.warn('AuthProvider: missing generic actions for key', key);
+        // Kick off background hydration so UI can render immediately
+        (async () => {
+          try {
+            setHydrating(true);
+            if (!userData?.tenant_domain_prefix) {
+              return;
             }
-          }
-        } catch (e) {
-          console.warn('AuthProvider: cache validate failed', e);
-        }
-
-        // Initialize and validate tasks AFTER core caches are ready
-        await TasksCache.init();
-        await TasksCache.validateTasks();
-
-
-        // Manifest verify LAST to avoid racing with decryption/hydration
-        try {
-          const manifestResp = await apiClient.get('/sync/manifest');
-          if (manifestResp.status === 200) {
-            const m = manifestResp.data?.data || manifestResp.data;
-            const ok = await verifyManifest(m);
-            if (!ok) {
-              console.warn('Manifest signature invalid');
+            console.log(firebaseUser.uid);
+            const result = await DB.init(firebaseUser.uid);
+            console.log('DB.init: result', result);
+            if (!result) {
+              console.warn('DB failed to initialize, deferring cache hydration');
+              return;
             }
+
+            // Explicitly wait for DB readiness to avoid races during first login
+            const ready = await DB.whenReady();
+            if (!ready) {
+              console.warn('DB not ready after init, deferring cache hydration');
+              return;
+            }
+
+            // Keys used across hydration
+            const coreKeys = [
+              'workspaces',
+              'teams',
+              'categories',
+              'templates',
+              'statuses',
+              'statusTransitions',
+              'statusTransitionGroups',
+              'priorities',
+              'slas',
+              'spots',
+              'users',
+              'forms',
+              'workflows',
+            ] as const;
+
+            // A) Immediately populate UI from IndexedDB for tasks and core entities
+            await Promise.allSettled([
+              // Tasks first paint
+              dispatch(getTasksFromIndexedDB()),
+              // Core slices paint
+              ...coreKeys.map(async (key) => {
+                const actions = (genericActions as any)[key];
+                if (actions?.getFromIndexedDB) {
+                  return dispatch(actions.getFromIndexedDB());
+                } else {
+                  console.warn('AuthProvider: missing generic actions for key', key);
+                  return Promise.resolve();
+                }
+              }),
+            ]);
+
+            // B) Kick off tasks validation fully in the background, then refresh tasks from IDB
+            (async () => {
+              try {
+                await TasksCache.init();
+                await TasksCache.validateTasks();
+                await dispatch(getTasksFromIndexedDB());
+              } catch (e) {
+                console.warn('AuthProvider: tasks cache validate failed', e);
+              }
+            })();
+
+            // C) Validate core reference caches, then refresh from IndexedDB
+            try {
+              const caches: GenericCache[] = coreKeys
+                .map((k) => (genericCaches as any)[k])
+                .filter((c: any): c is GenericCache => !!c);
+              await GenericCache.validateMultiple(caches);
+
+              await Promise.allSettled(
+                coreKeys.map(async (key) => {
+                  const actions = (genericActions as any)[key];
+                  if (actions?.getFromIndexedDB) {
+                    return dispatch(actions.getFromIndexedDB());
+                  } else {
+                    return Promise.resolve();
+                  }
+                })
+              );
+            } catch (e) {
+              console.warn('AuthProvider: cache validate/load sequence failed', e);
+            }
+
+            // Manifest verify LAST to avoid racing with decryption/hydration
+            try {
+              const manifestResp = await apiClient.get('/sync/manifest');
+              if (manifestResp.status === 200) {
+                const m = manifestResp.data?.data || manifestResp.data;
+                const ok = await verifyManifest(m);
+                if (!ok) {
+                  console.warn('Manifest signature invalid');
+                }
+              }
+            } catch (e) {
+              console.warn('Manifest fetch/verify failed (continuing):', e);
+            }
+
+            // Category-field-assignments are fetched per category on demand and cached via GenericCache
+            const rtl = new RealTimeListener({ debug: true });
+            rtl.connectAndHold();
+          } catch (err) {
+            console.warn('AuthProvider: background hydration failed', err);
+          } finally {
+            setHydrating(false);
           }
-        } catch (e) {
-          console.warn('Manifest fetch/verify failed (continuing):', e);
-        }
-
-
-        console.log("here")
-
-        // Category-field-assignments are fetched per category on demand and cached via GenericCache
-
-        const rtl = new RealTimeListener({ debug: true });
-        rtl.connectAndHold();
+        })();
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user data:', error);
@@ -211,6 +238,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         user,
         loading,
         userLoading,
+        hydrating,
         refetchUser,
       }}
     >

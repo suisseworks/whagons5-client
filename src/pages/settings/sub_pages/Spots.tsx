@@ -19,7 +19,7 @@ import {
   SelectField,
   ColorIndicatorCellRenderer
 } from "../components";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
+import { UrlTabs } from "@/components/ui/url-tabs";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -338,6 +338,46 @@ function Spots() {
     </div>
   );
 
+  // Define tabs for URL persistence
+  const spotsTabs = [
+    {
+      value: 'main',
+      label: 'Spots',
+      content: (
+        <div className="flex-1 min-h-0 flex flex-col space-y-4">
+          <SettingsGrid
+            rowData={searchableHierarchyData}
+            columnDefs={colDefs}
+            gridOptions={gridOptions}
+            rowSelection={rowSelection as any}
+            noRowsMessage="No spots found"
+            onRowDoubleClicked={handleEdit}
+            className="flex-1 min-h-0"
+            height="100%"
+          />
+        </div>
+      )
+    },
+    {
+      value: 'branches',
+      label: 'Branches',
+      content: (
+        <div className="flex-1 min-h-0 flex flex-col space-y-4">
+          <SettingsGrid
+            rowData={searchableHierarchyData.filter((s: any) => s.is_branch)}
+            columnDefs={colDefs}
+            gridOptions={gridOptions}
+            rowSelection={rowSelection as any}
+            noRowsMessage="No branches found"
+            onRowDoubleClicked={handleEdit}
+            className="flex-1 min-h-0"
+            height="100%"
+          />
+        </div>
+      )
+    }
+  ];
+
   return (
     <SettingsLayout
       title="Spots"
@@ -385,36 +425,12 @@ function Spots() {
         </div>
       }
     >
-      <Tabs defaultValue="main" className="flex-1 h-full flex flex-col">
-        <TabsList>
-          <TabsTrigger value="main">Spots</TabsTrigger>
-          <TabsTrigger value="branches">Branches</TabsTrigger>
-        </TabsList>
-        <TabsContent value="main" className="flex-1 min-h-0 flex flex-col space-y-4">
-          <SettingsGrid
-            rowData={searchableHierarchyData}
-            columnDefs={colDefs}
-            gridOptions={gridOptions}
-            rowSelection={rowSelection as any}
-            noRowsMessage="No spots found"
-            onRowDoubleClicked={handleEdit}
-            className="flex-1 min-h-0"
-            height="100%"
-          />
-        </TabsContent>
-        <TabsContent value="branches" className="flex-1 min-h-0 flex flex-col space-y-4">
-          <SettingsGrid
-            rowData={searchableHierarchyData.filter((s: any) => s.is_branch)}
-            columnDefs={colDefs}
-            gridOptions={gridOptions}
-            rowSelection={rowSelection as any}
-            noRowsMessage="No branches found"
-            onRowDoubleClicked={handleEdit}
-            className="flex-1 min-h-0"
-            height="100%"
-          />
-        </TabsContent>
-      </Tabs>
+      <UrlTabs
+        tabs={spotsTabs}
+        defaultValue="main"
+        basePath="/settings/spots"
+        className="flex-1 h-full flex flex-col"
+      />
 
       {/* Create Spot Dialog */
       }
