@@ -257,6 +257,11 @@
   border-bottom: 1px solid oklch(from var(--color-border) l calc(l + 0.08) c h / 0.25);
 }
 
+/* Subtle underline for workspace grid header */
+.wh-workspace-grid .ag-header {
+  border-bottom: 1px solid var(--color-border);
+}
+
 .ag-theme-quartz-dark {
   /* Reuse most light theme mappings, but reference .dark variables implicitly via CSS cascade */
   /* Variables unique to dark theme or needing specific override */

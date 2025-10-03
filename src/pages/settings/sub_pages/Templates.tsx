@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboardList, faPlus, faFileAlt, faTags } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
+import { RootState, AppDispatch } from "@/store/store";
+import { genericActions } from "@/store/genericSlices";
 import { Template, Task, Category } from "@/store/types";
 import { iconService } from '@/database/iconService';
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
   SelectField,
   CheckboxField
 } from "../components";
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { MultiSelect } from "@/components/ui/multi-select";
 
 // Custom component for async icon loading in Templates
@@ -71,6 +73,7 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Templates() {
+  const dispatch = useDispatch<AppDispatch>();
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
@@ -78,6 +81,22 @@ function Templates() {
   const { value: slas } = useSelector((state: RootState) => state.slas);
   const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
+  const approvalTemplates = useSelector((state: RootState) => (state as any).approvalTemplates?.value ?? []) as any[];
+  // State for default users (using string IDs for MultiSelect)
+  const [createDefaultUserValues, setCreateDefaultUserValues] = useState<string[]>([]);
+  const [editDefaultUserValues, setEditDefaultUserValues] = useState<string[]>([]);
+
+  // State for approver users (using string IDs for MultiSelect)
+  const [createApproverValues, setCreateApproverValues] = useState<string[]>([]);
+  const [editApproverValues, setEditApproverValues] = useState<string[]>([]);
+
+  // Convert users to MultiSelectOption format
+  const userOptions = useMemo(() => {
+    return (users as any[]).map((user: any) => ({
+      label: user?.name || user?.email || `User ${user.id}`,
+      value: String(user.id)
+    }));
+  }, [users]);
   
   // Use shared state management
   const {
@@ -108,9 +127,9 @@ function Templates() {
     searchFields: ['name']
   });
 
-  // Local state for multi-select users
-  const [createUserIds, setCreateUserIds] = useState<number[]>([]);
-  const [editUserIds, setEditUserIds] = useState<number[]>([]);
+  // Approvals (template-level) state
+  const [createRequiresApproval, setCreateRequiresApproval] = useState<boolean>(false);
+  const [editRequiresApproval, setEditRequiresApproval] = useState<boolean>(false);
 
   // Local state for form values
   const [createFormData, setCreateFormData] = useState({
@@ -131,12 +150,26 @@ function Templates() {
     enabled: true
   });
 
+  // Hydrate approval templates list
+  useEffect(() => {
+    dispatch((genericActions as any).approvalTemplates?.getFromIndexedDB?.());
+    dispatch((genericActions as any).approvalTemplates?.fetchFromAPI?.());
+    // Ensure users are available for approver selection
+    dispatch((genericActions as any).users?.getFromIndexedDB?.());
+    dispatch((genericActions as any).users?.fetchFromAPI?.());
+  }, [dispatch]);
+
+  const findCategoryApprovalTemplate = useCallback((categoryId: number | null | undefined) => {
+    if (!categoryId) return null;
+    return approvalTemplates.find((t: any) => Number(t.category_id) === Number(categoryId) && t.is_default);
+  }, [approvalTemplates]);
+
   useEffect(() => {
     if (isEditDialogOpen && editingTemplate) {
       const ids = Array.isArray((editingTemplate as any).default_user_ids)
-        ? (editingTemplate as any).default_user_ids
+        ? (editingTemplate as any).default_user_ids.map((id: number) => String(id))
         : [];
-      setEditUserIds(ids);
+      setEditDefaultUserValues(ids);
 
       // Set form data values
       setEditFormData({
@@ -147,12 +180,21 @@ function Templates() {
         expected_duration: (editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : '',
         enabled: (editingTemplate as any).enabled !== false // Default to true if not set
       });
+
+      // Prefill approvals controls from category default approval template
+      const currentCatId = editingTemplate.category_id as number | null | undefined;
+      const catTpl = findCategoryApprovalTemplate(currentCatId || undefined);
+      const approvers = ((catTpl?.template_config?.approvers as any[]) || [])
+        .filter((a: any) => (a?.type === 'user' && typeof a?.value === 'number'))
+        .map((a: any) => String(a.value));
+      setEditRequiresApproval(!!catTpl?.is_active);
+      setEditApproverValues(approvers);
     }
-  }, [isEditDialogOpen, editingTemplate]);
+  }, [isEditDialogOpen, editingTemplate, findCategoryApprovalTemplate]);
 
   // Helper functions
   const minutesToHHMM = (totalMinutes: number | null | undefined) => {
-    if (totalMinutes == null || !Number.isFinite(totalMinutes) || Number(totalMinutes) <= 0) return '';
+    if (totalMinutes == null || !Number.isFinite(totalMinutes) || Number(totalMinutes) <= 0) return '—';
     const hours = Math.floor(Number(totalMinutes) / 60);
     const minutes = Number(totalMinutes) % 60;
     const hh = String(hours).padStart(2, '0');
@@ -283,7 +325,7 @@ function Templates() {
       minWidth: 170,
       valueFormatter: (params: any) => {
         const v = params.value;
-        if (v == null || v === '') return '—';
+        if (v == null || v === '' || v === 0) return '—';
         const n = Number(v);
         if (!Number.isFinite(n) || n <= 0) return '—';
         return minutesToHHMM(n) || '—';
@@ -373,17 +415,42 @@ function Templates() {
       priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
       default_spot_id: createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null,
-      default_user_ids: (() => {
-        const vals = formData.getAll('default_user_ids');
-        const ids = vals.map((v) => parseInt(v as string, 10)).filter((n) => !Number.isNaN(n));
-        return ids.length ? ids : null;
-      })(),
+      default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
       instructions,
-      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : null; })(),
+      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
       enabled
     };
 
     await createItem(templateData);
+
+    // Clear any previous error messages after successful creation
+    (window as any).__settings_error = null;
+
+    // Upsert category default approval template if requested
+    try {
+      const categoryId = parseInt(createFormData.category_id);
+      if (Number.isFinite(categoryId)) {
+        const existing = findCategoryApprovalTemplate(categoryId);
+        if (createRequiresApproval) {
+          const payload: any = {
+            name: `Default approval for category ${categoryId}`,
+            category_id: categoryId,
+            template_config: {
+              approvers: (createApproverValues || []).map((id) => ({ type: 'user', value: Number(id) }))
+            },
+            is_active: true,
+            is_default: true
+          };
+          if (existing) {
+            await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: payload }));
+          } else {
+            await dispatch((genericActions as any).approvalTemplates.addAsync(payload));
+          }
+        } else if (existing && existing.is_active) {
+          await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: { is_active: false } }));
+        }
+      }
+    } catch {}
 
     // Reset form after successful creation
     setCreateFormData({
@@ -394,24 +461,27 @@ function Templates() {
       expected_duration: '',
       enabled: true
     });
-    setCreateUserIds([]);
+    setCreateDefaultUserValues([]);
+    setCreateApproverValues([]);
+    setCreateRequiresApproval(false);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
+    try {
     e.preventDefault();
     if (!editingTemplate) return;
 
     const formData = new FormData(e.target as HTMLFormElement);
 
     // Get form values
-    const name = formData.get('name') as string;
-    const description = (formData.get('description') as string) || null;
-    const instructions = (formData.get('instructions') as string) || null;
+    const name = (formData.get('name') as string) ?? ((editingTemplate as any)?.name ?? '');
+    const description = ((formData.get('description') as string) ?? (editingTemplate as any)?.description ?? null) as any;
+    const instructions = ((formData.get('instructions') as string) ?? (editingTemplate as any)?.instructions ?? null) as any;
     // enabled state handled via editFormData.enabled
-    const expectedDurationRaw = formData.get('expected_duration') as string;
+    const expectedDurationRaw = (formData.get('expected_duration') as string) ?? (((editingTemplate as any)?.expected_duration != null) ? String((editingTemplate as any).expected_duration) : '');
 
     // Validate required fields
-    if (!name?.trim()) {
+    if (!name?.toString()?.trim()) {
       throw new Error('Template name is required');
     }
     if (!editFormData.category_id) {
@@ -425,18 +495,78 @@ function Templates() {
       priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
       default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null,
-      default_user_ids: (() => {
-        const vals = formData.getAll('default_user_ids');
-        const ids = vals.map((v) => parseInt(v as string, 10)).filter((n) => !Number.isNaN(n));
-        return ids.length ? ids : null;
-      })(),
+      default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
       instructions,
-      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : null; })(),
+      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
       enabled: editFormData.enabled
     };
 
     await updateItem(editingTemplate.id, updates);
+
+    // Clear any previous error messages after successful update
+    (window as any).__settings_error = null;
+
+    // Upsert category default approval template if requested
+    try {
+      const categoryId = parseInt(editFormData.category_id);
+      if (Number.isFinite(categoryId)) {
+        const existing = findCategoryApprovalTemplate(categoryId);
+        if (editRequiresApproval) {
+          const payload: any = {
+            name: `Default approval for category ${categoryId}`,
+            category_id: categoryId,
+            template_config: {
+              approvers: (editApproverValues || []).map((id) => ({ type: 'user', value: Number(id) }))
+            },
+            is_active: true,
+            is_default: true
+          };
+          if (existing) {
+            await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: payload }));
+          } else {
+            await dispatch((genericActions as any).approvalTemplates.addAsync(payload));
+          }
+        } else if (existing && existing.is_active) {
+          await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: { is_active: false } }));
+        }
+      }
+    } catch {}
+    } catch (err: any) {
+      console.error('Edit template submit failed:', err);
+      // Surface a simple error into the dialog footer
+      const msg = (err?.message || 'Update failed');
+      (window as any).__settings_error = msg;
+    }
   };
+
+  // Fallback: direct save callable from any tab (bypasses form submit quirks)
+  const saveEditsDirect = async () => {
+    if (!editingTemplate) return;
+    try {
+      const updates: any = {
+        name: (editingTemplate as any).name || '',
+        description: (editingTemplate as any).description ?? null,
+        category_id: editFormData.category_id ? parseInt(editFormData.category_id) : (editingTemplate as any).category_id,
+        priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : ((editingTemplate as any).priority_id ?? null),
+        sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : ((editingTemplate as any).sla_id ?? null),
+        default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : ((editingTemplate as any).default_spot_id ?? null),
+        default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
+        instructions: (editingTemplate as any).instructions ?? null,
+        expected_duration: (() => { const raw: any = (document.getElementById('edit-expected_duration') as HTMLInputElement | null)?.value; const n = parseInt(raw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+        enabled: editFormData.enabled
+      };
+      await updateItem(editingTemplate.id, updates);
+
+      // Clear any previous error messages after successful update
+      (window as any).__settings_error = null;
+    } catch (err: any) {
+      console.error('Direct save failed:', err);
+      (window as any).__settings_error = (err?.message || 'Update failed');
+    }
+  };
+
+  // expose on window for SettingsDialog fallback
+  (window as any).saveEditsDirect = saveEditsDirect;
 
   // Render entity preview for delete dialog
   const renderTemplatePreview = (template: Template) => (
@@ -458,7 +588,7 @@ function Templates() {
           >
             {priorityById.get((template as any).priority_id)?.name || 'Priority'}
           </Badge>
-          {((template as any).expected_duration ?? null) ? (
+          {((template as any).expected_duration ?? 0) > 0 ? (
             <Badge variant="secondary" className="text-xs">{minutesToHHMM((template as any).expected_duration)}</Badge>
           ) : null}
           {(template as any).default_spot_id && (
@@ -529,7 +659,10 @@ function Templates() {
         open={isCreateDialogOpen}
         onOpenChange={(open) => {
           setIsCreateDialogOpen(open);
-          if (!open) {
+          if (open) {
+            // Clear any error messages when opening create dialog
+            (window as any).__settings_error = null;
+          } else {
             // Reset form data when closing create dialog
             setCreateFormData({
               category_id: '',
@@ -539,7 +672,8 @@ function Templates() {
               expected_duration: '',
               enabled: true
             });
-            setCreateUserIds([]);
+            setCreateDefaultUserValues([]);
+            setCreateApproverValues([]);
           }
         }}
         type="create"
@@ -550,7 +684,14 @@ function Templates() {
         error={formError}
         submitDisabled={isSubmitting}
       >
-        <div className="grid gap-4">
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="defaults">Defaults</TabsTrigger>
+            <TabsTrigger value="approvals">Approvals</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
+        <div className="grid gap-4 min-h-[480px]">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name *</Label>
             <Input id="name" name="name" className="col-span-3" required />
@@ -559,10 +700,6 @@ function Templates() {
             <Label htmlFor="description" className="text-right">Description</Label>
             <Input id="description" name="description" className="col-span-3" />
           </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="expected_duration" className="text-right">Expected Duration (min)</Label>
-          <Input id="expected_duration" name="expected_duration" type="number" min="0" step="1" placeholder="e.g. 90" className="col-span-3" />
-        </div>
           <SelectField
             id="category"
             label="Category"
@@ -573,34 +710,7 @@ function Templates() {
               value: category.id.toString(),
               label: category.name
             }))}
-            required
           />
-          <SelectField
-            id="default_spot_id"
-            label="Default Spot"
-            value={createFormData.default_spot_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, default_spot_id: value }))}
-            placeholder="None"
-            options={(spots as any[]).map((s: any) => ({
-              value: s.id.toString(),
-              label: s.name
-            }))}
-          />
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label className="text-right pt-2">Default Users</Label>
-            <div className="col-span-3">
-              <MultiSelect
-                options={(users as any[]).map((u: any) => ({
-                  label: u.name || u.email || `User ${u.id}`,
-                  value: String(u.id)
-                }))}
-                onValueChange={(values: string[]) => setCreateUserIds(values.map((v: string) => Number(v)))}
-                defaultValue={createUserIds.map(id => String(id))}
-                placeholder="Select users"
-              />
-            </div>
-          </div>
-          {/* Team removed per migration */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="priority" className="text-right">Priority</Label>
             <select
@@ -633,24 +743,71 @@ function Templates() {
               ))}
             </select>
           </div>
-          {/* No duration field per migration */}
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="instructions" className="text-right pt-2">Instructions</Label>
-            <textarea
-              id="instructions"
-              name="instructions"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
-              placeholder="Enter detailed instructions for tasks created from this template..."
-            />
-          </div>
-          <CheckboxField
-            id="enabled"
-            name="enabled"
-            label="Status"
-            defaultChecked={true}
-            description="Enabled"
-          />
         </div>
+          </TabsContent>
+          <TabsContent value="defaults">
+            <div className="grid gap-4 min-h-[480px]">
+              <SelectField
+                id="default_spot_id"
+                label="Default Spot"
+                value={createFormData.default_spot_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, default_spot_id: value }))}
+                placeholder="None"
+                options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))}
+              />
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">Default Users</Label>
+                <div className="col-span-3">
+                  <MultiSelect
+                    options={userOptions}
+                    onValueChange={setCreateDefaultUserValues}
+                    defaultValue={createDefaultUserValues}
+                    placeholder="Select default users..."
+                    maxCount={5}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="expected_duration" className="text-right">Expected Duration (min)</Label>
+                <Input id="expected_duration" name="expected_duration" type="number" min="0" step="1" placeholder="e.g. 90" className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="instructions" className="text-right pt-2">Instructions</Label>
+                <textarea id="instructions" name="instructions" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder="Enter detailed instructions..." />
+              </div>
+              <CheckboxField id="enabled" name="enabled" label="Status" defaultChecked={true} description="Enabled" />
+            </div>
+          </TabsContent>
+          <TabsContent value="approvals">
+            <div className="grid gap-4 min-h-[480px]">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Requires approval</Label>
+                <div className="col-span-3">
+                  <div className="flex items-center gap-3">
+                    <input id="create-requires-approval" type="checkbox" checked={createRequiresApproval} onChange={(e) => setCreateRequiresApproval(e.target.checked)} />
+                    <span className="text-sm text-muted-foreground">When tasks enter an approval status, use this category's approvers</span>
+                  </div>
+                </div>
+              </div>
+              {createRequiresApproval && (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">Approvers</Label>
+                  <div className="col-span-3">
+                    <MultiSelect
+                      options={userOptions}
+                      onValueChange={setCreateApproverValues}
+                      defaultValue={createApproverValues}
+                      placeholder="Select approvers..."
+                      maxCount={5}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </SettingsDialog>
 
       {/* Edit Template Dialog */}
@@ -658,7 +815,10 @@ function Templates() {
         open={isEditDialogOpen}
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);
-          if (!open) {
+          if (open) {
+            // Clear any error messages when opening edit dialog
+            (window as any).__settings_error = null;
+          } else {
             // Reset form data when closing edit dialog
             setEditFormData({
               category_id: '',
@@ -668,7 +828,8 @@ function Templates() {
               expected_duration: '',
               enabled: true
             });
-            setEditUserIds([]);
+            setEditDefaultUserValues([]);
+            setEditApproverValues([]);
           }
         }}
         type="edit"
@@ -680,7 +841,14 @@ function Templates() {
         submitDisabled={isSubmitting || !editingTemplate}
       >
         {editingTemplate && (
-          <div className="grid gap-4">
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList>
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="defaults">Defaults</TabsTrigger>
+              <TabsTrigger value="approvals">Approvals</TabsTrigger>
+            </TabsList>
+            <TabsContent value="general">
+          <div className="grid gap-4 min-h-[480px]">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-name" className="text-right">Name *</Label>
               <Input
@@ -722,7 +890,6 @@ function Templates() {
                 value: category.id.toString(),
                 label: category.name
               }))}
-              required
             />
             {/* Team removed per migration */}
             <SelectField
@@ -742,55 +909,66 @@ function Templates() {
               value={editFormData.sla_id}
               onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value }))}
               placeholder="None"
-              options={Array.from(slaById.entries()).map(([id, sla]) => ({
-                value: id.toString(),
-                label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`
-              }))}
-            />
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="edit-instructions" className="text-right pt-2">Instructions</Label>
-              <textarea
-                id="edit-instructions"
-                name="instructions"
-                defaultValue={(editingTemplate as any).instructions || ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
-                placeholder="Enter detailed instructions for tasks created from this template..."
-              />
-            </div>
-            {/* Removed duration, instructions, enabled per migration */}
-            <SelectField
-              id="edit-default-spot"
-              label="Default Spot"
-              value={editFormData.default_spot_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, default_spot_id: value }))}
-              placeholder="None"
-              options={(spots as any[]).map((s: any) => ({
-                value: s.id.toString(),
-                label: s.name
-              }))}
-            />
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">Default Users</Label>
-              <div className="col-span-3">
-                <MultiSelect
-                  options={(users as any[]).map((u: any) => ({
-                    label: u.name || u.email || `User ${u.id}`,
-                    value: String(u.id)
-                  }))}
-                  onValueChange={(values: string[]) => setEditUserIds(values.map((v: string) => Number(v)))}
-                  defaultValue={editUserIds.map(id => String(id))}
-                  placeholder="Select users"
-                />
-              </div>
-            </div>
-            <CheckboxField
-              id="edit-enabled"
-              label="Enabled"
-              checked={editFormData.enabled}
-              onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
-              description="Enable this template"
+              options={Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))}
             />
           </div>
+            </TabsContent>
+            <TabsContent value="defaults">
+              <div className="grid gap-4 min-h-[480px]">
+                <SelectField id="edit-default-spot" label="Default Spot" value={editFormData.default_spot_id} onChange={(value) => setEditFormData(prev => ({ ...prev, default_spot_id: value }))} placeholder="None" options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))} />
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">Default Users</Label>
+                  <div className="col-span-3">
+                    <MultiSelect
+                      options={userOptions}
+                      onValueChange={setEditDefaultUserValues}
+                      defaultValue={editDefaultUserValues}
+                      placeholder="Select default users..."
+                      maxCount={5}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-expected_duration" className="text-right">Expected Duration (min)</Label>
+                  <Input id="edit-expected_duration" name="expected_duration" type="number" min="0" step="1" defaultValue={(editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : ''} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="edit-instructions" className="text-right pt-2">Instructions</Label>
+                  <textarea id="edit-instructions" name="instructions" defaultValue={(editingTemplate as any).instructions || ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder="Enter detailed instructions..." />
+                </div>
+                <CheckboxField id="edit-enabled" label="Enabled" checked={editFormData.enabled} onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))} description="Enable this template" />
+              </div>
+            </TabsContent>
+            <TabsContent value="approvals">
+              <div className="grid gap-4 min-h-[480px]">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Requires approval</Label>
+                  <div className="col-span-3">
+                    <div className="flex items-center gap-3">
+                      <input id="edit-requires-approval" type="checkbox" checked={editRequiresApproval} onChange={(e) => setEditRequiresApproval(e.target.checked)} />
+                      <span className="text-sm text-muted-foreground">When tasks enter an approval status, use this category's approvers</span>
+                    </div>
+                  </div>
+                </div>
+                {editRequiresApproval && (
+                  <div className="grid grid-cols-4 items-start gap-4">
+                    <Label className="text-right pt-2">Approvers</Label>
+                    <div className="col-span-3">
+                      <MultiSelect
+                        options={userOptions}
+                        onValueChange={setEditApproverValues}
+                        defaultValue={editApproverValues}
+                        placeholder="Select approvers..."
+                        maxCount={5}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
       </SettingsDialog>
 

@@ -801,9 +801,11 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 
 					<PopoverTrigger asChild>
 						<Button
+						type="button"
 							ref={buttonRef}
 							{...props}
-							onClick={(event) => handleTogglePopover(event)}
+							onMouseDown={(event) => handleTogglePopover(event as any)}
+							onClick={(e)=>{e.preventDefault(); e.stopPropagation();}}
 							disabled={disabled}
 							role="combobox"
 							aria-expanded={isPopoverOpen}
@@ -1014,7 +1016,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 						aria-multiselectable="true"
 						aria-label="Available options"
 						className={cn(
-							"w-auto p-0",
+							"w-auto p-0 z-[100]",
 							getPopoverAnimationClass(),
 							screenSize === "mobile" && "w-[85vw] max-w-[280px]",
 							screenSize === "tablet" && "w-[70vw] max-w-md",
@@ -1029,6 +1031,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 							touchAction: "manipulation",
 						}}
 						align="start"
+						sideOffset={6}
 						onEscapeKeyDown={() => setIsPopoverOpen(false)}>
 						<Command>
 							{searchable && (

@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import React, { ReactNode, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -46,6 +46,26 @@ export function SettingsDialog({
   entityData,
   renderEntityPreview
 }: SettingsDialogProps) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const submitNow = () => {
+    if (type === 'delete' && onConfirm) {
+      onConfirm();
+      return;
+    }
+    if (onSubmit) {
+      const fakeEvent: any = {
+        preventDefault: () => {},
+        target: formRef.current,
+        currentTarget: formRef.current,
+      };
+      onSubmit(fakeEvent as React.FormEvent);
+    }
+    // Optional: call component-provided direct saver if exposed
+    const w: any = window as any;
+    if (typeof w.saveEditsDirect === 'function') {
+      try { w.saveEditsDirect(); } catch {}
+    }
+  };
   const getDefaultTitle = () => {
     switch (type) {
       case 'create': return title || 'Create Item';
@@ -119,19 +139,21 @@ export function SettingsDialog({
         )}
 
         {(type === 'create' || type === 'edit' || type === 'custom') ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {children}
+          <>
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate onKeyDown={(e)=>{ if(e.key==='Enter' && (e.target as HTMLElement)?.tagName?.toLowerCase() !== 'textarea'){ e.preventDefault(); } }}>
+              {children}
+              <button type="submit" style={{ display: 'none' }} data-hidden-submit="true" />
+            </form>
             <DialogFooter>
-              {error && (
-                <div className="text-sm text-destructive mb-2 text-left mr-auto">
-                  {error}
-                </div>
-              )}
+              <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
+              </div>
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 {cancelText}
               </Button>
               <Button
-                type="submit"
+                type="button"
+                onClick={submitNow}
                 variant={getSubmitVariant()}
                 disabled={isSubmitting || submitDisabled}
               >
@@ -143,7 +165,7 @@ export function SettingsDialog({
                 {getDefaultSubmitText()}
               </Button>
             </DialogFooter>
-          </form>
+          </>
         ) : (
           <DialogFooter>
             {error && (
