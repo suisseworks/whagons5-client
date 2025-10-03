@@ -1,7 +1,7 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger, useSidebar } from "./ui/sidebar";
 import { logout } from "@/pages/authentication/auth";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import {
     DropdownMenu,
@@ -202,20 +202,20 @@ function Header() {
                         <Breadcrumb>
                             <BreadcrumbList className="gap-1.5 sm:gap-2">
                                 {breadcrumbs.map((bc, idx) => (
-                                    <>
-                                    {idx > 0 && <BreadcrumbSeparator />}
-                                    <BreadcrumbItem key={idx}>
-                                        {idx < breadcrumbs.length - 1 ? (
-                                            <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
-                                                <Link to={bc.to || '#'} className="truncate max-w-[10rem]">
-                                                    {bc.label}
-                                                </Link>
-                                            </BreadcrumbLink>
-                                        ) : (
-                                            <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
-                                        )}
-                                    </BreadcrumbItem>
-                                    </>
+                                    <React.Fragment key={idx}>
+                                        {idx > 0 && <BreadcrumbSeparator />}
+                                        <BreadcrumbItem>
+                                            {idx < breadcrumbs.length - 1 ? (
+                                                <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
+                                                    <Link to={bc.to || '#'} className="truncate max-w-[10rem]">
+                                                        {bc.label}
+                                                    </Link>
+                                                </BreadcrumbLink>
+                                            ) : (
+                                                <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
+                                            )}
+                                        </BreadcrumbItem>
+                                    </React.Fragment>
                                 ))}
                             </BreadcrumbList>
                         </Breadcrumb>
@@ -232,20 +232,20 @@ function Header() {
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 {breadcrumbs.map((bc, idx) => (
-                                    <>
-                                    <BreadcrumbSeparator key={`sep-${idx}`} />
-                                    <BreadcrumbItem key={idx}>
-                                        {idx < breadcrumbs.length - 1 ? (
-                                            <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
-                                                <Link to={bc.to || '#'} className="truncate max-w-[10rem]">
-                                                    {bc.label}
-                                                </Link>
-                                            </BreadcrumbLink>
-                                        ) : (
-                                            <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
-                                        )}
-                                    </BreadcrumbItem>
-                                    </>
+                                    <React.Fragment key={idx}>
+                                        <BreadcrumbSeparator />
+                                        <BreadcrumbItem>
+                                            {idx < breadcrumbs.length - 1 ? (
+                                                <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
+                                                    <Link to={bc.to || '#'} className="truncate max-w-[10rem]">
+                                                        {bc.label}
+                                                    </Link>
+                                                </BreadcrumbLink>
+                                            ) : (
+                                                <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
+                                            )}
+                                        </BreadcrumbItem>
+                                    </React.Fragment>
                                 ))}
                             </BreadcrumbList>
                         </Breadcrumb>

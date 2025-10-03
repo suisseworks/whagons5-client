@@ -19,24 +19,24 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.98 0.005 45); /* Off-white background */
+  --background: oklch(0.95 0.008 45); /* Softer off-white background */
   --foreground: oklch(0.1 0.02 25); /* Even darker text for maximum contrast */
-  --card: oklch(0.98 0.005 45); /* Off-white cards */
+  --card: oklch(0.96 0.008 45); /* Softer off-white cards */
   --card-foreground: oklch(0.1 0.02 25); /* Even darker card text */
-  --popover: oklch(0.98 0.005 45);
+  --popover: oklch(0.96 0.008 45);
   --popover-foreground: oklch(0.1 0.02 25); /* Even darker popover text */
   --primary: oklch(0.72 0.12 195); /* Teal primary */
   --primary-foreground: oklch(1 0 0); /* White text on primary */
-  --secondary: oklch(0.96 0.02 195); /* Light teal-tinted background for contrast */
+  --secondary: oklch(0.93 0.02 195); /* Softer teal-tinted background */
   --secondary-foreground: oklch(0.15 0.02 195); /* Darker secondary text */
-  --muted: oklch(0.96 0.008 230); /* Light neutral with cool tint for contrast */
+  --muted: oklch(0.93 0.01 230); /* Softer neutral with cool tint */
   --muted-foreground: oklch(0.28 0.02 230); /* Darker muted text */
   --accent: oklch(0.68 0.12 195); /* Teal accent */
   --accent-foreground: oklch(1 0 0); /* White text on accent */
   --destructive: oklch(0.6 0.2 25); /* Keep red destructive */
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.85 0.02 45); /* Darker border for better visibility */
-  --input: oklch(0.98 0.01 45); /* Very light input background */
+  --border: oklch(0.82 0.02 45); /* Slightly darker border for better contrast */
+  --input: oklch(0.95 0.01 45); /* Softer input background */
   --ring: oklch(0.72 0.12 195 / 0.35); /* Teal focus ring */
   --chart-1: oklch(0.72 0.12 195); /* Teal */
   --chart-2: oklch(0.66 0.12 230); /* Blue */
@@ -46,18 +46,18 @@
   --radius: 0.625rem;
   
   /* Global sidebar theme (applies to both light and dark for brand consistency) */
-  --sidebar: oklch(0.98 0.005 45); /* Off-white sidebar */
+  --sidebar: oklch(0.95 0.008 45); /* Softer off-white sidebar */
   --sidebar-foreground: #111827; /* Gray-900 text for readability */
   --sidebar-primary: oklch(0.72 0.12 195); /* Teal highlights in sidebar */
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.96 0.008 230); /* Light gray hover for contrast */
+  --sidebar-accent: oklch(0.93 0.01 230); /* Softer gray hover */
   --sidebar-accent-foreground: #111827; /* Dark text on hover */
-  --sidebar-border: oklch(0.85 0.02 45); /* Subtle light border */
+  --sidebar-border: oklch(0.82 0.02 45); /* Slightly darker border */
   --sidebar-ring: oklch(0.72 0.12 195 / 0.5); /* Teal focus in sidebar */
   
   /* Gradient definitions for teal theme */
   --gradient-primary: linear-gradient(135deg, oklch(0.72 0.12 195) 0%, oklch(0.74 0.14 210) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.98 0.005 200) 0%, oklch(0.96 0.01 220) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.95 0.008 200) 0%, oklch(0.93 0.01 220) 100%);
   --gradient-accent: linear-gradient(135deg, oklch(0.68 0.12 195) 0%, oklch(0.66 0.12 230) 100%);
 }
 
