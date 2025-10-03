@@ -97,7 +97,7 @@ function Templates() {
       value: String(user.id)
     }));
   }, [users]);
-  
+
   // Use shared state management
   const {
     items: templates,
