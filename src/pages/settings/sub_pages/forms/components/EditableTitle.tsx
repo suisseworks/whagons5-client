@@ -27,12 +27,25 @@ export function EditableTitle({ value, onChange, placeholder = "Untitled form", 
   const [activeFormats, setActiveFormats] = useState<string[]>([]);
   const divRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wasEditingRef = useRef<boolean>(isEditing);
 
   useEffect(() => {
     if (divRef.current && !isEditing) {
       divRef.current.innerHTML = value || '';
     }
-  }, [value, isEditing]);
+  }, [value]);
+
+  // When editing is toggled off externally (e.g., switching to another field),
+  // commit current content so it saves consistently like on outside click.
+  useEffect(() => {
+    if (wasEditingRef.current && !isEditing) {
+      if (divRef.current) {
+        const content = divRef.current.innerHTML;
+        onChange(content);
+      }
+    }
+    wasEditingRef.current = isEditing;
+  }, [isEditing, onChange]);
 
   useEffect(() => {
     if (isEditing && divRef.current) {
@@ -189,11 +202,14 @@ export function EditableTitle({ value, onChange, placeholder = "Untitled form", 
           className={`min-h-[3rem] flex items-center cursor-text px-2 py-1 transition-all ${
             isEditing ? 'border-b-2 border-primary' : 'border-b-2 border-transparent hover:bg-muted/30'
           }`}
-          onClick={() => setIsEditing(true)}
+          onMouseDown={() => {
+            setIsEditing(true);
+            setTimeout(() => divRef.current?.focus(), 0);
+          }}
         >
           <div
             ref={divRef}
-            contentEditable={isEditing}
+            contentEditable={true}
             onKeyDown={handleKeyDown}
             onInput={(e) => {
               // Update on input to keep content in sync

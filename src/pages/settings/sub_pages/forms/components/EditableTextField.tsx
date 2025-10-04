@@ -27,12 +27,25 @@ export function EditableTextField({ value, onChange, placeholder = "Enter text",
   const [activeFormats, setActiveFormats] = useState<string[]>([]);
   const divRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wasEditingRef = useRef<boolean>(isEditing);
 
   useEffect(() => {
     if (divRef.current && !isEditing) {
       divRef.current.innerHTML = value || '';
     }
-  }, [value, isEditing]);
+  }, [value]);
+
+  // Ensure content is saved when editing ends due to focus moving elsewhere
+  // (e.g., clicking into another editable field like the title).
+  useEffect(() => {
+    if (wasEditingRef.current && !isEditing) {
+      if (divRef.current) {
+        const content = divRef.current.innerHTML;
+        onChange(content);
+      }
+    }
+    wasEditingRef.current = isEditing;
+  }, [isEditing, onChange]);
 
   useEffect(() => {
     if (isEditing && divRef.current) {
@@ -187,11 +200,14 @@ export function EditableTextField({ value, onChange, placeholder = "Enter text",
           className={`min-h-[3rem] flex items-start cursor-text px-3 py-2.5 rounded-md transition-all ${
             isEditing ? 'bg-muted/30 border-b-2 border-primary' : 'bg-muted/20 border-b-2 border-transparent hover:bg-muted/40'
           }`}
-          onClick={() => setIsEditing(true)}
+          onMouseDown={() => {
+            setIsEditing(true);
+            setTimeout(() => divRef.current?.focus(), 0);
+          }}
         >
           <div
             ref={divRef}
-            contentEditable={isEditing}
+            contentEditable={true}
             onKeyDown={handleKeyDown}
             onInput={(e) => {
               const target = e.target as HTMLDivElement;

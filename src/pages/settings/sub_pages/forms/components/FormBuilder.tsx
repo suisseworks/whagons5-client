@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -38,10 +38,43 @@ export interface FormBuilderProps {
   onPreview?: () => void;
 }
 
+// In DragOverlay, we want to animate from preview → editing on drop.
+// This wrapper mounts as preview, then flips to editing in the next frame
+// when `toSelected` is true, so DraggableField's internal transitions run.
+function AnimatedOverlayField({ field, toSelected }: { field: BuilderSchemaField; toSelected: boolean }) {
+  const [selected, setSelected] = useState<boolean>(false);
+  useEffect(() => {
+    if (toSelected) {
+      const id = requestAnimationFrame(() => setSelected(true));
+      return () => cancelAnimationFrame(id);
+    } else {
+      setSelected(false);
+    }
+  }, [toSelected]);
+
+  return (
+    <DraggableField
+      field={field}
+      isSelected={selected}
+      onSelect={() => {}}
+      onUpdate={() => {}}
+      onRemove={() => {}}
+    />
+  );
+}
+
 export function FormBuilder({ schema, onChange }: FormBuilderProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [dropAnimatingId, setDropAnimatingId] = useState<number | null>(null);
+  const [floatingToolbarStyle, setFloatingToolbarStyle] = useState<{ top: number; left: number } | null>(null);
+  const selectedElRef = useRef<HTMLDivElement | null>(null);
   const [editingField, setEditingField] = useState<'title' | 'description' | 'field-label' | null>(null);
+  const [lockedCollapse, setLockedCollapse] = useState<{ index: number; height: number } | null>(null);
+  const [dropStartOffset, setDropStartOffset] = useState<{ index: number; offset: number } | null>(null);
+  const [overlayFromRect, setOverlayFromRect] = useState<DOMRect | null>(null);
+  const [overlayToRect, setOverlayToRect] = useState<DOMRect | null>(null);
+  const [overlayAnimActive, setOverlayAnimActive] = useState<boolean>(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -106,22 +139,121 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    const finishedId = Number(active.id);
     setActiveId(null);
+    setDropAnimatingId(finishedId);
 
     if (!over) return;
 
     const activeIndex = schema.fields?.findIndex(field => field.id === Number(active.id)) ?? -1;
     const overIndex = schema.fields?.findIndex(field => field.id === Number(over.id)) ?? -1;
+    const prevSelected = selectedIndex;
 
-    if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-      const nextFields = arrayMove(schema.fields || [], activeIndex, overIndex);
+    if (activeIndex !== -1 && overIndex !== -1) {
+      // Snapshot the old rect (where the overlay thinks it should go)
+      const overEl = document.querySelector(`[data-draggable-id="${Number(over.id)}"]`) as HTMLElement | null;
+      if (overEl) {
+        setOverlayFromRect(overEl.getBoundingClientRect());
+      }
+
+      // Commit the final layout immediately
+      const nextFields = activeIndex !== overIndex
+        ? arrayMove(schema.fields || [], activeIndex, overIndex)
+        : (schema.fields || []);
       onChange({ ...schema, fields: nextFields });
       setSelectedIndex(overIndex);
+
+      // If dropping below previously selected, nudge the new card upward from delta height
+      if (prevSelected !== null) {
+        const prevEl = document.querySelectorAll('[data-draggable-id]')[prevSelected] as HTMLElement | null;
+        if (prevEl) {
+          const prevExpanded = Number(prevEl.getAttribute('data-expanded-height') || 0);
+          const prevCollapsed = Number(prevEl.getAttribute('data-collapsed-height') || 0);
+          const delta = Math.max(0, prevExpanded - prevCollapsed);
+          const newIndexAfter = nextFields.findIndex(f => f.id === finishedId);
+          if (newIndexAfter > prevSelected && delta > 0) {
+            setDropStartOffset({ index: newIndexAfter, offset: delta });
+            setTimeout(() => setDropStartOffset(null), 220);
+          }
+        }
+      }
+
+      // Next frame, measure the real destination rect and start animating
+      requestAnimationFrame(() => {
+        const destEl = document.querySelector(`[data-draggable-id="${finishedId}"]`) as HTMLElement | null;
+        if (destEl) {
+          setOverlayToRect(destEl.getBoundingClientRect());
+          // kick animation on next frame so the "from" paint happens first
+          requestAnimationFrame(() => setOverlayAnimActive(true));
+        }
+      });
     }
+
+    // Lock the previous selected card's height to prevent layout shift during overlay return
+    if (prevSelected !== null && selectedElRef.current) {
+      const rect = selectedElRef.current.getBoundingClientRect();
+      setLockedCollapse({ index: prevSelected, height: rect.height });
+    }
+
+    // Clear drop animation flag after a short delay (matches DragOverlay default)
+    window.setTimeout(() => {
+      setDropAnimatingId(null);
+      setLockedCollapse(null);
+      setOverlayFromRect(null);
+      setOverlayToRect(null);
+      setOverlayAnimActive(false);
+      setDropStartOffset(null);
+    }, 250);
   };
 
   const fields = schema.fields || [];
   const fieldIds = fields.map(field => field.id);
+
+  // Update floating toolbar position whenever selection changes
+  const updateFloatingToolbarFromEl = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const top = rect.top + rect.height / 2 + (window.scrollY || document.documentElement.scrollTop);
+    const left = rect.right + 12 + (window.scrollX || document.documentElement.scrollLeft);
+    setFloatingToolbarStyle(prev => {
+      if (!prev || Math.abs(prev.top - top) > 0.5 || Math.abs(prev.left - left) > 0.5) {
+        return { top, left };
+      }
+      return prev;
+    });
+  }, []);
+
+  const updateFloatingToolbar = (el: HTMLDivElement | null) => {
+    // Avoid setState inside ref callback to prevent nested update loops
+    selectedElRef.current = el;
+  };
+
+  useEffect(() => {
+    const onScrollOrResize = () => {
+      if (selectedElRef.current) updateFloatingToolbarFromEl(selectedElRef.current);
+    };
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [updateFloatingToolbarFromEl]);
+
+  // Recompute toolbar position when selection changes (post-commit)
+  useEffect(() => {
+    if (selectedElRef.current) updateFloatingToolbarFromEl(selectedElRef.current);
+  }, [selectedIndex, updateFloatingToolbarFromEl]);
+
+  // Flip overlay into "editing" immediately when the user releases the pointer
+  useEffect(() => {
+    if (!activeId) return;
+    const handlePointerUp = () => {
+      setDropAnimatingId(activeId);
+    };
+    window.addEventListener('pointerup', handlePointerUp, { capture: true, once: true } as any);
+    return () => window.removeEventListener('pointerup', handlePointerUp, true);
+  }, [activeId]);
 
   return (
     <div className="flex gap-3 justify-center w-full">
@@ -165,7 +297,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="space-y-3">
+        <div className="space-y-3 will-change-transform">
           {fields.length === 0 ? (
             <div className="rounded-lg border-2 border-dashed border-primary/30 bg-card p-8 text-center shadow-sm">
               <div className="text-muted-foreground mb-4">
@@ -186,23 +318,44 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                       onSelect={() => setSelectedIndex(index)}
                       onUpdate={(updates) => updateField(index, updates)}
                       onRemove={() => removeField(index)}
+                      onAddFieldAfter={(type) => addField(type, index)}
+                      setContainerRef={selectedIndex === index ? updateFloatingToolbar : undefined}
+                      lockedHeight={lockedCollapse?.index === index ? lockedCollapse.height : undefined}
+                      startOffsetY={dropStartOffset?.index === index ? dropStartOffset.offset : undefined}
                     />
                 ))}
               </SortableContext>
           )}
         </div>
 
-        <DragOverlay>
-          {activeId ? (
-            <DraggableField
-              field={fields.find(f => f.id === activeId)!}
-              isSelected={true}
-              onSelect={() => {}}
-              onUpdate={() => {}}
-              onRemove={() => {}}
-            />
-          ) : null}
-        </DragOverlay>
+      <DragOverlay>
+        {(() => {
+          const overlayId = activeId ?? dropAnimatingId;
+          if (!overlayId) return null;
+          const overlayIndex = fields.findIndex(f => f.id === overlayId);
+          const overlayField = fields[overlayIndex]!;
+          const shouldAnimateToSelected = Boolean(dropAnimatingId);
+          const hasRects = overlayFromRect && overlayToRect;
+          const fromT = overlayFromRect ? `translate(${overlayFromRect.left + (window.scrollX||0)}px, ${overlayFromRect.top + (window.scrollY||0)}px)` : undefined;
+          const toT = overlayToRect ? `translate(${overlayToRect.left + (window.scrollX||0)}px, ${overlayToRect.top + (window.scrollY||0)}px)` : undefined;
+          const style = hasRects ? {
+            position: 'fixed' as const,
+            left: 0,
+            top: 0,
+            transform: overlayAnimActive ? toT : fromT,
+            transition: overlayAnimActive ? 'transform 180ms linear' : 'none'
+          } : undefined;
+          return (
+            <div style={style}>
+              <AnimatedOverlayField
+                key={`animated-${overlayId}-${shouldAnimateToSelected ? 'to-selected' : 'static'}`}
+                field={overlayField}
+                toSelected={shouldAnimateToSelected}
+              />
+            </div>
+          );
+        })()}
+      </DragOverlay>
       </DndContext>
 
       {/* Field count */}
@@ -211,11 +364,28 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
       </div>
       </div>
 
-      {/* Add field toolbar - outside the main container, at the bottom */}
+      {/* Add field toolbars */}
       {fields.length > 0 && (
-        <div className="flex-shrink-0 self-end pb-4">
-          <AddFieldToolbar onAddField={(type) => addField(type)} />
-        </div>
+        <>
+          {/* Floating toolbar that follows the selected field. Hidden with display:none when no selection */}
+          <div
+            className={`${selectedIndex !== null ? 'fixed z-20 transition-transform duration-200 will-change-transform' : ''}`}
+            style={
+              selectedIndex !== null && floatingToolbarStyle
+                ? { transform: `translate(${floatingToolbarStyle.left}px, ${floatingToolbarStyle.top}px) translateY(-50%)`, display: 'block' }
+                : { display: 'none' }
+            }
+          >
+            <AddFieldToolbar onAddField={(type) => addField(type, selectedIndex ?? undefined)} />
+          </div>
+
+          {/* Bottom-right toolbar when no field is selected (e.g., title/description selected) */}
+          {selectedIndex === null && (
+            <div className="flex-shrink-0 self-end pb-4">
+              <AddFieldToolbar onAddField={(type) => addField(type)} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
