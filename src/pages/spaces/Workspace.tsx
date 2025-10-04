@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
 import { ClipboardList, Settings, Plus } from 'lucide-react';
-import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
+import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import { Input } from '@/components/ui/input';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
-import { AnimatePresence, motion, useAnimation } from 'motion/react';
+import { motion, useAnimation } from 'motion/react';
 
 export const Workspace = () => {
   const location = useLocation();
@@ -23,11 +23,11 @@ export const Workspace = () => {
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
+  const tableRef = useRef<WorkspaceTableHandle | null>(null);
+  const [showClearFilters, setShowClearFilters] = useState(false);
   const [openCreateTask, setOpenCreateTask] = useState(false);
 
-
   const gridControls = useAnimation();
-
 
   // Handle grid animation based on current tab
   useEffect(() => {
@@ -46,7 +46,6 @@ export const Workspace = () => {
   }, [activeTab, gridControls]);
 
   //
-
   // Clear cache when workspace ID changes
   useEffect(() => {
     if (id) {
@@ -60,7 +59,6 @@ export const Workspace = () => {
       });
     }
   }, [id, location.pathname]);
-
   // Debug logging
   console.log('Workspace component - id:', id, 'typeof:', typeof id);
   console.log('Current path:', location.pathname);
@@ -68,22 +66,41 @@ export const Workspace = () => {
   // Check if this is the "all" workspace route
   const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
 
-  // Handle invalid workspace ID - simplified validation
-  if (!id && !isAllWorkspaces) {
-    console.log('No workspace ID provided and not all workspaces route');
+  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
+  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+
+  // Persist and restore search text globally
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved != null) setSearchText(saved);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      if (searchText) {
+        localStorage.setItem(key, searchText);
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  }, [searchText]);
+
+  if (invalidWorkspaceRoute) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
-          <p className="text-gray-600 mt-2">ID: "{id}" - Please check the URL and try again.</p>
+          <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
         </div>
       </div>
     );
   }
 
-  // Additional validation for numeric IDs (but allow 'all' or all workspaces route)
-  if (!isAllWorkspaces && isNaN(Number(id))) {
-    console.log('Invalid workspace ID detected:', id);
+  if (invalidWorkspaceId) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -93,7 +110,6 @@ export const Workspace = () => {
       </div>
     );
   }
-
 
   // Define tabs for URL persistence
   const workspaceTabs = [
@@ -110,7 +126,13 @@ export const Workspace = () => {
           className='flex-1 h-full'
           animate={gridControls}
         >
-          <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
+          <WorkspaceTable 
+            ref={tableRef}
+            rowCache={rowCache} 
+            workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
+            searchText={searchText}
+            onFiltersChanged={(active) => setShowClearFilters(!!active)}
+          />
         </motion.div>
       )
     },
@@ -144,7 +166,6 @@ export const Workspace = () => {
           onChange={(e) => setSearchText(e.target.value)}
         />
       </div>
-
       <div className='flex h-full'>
         <UrlTabs
           tabs={workspaceTabs}
@@ -153,6 +174,8 @@ export const Workspace = () => {
           pathMap={{ grid: '', list: '/settings' }}
           className="w-full h-full flex flex-col"
           onValueChange={setActiveTab}
+          showClearFilters={showClearFilters}
+          onClearFilters={() => tableRef.current?.clearFilters()}
         />
       </div>
 
@@ -170,7 +193,6 @@ export const Workspace = () => {
         </>
       )}
     </div>
-
 
   );
 };

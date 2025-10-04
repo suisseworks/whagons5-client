@@ -42,7 +42,7 @@ import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarDummy from './AppSidebarDummy';
 
 // Global pinned state management
-let isPinnedGlobal = false;
+let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
 const pinnedStateCallbacks: ((pinned: boolean) => void)[] = [];
 
 export const setPinnedState = (pinned: boolean) => {
@@ -71,6 +71,7 @@ const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   const handleClick = () => {
     const newPinned = !isPinned;
     setPinnedState(newPinned);
+    localStorage.setItem('sidebarPinned', newPinned.toString());
     // Don't auto-close when unpinning - let hover behavior handle it
   };
 

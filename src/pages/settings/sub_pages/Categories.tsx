@@ -284,35 +284,30 @@ function Categories() {
       filter: true
     },
     {
-      field: 'actions',
       headerName: 'Actions',
       colId: 'actions',
-      minWidth: 160,
+      minWidth: 200,
       suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
         customActions: [{
           icon: faCubes,
-          label: 'Fields',
+          label: 'Fields', // Restored visible label
           variant: 'outline',
           onClick: openManageFields,
-          className: 'p-1 h-7 relative',
+          className: 'p-1 h-7 relative flex items-center justify-center', // Flex for centering icon + label + badge doesn't affect
           // @ts-ignore allow badge inside button
           renderExtra: (row: any) => {
             const count = assignmentCountByCategory[Number(row?.id)] || 0;
-            // Reserve space for the badge to keep Edit/Delete aligned across rows
+            if (!count) return null;
             return (
-              <span className="ml-2 inline-flex items-center justify-center w-[1.25rem] h-[1.25rem]">
-                {count ? (
-                  <span
-                    className="inline-flex items-center justify-center text-[11px] font-semibold leading-none w-[1.125rem] h-[1.125rem] rounded-full bg-amber-500 text-amber-950 ring-1 ring-amber-600/60 shadow-sm"
-                    title={`${count} custom field${count !== 1 ? 's' : ''}`}
-                    aria-label={`${count} custom field${count !== 1 ? 's' : ''}`}
-                  >
-                    {count}
-                  </span>
-                ) : (
-                  <span className="w-[1.125rem] h-[1.125rem]" aria-hidden="true" />
-                )}
+              <span className="absolute -top-1 -right-1 z-10">
+                <span
+                  className="inline-flex items-center justify-center text-[10px] font-semibold leading-none w-3 h-3 rounded-full bg-amber-500 text-amber-950 ring-1 ring-amber-600/60 shadow-sm"
+                  title={`${count} custom field${count !== 1 ? 's' : ''}`}
+                  aria-label={`${count} custom field${count !== 1 ? 's' : ''}`}
+                >
+                  {count}
+                </span>
               </span>
             );
           }

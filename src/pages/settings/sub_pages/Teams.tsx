@@ -146,7 +146,7 @@ function Teams() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 100,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDeleteTeam

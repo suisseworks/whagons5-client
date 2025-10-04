@@ -115,9 +115,7 @@ export function DraggableField({
         style={{ maxHeight: isSelected ? (lockedHeight ?? 0) : PREVIEW_HEIGHT, transitionDuration: `${commonDurMs}ms`, transitionTimingFunction: 'linear' }}
       >
         <div ref={previewRef} className="space-y-3">
-          <div className="text-sm font-medium text-foreground">
-            {field.label || 'Untitled question'}
-          </div>
+          <div className="text-sm font-medium text-foreground" dangerouslySetInnerHTML={{ __html: field.label || 'Untitled question' }} />
           {field.type === 'text' && <ShortAnswerField isEditing={false} />}
           {field.type === 'textarea' && <ParagraphField isEditing={false} />}
           {field.type === 'select' && (

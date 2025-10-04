@@ -271,7 +271,7 @@ function Statuses() {
       field: 'actions',
       headerName: 'Actions',
       colId: 'actions',
-      minWidth: 180,
+      width: 100,
       suppressSizeToFit: true,
       pinned: 'right',
       cellRenderer: createActionsCellRenderer({

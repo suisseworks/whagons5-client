@@ -212,7 +212,7 @@ function Users() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 140,
+      width: 100,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete

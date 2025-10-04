@@ -83,28 +83,30 @@ export function CheckboxField({ options, onOptionsChange, isEditing = true }: Ch
   // Edit view - what form creator sees
   return (
     <div className="py-4 px-2 space-y-2.5 mt-0 pt-0 mb-2">
-      {currentOptions.map((option, index) => (
-        <div key={index} className="flex items-center gap-3 group">
-          <Checkbox disabled className="mt-2.5" />
-          <Input
-            value={option}
-            onChange={(e) => handleOptionChange(index, e.target.value)}
-            className="flex-1"
-            placeholder={`Option ${index + 1}`}
-          />
-          {currentOptions.length > 1 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => handleRemoveOption(index)}
-            >
-              <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      ))}
+      <div className="max-h-48 overflow-y-auto space-y-2.5 pr-2">
+        {currentOptions.map((option, index) => (
+          <div key={index} className="flex items-center gap-3 group">
+            <Checkbox disabled className="mt-2.5" />
+            <Input
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+              className="flex-1"
+              placeholder={`Option ${index + 1}`}
+            />
+            {currentOptions.length > 1 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => handleRemoveOption(index)}
+              >
+                <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
       
       <div className="flex items-center gap-3 h-9">
         <Checkbox disabled />

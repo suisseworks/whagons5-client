@@ -55,27 +55,6 @@ import { MultipleChoiceField } from "./components/field-types/MultipleChoiceFiel
 import { CheckboxField } from "./components/field-types/CheckboxField";
 import StatusButton from "@/components/ui/StatusButton";
 
-// Simple renderer for form name with version badge
-const FormNameCellRenderer = (props: ICellRendererParams) => {
-  const versions: FormVersion[] = (props.context?.formVersions || []) as FormVersion[];
-  const active = versions
-    .filter(v => v.form_id === props.data.id)
-    .sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
-  return (
-    <div className="flex items-center h-full space-x-2">
-      <FontAwesomeIcon icon={faClipboardList} className="w-4 h-4 text-gray-300" />
-      <div className="flex items-center gap-2">
-        <span>{props.value}</span>
-        {active && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
-            v{active.version}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
 function Forms() {
   // Bring in forms and versions for context rendering
   const { value: formVersions } = useSelector((state: RootState) => (state as any).formVersions || { value: [] });
@@ -260,53 +239,6 @@ function Forms() {
     }
   }, [formVersions, forms]);
 
-  // Column defs
-  const colDefs = useMemo<ColDef[]>(() => [
-    {
-      field: 'name',
-      headerName: 'Form Name',
-      flex: 2,
-      minWidth: 220,
-      cellRenderer: FormNameCellRenderer
-    },
-    {
-      field: 'description',
-      headerName: 'Description',
-      flex: 3,
-      minWidth: 260
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      minWidth: 220,
-      suppressSizeToFit: true,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: async (item: any) => {
-          await loadFormForEditing(item.id);
-          // Ensure we are on the builder tab in the URL with the editing form id
-          navigate(`/settings/forms?tab=builder&editing_form=${item.id}`, { replace: true });
-        },
-        onDelete: handleDelete,
-        customActions: [
-          {
-            icon: faEye,
-            label: 'Preview',
-            variant: 'outline',
-            onClick: (item: Form) => {
-              loadFormForPreview(item.id);
-            },
-            className: 'px-3 h-8 text-xs',
-            disabled: () => false // Allow preview for all forms - will show draft if no published version exists
-          }
-        ]
-      }),
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
-    }
-  ], [handleDelete, loadFormForPreview, loadFormForEditing, formVersions]);
-
   useEffect(() => {
     if (selectedForm) {
       setBuilderSchema((prev: FormBuilderSchema) => prev?.form_id === selectedForm.id ? prev : {
@@ -343,6 +275,82 @@ function Forms() {
     // Placeholder: in future, create or update a draft formVersion with schema_data
     console.log('save draft', builderSchema);
   }, [builderSchema]);
+
+  // Custom renderer for description to handle HTML and vertical centering
+  const DescriptionCellRenderer = (props: ICellRendererParams) => {
+    return (
+      <div className="text-sm flex items-center h-full" dangerouslySetInnerHTML={{ __html: props.value || '' }} />
+    );
+  };
+
+  // Update FormNameCellRenderer to also handle HTML in name if present
+  const FormNameCellRenderer = (props: ICellRendererParams) => {
+    const versions: FormVersion[] = (props.context?.formVersions || []) as FormVersion[];
+    const active = versions
+      .filter(v => v.form_id === props.data.id)
+      .sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
+    return (
+      <div className="flex items-center h-full space-x-2">
+        <FontAwesomeIcon icon={faClipboardList} className="w-4 h-4 text-gray-300" />
+        <div className="flex items-center gap-2">
+          <div dangerouslySetInnerHTML={{ __html: props.value || '' }} />
+          {active && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+              v{active.version}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Column defs
+  const colDefs = useMemo<ColDef[]>(() => [
+    {
+      field: 'name',
+      headerName: 'Form Name',
+      flex: 2,
+      minWidth: 220,
+      cellRenderer: FormNameCellRenderer
+    },
+    {
+      field: 'description',
+      headerName: 'Description',
+      flex: 3,
+      minWidth: 260,
+      cellRenderer: DescriptionCellRenderer
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      minWidth: 220,
+      suppressSizeToFit: true,
+      cellRenderer: createActionsCellRenderer({
+        onEdit: async (item: any) => {
+          await loadFormForEditing(item.id);
+          // Ensure we are on the builder tab in the URL with the editing form id
+          navigate(`/settings/forms?tab=builder&editing_form=${item.id}`, { replace: true });
+        },
+        onDelete: handleDelete,
+        customActions: [
+          {
+            icon: faEye,
+            label: 'Preview',
+            variant: 'outline',
+            onClick: (item: Form) => {
+              loadFormForPreview(item.id);
+            },
+            className: 'px-3 h-8 text-xs',
+            disabled: () => false // Allow preview for all forms - will show draft if no published version exists
+          }
+        ]
+      }),
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right'
+    }
+  ], [handleDelete, loadFormForPreview, loadFormForEditing, formVersions, createActionsCellRenderer, navigate]);
 
   // Define tabs for URL persistence
   const formsTabs = [
@@ -383,7 +391,7 @@ function Forms() {
                   className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-secondary/50 bg-secondary/20 hover:bg-secondary/30 text-foreground transition-colors"
                   title="Exit edit mode and start a new form"
                 >
-                  <span className="text-xs font-medium">Editing: {selectedForm.name}</span>
+                  <span className="text-xs font-medium" dangerouslySetInnerHTML={{ __html: selectedForm.name }} />
                   <FontAwesomeIcon icon={faXmark} className="w-3 h-3 opacity-70" />
                 </button>
               ) : 'Select a form to edit'}
@@ -425,9 +433,11 @@ function Forms() {
                         const newVersion = await dispatch(genericActions.formVersions.addAsync(newVersionPayload)).unwrap();
                         // Update form current_version_id
                         await updateItem(selectedForm.id, { current_version_id: newVersion.id } as any);
+                        // Refresh the editor state
+                        await loadFormForEditing(selectedForm.id);
                       } else if (currentVersionId) {
                         // Update current
-                        await dispatch(genericActions.formVersions.updateAsync({ id: currentVersionId, fields: schemaData })).unwrap();
+                        await dispatch(genericActions.formVersions.updateAsync({ id: currentVersionId, updates: { fields: schemaData } })).unwrap();
                       }
                       setSaveStatus("success");
                       setTimeout(() => setSaveStatus("idle"), 900);
@@ -481,6 +491,8 @@ function Forms() {
                           await updateItem(newFormId, { current_version_id: version.id } as any);
                         }
                       }
+                      localStorage.removeItem('formBuilderDraft');
+                      await loadFormForEditing(formId);
                       setPublishStatus("success");
                       setTimeout(() => setPublishStatus("idle"), 900);
                     } catch (e) {
@@ -593,9 +605,9 @@ function Forms() {
           <div className="space-y-6">
             {/* Form Header */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold">{builderSchema.title || 'Untitled form'}</h1>
+              <h1 className="text-2xl font-bold" dangerouslySetInnerHTML={{ __html: builderSchema.title || 'Untitled form' }} />
               {builderSchema.description && (
-                <p className="text-muted-foreground">{builderSchema.description}</p>
+                <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: builderSchema.description }} />
               )}
             </div>
 
@@ -603,7 +615,7 @@ function Forms() {
             <div className="space-y-4">
               {(builderSchema.fields || []).map((f: any) => (
                 <div key={f.id} className="space-y-2">
-                  <div className="text-sm font-medium">{f.label}{f.required ? ' *' : ''}</div>
+                  <div className="text-sm font-medium" dangerouslySetInnerHTML={{ __html: `${f.label || 'Untitled question'}${f.required ? ' <span class="text-red-500">*</span>' : ''}` }} />
                   {f.type === 'text' && <ShortAnswerField isEditing={false} />}
                   {f.type === 'textarea' && <ParagraphField isEditing={false} />}
                   {f.type === 'select' && (

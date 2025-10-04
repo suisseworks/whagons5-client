@@ -18,6 +18,11 @@ const CUSTOM_SIDEBAR_WIDTH_ICON = 4; // Match the 4rem from AppSidebar
 const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const location = useLocation();
   const isWelcome = (location.pathname === '/home' && new URLSearchParams(location.search).has('welcome')) || location.pathname === '/welcome';
+  
+  const savedPinnedStr = localStorage.getItem('sidebarPinned');
+  const hasSaved = savedPinnedStr !== null;
+  const defaultOpenValue = hasSaved ? savedPinnedStr === 'true' : true;
+  
   if (isWelcome) {
     return (
       <ThemeProvider>
@@ -30,12 +35,12 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <ThemeProvider>
       <SidebarProvider 
-      defaultOpen={true}
-      style={{
-        "--sidebar-width": `${CUSTOM_SIDEBAR_WIDTH}rem`,
-        "--sidebar-width-mobile": `${CUSTOM_SIDEBAR_WIDTH_MOBILE}rem`,
-        "--sidebar-width-icon": `${CUSTOM_SIDEBAR_WIDTH_ICON}rem`,
-      } as React.CSSProperties}
+        defaultOpen={defaultOpenValue}
+        style={{
+          "--sidebar-width": `${CUSTOM_SIDEBAR_WIDTH}rem`,
+          "--sidebar-width-mobile": `${CUSTOM_SIDEBAR_WIDTH_MOBILE}rem`,
+          "--sidebar-width-icon": `${CUSTOM_SIDEBAR_WIDTH_ICON}rem`,
+        } as React.CSSProperties}
       >
         <div className="flex h-screen w-full overflow-hidden bg-background">
           {!isWelcome && <AppSidebar overlayOnExpand={false} />}

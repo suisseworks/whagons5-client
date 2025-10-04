@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
+import { X } from 'lucide-react';
+import { Button } from './button';
 
 interface TabItem {
   value: string;
@@ -19,6 +21,9 @@ interface UrlTabsProps {
   onValueChange?: (value: string) => void;
   // Path mode: map logical value -> path suffix (e.g., { users: '/users', overview: '' })
   pathMap?: Record<string, string>;
+  // Optional: control a right-side action (e.g., Clear filters)
+  showClearFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 /**
@@ -35,6 +40,9 @@ export function UrlTabs({
   children,
   onValueChange,
   pathMap,
+  // Optional: control a right-side action (e.g., Clear filters)
+  showClearFilters,
+  onClearFilters,
 }: UrlTabsProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -113,25 +121,41 @@ export function UrlTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>
-      <TabsList>
+      <div className="relative flex-1 flex flex-col min-h-0 w-full">
+        <TabsList>
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              disabled={tab.disabled}
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {showClearFilters && (
+          <div className="absolute right-0 top-0 translate-x-full">
+            <Button
+              variant="outline"
+              size="sm"
+              className="z-10 ml-4 flex items-center gap-1 h-8 px-3 rounded-full bg-card border-border shadow-sm hover:bg-accent"
+              onClick={onClearFilters}
+            >
+              Clear filters
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
         {tabs.map((tab) => (
-          <TabsTrigger
-            key={tab.value}
-            value={tab.value}
-            disabled={tab.disabled}
-          >
-            {tab.label}
-          </TabsTrigger>
+          <TabsContent key={tab.value} value={tab.value}>
+            {tab.content}
+          </TabsContent>
         ))}
-      </TabsList>
 
-      {tabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value}>
-          {tab.content}
-        </TabsContent>
-      ))}
-
-      {children}
+        {children}
+      </div>
     </Tabs>
   );
 }

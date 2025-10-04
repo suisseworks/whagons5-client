@@ -97,6 +97,27 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
   const workspaceSlottedItems = useMemo(() => utils.toSlottedItems(localWorkspaces, 'id', workspaceSlotItemMap), [localWorkspaces, workspaceSlotItemMap]);
   const pendingSlotItemMapRef = useRef<SlotItemMapArray | null>(null);
 
+  const displaySlottedItems = useMemo(() => {
+    if (!workspaceSlottedItems.length) {
+      return localWorkspaces.map((workspace) => ({
+        slotId: String(workspace.id),
+        itemId: String(workspace.id),
+        item: workspace,
+      }));
+    }
+
+    const hasRenderableItem = workspaceSlottedItems.some(({ item }) => Boolean(item));
+    if (!hasRenderableItem) {
+      return localWorkspaces.map((workspace) => ({
+        slotId: String(workspace.id),
+        itemId: String(workspace.id),
+        item: workspace,
+      }));
+    }
+
+    return workspaceSlottedItems;
+  }, [workspaceSlottedItems, localWorkspaces]);
+
   useEffect(() => {
     const currentIds = localWorkspaces.map((workspace) => String(workspace.id));
     const saved = loadWorkspaceOrder();
@@ -130,6 +151,12 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
     }
 
     swapyRef.current?.destroy?.();
+
+    if (localWorkspaces.length === 0) {
+      swapyRef.current = null;
+      return;
+    }
+
     const instance = createSwapy(container, {
       manualSwap: true,
     });
@@ -270,7 +297,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
           <SidebarGroupContent className={collapsed ? 'pt-2' : 'pt-2 pl-1'}>
             <div ref={workspaceContainerRef}>
               <div className={collapsed ? 'flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent z-300' : 'workspace-items'}>
-                {workspaceSlottedItems.map(({ slotId, itemId, item }) => (
+                {displaySlottedItems.map(({ slotId, itemId, item }) => (
                   <div data-swapy-slot={slotId} key={slotId}>
                     {item && (
                       <div

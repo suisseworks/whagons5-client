@@ -217,6 +217,8 @@ export function EditableTitle({ value, onChange, placeholder = "Untitled form", 
               if (target.innerHTML === '<br>') {
                 target.innerHTML = '';
               }
+              // Call onChange with current innerHTML for live updates
+              onChange(target.innerHTML);
             }}
             className="text-2xl font-bold text-foreground bg-transparent border-none outline-none w-full empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground"
             data-placeholder={placeholder}

@@ -181,7 +181,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
 
             // Category-field-assignments are fetched per category on demand and cached via GenericCache
-            const rtl = new RealTimeListener({ debug: true });
+            const rtl = new RealTimeListener(
+              // {
+              //   debug: true,
+              // }
+            );
             rtl.connectAndHold();
           } catch (err) {
             console.warn('AuthProvider: background hydration failed', err);

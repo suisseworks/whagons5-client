@@ -129,7 +129,8 @@ function Priorities() {
     {
       field: "actions",
       headerName: "Actions",
-      width: 120,
+      width: 100, // Fixed compact width for icons only
+      suppressSizeToFit: true, // Lock size, no auto-expansion
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete

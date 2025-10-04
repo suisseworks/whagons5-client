@@ -197,7 +197,7 @@ export function EditableTextField({ value, onChange, placeholder = "Enter text",
   return (
     <div ref={containerRef} className="relative w-full">
         <div
-          className={`min-h-[3rem] flex items-start cursor-text px-3 py-2.5 rounded-md transition-all ${
+          className={`min-h-[3rem] flex items-center cursor-text px-3 py-2.5 rounded-md transition-all ${
             isEditing ? 'bg-muted/30 border-b-2 border-primary' : 'bg-muted/20 border-b-2 border-transparent hover:bg-muted/40'
           }`}
           onMouseDown={() => {
@@ -214,6 +214,8 @@ export function EditableTextField({ value, onChange, placeholder = "Enter text",
               if (target.innerHTML === '<br>') {
                 target.innerHTML = '';
               }
+              // Call onChange with current innerHTML for live updates
+              onChange(target.innerHTML);
             }}
             className="text-sm text-foreground bg-transparent border-none outline-none w-full min-h-[2.5rem] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
             data-placeholder={placeholder}
