@@ -114,6 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               'spots',
               'users',
               'forms',
+              'formVersions',
               'workflows',
             ] as const;
 

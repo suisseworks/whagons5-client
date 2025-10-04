@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { useState } from "react";
 
 interface MultipleChoiceFieldProps {
   options: string[];
@@ -15,6 +17,9 @@ export function MultipleChoiceField({ options, onOptionsChange, isEditing = true
   
   // Check if "Other" option exists in the current options
   const hasOther = currentOptions.some(option => option.toLowerCase() === 'other');
+  
+  // State for preview select value
+  const [selectedValue, setSelectedValue] = useState<string>("");
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...currentOptions];
@@ -42,19 +47,22 @@ export function MultipleChoiceField({ options, onOptionsChange, isEditing = true
   // Rendered view - what users see when filling the form
   if (!isEditing) {
     return (
-      <div className="space-y-2 py-2">
-        {currentOptions.filter(opt => opt.trim()).map((option, index) => (
-          <div key={index} className="flex items-center gap-3">
-            <div className="w-4 h-4 rounded-full border-2 border-muted-foreground flex-shrink-0" />
-            <span className="text-sm">{option || `Option ${index + 1}`}</span>
-          </div>
-        ))}
-        {currentOptions.filter(opt => opt.trim()).length === 0 && (
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 rounded-full border-2 border-muted-foreground flex-shrink-0" />
-            <span className="text-sm text-muted-foreground">Option 1</span>
-          </div>
-        )}
+      <div className="py-2">
+        <Select value={selectedValue} onValueChange={setSelectedValue}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select an option" />
+          </SelectTrigger>
+          <SelectContent>
+            {currentOptions.filter(opt => opt.trim()).map((option, index) => (
+              <SelectItem key={index} value={option || `option-${index}`}>
+                {option || `Option ${index + 1}`}
+              </SelectItem>
+            ))}
+            {currentOptions.filter(opt => opt.trim()).length === 0 && (
+              <SelectItem value="option-empty">Option 1</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
       </div>
     );
   }

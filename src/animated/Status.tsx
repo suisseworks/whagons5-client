@@ -49,7 +49,7 @@ const SPRING = { type: "spring" as const, stiffness: 520, damping: 24, mass: 0.9
 // --- Component --------------------------------------------------------------
 
 // Inline animated SVG spinner (smooth rotating dash)
-function AnimatedSpinner() {
+export function AnimatedSpinner() {
   return (
     <MotionConfig>
       <motion.svg
@@ -83,7 +83,7 @@ function AnimatedSpinner() {
 }
 
 // Inline animated SVG check that path-traces left→right without a start/end dot
-function AnimatedCheck({ active }: { active: boolean }) {
+export function AnimatedCheck({ active }: { active: boolean }) {
   return (
     <motion.svg
       key={String(active)}

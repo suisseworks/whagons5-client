@@ -127,7 +127,13 @@ export function DraggableField({
               isEditing={false}
             />
           )}
-          {field.type === 'checkbox' && <CheckboxField isEditing={false} />}
+          {field.type === 'checkbox' && (
+            <CheckboxField
+              options={field.options || []}
+              onOptionsChange={() => {}}
+              isEditing={false}
+            />
+          )}
         </div>
       </div>
 
@@ -169,7 +175,13 @@ export function DraggableField({
                 isEditing={true}
               />
             )}
-            {field.type === 'checkbox' && <CheckboxField isEditing={true} />}
+            {field.type === 'checkbox' && (
+              <CheckboxField
+                options={field.options || []}
+                onOptionsChange={(options) => onUpdate({ options })}
+                isEditing={true}
+              />
+            )}
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="flex items-center gap-2">
                 <Button

@@ -2,9 +2,10 @@ import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faEye, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Form, FormVersion } from "@/store/types";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // Extended types for form builder
 interface FormBuilderSchema {
@@ -19,19 +20,19 @@ interface FormBuilderSchema {
   form_id?: number;
   title?: string;
   description?: string;
+  isDraft?: boolean;
 }
 
 interface BuilderMeta {
   name: string;
   description: string;
-  is_active: boolean;
 }
 
 // Extended Form interface to include properties used in the component
 interface ExtendedForm extends Omit<Form, 'is_active'> {
   description?: string;
-  is_active?: boolean;
   created_by?: number;
+  current_version_id?: number;
 }
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/store/store";
@@ -48,13 +49,18 @@ import FormBuilder from "./components/FormBuilder";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UrlTabs } from "@/components/ui/url-tabs";
+import { ShortAnswerField } from "./components/field-types/ShortAnswerField";
+import { ParagraphField } from "./components/field-types/ParagraphField";
+import { MultipleChoiceField } from "./components/field-types/MultipleChoiceField";
+import { CheckboxField } from "./components/field-types/CheckboxField";
+import StatusButton from "@/components/ui/StatusButton";
 
 // Simple renderer for form name with version badge
 const FormNameCellRenderer = (props: ICellRendererParams) => {
   const versions: FormVersion[] = (props.context?.formVersions || []) as FormVersion[];
   const active = versions
     .filter(v => v.form_id === props.data.id)
-    .sort((a, b) => Number(b.version) - Number(a.version))[0];
+    .sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
   return (
     <div className="flex items-center h-full space-x-2">
       <FontAwesomeIcon icon={faClipboardList} className="w-4 h-4 text-gray-300" />
@@ -62,7 +68,7 @@ const FormNameCellRenderer = (props: ICellRendererParams) => {
         <span>{props.value}</span>
         {active && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
-            v{active.version}{active.is_active ? '' : ' (draft)'}
+            v{active.version}
           </span>
         )}
       </div>
@@ -75,6 +81,8 @@ function Forms() {
   const { value: formVersions } = useSelector((state: RootState) => (state as any).formVersions || { value: [] });
   const dispatch = useDispatch<AppDispatch>();
   const authUser = useAuthUser();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const {
     items: forms,
@@ -98,10 +106,159 @@ function Forms() {
   });
 
   // Tabs and selection state
-  const [activeTab, setActiveTab] = useState<'list' | 'builder'>('list');
   const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
   const selectedForm = useMemo(() => forms.find((f: Form) => f.id === selectedFormId) || null, [forms, selectedFormId]);
-  const [builderMeta, setBuilderMeta] = useState<BuilderMeta>({ name: '', description: '', is_active: true });
+  const [builderMeta, setBuilderMeta] = useState<BuilderMeta>({ name: '', description: '' });
+  const [isNewForm, setIsNewForm] = useState(false);
+  const [skipBuilderClearOnce, setSkipBuilderClearOnce] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
+  const [publishStatus, setPublishStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
+
+  // Builder state (per-session draft) - persisted to localStorage
+  const [builderSchema, setBuilderSchema] = useState<FormBuilderSchema>(() => {
+    const saved = localStorage.getItem('formBuilderDraft');
+    return saved ? JSON.parse(saved) : { fields: [], title: '', description: '' };
+  });
+
+  const [currentVersionId, setCurrentVersionId] = useState<number | null>(null);
+  const [isVersionUsed, setIsVersionUsed] = useState(false);
+
+  // Auto-save to localStorage whenever builder schema changes (new-form mode only)
+  useEffect(() => {
+    if (isNewForm) {
+      localStorage.setItem('formBuilderDraft', JSON.stringify(builderSchema));
+    }
+  }, [builderSchema, isNewForm]);
+
+  // Clear function for the red clear button
+  const clearBuilder = useCallback(() => {
+    setBuilderSchema({ fields: [], title: '', description: '' });
+    setBuilderMeta({ name: '', description: '' });
+    setIsNewForm(true);
+    setSelectedFormId(null);
+    localStorage.removeItem('formBuilderDraft');
+  }, []);
+
+  // Helper: create a form version (draft or active)
+  const createFormVersion = useCallback(async (formId: number) => {
+    const latest = [...formVersions]
+      .filter((v: FormVersion) => v.form_id === formId)
+      .sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
+    const nextVersion = (latest ? Number(latest.version) : 0) + 1;
+
+    const schemaData = {
+      title: builderMeta.name,
+      description: builderMeta.description,
+      fields: builderSchema.fields || []
+    };
+
+    const payload = {
+      form_id: formId,
+      version: nextVersion,
+      fields: schemaData
+    } as any;
+    const response = await dispatch(genericActions.formVersions.addAsync(payload)).unwrap();
+    return response as unknown as { id: number; form_id: number; version: number; fields?: any };
+  }, [builderMeta, builderSchema, formVersions, dispatch]);
+
+  // Function to load form for editing
+  const loadFormForEditing = useCallback(async (formId: number) => {
+    try {
+      // Load latest version (active or draft) for this form from backend cache
+      const form = forms.find(f => f.id === formId) as ExtendedForm | undefined;
+      const latest = [...formVersions]
+        .filter((v: FormVersion) => v.form_id === formId)
+        .sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
+
+      let activeVersionId: number | null = null;
+      if (form && (form as any).current_version_id) {
+        activeVersionId = (form as any).current_version_id;
+      } else if (latest) {
+        activeVersionId = latest.id;
+      }
+
+      if (activeVersionId) {
+        setCurrentVersionId(activeVersionId);
+        try {
+          const res = await fetch(`/api/form-versions/${activeVersionId}/usages`);
+          if (res.ok) {
+            const data = await res.json();
+            setIsVersionUsed(data.task_count > 0);
+          } else {
+            setIsVersionUsed(false);
+          }
+        } catch (e) {
+          console.error('Failed to fetch version usages:', e);
+          setIsVersionUsed(false);
+        }
+      } else {
+        setCurrentVersionId(null);
+        setIsVersionUsed(false);
+      }
+
+      if ((latest as any)?.fields || (latest as any)?.schema_data) {
+        const raw = (latest as any).fields ?? (latest as any).schema_data;
+        const parsed = typeof raw === 'object' ? raw : (typeof raw === 'string' ? JSON.parse(raw) : {});
+        const title = (parsed?.title ?? (form ? form.name : '')) || '';
+        const description = (parsed?.description ?? ((form as ExtendedForm)?.description ?? '')) || '';
+        setBuilderSchema({
+          fields: parsed?.fields || [],
+          title,
+          description,
+          form_id: formId,
+          isDraft: !(form && (form as any).current_version_id === latest.id)
+        });
+        setBuilderMeta({ name: title, description });
+      } else {
+        // Initialize from the form's own meta (no versions yet)
+        const form = forms.find(f => f.id === formId);
+        const title = (form ? form.name : '') || '';
+        const description = ((form as ExtendedForm | undefined)?.description ?? '') || '';
+        setBuilderSchema({ fields: [], form_id: formId, title, description, isDraft: true });
+        setBuilderMeta({ name: title, description });
+      }
+
+      setSelectedFormId(formId);
+      setIsNewForm(false); // We're editing an existing form
+      setSkipBuilderClearOnce(true); // Prevent a subsequent builder tab change from clearing
+    } catch (error) {
+      console.error('Error loading form for editing:', error);
+    }
+  }, [formVersions, forms]);
+
+  // Function to load form schema for preview (always shows published version)
+  const loadFormForPreview = useCallback(async (formId: number) => {
+    try {
+      // Find the active version for this form (by current_version_id)
+      const form = forms.find(f => f.id === formId) as ExtendedForm | undefined;
+      const activeVersion = [...formVersions]
+        .filter((v: FormVersion) => v.form_id === formId)
+        .find((v: FormVersion) => ((form as any)?.current_version_id ? v.id === (form as any).current_version_id : false))
+        || [...formVersions].filter((v: FormVersion) => v.form_id === formId).sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
+
+      if ((activeVersion as any)?.fields) {
+        const fieldsRaw = (activeVersion as any)?.fields;
+        const parsed = typeof fieldsRaw === 'string' ? JSON.parse(fieldsRaw) : (fieldsRaw || {});
+        setBuilderSchema({
+          fields: parsed?.fields || [],
+          title: parsed?.title || '',
+          description: parsed?.description || '',
+          form_id: formId,
+          isDraft: false
+        });
+        setIsPreviewOpen(true);
+      } else {
+        setBuilderSchema({ fields: [], form_id: formId, title: 'Untitled form', description: '', isDraft: false });
+        setIsPreviewOpen(true);
+      }
+    } catch (error) {
+      console.error('Error loading form for preview:', error);
+      const form = forms.find(f => f.id === formId);
+      setBuilderSchema({ fields: [], form_id: formId, title: form?.name || 'Untitled form', description: (form as any)?.description || '', isDraft: false });
+      setIsPreviewOpen(true);
+    }
+  }, [formVersions, forms]);
 
   // Column defs
   const colDefs = useMemo<ColDef[]>(() => [
@@ -119,60 +276,36 @@ function Forms() {
       minWidth: 260
     },
     {
-      field: 'is_active',
-      headerName: 'Active',
-      width: 120,
-      valueFormatter: (p) => (p.value ? 'Yes' : 'No')
-    },
-    {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      minWidth: 220,
+      suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
-        onEdit: (item: Form) => {
-          setSelectedFormId(item.id);
-          setBuilderMeta({
-            name: item.name,
-            description: (item as ExtendedForm).description || '',
-            is_active: !!(item as ExtendedForm).is_active
-          });
-          setActiveTab('builder');
+        onEdit: async (item: any) => {
+          await loadFormForEditing(item.id);
+          // Ensure we are on the builder tab in the URL with the editing form id
+          navigate(`/settings/forms?tab=builder&editing_form=${item.id}`, { replace: true });
         },
-        onDelete: handleDelete
+        onDelete: handleDelete,
+        customActions: [
+          {
+            icon: faEye,
+            label: 'Preview',
+            variant: 'outline',
+            onClick: (item: Form) => {
+              loadFormForPreview(item.id);
+            },
+            className: 'px-3 h-8 text-xs',
+            disabled: () => false // Allow preview for all forms - will show draft if no published version exists
+          }
+        ]
       }),
       sortable: false,
       filter: false,
       resizable: false,
       pinned: 'right'
     }
-  ], [handleDelete]);
-
-  // Create or update meta from Builder
-  const updateFormMeta = useCallback(async () => {
-    if (selectedForm) {
-      await updateItem(selectedForm.id, {
-        name: builderMeta.name,
-        description: builderMeta.description || undefined,
-        is_active: builderMeta.is_active
-      } as ExtendedForm);
-    } else {
-      const payload: ExtendedForm = {
-        name: builderMeta.name,
-        description: builderMeta.description || undefined,
-        id: 0, // Will be set by the server
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      // Server requires created_by
-      if (authUser?.id) payload.created_by = Number(authUser.id);
-      const saved = await dispatch(genericActions.forms.addAsync(payload)).unwrap();
-      setSelectedFormId((saved as ExtendedForm).id);
-    }
-  }, [selectedForm, builderMeta, updateItem, dispatch, authUser]);
-
-  // Builder state (per-session draft). In a full impl., this would link to formVersions.
-  const [builderSchema, setBuilderSchema] = useState<FormBuilderSchema>({ fields: [], title: '', description: '' });
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  ], [handleDelete, loadFormForPreview, loadFormForEditing, formVersions]);
 
   useEffect(() => {
     if (selectedForm) {
@@ -184,23 +317,31 @@ function Forms() {
       });
       setBuilderMeta({
         name: selectedForm.name,
-        description: (selectedForm as ExtendedForm).description || '',
-        is_active: !!(selectedForm as ExtendedForm).is_active
+        description: (selectedForm as ExtendedForm).description || ''
       });
     } else {
       setBuilderSchema({ fields: [], title: '', description: '' });
-      setBuilderMeta({ name: '', description: '', is_active: true });
+      setBuilderMeta({ name: '', description: '' });
     }
   }, [selectedForm]);
+
+  useEffect(() => {
+    // Support both correct and misspelled param to be forgiving
+    const params = new URLSearchParams(location.search);
+    const builderTab = params.get('tab');
+    const editIdStr = params.get('editing_form') || params.get('editting_from');
+    const editId = editIdStr ? Number(editIdStr) : NaN;
+
+    if (builderTab === 'builder' && !Number.isNaN(editId)) {
+      // Open in edit mode for this form
+      setSkipBuilderClearOnce(true);
+      loadFormForEditing(editId).catch(console.error);
+    }
+  }, [location.search, loadFormForEditing]);
 
   const saveDraft = useCallback(() => {
     // Placeholder: in future, create or update a draft formVersion with schema_data
     console.log('save draft', builderSchema);
-  }, [builderSchema]);
-
-  const publish = useCallback(() => {
-    // Placeholder: will create a new active version and set it as current
-    console.log('publish', builderSchema);
   }, [builderSchema]);
 
   // Define tabs for URL persistence
@@ -214,15 +355,7 @@ function Forms() {
             rowData={filteredItems}
             columnDefs={colDefs}
             noRowsMessage="No forms found"
-            onRowDoubleClicked={(item: Form) => {
-              setSelectedFormId(item.id);
-              setBuilderMeta({
-                name: item.name,
-                description: (item as ExtendedForm).description || '',
-                is_active: !!(item as ExtendedForm).is_active
-              });
-              setActiveTab('builder');
-            }}
+            onRowDoubleClicked={(event: any) => { if (!event?.data) return; loadFormForEditing(event.data.id).then(() => { navigate(`/settings/forms?tab=builder&editing_form=${event.data.id}`, { replace: true }); }); }}
             onGridReady={(params: any) => {
               params.api.setGridOption('context', { formVersions });
             }}
@@ -240,15 +373,128 @@ function Forms() {
           {/* Header with form info and action buttons */}
           <div className="flex items-center justify-between pb-4 border-b">
             <div className="text-sm text-muted-foreground">
-              {selectedForm ? `Editing: ${selectedForm.name}` : 'Creating a new form'}
+              {isNewForm ? 'Creating a new form' : selectedForm ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearBuilder();
+                    navigate('/settings/forms?tab=builder', { replace: true });
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-secondary/50 bg-secondary/20 hover:bg-secondary/30 text-foreground transition-colors"
+                  title="Exit edit mode and start a new form"
+                >
+                  <span className="text-xs font-medium">Editing: {selectedForm.name}</span>
+                  <FontAwesomeIcon icon={faXmark} className="w-3 h-3 opacity-70" />
+                </button>
+              ) : 'Select a form to edit'}
             </div>
             <div className="flex gap-2">
+              {/* Action buttons: Preview, Clear, and mode-dependent New/Publish */}
               <Button size="sm" variant="outline" type="button" onClick={() => setIsPreviewOpen(true)}>
                 Preview
               </Button>
-              <Button size="sm" variant="secondary" type="button" onClick={async () => { await updateFormMeta(); publish(); }} disabled={!builderMeta.name.trim()}>
-                Publish
-              </Button>
+              {/* Save Changes (edit mode only) */}
+              {selectedForm && !isNewForm && (
+                <StatusButton
+                  size="sm"
+                  variant="secondary"
+                  status={saveStatus}
+                  onClick={async () => {
+                    try {
+                      setSaveStatus("processing");
+                      // Update form meta
+                      await updateItem(selectedForm.id, {
+                        name: builderMeta.name,
+                        description: builderMeta.description || undefined
+                      });
+                      // Schema
+                      const schemaData = {
+                        title: builderMeta.name,
+                        description: builderMeta.description || '',
+                        fields: builderSchema.fields || []
+                      };
+                      if (isVersionUsed && currentVersionId) {
+                        // Create new version
+                        const latestVersion = formVersions.filter((v: FormVersion) => v.form_id === selectedForm.id).sort((a: FormVersion, b: FormVersion) => Number(b.version) - Number(a.version))[0];
+                        const nextVersion = (latestVersion ? Number(latestVersion.version) : 0) + 1;
+                        const newVersionPayload = {
+                          form_id: selectedForm.id,
+                          version: nextVersion,
+                          fields: schemaData
+                        };
+                        const newVersion = await dispatch(genericActions.formVersions.addAsync(newVersionPayload)).unwrap();
+                        // Update form current_version_id
+                        await updateItem(selectedForm.id, { current_version_id: newVersion.id } as any);
+                      } else if (currentVersionId) {
+                        // Update current
+                        await dispatch(genericActions.formVersions.updateAsync({ id: currentVersionId, fields: schemaData })).unwrap();
+                      }
+                      setSaveStatus("success");
+                      setTimeout(() => setSaveStatus("idle"), 900);
+                    } catch (e) {
+                      console.error('Error saving changes:', e);
+                      setSaveStatus("error");
+                      setTimeout(() => setSaveStatus("idle"), 1200);
+                    }
+                  }}
+                  disabled={!builderMeta.name.trim()}
+                  title="Save changes to this form"
+                >
+                  Save Changes
+                </StatusButton>
+              )}
+
+              {/* Single New/Publish button depending on mode */}
+              <StatusButton
+                size="sm"
+                variant="secondary"
+                status={selectedForm && !isNewForm ? "idle" : publishStatus}
+                type="button"
+                onClick={async () => {
+                  if (selectedForm && !isNewForm) {
+                    // Editing existing → switch to New Form mode
+                    clearBuilder();
+                    navigate('/settings/forms?tab=builder', { replace: true });
+                  } else {
+                    // Creating new → publish (create first if needed)
+                    try {
+                      setPublishStatus("processing");
+                      let formId: number;
+                      let newFormId: number | null = null;
+                      if (!selectedFormId) {
+                        const formPayload: any = {
+                          name: builderMeta.name,
+                          description: builderMeta.description || undefined,
+                          created_by: authUser?.id,
+                        };
+                        const newForm = await dispatch(genericActions.forms.addAsync(formPayload)).unwrap();
+                        formId = newForm.id;
+                        newFormId = formId;
+                        setSelectedFormId(formId);
+                      } else {
+                        formId = selectedFormId;
+                      }
+                      const version = await createFormVersion(formId);
+                      if (newFormId) {
+                        const foundForm = forms.find((f: Form) => f.id === newFormId);
+                        if (!(foundForm as any)?.current_version_id) {
+                          await updateItem(newFormId, { current_version_id: version.id } as any);
+                        }
+                      }
+                      setPublishStatus("success");
+                      setTimeout(() => setPublishStatus("idle"), 900);
+                    } catch (e) {
+                      console.error('Error publishing form:', e);
+                      setPublishStatus("error");
+                      setTimeout(() => setPublishStatus("idle"), 1200);
+                    }
+                  }
+                }}
+                disabled={!builderMeta.name.trim() && !(selectedForm && !isNewForm)}
+                title={selectedForm && !isNewForm ? 'Start a new form' : 'Publish form'}
+              >
+                {selectedForm && !isNewForm ? 'New Form' : 'Publish'}
+              </StatusButton>
             </div>
           </div>
 
@@ -264,9 +510,12 @@ function Forms() {
                 if (newSchema.description !== undefined) {
                   setBuilderMeta(prev => ({ ...prev, description: newSchema.description || '' }));
                 }
+                // Persist draft ONLY for new form mode
+                if (isNewForm) {
+                  try { localStorage.setItem('formBuilderDraft', JSON.stringify(newSchema)); } catch {}
+                }
               }}
               onSaveDraft={saveDraft}
-              onPublish={publish}
               onPreview={() => setIsPreviewOpen(true)}
             />
           </div>
@@ -298,7 +547,17 @@ function Forms() {
         defaultValue="list"
         basePath="/settings/forms"
         className="flex-1 h-full flex flex-col"
-        onValueChange={(v: string) => setActiveTab(v as 'list' | 'builder')}
+        onValueChange={(value) => {
+          if (value === 'builder') {
+            if (skipBuilderClearOnce) {
+              // Coming from Edit → Builder programmatically; do not clear
+              setSkipBuilderClearOnce(false);
+            } else {
+              // User switched to Builder manually → always new form mode
+              clearBuilder();
+            }
+          }
+        }}
       />
 
       {/* Delete Confirmation */}
@@ -343,26 +602,23 @@ function Forms() {
             {/* Form Fields */}
             <div className="space-y-4">
               {(builderSchema.fields || []).map((f: any) => (
-                <div key={f.id} className="space-y-1">
+                <div key={f.id} className="space-y-2">
                   <div className="text-sm font-medium">{f.label}{f.required ? ' *' : ''}</div>
-                  {f.type === 'text' && (
-                    <input className="w-full px-3 py-2 border rounded text-sm" placeholder={f.placeholder || ''} />
-                  )}
-                  {f.type === 'textarea' && (
-                    <textarea className="w-full px-3 py-2 border rounded text-sm" placeholder={f.placeholder || ''} />
-                  )}
+                  {f.type === 'text' && <ShortAnswerField isEditing={false} />}
+                  {f.type === 'textarea' && <ParagraphField isEditing={false} />}
                   {f.type === 'select' && (
-                    <select className="w-full px-3 py-2 border rounded text-sm">
-                      {(f.options || []).map((opt: string, i: number) => (
-                        <option key={i}>{opt}</option>
-                      ))}
-                    </select>
+                    <MultipleChoiceField
+                      options={f.options || []}
+                      onOptionsChange={() => {}}
+                      isEditing={false}
+                    />
                   )}
                   {f.type === 'checkbox' && (
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input type="checkbox" />
-                      {f.label}
-                    </label>
+                    <CheckboxField
+                      options={f.options || []}
+                      onOptionsChange={() => {}}
+                      isEditing={false}
+                    />
                   )}
                 </div>
               ))}

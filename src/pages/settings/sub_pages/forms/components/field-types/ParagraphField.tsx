@@ -1,13 +1,24 @@
+import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
+
 interface ParagraphFieldProps {
   isEditing?: boolean;
 }
 
 export function ParagraphField({ isEditing = true }: ParagraphFieldProps) {
+  // State for preview textarea value
+  const [value, setValue] = useState<string>("");
+
+  // Rendered view - what users see when filling the form
   if (!isEditing) {
-    // Rendered view - what users see when filling the form
     return (
-      <div className="text-sm text-muted-foreground py-2 border-b border-muted-foreground/30">
-        Long answer text
+      <div className="py-2">
+        <Textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Long answer"
+          rows={4}
+        />
       </div>
     );
   }
