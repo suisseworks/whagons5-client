@@ -154,6 +154,26 @@
     @apply bg-background text-foreground;
   }
   
+  /* Subtle header gradient: extremely soft, works in light and dark */
+  .wh-header {
+    background: linear-gradient(
+      to right,
+      oklch(from var(--color-card) l calc(l + 0.06) c h / 1) 0%,
+      oklch(from var(--color-card) l c h / 1) 55%,
+      oklch(from var(--color-card) l calc(l - 0.06) c h / 1) 100%
+    );
+  }
+
+  /* Ensure clear-but-subtle gradient in dark theme as well */
+  .dark .wh-header {
+    background: linear-gradient(
+      to right,
+      oklch(from var(--color-card) l calc(l + 0.035) c h / 1) 0%,
+      oklch(from var(--color-card) l c h / 1) 55%,
+      oklch(from var(--color-card) l calc(l - 0.035) c h / 1) 100%
+    );
+  }
+  
   /* Gradient button helpers */
   .btn-gradient-primary {
     background: var(--gradient-primary);
@@ -427,4 +447,109 @@
   }
 }
 
+
+/* Subtle background pattern for sidebar surfaces */
+@layer utilities {
+  .bg-sidebar {
+    /* Very subtle dot grid; tuned for light theme */
+    background-image:
+      radial-gradient(hsl(0 0% 0% / 0.045) 1px, transparent 1px),
+      radial-gradient(hsl(0 0% 0% / 0.03) 1px, transparent 1px);
+    background-position: 0 0, 6px 6px;
+    background-size: 12px 12px;
+  }
+
+  .dark .bg-sidebar {
+    /* Slightly brighter dots on dark to ensure visibility */
+    background-image:
+      radial-gradient(hsl(0 0% 100% / 0.075) 1px, transparent 1px),
+      radial-gradient(hsl(0 0% 100% / 0.05) 1px, transparent 1px);
+  }
+}
+
+/* Modern list-card styling for AG Grid */
+.ag-theme-quartz.wh-modern-grid,
+.ag-theme-quartz-dark.wh-modern-grid {
+  --ag-row-border-color: transparent;
+  --ag-border-color: transparent;
+  --ag-secondary-border-color: transparent;
+}
+
+/* Row as card: rounded, subtle elevation, divider-less */
+.wh-modern-grid .ag-center-cols-container .ag-row {
+  /* Use horizontal margins only to avoid AG Grid row stacking issues */
+  margin: 0 8px;
+  border-radius: var(--radius-md);
+  background-color: oklch(from var(--color-card) l c h / 0.6);
+  box-shadow: 0 1px 0 oklch(from var(--color-background) l calc(l - 0.06) c h / 0.6);
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.dark .wh-modern-grid .ag-center-cols-container .ag-row {
+  background-color: oklch(from var(--color-card) l calc(l - 0.02) c h / 0.75);
+  box-shadow: 0 1px 0 oklch(from var(--color-background) l calc(l + 0.06) c h / 0.25);
+}
+
+/* Hover and selection polish */
+.wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+  background-color: oklch(from var(--color-secondary) l c h / 0.55) !important;
+  box-shadow: 0 4px 14px oklch(from var(--color-background) l calc(l - 0.1) c h / 0.18);
+  transform: translateY(-1px);
+}
+
+.wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
+  background-color: oklch(from var(--color-accent) l c h / 0.22) !important;
+  box-shadow: 0 6px 16px oklch(from var(--color-background) l calc(l - 0.12) c h / 0.22);
+}
+
+/* Reduce gridlines and header chrome */
+.wh-modern-grid .ag-header {
+  background: transparent;
+  border-bottom: none;
+}
+
+.wh-modern-grid .ag-header .ag-header-cell,
+.wh-modern-grid .ag-header .ag-header-group-cell {
+  background: transparent;
+}
+
+/* Compact, friendly cell paddings */
+.wh-modern-grid .ag-cell {
+  padding-block: 10px;
+}
+
+/* Make drag handles and resize lines subtle */
+.wh-modern-grid .ag-header .ag-header-cell-resize {
+  opacity: 0.25;
+}
+
+/* Zebra hover nuance: faint divider on alternating rows only when not selected */
+.wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
+  box-shadow: inset 0 -1px 0 oklch(from var(--color-border) l calc(l - 0.06) c h / 0.25);
+}
+
+/* Soft blurred header strip to separate from content without hard border */
+.wh-modern-grid .ag-header-viewport {
+  backdrop-filter: saturate(1.1) blur(4px);
+  background: linear-gradient(
+    to bottom,
+    oklch(from var(--color-background) l calc(l + 0.02) c h / 0.75),
+    oklch(from var(--color-background) l c h / 0.55)
+  );
+  border-bottom: 1px solid oklch(from var(--color-border) l calc(l - 0.02) c h / 0.6);
+}
+
+/* Better keyboard focus ring on cells */
+.wh-modern-grid .ag-cell:focus-within {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -2px;
+  border-radius: calc(var(--radius-md) - 2px);
+}
+
+/* Density controls */
+.wh-modern-grid.wh-density-compact .ag-center-cols-container .ag-row { margin: 0 6px; }
+.wh-modern-grid.wh-density-compact .ag-cell { padding-block: 6px; }
+
+.wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 10px; }
+.wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 12px; }
 

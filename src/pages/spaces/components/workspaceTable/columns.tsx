@@ -30,20 +30,34 @@ export function buildWorkspaceColumns(opts: any) {
     );
   };
 
+  const groupByStatus: boolean = !!opts.groupByStatus;
+
   return ([
     {
       field: 'name',
       headerName: 'Task',
       flex: 2.5,
       filter: false,
+      wrapText: true,
+      autoHeight: true,
       cellRenderer: (p: any) => {
         const name = p.data?.name || '';
         const description = p.data?.description || '';
         return (
-          <div className="flex flex-col gap-1 h-full justify-center py-2">
+          <div className="flex flex-col gap-1 py-1">
             <div className="font-semibold text-base text-foreground">{name}</div>
             {description && (
-              <div className="text-xs text-muted-foreground/70 truncate">{description}</div>
+              <div
+                className="text-xs text-muted-foreground/70"
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {description}
+              </div>
             )}
           </div>
         );
@@ -54,6 +68,8 @@ export function buildWorkspaceColumns(opts: any) {
       field: 'status_id',
       headerName: 'Status',
       sortable: true,
+      rowGroup: groupByStatus || undefined,
+      hide: groupByStatus || undefined,
       filter: 'agSetColumnFilter',
       valueFormatter: (p: any) => {
         const meta: any = statusMap[p.value as number];

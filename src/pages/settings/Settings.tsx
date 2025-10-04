@@ -16,7 +16,8 @@ import {
   faArrowUpWideShort,
   faGripVertical,
   faStopwatch,
-  faCog
+  faCog,
+  faDiagramProject
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useState } from "react";
@@ -56,15 +57,15 @@ function Settings() {
   // Spot count now derived from Redux slice hydrated in AuthProvider
 
   // Select from store
-  const categories = useSelector((s: RootState) => s.categories.value);
-  const templates = useSelector((s: RootState) => s.templates.value);
-  const teams = useSelector((s: RootState) => s.teams.value);
-  const statuses = useSelector((s: RootState) => s.statuses.value);
-  const priorities = useSelector((s: RootState) => s.priorities.value);
-  const slas = useSelector((s: RootState) => s.slas.value);
-  const users = useSelector((s: RootState) => s.users.value);
-  const forms = useSelector((s: RootState) => s.forms.value);
-  const spots = useSelector((s: RootState) => s.spots.value);
+  const categories = useSelector((s: RootState) => s.categories?.value ?? []);
+  const templates = useSelector((s: RootState) => s.templates?.value ?? []);
+  const teams = useSelector((s: RootState) => s.teams?.value ?? []);
+  const statuses = useSelector((s: RootState) => s.statuses?.value ?? []);
+  const priorities = useSelector((s: RootState) => s.priorities?.value ?? []);
+  const slas = useSelector((s: RootState) => s.slas?.value ?? []);
+  const users = useSelector((s: RootState) => s.users?.value ?? []);
+  const forms = useSelector((s: RootState) => s.forms?.value ?? []);
+  const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const didMoveRef = useRef(false);
   const pointerStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
   // const workflows = useSelector((s: RootState) => s.workflows.value);
@@ -80,7 +81,7 @@ function Settings() {
       slas: slas.length,
       users: users.length,
       forms: forms.length,
-      // workflows: workflows.length,
+      workflows: 0,
     };
   }, [categories.length, templates.length, teams.length, spots.length, statuses.length, priorities.length, slas.length, users.length, forms.length]);
 
@@ -164,14 +165,14 @@ function Settings() {
       description: 'Manage forms and submissions',
       color: 'text-pink-500'
     },
-    // {
-    //   id: 'workflows',
-    //   title: 'Workflows',
-    //   icon: faDiagramProject,
-    //   count: counts.workflows,
-    //   description: 'Design and automate workflows',
-    //   color: 'text-cyan-500'
-    // },
+    {
+      id: 'workflows',
+      title: 'Workflows',
+      icon: faDiagramProject,
+      count: counts.workflows,
+      description: 'Design and automate workflows',
+      color: 'text-cyan-500'
+    },
   ], [counts.slas, counts.forms]);
 
   //set up maps for swapy

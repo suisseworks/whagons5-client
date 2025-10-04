@@ -454,3 +454,17 @@ export interface Exception {
     created_at: string;
 }
 
+// Workflow Management (Coming Soon)
+export interface Workflow {
+    id: number;
+    name: string;
+    description?: string | null;
+    workspace_id?: number | null;
+    is_active: boolean;
+    trigger_conditions?: string | null; // JSON conditions for when workflow runs
+    actions?: string | null; // JSON array of actions to perform
+    created_by?: number | null;
+    created_at: string;
+    updated_at: string;
+}
+

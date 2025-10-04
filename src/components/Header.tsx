@@ -217,7 +217,7 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card border-b border-border/50 shadow-sm">
+        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/50 shadow-sm">
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
@@ -246,7 +246,7 @@ function Header() {
                                                     </Link>
                                                 </BreadcrumbLink>
                                             ) : (
-                                                <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
+                                                <BreadcrumbPage className="truncate max-w-[10rem] text-lg sm:text-xl font-semibold">{bc.label}</BreadcrumbPage>
                                             )}
                                         </BreadcrumbItem>
                                     </React.Fragment>
@@ -278,7 +278,7 @@ function Header() {
                                                     </Link>
                                                 </BreadcrumbLink>
                                             ) : (
-                                                <BreadcrumbPage className="truncate max-w-[10rem] font-semibold">{bc.label}</BreadcrumbPage>
+                                                <BreadcrumbPage className="truncate max-w-[10rem] text-lg sm:text-xl font-semibold">{bc.label}</BreadcrumbPage>
                                             )}
                                         </BreadcrumbItem>
                                     </React.Fragment>

@@ -236,9 +236,12 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 relative bg-no-repeat bg-cover bg-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20" style={{ backgroundImage: "url('/whagons.svg')" }}>
+      {/* Background overlay for better content readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-transparent to-white/60 dark:from-gray-900/80 dark:via-transparent dark:to-gray-900/60"></div>
+
       {/* Small logo in top left corner */}
-      <div className="absolute top-6 left-6">
+      <div className="absolute top-6 left-6 z-10">
         <div className="flex items-center">
           <WhagonsCheck width={28} height={14} color="#27C1A7" />
           <div className="text-sm pl-1.5 font-semibold text-[#27C1A7]" style={{ fontFamily: 'Montserrat' }}>
@@ -247,7 +250,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
         </div>
       </div>
 
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md z-10 relative">
         <div className="text-center mb-10">
           <div className="space-y-3">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -289,7 +292,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/20 dark:border-gray-700/20 p-8">
           {renderStep()}
         </div>
       </div>

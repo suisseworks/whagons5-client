@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DialogClose } from '@/components/ui/dialog';
 import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck } from 'lucide-react';
 
 function Profile() {
@@ -98,6 +99,20 @@ function Profile() {
         }
         setIsEditing(false);
     };
+
+    // Handle keyboard events
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isEditing && !saving) {
+                handleCancelEdit();
+            }
+        };
+
+        if (isEditing) {
+            document.addEventListener('keydown', handleKeyDown);
+            return () => document.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [isEditing, saving]);
 
     // Format date helper
     const formatDate = (dateString?: string) => {
@@ -291,13 +306,23 @@ function Profile() {
             </div>
 
             {/* Edit Profile Dialog */}
-            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+            <Dialog open={isEditing} onOpenChange={(open) => !saving && setIsEditing(open)}>
                 <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
+                    <DialogHeader className="relative pr-10">
                         <DialogTitle>Edit Profile</DialogTitle>
                         <DialogDescription>
                             Update your profile information below.
                         </DialogDescription>
+                        <DialogClose asChild>
+                            <button
+                                type="button"
+                                aria-label="Close"
+                                className="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+                                disabled={saving}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </DialogClose>
                     </DialogHeader>
 
                     <div className="space-y-6 py-4">
@@ -353,13 +378,14 @@ function Profile() {
                     </div>
 
                     <DialogFooter>
-                        <Button 
-                            variant="outline" 
-                            onClick={handleCancelEdit}
-                            disabled={saving}
-                        >
-                            Cancel
-                        </Button>
+                        <DialogClose asChild>
+                            <Button
+                                variant="outline"
+                                disabled={saving}
+                            >
+                                Cancel
+                            </Button>
+                        </DialogClose>
                         <Button 
                             onClick={handleSaveProfile}
                             disabled={saving}
