@@ -70,7 +70,7 @@ export function SettingsGrid<T = any>({
 
   return (
     <div
-      className={`ag-theme-quartz wh-settings-grid w-full ${className ?? ""}`}
+      className={`ag-theme-quartz wh-settings-grid wh-modern-grid wh-density-comfortable w-full ${className ?? ""}`}
       style={{ height: height ?? "100%", ...(style ?? {}) }}
     >
       <AgGridReact

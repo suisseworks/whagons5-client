@@ -8,7 +8,7 @@ export const GRID_STYLES = {
 };
 
 export const GRID_CONSTANTS = {
-  ROW_HEIGHT: 80,
+  ROW_HEIGHT: 70,
   HEADER_HEIGHT: 44,
   ROW_BUFFER: 50,
   CLIENT_THRESHOLD: 1000,
@@ -24,7 +24,7 @@ export const createLoadingSpinner = () => (
 );
 
 export const createGridContainer = (children: React.ReactNode) => (
-  <div style={GRID_STYLES.container} className="ag-theme-quartz wh-workspace-grid h-full w-full">
+  <div style={GRID_STYLES.container} className="ag-theme-quartz wh-workspace-grid wh-modern-grid wh-density-compact h-full w-full">
     <div style={GRID_STYLES.grid}>
       {children}
     </div>

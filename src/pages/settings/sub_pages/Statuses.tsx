@@ -40,9 +40,58 @@ function Statuses() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const [transitionsView, setTransitionsView] = useState<'matrix' | 'visual'>('visual');
+  const [activeStatuses, setActiveStatuses] = useState<Set<number>>(new Set());
   const tenant = getCurrentTenant();
+
+  // Update active statuses when group selection changes
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setActiveStatuses(new Set());
+      return;
+    }
+
+    const groupTransitions = statusTransitions.filter((t: any) => t.status_transition_group_id === selectedGroupId);
+    const activeStatusIds = new Set<number>();
+
+    groupTransitions.forEach((transition: any) => {
+      activeStatusIds.add(transition.from_status);
+      activeStatusIds.add(transition.to_status);
+    });
+
+    setActiveStatuses(activeStatusIds);
+  }, [selectedGroupId, statusTransitions]);
+
+  // Handlers for managing active statuses in workflow
+  const handleAddStatusToWorkflow = (statusId: number) => {
+    setActiveStatuses(prev => new Set([...prev, statusId]));
+  };
+
+  // Statuses to show in matrix (match rows and columns)
+  const matrixStatuses = useMemo(() => (
+    selectedGroupId ? statuses.filter(s => activeStatuses.has(s.id)) : statuses
+  ), [selectedGroupId, statuses, activeStatuses]);
+
+  const handleRemoveStatusFromWorkflow = (statusId: number) => {
+    if (!selectedGroupId) return;
+
+    // Remove all transitions involving this status
+    const transitionsToRemove = statusTransitions.filter((t: any) =>
+      t.status_transition_group_id === selectedGroupId &&
+      (t.from_status === statusId || t.to_status === statusId)
+    );
+
+    transitionsToRemove.forEach((transition: any) => {
+      dispatch(genericActions.statusTransitions.removeAsync(transition.id));
+    });
+
+    setActiveStatuses(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(statusId);
+      return newSet;
+    });
+  };
 
   // Dialog state for create/rename group (shadcn)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
@@ -474,7 +523,7 @@ function Statuses() {
                   <TableHeader>
                     <TableRow className="border-b-2 bg-muted/50">
                       <TableHead className="sticky left-0 z-10 bg-muted/50 border-r-2 font-semibold text-foreground min-w-[120px]">From \\ To</TableHead>
-                      {statuses.map((to: any) => (
+                      {matrixStatuses.map((to: any) => (
                         <TableHead key={`to-${to.id}`} className="whitespace-nowrap min-w-[100px] text-center font-semibold border-r last:border-r-0">
                           <div className="flex flex-col items-center space-y-1">
                             <StatusIcon icon={to.icon || 'fas fa-circle'} color={to.color || '#6B7280'} />
@@ -485,7 +534,7 @@ function Statuses() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {statuses.map((from: any, rowIndex: number) => (
+                    {matrixStatuses.map((from: any, rowIndex: number) => (
                       <TableRow key={`from-${from.id}`} className={rowIndex % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
                         <TableCell className="sticky left-0 z-10 bg-background border-r-2 font-medium whitespace-nowrap min-w-[120px] p-3">
                           <div className="flex items-center space-x-2">
@@ -493,7 +542,7 @@ function Statuses() {
                             <span>{from.name}</span>
                           </div>
                         </TableCell>
-                        {statuses.map((to: any) => {
+                        {matrixStatuses.map((to: any) => {
                           const key = `${from.id}->${to.id}`;
                           const checked = transitionsByKey.has(key);
                           const disabled = from.id === to.id;
@@ -519,9 +568,12 @@ function Statuses() {
               <div className="h-full w-full overflow-auto">
                 <VisualTransitions
                   embedded
-                  statuses={statuses}
+                  allStatuses={statuses}
+                  activeStatuses={statuses.filter(s => activeStatuses.has(s.id))}
                   transitions={statusTransitions.filter((t: any) => selectedGroupId ? t.status_transition_group_id === selectedGroupId : true)}
                   onToggle={toggleTransition}
+                  onAddStatus={handleAddStatusToWorkflow}
+                  onRemoveStatus={handleRemoveStatusFromWorkflow}
                   selectedGroupId={selectedGroupId}
                 />
               </div>
@@ -538,11 +590,22 @@ function Statuses() {
           <div className="border rounded-lg p-4 bg-card">
             <div className="flex items-center gap-3 mb-3">
               <h2 className="text-xl font-semibold">Status Approvals</h2>
-              {selectedStatus ? (
-                <div className="text-sm text-muted-foreground">Editing: <span className="font-medium">{selectedStatus.name}</span></div>
-              ) : (
-                <div className="text-sm text-muted-foreground">Select a status above to configure approvals</div>
-              )}
+              <div className="flex items-center gap-2">
+                <Select value={selectedStatus ? String(selectedStatus.id) : ''} onValueChange={(v) => setSelectedStatus(statuses.find(s => String(s.id) === v) || null)}>
+                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Select status" /></SelectTrigger>
+                  <SelectContent position="popper">
+                    {statuses.map((s: any) => (
+                      <SelectItem key={`ap-sel-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedStatus && (
+                  <div className="flex items-center gap-2 px-2 py-1 rounded border" style={{ borderColor: selectedStatus.color || '#6B7280' }}>
+                    <StatusIcon icon={selectedStatus.icon || 'fas fa-circle'} color={selectedStatus.color || '#6B7280'} />
+                    <span className="font-medium">{selectedStatus.name}</span>
+                  </div>
+                )}
+              </div>
               <div className="ml-auto">
                 <Button size="sm" disabled={!selectedStatus || apSaving} onClick={handleSaveApproval}>
                   {apSaving ? 'Saving…' : 'Save'}
@@ -553,7 +616,7 @@ function Statuses() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <Checkbox checked={apHasContext} onCheckedChange={(v: any) => setApHasContext(!!v)} />
+                  <Checkbox checked={apHasContext} onCheckedChange={(v: any) => setApHasContext(!!v)} disabled={!selectedStatus} />
                   <div>
                     <div className="font-medium">Enable approvals on this status</div>
                     <div className="text-sm text-muted-foreground">When tasks enter this status, an approval flow will be started.</div>
@@ -561,7 +624,7 @@ function Statuses() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Checkbox checked={apAutoAdvance} onCheckedChange={(v: any) => setApAutoAdvance(!!v)} disabled={!apHasContext} />
+                  <Checkbox checked={apAutoAdvance} onCheckedChange={(v: any) => setApAutoAdvance(!!v)} disabled={!apHasContext || !selectedStatus} />
                   <div>
                     <div className="font-medium">Auto-advance after approval</div>
                     <div className="text-sm text-muted-foreground">Automatically move to the configured next status when approved.</div>
@@ -571,7 +634,7 @@ function Statuses() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="text-sm font-medium mb-1">Next on approve</div>
-                    <Select value={apNextOnApprove ? String(apNextOnApprove) : ''} onValueChange={(v) => setApNextOnApprove(v ? Number(v) : null)} disabled={!apHasContext}>
+                    <Select value={apNextOnApprove ? String(apNextOnApprove) : ''} onValueChange={(v) => setApNextOnApprove(v ? Number(v) : null)} disabled={!apHasContext || !selectedStatus}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
                       <SelectContent position="popper">
                         {statuses.map((s: any) => (
@@ -582,7 +645,7 @@ function Statuses() {
                   </div>
                   <div>
                     <div className="text-sm font-medium mb-1">Next on reject</div>
-                    <Select value={apNextOnReject ? String(apNextOnReject) : ''} onValueChange={(v) => setApNextOnReject(v ? Number(v) : null)} disabled={!apHasContext}>
+                    <Select value={apNextOnReject ? String(apNextOnReject) : ''} onValueChange={(v) => setApNextOnReject(v ? Number(v) : null)} disabled={!apHasContext || !selectedStatus}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
                       <SelectContent position="popper">
                         {statuses.map((s: any) => (
@@ -593,7 +656,7 @@ function Statuses() {
                   </div>
                   <div>
                     <div className="text-sm font-medium mb-1">Next on timeout</div>
-                    <Select value={apNextOnTimeout ? String(apNextOnTimeout) : ''} onValueChange={(v) => setApNextOnTimeout(v ? Number(v) : null)} disabled={!apHasContext}>
+                    <Select value={apNextOnTimeout ? String(apNextOnTimeout) : ''} onValueChange={(v) => setApNextOnTimeout(v ? Number(v) : null)} disabled={!apHasContext || !selectedStatus}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
                       <SelectContent position="popper">
                         {statuses.map((s: any) => (
@@ -607,7 +670,7 @@ function Statuses() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="text-sm font-medium mb-1">Default type</div>
-                    <Select value={apDefaultType} onValueChange={(v: any) => setApDefaultType(v)} disabled={!apHasContext}>
+                    <Select value={apDefaultType} onValueChange={(v: any) => setApDefaultType(v)} disabled={!apHasContext || !selectedStatus}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Select type" /></SelectTrigger>
                       <SelectContent position="popper">
                         {['all','single','majority','sequential'].map((t) => (
@@ -618,49 +681,30 @@ function Statuses() {
                   </div>
                   <div>
                     <div className="text-sm font-medium mb-1">Min approvers</div>
-                    <Input type="number" value={apMinApprovers} onChange={(e) => setApMinApprovers(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext} />
+                    <Input type="number" value={apMinApprovers} onChange={(e) => setApMinApprovers(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext || !selectedStatus} />
                   </div>
                   <div>
                     <div className="text-sm font-medium mb-1">Timeout (hours)</div>
-                    <Input type="number" value={apTimeoutHours} onChange={(e) => setApTimeoutHours(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext} />
+                    <Input type="number" value={apTimeoutHours} onChange={(e) => setApTimeoutHours(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext || !selectedStatus} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="flex items-center gap-2">
-                    <Checkbox checked={apBlocksEditing} onCheckedChange={(v: any) => setApBlocksEditing(!!v)} disabled={!apHasContext} />
+                    <Checkbox checked={apBlocksEditing} onCheckedChange={(v: any) => setApBlocksEditing(!!v)} disabled={!apHasContext || !selectedStatus} />
                     <span className="text-sm">Block editing</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Checkbox checked={apBlocksDeletion} onCheckedChange={(v: any) => setApBlocksDeletion(!!v)} disabled={!apHasContext} />
+                    <Checkbox checked={apBlocksDeletion} onCheckedChange={(v: any) => setApBlocksDeletion(!!v)} disabled={!apHasContext || !selectedStatus} />
                     <span className="text-sm">Block deletion</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Checkbox checked={apBlocksReassign} onCheckedChange={(v: any) => setApBlocksReassign(!!v)} disabled={!apHasContext} />
+                    <Checkbox checked={apBlocksReassign} onCheckedChange={(v: any) => setApBlocksReassign(!!v)} disabled={!apHasContext || !selectedStatus} />
                     <span className="text-sm">Block reassignment</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <div className="font-medium mb-1">Approval templates</div>
-                  <div className="text-sm text-muted-foreground mb-2">Templates are resolved by task category at runtime (default per category). You can manage templates in Settings → Templates. No explicit link is required here.</div>
-                  <div className="rounded border p-3 max-h-56 overflow-auto">
-                    {approvalTemplates.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No templates available.</div>
-                    ) : (
-                      <ul className="text-sm list-disc pl-5 space-y-1">
-                        {approvalTemplates.map((t: any) => (
-                          <li key={`tpl-${t.id}`}>{t.name}{t.is_default ? ' (default)' : ''}{t.category_id ? ` — category #${t.category_id}` : ''}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                {apError && <div className="text-sm text-red-600">{apError}</div>}
-              </div>
+              {apError && <div className="text-sm text-red-600">{apError}</div>}
+            </div>
             </div>
           </div>
         </div>

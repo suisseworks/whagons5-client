@@ -251,7 +251,7 @@ function Categories() {
     },
     {
       field: 'status_transition_group_id',
-      headerName: 'Transition Group',
+      headerName: 'Status Transition Group',
       flex: 1.5,
       minWidth: 240,
       cellRenderer: (params: ICellRendererParams) => {
@@ -282,26 +282,13 @@ function Categories() {
       cellRenderer: createActionsCellRenderer({
         customActions: [{
           icon: faCubes,
-          label: 'Fields', // Restored visible label
+          label: (row: any) => {
+            const count = assignmentCountByCategory[Number(row?.id)] || 0;
+            return count > 0 ? `Fields (${count})` : 'Fields';
+          },
           variant: 'outline',
           onClick: openManageFields,
-          className: 'p-1 h-7 relative flex items-center justify-center', // Flex for centering icon + label + badge doesn't affect
-          // @ts-ignore allow badge inside button
-          renderExtra: (row: any) => {
-            const count = assignmentCountByCategory[Number(row?.id)] || 0;
-            if (!count) return null;
-            return (
-              <span className="absolute -top-1 -right-1 z-10">
-                <span
-                  className="inline-flex items-center justify-center text-[10px] font-semibold leading-none w-3 h-3 rounded-full bg-amber-500 text-amber-950 ring-1 ring-amber-600/60 shadow-sm"
-                  title={`${count} custom field${count !== 1 ? 's' : ''}`}
-                  aria-label={`${count} custom field${count !== 1 ? 's' : ''}`}
-                >
-                  {count}
-                </span>
-              </span>
-            );
-          }
+          className: 'p-1 h-7 relative flex items-center justify-center'
         }],
         onEdit: handleEdit,
         onDelete: handleDeleteCategory
@@ -548,7 +535,7 @@ function Categories() {
           />
           <SelectField
             id="status-group"
-            label="Transition Group"
+            label="Status Transition Group"
             value={createFormData.status_transition_group_id}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, status_transition_group_id: value }))}
             placeholder="Select group…"
@@ -622,7 +609,7 @@ function Categories() {
           />
           <SelectField
             id="edit-status-group"
-            label="Transition Group"
+            label="Status Transition Group"
             value={editFormData.status_transition_group_id}
             onChange={(value) => setEditFormData(prev => ({ ...prev, status_transition_group_id: value }))}
             placeholder="Select group…"

@@ -9,6 +9,7 @@ import {
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import React, { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import AssistantWidget from '@/components/AssistantWidget';
 
 // Define sidebar width constants to keep them in sync
 const CUSTOM_SIDEBAR_WIDTH = 15;
@@ -49,6 +50,7 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
             {!isWelcome && <Header />}
             <div className={`${isWelcome ? 'flex-1 p-0 overflow-hidden' : 'flex-1 p-4 md:p-6 overflow-auto'}`}>
               {children}
+              <AssistantWidget />
             </div>
           </SidebarInset>
         </div>

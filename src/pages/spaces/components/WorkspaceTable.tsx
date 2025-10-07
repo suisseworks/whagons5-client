@@ -299,6 +299,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     spotMap,
     spotsLoaded: metadataLoadedFlags.spotsLoaded,
     userMap,
+    groupByStatus: useClientSide,
   } as any), [
     statusMap, priorityMap, spotMap, userMap,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,

@@ -352,6 +352,34 @@ function Templates() {
       filter: false
     },
     {
+      field: 'requires_approval',
+      headerName: 'Requires Approval',
+      flex: 0.8,
+      minWidth: 140,
+      cellRenderer: (params: ICellRendererParams) => {
+        const categoryId = Number(params.data?.category_id);
+        if (!categoryId) return <span className="text-muted-foreground">—</span>;
+
+        const approvalTemplate = findCategoryApprovalTemplate(categoryId);
+        const requiresApproval = approvalTemplate?.is_active || false;
+
+        return (
+          <Badge variant={requiresApproval ? "default" : "secondary"}>
+            {requiresApproval ? 'Yes' : 'No'}
+          </Badge>
+        );
+      },
+      sortable: true,
+      filter: true,
+      valueGetter: (params: any) => {
+        const categoryId = Number(params.data?.category_id);
+        if (!categoryId) return false;
+
+        const approvalTemplate = findCategoryApprovalTemplate(categoryId);
+        return approvalTemplate?.is_active || false;
+      }
+    },
+    {
       field: 'actions',
       headerName: 'Actions',
       width: 100,
@@ -777,7 +805,7 @@ function Templates() {
                 <div className="col-span-3">
                   <div className="flex items-center gap-3">
                     <input id="create-requires-approval" type="checkbox" checked={createRequiresApproval} onChange={(e) => setCreateRequiresApproval(e.target.checked)} />
-                    <span className="text-sm text-muted-foreground">When tasks enter an approval status, use this category's approvers</span>
+                    <span className="text-sm text-muted-foreground">Select approvers for tasks that require approval</span>
                   </div>
                 </div>
               </div>
@@ -938,7 +966,7 @@ function Templates() {
                   <div className="col-span-3">
                     <div className="flex items-center gap-3">
                       <input id="edit-requires-approval" type="checkbox" checked={editRequiresApproval} onChange={(e) => setEditRequiresApproval(e.target.checked)} />
-                      <span className="text-sm text-muted-foreground">When tasks enter an approval status, use this category's approvers</span>
+                      <span className="text-sm text-muted-foreground">Select approvers for tasks that require approval</span>
                     </div>
                   </div>
                 </div>

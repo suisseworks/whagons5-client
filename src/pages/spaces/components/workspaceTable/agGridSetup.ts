@@ -22,6 +22,7 @@ export const loadAgGridModules = async (): Promise<boolean> => {
       'ClientSideRowModelModule',
       'InfiniteRowModelModule',
       // enterprise
+      'RowGroupingModule',
       'SetFilterModule',
       'MultiFilterModule',
       'AdvancedFilterModule',
@@ -60,6 +61,8 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     // Client-Side Row Model
     rowData: clientRows,
     getRowId: (params: any) => String(params.data.id),
+    groupDisplayType: 'groupRows',
+    groupDefaultExpanded: 1,
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,

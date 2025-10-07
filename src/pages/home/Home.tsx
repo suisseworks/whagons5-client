@@ -74,6 +74,45 @@ function Home() {
     }
   }, [location.pathname, location.search, backgroundImages.length, quotes.length]);
 
+  // Keep the screen awake while the welcome view is visible (best-effort)
+  useEffect(() => {
+    if (!showWelcome) return;
+
+    let wakeLockSentinel: any | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        const nav: any = navigator as any;
+        if (nav && nav.wakeLock && typeof nav.wakeLock.request === 'function') {
+          wakeLockSentinel = await nav.wakeLock.request('screen');
+          // Re-request if it gets released while the page is visible
+          wakeLockSentinel.addEventListener?.('release', () => {
+            if (document.visibilityState === 'visible') {
+              requestWakeLock().catch(() => {});
+            }
+          });
+        }
+      } catch (_e) {
+        // Ignore; not supported or blocked until user gesture
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && (!wakeLockSentinel || wakeLockSentinel.released)) {
+        requestWakeLock().catch(() => {});
+      }
+    };
+
+    requestWakeLock().catch(() => {});
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      try { wakeLockSentinel?.release?.(); } catch (_e) {}
+      wakeLockSentinel = null;
+    };
+  }, [showWelcome]);
+
   // Safely destructure with default values
   const workspacesState = useSelector((s: RootState) => s.workspaces);
   const teamsState = useSelector((s: RootState) => s.teams);

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  const { modal = false, ...rest } = props as any
+  const { modal = true, ...rest } = props as any
   return <DialogPrimitive.Root data-slot="dialog" modal={modal} {...(rest as any)} />
 }
 
