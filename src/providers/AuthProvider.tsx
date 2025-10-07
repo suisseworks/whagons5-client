@@ -25,6 +25,7 @@ import {
 } from '@/crypto/crypto';
 import { DB } from '@/store/indexedDB/DB';
 import { verifyManifest } from '@/lib/manifestVerify';
+import { DataManager } from '@/store/DataManager';
 
 // Define context types
 interface AuthContextType {
@@ -100,82 +101,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               return;
             }
 
-            // Keys used across hydration
-            const coreKeys = [
-              'workspaces',
-              'teams',
-              'categories',
-              'templates',
-              'statuses',
-              'statusTransitions',
-              'statusTransitionGroups',
-              'priorities',
-              'slas',
-              'spots',
-              'users',
-              'forms',
-              'formVersions',
-              'workflows',
-            ] as const;
+            const dataManager = new DataManager(dispatch);
+            await dataManager.loadCoreFromIndexedDB();
 
-            // A) Immediately populate UI from IndexedDB for tasks and core entities
-            await Promise.allSettled([
-              // Tasks first paint
-              dispatch(getTasksFromIndexedDB()),
-              // Core slices paint
-              ...coreKeys.map(async (key) => {
-                const actions = (genericActions as any)[key];
-                if (actions?.getFromIndexedDB) {
-                  return dispatch(actions.getFromIndexedDB());
-                } else {
-                  console.warn('AuthProvider: missing generic actions for key', key);
-                  return Promise.resolve();
-                }
-              }),
-            ]);
-
-            // B) Kick off tasks validation fully in the background, then refresh tasks from IDB
+            // Background validation
             (async () => {
               try {
-                await TasksCache.init();
-                await TasksCache.validateTasks();
-                await dispatch(getTasksFromIndexedDB());
+                await dataManager.validateAndRefresh();
               } catch (e) {
-                console.warn('AuthProvider: tasks cache validate failed', e);
+                console.warn('AuthProvider: validation failed', e);
               }
             })();
 
-            // C) Validate core reference caches, then refresh from IndexedDB
+            // Verify manifest
             try {
-              const caches: GenericCache[] = coreKeys
-                .map((k) => (genericCaches as any)[k])
-                .filter((c: any): c is GenericCache => !!c);
-              await GenericCache.validateMultiple(caches);
-
-              await Promise.allSettled(
-                coreKeys.map(async (key) => {
-                  const actions = (genericActions as any)[key];
-                  if (actions?.getFromIndexedDB) {
-                    return dispatch(actions.getFromIndexedDB());
-                  } else {
-                    return Promise.resolve();
-                  }
-                })
-              );
-            } catch (e) {
-              console.warn('AuthProvider: cache validate/load sequence failed', e);
-            }
-
-            // Manifest verify LAST to avoid racing with decryption/hydration
-            try {
-              const manifestResp = await apiClient.get('/sync/manifest');
-              if (manifestResp.status === 200) {
-                const m = manifestResp.data?.data || manifestResp.data;
-                const ok = await verifyManifest(m);
-                if (!ok) {
-                  console.warn('Manifest signature invalid');
-                }
-              }
+              await dataManager.verifyManifest();
             } catch (e) {
               console.warn('Manifest fetch/verify failed (continuing):', e);
             }
@@ -193,6 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setHydrating(false);
           }
         })();
+
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user data:', error);

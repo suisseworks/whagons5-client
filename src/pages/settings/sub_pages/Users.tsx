@@ -43,14 +43,6 @@ function Users() {
   // Redux state for related data
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   
-  // Hydrate users and teams (IndexedDB -> Redux), then background refresh
-  useEffect(() => {
-    dispatch(genericActions.users.getFromIndexedDB());
-    dispatch(genericActions.users.fetchFromAPI({ per_page: 1000 }));
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(genericActions.teams.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
   // Use shared state management
@@ -112,20 +104,6 @@ function Users() {
       });
     }
   }, [editingUser]);
-
-  // Ensure teams are fetched when opening create dialog (in case page loaded elsewhere first)
-  useEffect(() => {
-    if (!isCreateDialogOpen) return;
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(genericActions.teams.fetchFromAPI({ per_page: 1000 }));
-  }, [isCreateDialogOpen, dispatch]);
-
-  // Ensure teams are fetched when opening edit dialog as well
-  useEffect(() => {
-    if (!isEditDialogOpen) return;
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(genericActions.teams.fetchFromAPI({ per_page: 1000 }));
-  }, [isEditDialogOpen, dispatch]);
 
   const columnDefs = useMemo<ColDef[]>(() => ([
     {

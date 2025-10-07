@@ -132,12 +132,6 @@ function Categories() {
     searchFields: ['name', 'description']
   });
 
-  // Load transition groups (for dropdowns and column rendering)
-  useEffect(() => {
-    dispatch(genericActions.statusTransitionGroups.getFromIndexedDB());
-    dispatch(genericActions.statusTransitionGroups.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-
   // Form state for create dialog
   const [createFormData, setCreateFormData] = useState<CategoryFormData>({
     name: '',
