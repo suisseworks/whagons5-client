@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -10,7 +10,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Category, Task, Team, StatusTransitionGroup } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconService } from '@/database/iconService';
@@ -96,8 +95,6 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Categories() {
-  const dispatch = useDispatch();
-  // Redux state for related data
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };

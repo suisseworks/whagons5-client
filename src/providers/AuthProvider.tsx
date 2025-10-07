@@ -10,21 +10,13 @@ import {
 import { User } from '../types/user';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
-// Custom slice with advanced features (tasks only)
-import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
-
-// Generic slices actions (handles all other tables)
-import { genericActions, genericCaches } from '@/store/genericSlices';
-import { GenericCache } from '@/store/indexedDB/GenericCache';
 
 // Custom caches with advanced features
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
 import {
   zeroizeKeys,
 } from '@/crypto/crypto';
 import { DB } from '@/store/indexedDB/DB';
-import { verifyManifest } from '@/lib/manifestVerify';
 import { DataManager } from '@/store/DataManager';
 
 // Define context types
