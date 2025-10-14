@@ -139,7 +139,6 @@ function Statuses() {
   
   // Load persisted view and group, and save changes
   useEffect(() => {
-    // Only read persisted view; do not fetch slices here
     const vk = `wh_status_view:${tenant || 'default'}`;
     const vv = localStorage.getItem(vk);
     if (vv === 'matrix' || vv === 'visual') setTransitionsView(vv);

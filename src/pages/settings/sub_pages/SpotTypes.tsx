@@ -51,10 +51,7 @@ function SpotTypes() {
   });
 
   // Fast hydration (IndexedDB -> Redux) then background network refresh
-  useEffect(() => {
-    dispatch(genericActions.spotTypes.getFromIndexedDB());
-    dispatch(genericActions.spotTypes.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
+  // Remove the single useEffect for spotTypes loading.
 
   const SpotTypeNameCellRenderer = (params: any) => {
     const name = params.data?.name as string;

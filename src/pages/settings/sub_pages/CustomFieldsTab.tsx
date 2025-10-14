@@ -96,11 +96,6 @@ export default function CustomFieldsTab() {
     MULTI_SELECT: 'multi_select',
   }), []);
 
-  useEffect(() => {
-    dispatch(genericActions.customFields.getFromIndexedDB());
-    dispatch(genericActions.customFields.fetchFromAPI());
-  }, [dispatch]);
-
   // load persisted order
   const [order, setOrder] = useState<number[]>(() => {
     try {
@@ -216,8 +211,6 @@ export default function CustomFieldsTab() {
     };
     try {
       await dispatch(genericActions.customFields.addAsync(payload)).unwrap();
-      // Force a refresh from server to avoid any pruning/race and confirm persistence
-      await dispatch(genericActions.customFields.fetchFromAPI() as any);
       setOpen(false);
       setDraft({ name: "", field_type: "text", optionsText: "", isRequired: false, minLength: "", maxLength: "", minNumber: "", maxNumber: "", pattern: "" });
       // toast removed
@@ -242,7 +235,6 @@ export default function CustomFieldsTab() {
     };
     try {
       await dispatch(genericActions.customFields.updateAsync({ id: selectedField.id, updates } as any)).unwrap();
-      await dispatch(genericActions.customFields.fetchFromAPI() as any);
       setOpen(false);
       setSelectedField(null);
     } catch (e: any) {
@@ -312,7 +304,6 @@ export default function CustomFieldsTab() {
     try {
       setIsDeleting(true);
       await dispatch(genericActions.customFields.removeAsync(f.id as any)).unwrap?.();
-      await dispatch(genericActions.customFields.fetchFromAPI() as any);
     } catch (_) {
       // best-effort
     } finally {
@@ -329,9 +320,6 @@ export default function CustomFieldsTab() {
       icon={faCubes}
       iconColor="#f59e0b"
       backPath="/settings/categories"
-      breadcrumbs={[
-        { label: "Categories", path: "/settings/categories" }
-      ]}
       search={{
         placeholder: "Search fields...",
         value: search,

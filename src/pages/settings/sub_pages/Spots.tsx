@@ -45,13 +45,6 @@ function Spots() {
   // Redux state for related data
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: spotTypes } = useSelector((state: RootState) => (state as any).spotTypes || { value: [] });
-
-  // Hydrate spot types for dropdown (fast IndexedDB, then API refresh)
-  useEffect(() => {
-    // Some app shells may already hydrate; harmless to call again
-    dispatch(genericActions.spotTypes.getFromIndexedDB());
-    dispatch(genericActions.spotTypes.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
   
   // Use shared state management
   const {

@@ -126,13 +126,7 @@ function Slas() {
     searchFields: ["type", "notify_to"] as (keyof SlaAlertRow)[]
   });
 
-  // Hydrate from IndexedDB then refresh from API
-  useEffect(() => {
-    dispatch(genericActions.slas.getFromIndexedDB());
-    dispatch(genericActions.slas.fetchFromAPI({ per_page: 1000 }));
-    dispatch(genericActions.slaAlerts.getFromIndexedDB());
-    dispatch(genericActions.slaAlerts.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
+  // Remove the loading useEffects, rely on pre-loaded state.
 
   const columns = useMemo<ColDef[]>(() => [
     {

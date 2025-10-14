@@ -150,15 +150,6 @@ function Templates() {
     enabled: true
   });
 
-  // Hydrate approval templates list
-  useEffect(() => {
-    dispatch((genericActions as any).approvalTemplates?.getFromIndexedDB?.());
-    dispatch((genericActions as any).approvalTemplates?.fetchFromAPI?.());
-    // Ensure users are available for approver selection
-    dispatch((genericActions as any).users?.getFromIndexedDB?.());
-    dispatch((genericActions as any).users?.fetchFromAPI?.());
-  }, [dispatch]);
-
   const findCategoryApprovalTemplate = useCallback((categoryId: number | null | undefined) => {
     if (!categoryId) return null;
     return approvalTemplates.find((t: any) => Number(t.category_id) === Number(categoryId) && t.is_default);

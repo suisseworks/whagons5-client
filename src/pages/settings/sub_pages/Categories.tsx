@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -102,8 +102,6 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Categories() {
-  const dispatch = useDispatch();
-  // Redux state for related data
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
@@ -140,23 +138,7 @@ function Categories() {
     searchFields: ['name', 'description']
   });
 
-  // Load transition groups (for dropdowns and column rendering)
-  useEffect(() => {
-    dispatch(genericActions.statusTransitionGroups.getFromIndexedDB());
-    dispatch(genericActions.statusTransitionGroups.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-
-  // Load SLAs for dropdowns and grid rendering
-  useEffect(() => {
-    dispatch(genericActions.slas.getFromIndexedDB());
-    dispatch(genericActions.slas.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-
-  // Load category field assignments for field count display
-  useEffect(() => {
-    dispatch(genericActions.categoryFieldAssignments.getFromIndexedDB());
-    dispatch(genericActions.categoryFieldAssignments.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
+ 
 
   // Form state for create dialog
   const [createFormData, setCreateFormData] = useState<CategoryFormData>({
