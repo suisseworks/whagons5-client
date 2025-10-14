@@ -30,7 +30,7 @@ export function buildWorkspaceColumns(opts: any) {
     );
   };
 
-  const groupByStatus: boolean = !!opts.groupByStatus;
+  const groupByStatus: boolean = false;
 
   return ([
     {
@@ -68,8 +68,8 @@ export function buildWorkspaceColumns(opts: any) {
       field: 'status_id',
       headerName: 'Status',
       sortable: true,
-      rowGroup: groupByStatus || undefined,
-      hide: groupByStatus || undefined,
+      rowGroup: undefined,
+      hide: undefined,
       filter: 'agSetColumnFilter',
       valueFormatter: (p: any) => {
         const meta: any = statusMap[p.value as number];

@@ -60,11 +60,6 @@ export function SettingsDialog({
       };
       onSubmit(fakeEvent as React.FormEvent);
     }
-    // Optional: call component-provided direct saver if exposed
-    const w: any = window as any;
-    if (typeof w.saveEditsDirect === 'function') {
-      try { w.saveEditsDirect(); } catch {}
-    }
   };
   const getDefaultTitle = () => {
     switch (type) {

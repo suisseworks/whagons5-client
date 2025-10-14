@@ -2,10 +2,13 @@ import { useMemo, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import type { ColDef } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faStopwatch, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faStopwatch, faPlus, faCircleQuestion } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import whagonsLogo from "@/assets/whagons.svg";
+import blockShuffleImg from "@/assets/block-3-shuffle.svg";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -19,6 +22,9 @@ import { genericActions } from "@/store/genericSlices";
 type SlaRow = {
   id: number;
   name: string;
+  description: string | null;
+  color: string | null;
+  enabled: boolean;
   response_time: number | null; // minutes
   resolution_time: number | null; // minutes
 };
@@ -31,10 +37,36 @@ type SlaAlertRow = {
   notify_to: 'RESPONSIBLE' | 'CREATED_BY' | 'MANAGER' | 'TEAM';
 };
 
+// React cell renderer: small centered color swatch
+function ColorCellRenderer(params: any) {
+  const value = (params?.value as string | null) || null;
+  if (!value) return <>-</>;
+  return (
+    <div title={value} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+      <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, border: '1px solid #e5e7eb', background: value }} />
+    </div>
+  );
+}
+
+// React cell renderer: name with description below (muted)
+function NameWithDescriptionRenderer(params: any) {
+  const name = String(params?.value ?? '');
+  const description = params?.data?.description as string | null | undefined;
+  return (
+    <div className="flex flex-col py-1">
+      <div className="font-medium">{name}</div>
+      {description ? (
+        <div className="text-xs text-muted-foreground truncate">{description}</div>
+      ) : null}
+    </div>
+  );
+}
+
 function Slas() {
   const dispatch = useDispatch<AppDispatch>();
   const [activeTab, setActiveTab] = useState<'slas' | 'alerts'>('slas');
   const [selectedSlaId, setSelectedSlaId] = useState<number | ''>('');
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const {
     items,
@@ -62,7 +94,7 @@ function Slas() {
     handleCloseDeleteDialog
   } = useSettingsState<SlaRow>({
     entityName: "slas",
-    searchFields: ["name"] as (keyof SlaRow)[]
+    searchFields: ["name", "description"] as (keyof SlaRow)[]
   });
 
   const {
@@ -103,7 +135,24 @@ function Slas() {
   }, [dispatch]);
 
   const columns = useMemo<ColDef[]>(() => [
-    { field: "name", headerName: "Name", flex: 2, minWidth: 200 },
+    {
+      field: "name",
+      headerName: "Name",
+      flex: 2,
+      minWidth: 240,
+      cellRenderer: NameWithDescriptionRenderer,
+      wrapText: true,
+      autoHeight: true,
+      cellStyle: { whiteSpace: 'normal' }
+    },
+    {
+      field: "color",
+      headerName: "Color",
+      flex: 1,
+      minWidth: 100,
+      cellRenderer: ColorCellRenderer
+    },
+    { field: "enabled", headerName: "Enabled", flex: 1, minWidth: 100 },
     {
       field: "response_time",
       headerName: "Response (min)",
@@ -132,6 +181,9 @@ function Slas() {
     e.preventDefault();
     const form = new FormData(e.target as HTMLFormElement);
     const name = String(form.get("name") || "").trim();
+    const description = String(form.get("description") || "").trim();
+    const color = String(form.get("color") || "").trim();
+    const enabled = form.get("enabled") === "on";
     const response = form.get("response_time");
     const resolution = form.get("resolution_time");
     if (!name) { setFormError("Name is required"); return; }
@@ -141,6 +193,9 @@ function Slas() {
     if (!resolution || isNaN(resolutionNum) || resolutionNum < 1) { setFormError("Resolution time must be at least 1 minute"); return; }
     const payload: Omit<SlaRow, 'id'> = {
       name,
+      description,
+      color,
+      enabled,
       response_time: responseNum,
       resolution_time: resolutionNum
     } as any;
@@ -213,6 +268,12 @@ function Slas() {
       icon={faStopwatch}
       iconColor="#14b8a6"
       backPath="/settings"
+      headerActions={
+        <Button variant="outline" size="sm" onClick={() => setIsHelpOpen(true)}>
+          <FontAwesomeIcon icon={faCircleQuestion} className="mr-2" />
+          Help
+        </Button>
+      }
     >
       <Tabs
         value={activeTab}
@@ -239,6 +300,8 @@ function Slas() {
             noRowsMessage="No SLAs found"
             className="flex-1 min-h-0"
             height="100%"
+            rowHeight={44}
+            zebraRows
             onRowDoubleClicked={handleEdit as any}
           />
         </TabsContent>
@@ -274,6 +337,111 @@ function Slas() {
         </TabsContent>
       </Tabs>
 
+      {/* Help Dialog */}
+      <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Understanding SLAs</DialogTitle>
+            <DialogDescription>
+              A quick guide to configuring Service Level Agreements and Alerts in Whagons.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 sm:grid-cols-2 mb-4">
+            <img src={whagonsLogo} alt="Whagons" className="rounded-md border bg-muted p-3 h-40 object-contain" />
+            <img src={blockShuffleImg} alt="SLA overview" className="rounded-md border bg-muted p-3 h-40 object-contain" />
+          </div>
+
+          <div className="space-y-6 text-sm leading-6">
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">What is an SLA?</h3>
+              <p>
+                An SLA (Service Level Agreement) defines the expected response and resolution times for tasks or tickets.
+                SLAs help teams meet customer expectations by tracking time-bound commitments and triggering alerts before breaches occur.
+              </p>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">Core fields</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><span className="font-medium">Name</span>: The display name of the SLA.</li>
+                <li><span className="font-medium">Description</span>: Optional context for when to use this SLA.</li>
+                <li><span className="font-medium">Color</span>: A visual identifier used in the UI.</li>
+                <li><span className="font-medium">Enabled</span>: Toggle to activate/deactivate the SLA without deleting it.</li>
+                <li><span className="font-medium">Response (minutes)</span>: Target time to acknowledge or first respond.</li>
+                <li><span className="font-medium">Resolution (minutes)</span>: Target time to fully resolve the issue.</li>
+              </ul>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">Alerts</h3>
+              <p>
+                Alerts notify responsible people before an SLA is breached. Each alert is associated with a specific SLA.
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><span className="font-medium">Time (minutes)</span>: When to trigger the alert relative to the SLA target.</li>
+                <li><span className="font-medium">Type</span>: Choose <span className="font-mono">response</span> (acknowledgement) or <span className="font-mono">resolution</span> (full fix).</li>
+                <li><span className="font-medium">Notify To</span>: Recipient group — <span className="font-mono">RESPONSIBLE</span>, <span className="font-mono">CREATED_BY</span>, <span className="font-mono">MANAGER</span>, or <span className="font-mono">TEAM</span>.</li>
+              </ul>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">Best practices</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Start with realistic targets; refine using historical data.</li>
+                <li>Create multiple alerts (e.g., 50%, 80%, 100%) to escalate urgency.</li>
+                <li>Use colors consistently to differentiate SLA tiers (e.g., Bronze/Silver/Gold).</li>
+                <li>Disable instead of deleting SLAs you may reuse later.</li>
+              </ul>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">Example configurations</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-md border p-3">
+                  <div className="font-medium">Standard Support</div>
+                  <ul className="list-disc pl-5 mt-1 text-muted-foreground">
+                    <li>Response: 60 min</li>
+                    <li>Resolution: 480 min</li>
+                    <li>Alerts: 30 min (response), 240 min (resolution)</li>
+                  </ul>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="font-medium">Premium</div>
+                  <ul className="list-disc pl-5 mt-1 text-muted-foreground">
+                    <li>Response: 15 min</li>
+                    <li>Resolution: 120 min</li>
+                    <li>Alerts: 8 min (response), 60/90/110 min (resolution)</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">How SLAs work in Whagons</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>SLAs and Alerts are cached locally (IndexedDB) for instant loading and offline use.</li>
+                <li>Changes sync automatically via real-time updates; all clients see updates immediately.</li>
+                <li>Optimistic updates keep the UI responsive; errors roll back safely.</li>
+              </ul>
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-base font-semibold">FAQ</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><span className="font-medium">What happens if I change targets?</span> Existing tasks use the updated SLA immediately for future checks.</li>
+                <li><span className="font-medium">Do disabled SLAs keep alerts?</span> Yes, alerts remain but won’t trigger until re-enabled.</li>
+                <li><span className="font-medium">Who receives alerts?</span> Based on the <span className="font-mono">notify_to</span> option for each alert.</li>
+              </ul>
+            </section>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHelpOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <SettingsDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
@@ -287,6 +455,18 @@ function Slas() {
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name *</Label>
             <input id="name" name="name" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="description" className="text-right">Description</Label>
+            <input id="description" name="description" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="color" className="text-right">Color</Label>
+            <input id="color" name="color" type="color" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="enabled" className="text-right">Enabled</Label>
+            <input id="enabled" name="enabled" type="checkbox" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="response_time" className="text-right">Response (min) *</Label>
@@ -314,6 +494,18 @@ function Slas() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-name" className="text-right">Name *</Label>
               <input id="edit-name" name="name" defaultValue={editingItem.name} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-description" className="text-right">Description</Label>
+              <input id="edit-description" name="description" defaultValue={editingItem.description ?? undefined} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-color" className="text-right">Color</Label>
+              <input id="edit-color" name="color" type="color" defaultValue={editingItem.color ?? '#000000'} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-enabled" className="text-right">Enabled</Label>
+              <input id="edit-enabled" name="enabled" type="checkbox" defaultChecked={!!editingItem.enabled} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-response_time" className="text-right">Response (min)</Label>

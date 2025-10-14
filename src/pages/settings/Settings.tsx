@@ -17,7 +17,10 @@ import {
   faGripVertical,
   faStopwatch,
   faCog,
-  faDiagramProject
+  faDiagramProject,
+  faCalendar,
+  faRocket,
+  faTrophy
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useState } from "react";
@@ -173,6 +176,30 @@ function Settings() {
       description: 'Design and automate workflows',
       color: 'text-cyan-500'
     },
+    {
+      id: 'schedules',
+      title: 'Schedules',
+      icon: faCalendar,
+      count: 0,
+      description: 'Manage schedules and time-based workflows',
+      color: 'text-orange-500'
+    },
+    {
+      id: 'motivation',
+      title: 'Motivation',
+      icon: faRocket,
+      count: 0,
+      description: 'Configure motivation and engagement settings',
+      color: 'text-yellow-500'
+    },
+    {
+      id: 'gamification',
+      title: 'Gamification',
+      icon: faTrophy,
+      count: 0,
+      description: 'Set up gamification elements and rewards',
+      color: 'text-purple-500'
+    },
   ], [counts.slas, counts.forms]);
 
   //set up maps for swapy
@@ -288,6 +315,15 @@ function Settings() {
         break;
       case 'users':
         navigate('/settings/users');
+        break;
+      case 'schedules':
+        navigate('/settings/schedules');
+        break;
+      case 'motivation':
+        navigate('/settings/motivation');
+        break;
+      case 'gamification':
+        navigate('/settings/gamification');
         break;
       default:
         console.log(`Unknown setting: ${settingId}`);

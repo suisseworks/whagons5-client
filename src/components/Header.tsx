@@ -19,6 +19,8 @@ import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
+import AssistantWidget from '@/components/AssistantWidget';
+import { Bot } from 'lucide-react';
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -303,6 +305,18 @@ function Header() {
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9" />
+                    <AssistantWidget
+                        floating={false}
+                        renderTrigger={(open) => (
+                            <button
+                                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent text-foreground"
+                                title="AI Assistant"
+                                onClick={open}
+                            >
+                                <Bot className="h-5 w-5" />
+                            </button>
+                        )}
+                    />
 
                     {/* Notifications */}
                     <DropdownMenu>

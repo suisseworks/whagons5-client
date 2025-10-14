@@ -935,9 +935,9 @@ function Templates() {
               id="edit-sla"
               label="SLA"
               value={editFormData.sla_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value }))}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
               placeholder="None"
-              options={Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))}
+              options={[{ value: 'none', label: 'None' }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
             />
           </div>
             </TabsContent>

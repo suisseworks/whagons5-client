@@ -30,7 +30,7 @@ export interface Category {
     color: string;
     icon: string;
     enabled: boolean;
-    sla_id: number;
+    sla_id?: number | null;
     team_id: number;
     workspace_id: number;
     status_transition_group_id: number;
