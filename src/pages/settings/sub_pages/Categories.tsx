@@ -10,7 +10,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Category, Task, Team, StatusTransitionGroup, Sla } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconService } from '@/database/iconService';
