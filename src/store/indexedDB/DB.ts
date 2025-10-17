@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.1';
+const CURRENT_DB_VERSION = '1.9.4';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -176,6 +176,9 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('slas')) {
             db.createObjectStore('slas', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('sla_policies')) {
+            db.createObjectStore('sla_policies', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('sla_alerts')) {
             db.createObjectStore('sla_alerts', { keyPath: 'id' });
@@ -436,6 +439,7 @@ export class DB {
       | 'task_tags'
       | 'spot_types'
       | 'slas'
+      | 'sla_policies'
       | 'sla_alerts'
       | 'category_priorities'
       | 'forms'
@@ -486,6 +490,7 @@ export class DB {
       | 'task_tags'
       | 'spot_types'
       | 'slas'
+      | 'sla_policies'
       | 'sla_alerts'
       | 'category_priorities'
       | 'forms'

@@ -38,7 +38,7 @@ const genericSliceConfigs = [
 
     // Reference Tables
     { name: 'statuses', table: 'wh_statuses', endpoint: '/statuses', store: 'statuses', hashFields: ['id','name','action','color','icon','system','initial','updated_at'] },
-    { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','sla_id','category_id','updated_at'] },
+    { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','category_id','updated_at'] },
     { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','parent_id','spot_type_id','is_branch','updated_at'] },
     { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','updated_at'] },
     { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','color','updated_at'] },
@@ -46,7 +46,8 @@ const genericSliceConfigs = [
     { name: 'statusTransitionGroups', table: 'wh_status_transition_groups', endpoint: '/status-transition-groups', store: 'status_transition_groups', hashFields: ['id','name','description','is_default','is_active','updated_at'] },
 
     // Business Logic
-    { name: 'slas', table: 'wh_slas', endpoint: '/slas', store: 'slas', hashFields: ['id','name', 'description', 'color', 'enabled', 'response_time','resolution_time','updated_at'] },
+    { name: 'slas', table: 'wh_slas', endpoint: '/slas', store: 'slas', hashFields: ['id','name', 'description', 'color', 'enabled', 'response_time','resolution_time','sla_policy_id','updated_at'] },
+    { name: 'slaPolicies', table: 'wh_sla_policies', endpoint: '/sla-policies', store: 'sla_policies', hashFields: ['id','name','description','active','trigger_type','trigger_status_id','trigger_field_id','trigger_operator','trigger_value_text','trigger_value_number','trigger_value_boolean','grace_seconds','updated_at'] },
     { name: 'slaAlerts', table: 'wh_sla_alerts', endpoint: '/sla-alerts', store: 'sla_alerts', hashFields: ['id','sla_id','time','type','notify_to','updated_at'] },
     { name: 'categoryPriorities', table: 'wh_category_priority', endpoint: '/category-priorities', store: 'category_priorities', hashFields: ['id','priority_id','category_id','sla_id','updated_at'] },
     { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','updated_at'] },
@@ -108,6 +109,7 @@ export const {
     statusTransitions,
     statusTransitionGroups,
     slas,
+    slaPolicies,
     slaAlerts,
     categoryPriorities,
     invitations,
@@ -166,6 +168,7 @@ export const genericEventNames = {
     statusTransitions: genericSlices.slices.statusTransitions.eventNames,
     statusTransitionGroups: genericSlices.slices.statusTransitionGroups.eventNames,
     slas: genericSlices.slices.slas.eventNames,
+    slaPolicies: genericSlices.slices.slaPolicies.eventNames,
     slaAlerts: genericSlices.slices.slaAlerts.eventNames,
     categoryPriorities: genericSlices.slices.categoryPriorities.eventNames,
     invitations: genericSlices.slices.invitations.eventNames,
@@ -215,6 +218,7 @@ export const genericActions = {
     statusTransitions: genericSlices.slices.statusTransitions.actions,
     statusTransitionGroups: genericSlices.slices.statusTransitionGroups.actions,
     slas: genericSlices.slices.slas.actions,
+    slaPolicies: genericSlices.slices.slaPolicies.actions,
     slaAlerts: genericSlices.slices.slaAlerts.actions,
     categoryPriorities: genericSlices.slices.categoryPriorities.actions,
     invitations: genericSlices.slices.invitations.actions,

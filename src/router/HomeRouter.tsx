@@ -22,7 +22,8 @@ import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
-import Messages from '@/pages/messages/Messages';
+// Messages removed
+import TeamConnect from '@/pages/teamconnect/TeamConnect';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
 
@@ -65,8 +66,7 @@ export const HomeRoutes = () => {
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/plugins" element={<Plugins />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/messages/board/:id" element={<Messages />} />
+          <Route path="/teamconnect" element={<TeamConnect />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />

@@ -17,6 +17,7 @@ export interface SettingsGridProps<T = any> {
   defaultColDef?: ColDef;
   rowSelection?: 'single' | 'multiple' | any; // allow object config per example
   onSelectionChanged?: (selectedRows: T[]) => void;
+  onRowClicked?: (row: T) => void;
   onRowDoubleClicked?: (row: T) => void;
   onCellValueChanged?: (event: any) => void;
   autoGroupColumnDef?: ColDef;
@@ -41,6 +42,7 @@ export function SettingsGrid<T = any>({
   },
   rowSelection,
   onSelectionChanged,
+  onRowClicked,
   onRowDoubleClicked,
   onCellValueChanged,
   autoGroupColumnDef,
@@ -106,6 +108,11 @@ export function SettingsGrid<T = any>({
           if (gridRef.current?.api && onSelectionChanged) {
             const selected = gridRef.current.api.getSelectedRows() as T[];
             onSelectionChanged(selected);
+          }
+        }}
+        onRowClicked={(event: any) => {
+          if (onRowClicked && event?.data) {
+            onRowClicked(event.data as T);
           }
         }}
         onRowDoubleClicked={(event: any) => {
