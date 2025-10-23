@@ -32,42 +32,10 @@ export interface EncryptionConfig {
 export const DISABLED_ENCRYPTION_STORES: string[] = [
   // Add store names here to disable encryption for them
   'tasks',           // Fast rendering for tasks
-  'workspaces',
-  'priorities',
-  'categories',
-  'teams',
-  'users',
-  'roles',
-  'permissions',
-  'user_teams',
-  'user_permissions',
-  'role_permissions',
-  'statuses',
-  'status_transitions',
-  'status_transition_groups',
-  'spots',
-  'spot_types',
-  'tags',
-  'templates',
-  'messages',
-  'forms',
-  'form_fields',
-  'form_versions',
-  'task_forms',
-  'field_options',
-  'custom_fields',
-  'category_field_assignments',
-  'spot_custom_fields',
-  'template_custom_fields',
-  'task_custom_field_values',
-  'spot_custom_field_values',
-  'slas',
-  'sla_policies',
-  'sla_alerts',
-  'category_priorities',
-  'invitations',
-  'task_logs',
-  // Leave cache_keys/crypto_meta encrypted; avatars can remain disabled/enabled independently
+  // 'categories',   // Uncomment to disable encryption for categories
+  // 'workspaces',   // Uncomment to disable encryption for workspaces
+  // 'teams',        // Uncomment to disable encryption for teams
+  // Add more stores as needed...
 ];
 
 /**

@@ -201,6 +201,9 @@ export class DB {
           if (!db.objectStoreNames.contains('messages')) {
             db.createObjectStore('messages', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('job_positions')) {
+            db.createObjectStore('job_positions', { keyPath: 'id' });
+          }
 
           
 
@@ -440,6 +443,9 @@ export class DB {
       | 'invitations'
       | 'task_logs'
       | 'templates'
+      | 'messages'
+      | 'job_positions'
+      | 'status_transition_groups'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -491,6 +497,9 @@ export class DB {
       | 'invitations'
       | 'task_logs'
       | 'templates'
+      | 'messages'
+      | 'job_positions'
+      | 'status_transition_groups'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'

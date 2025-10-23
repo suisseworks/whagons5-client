@@ -1,11 +1,20 @@
 import { useRef, useCallback, useEffect } from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
+
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { RowGroupingModule, TreeDataModule } from 'ag-grid-enterprise';
-
+export const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
+const enterprise: any = await import('ag-grid-enterprise');
 // Register AG Grid modules (community + enterprise needed for grouping/tree)
 ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataModule]);
+
+if (AG_GRID_LICENSE) {
+  const { LicenseManager } = enterprise;
+  LicenseManager.setLicenseKey(AG_GRID_LICENSE);
+} else {
+  console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
+}
 
 export interface SettingsGridProps<T = any> {
   rowData: T[];

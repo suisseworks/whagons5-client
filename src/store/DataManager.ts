@@ -21,7 +21,6 @@ const coreKeys = [
   'jobPositions',
   'forms',
   'formVersions',
-  'workflows',
 ] as const;
 
 export class DataManager {

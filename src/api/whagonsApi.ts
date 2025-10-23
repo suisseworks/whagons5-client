@@ -178,56 +178,42 @@ export const initializeAuth = () => {
   }
 };
 
-// Function to refresh the token with bounded retries + backoff
-const refreshToken = async (maxAttempts: number = 6): Promise<string> => {
+// Function to refresh the token
+const refreshToken = async () => {
   // First check if we have a valid stored token
   const storedToken = getStoredToken();
   if (storedToken) {
+    // Try to use the stored token first
     api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
     return storedToken;
   }
 
-  let attempt = 0;
-  // Exponential backoff capped at 5s
-  const getDelay = (n: number) => Math.min(500 * Math.pow(2, n), 5000);
-
-  while (attempt < maxAttempts) {
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        // No authenticated user yet; wait and retry a limited number of times
-        await new Promise((r) => setTimeout(r, getDelay(attempt)));
-        attempt += 1;
-        continue;
-      }
-
-      const token = await user.getIdToken();
-      if (!token) {
-        await new Promise((r) => setTimeout(r, getDelay(attempt)));
-        attempt += 1;
-        continue;
-      }
-
-      const response = await api.post(`/login`, { token });
-      if (response.status === 200) {
-        updateAuthToken(response.data.token);
-        return response.data.token;
-      }
-
-      // Non-200: treat as retryable until attempts exhausted
-      console.error('Refresh token non-200 response:', response.status);
-    } catch (error) {
-      console.error('Error refreshing token attempt', attempt + 1, error);
-      // fallthrough to backoff below
-    }
-
-    await new Promise((r) => setTimeout(r, getDelay(attempt)));
-    attempt += 1;
+  let token = await auth.currentUser?.getIdToken();
+  // console.log('Refreshing token', token);
+  if (!token) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return refreshToken();
   }
 
-  // Give up: clear any persisted token and surface an error to caller
-  deleteCookie('auth_token');
-  throw new Error('Unable to refresh token after multiple attempts');
+  try {
+    const response = await api.post(`/login`, {
+      token: token,
+    });
+
+    if (response.status === 200) {
+      // console.log('Successfully refreshed token');
+      updateAuthToken(response.data.token);
+      return response.data.token;
+    } else {
+      console.error('Refresh token failed');
+      throw new Error('Refresh token failed');
+    }
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    // If refresh fails, clear the stored token
+    deleteCookie('auth_token');
+    throw error;
+  }
 };
 
 // Ensure only a single refresh is in-flight across concurrent 401s
@@ -272,12 +258,7 @@ api.interceptors.request.use(
   (config) => {
     // Force every request to use the current subdomain from localStorage
     const currentSubdomain = getSubdomain();
-    // In local development against localhost, ignore subdomain to avoid tenant.localhost hostnames
-    // Use subdomain for localhost (e.g., mexico.localhost:8000 works); ignore only for raw 127.0.0.1
-    const isLocalDevHost = VITE_DEVELOPMENT === 'true' && /^127\.0\.0\.1(:\d+)?$/i.test(String(VITE_API_URL));
-    const correctBaseURL = isLocalDevHost
-      ? `${PROTOCOL}://${VITE_API_URL}/api`
-      : `${PROTOCOL}://${currentSubdomain}${VITE_API_URL}/api`;
+    const correctBaseURL = `${PROTOCOL}://${currentSubdomain}${VITE_API_URL}/api`;
     
     // console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
     
@@ -290,12 +271,6 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-
-// Track limited retries for 429s to avoid hammering endpoints
-const shouldRetry429 = (request: any) => {
-  const retries = request._429Retries || 0;
-  return retries < 3; // cap at 3 retries per request
-};
 
 // Add response interceptor
 api.interceptors.response.use(
@@ -314,15 +289,8 @@ api.interceptors.response.use(
       
       console.log('Tenant switched to:', domain_prefix, 'Need to retry request...');
       
-      // Guard against infinite loops: mark this request as tenant-switched once
-      const cfg: any = response.config || {};
-      if (cfg._tenantSwitchAttempted) {
-        console.warn('225 loop detected: already attempted tenant switch once for', cfg.url);
-        return response; // give up retrying to avoid spinner loop
-      }
-      cfg._tenantSwitchAttempted = true;
       // Retry the original request - the request interceptor will use the new subdomain
-      return api(cfg);
+      return api(response.config);
     }
     return response;
   },
@@ -342,16 +310,6 @@ api.interceptors.response.use(
       originalRequest._retryWithoutSubdomain = true;
       
       // Retry the original request - the request interceptor will use the new empty subdomain
-      return api(originalRequest);
-    }
-
-    // Handle rate limiting defensively with jittered backoff
-    if (error.response?.status === 429 && shouldRetry429(originalRequest)) {
-      originalRequest._429Retries = (originalRequest._429Retries || 0) + 1;
-      const base = 400; // ms
-      const delay = Math.min(base * Math.pow(2, originalRequest._429Retries), 5000);
-      const jitter = Math.random() * 150;
-      await new Promise((r) => setTimeout(r, delay + jitter));
       return api(originalRequest);
     }
 
