@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
 
 /* 
   Add this to your HTML head instead of importing here:
@@ -18,24 +19,24 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0); /* Pure white background */
+  --background: oklch(0.95 0.008 45); /* Softer off-white background */
   --foreground: oklch(0.1 0.02 25); /* Even darker text for maximum contrast */
-  --card: oklch(1 0 0); /* White cards */
+  --card: oklch(0.96 0.008 45); /* Softer off-white cards */
   --card-foreground: oklch(0.1 0.02 25); /* Even darker card text */
-  --popover: oklch(1 0 0);
+  --popover: oklch(0.96 0.008 45);
   --popover-foreground: oklch(0.1 0.02 25); /* Even darker popover text */
   --primary: oklch(0.72 0.12 195); /* Teal primary */
   --primary-foreground: oklch(1 0 0); /* White text on primary */
-  --secondary: oklch(0.97 0.02 195); /* Very light teal-tinted background */
+  --secondary: oklch(0.93 0.02 195); /* Softer teal-tinted background */
   --secondary-foreground: oklch(0.15 0.02 195); /* Darker secondary text */
-  --muted: oklch(0.97 0.008 230); /* Light neutral with cool tint */
+  --muted: oklch(0.93 0.01 230); /* Softer neutral with cool tint */
   --muted-foreground: oklch(0.28 0.02 230); /* Darker muted text */
   --accent: oklch(0.68 0.12 195); /* Teal accent */
   --accent-foreground: oklch(1 0 0); /* White text on accent */
   --destructive: oklch(0.6 0.2 25); /* Keep red destructive */
-  --destructive-foreground: oklch(0.98 0.01 25);
-  --border: oklch(0.85 0.02 45); /* Darker border for better visibility */
-  --input: oklch(0.98 0.01 45); /* Very light input background */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.82 0.02 45); /* Slightly darker border for better contrast */
+  --input: oklch(0.95 0.01 45); /* Softer input background */
   --ring: oklch(0.72 0.12 195 / 0.35); /* Teal focus ring */
   --chart-1: oklch(0.72 0.12 195); /* Teal */
   --chart-2: oklch(0.66 0.12 230); /* Blue */
@@ -45,61 +46,61 @@
   --radius: 0.625rem;
   
   /* Global sidebar theme (applies to both light and dark for brand consistency) */
-  --sidebar: #ffffff; /* White sidebar */
+  --sidebar: oklch(0.95 0.008 45); /* Softer off-white sidebar */
   --sidebar-foreground: #111827; /* Gray-900 text for readability */
   --sidebar-primary: oklch(0.72 0.12 195); /* Teal highlights in sidebar */
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.97 0.008 230); /* Light gray hover */
+  --sidebar-accent: oklch(0.93 0.01 230); /* Softer gray hover */
   --sidebar-accent-foreground: #111827; /* Dark text on hover */
-  --sidebar-border: oklch(0.85 0.02 45); /* Subtle light border */
+  --sidebar-border: oklch(0.82 0.02 45); /* Slightly darker border */
   --sidebar-ring: oklch(0.72 0.12 195 / 0.5); /* Teal focus in sidebar */
   
   /* Gradient definitions for teal theme */
   --gradient-primary: linear-gradient(135deg, oklch(0.72 0.12 195) 0%, oklch(0.74 0.14 210) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.98 0.005 200) 0%, oklch(0.96 0.01 220) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.95 0.008 200) 0%, oklch(0.93 0.01 220) 100%);
   --gradient-accent: linear-gradient(135deg, oklch(0.68 0.12 195) 0%, oklch(0.66 0.12 230) 100%);
 }
 
 .dark {
-  --background: oklch(0.18 0.02 25); /* Lighter dark background, less harsh */
-  --foreground: oklch(0.99 0.005 45); /* Nearly pure white text for maximum contrast */
-  --card: oklch(0.22 0.03 25); /* Lighter dark cards */
-  --card-foreground: oklch(0.99 0.005 45); /* Nearly pure white card text */
-  --popover: oklch(0.22 0.03 25);
-  --popover-foreground: oklch(0.99 0.005 45); /* Nearly pure white popover text */
-  --primary: oklch(0.78 0.15 195); /* Brighter teal for dark mode */
-  --primary-foreground: oklch(1 0 0); /* White text on primary */
-  --secondary: oklch(0.28 0.06 45); /* Lighter secondary background */
-  --secondary-foreground: oklch(0.98 0.01 45); /* Nearly white secondary text */
-  --muted: oklch(0.25 0.04 45); /* Lighter muted background */
-  --muted-foreground: oklch(0.9 0.02 45); /* Much brighter muted text for maximum contrast */
-  --accent: oklch(0.74 0.14 210); /* Cyan-teal accent */
+  --background: oklch(0.16 0.02 255); /* Neutral deep dark */
+  --foreground: oklch(0.98 0 0); /* Neutral white text */
+  --card: oklch(0.19 0.02 255); /* Slightly raised card */
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.19 0.02 255);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.78 0.2 280); /* Distinct violet for dark mode */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.23 0.03 255); /* Neutral subtle surface */
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.22 0.02 255);
+  --muted-foreground: oklch(0.88 0.02 255);
+  --accent: oklch(0.76 0.16 210);
   --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.7 0.22 25); /* Keep red destructive */
-  --destructive-foreground: oklch(0.1 0.02 25);
-  --border: oklch(0.4 0.06 45); /* Lighter border for better visibility */
-  --input: oklch(0.28 0.05 45); /* Lighter input background */
-  --ring: oklch(0.78 0.15 195 / 0.45); /* Teal focus ring */
-  --chart-1: oklch(0.78 0.15 195); /* Teal */
-  --chart-2: oklch(0.74 0.14 210); /* Cyan */
-  --chart-3: oklch(0.7 0.12 230); /* Blue */
-  --chart-4: oklch(0.72 0.13 170); /* Green-teal */
-  --chart-5: oklch(0.76 0.14 260); /* Indigo */
-  
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.36 0.03 255);
+  --input: oklch(0.24 0.03 255);
+  --ring: oklch(0.8 0.17 205 / 0.5);
+  --chart-1: oklch(0.8 0.17 205);
+  --chart-2: oklch(0.76 0.16 210);
+  --chart-3: oklch(0.72 0.14 230);
+  --chart-4: oklch(0.74 0.13 170);
+  --chart-5: oklch(0.78 0.15 260);
+
   /* Dark sidebar palette */
-  --sidebar: #0b1440; /* Deep navy */
-  --sidebar-foreground: #e5e7eb; /* Light text */
-  --sidebar-primary: oklch(0.78 0.15 195); /* Teal highlights */
+  --sidebar: oklch(0.18 0.02 255); /* Match neutral dark background */
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: oklch(0.78 0.2 280);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.28 0.04 250); /* Lighter than sidebar for clear hover */
-  --sidebar-accent-foreground: #e5e7eb; /* Light text */
-  --sidebar-border: oklch(0.38 0.03 240); /* Slightly lighter border for definition */
-  --sidebar-ring: oklch(0.7 0.2 45 / 0.5);
-  
+  --sidebar-accent: oklch(0.26 0.03 255);
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: oklch(0.34 0.03 255);
+  --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
+
   /* Dark mode gradients */
-  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.15 195) 0%, oklch(0.74 0.14 210) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.25 0.03 220) 0%, oklch(0.28 0.04 240) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.74 0.14 210) 0%, oklch(0.7 0.12 230) 100%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.22 0.02 255) 0%, oklch(0.26 0.03 255) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.76 0.16 210) 0%, oklch(0.72 0.14 230) 100%);
 }
 
 @theme inline {
@@ -151,6 +152,26 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Subtle header gradient: extremely soft, works in light and dark */
+  .wh-header {
+    background: linear-gradient(
+      to right,
+      oklch(from var(--color-card) l calc(l + 0.06) c h / 1) 0%,
+      oklch(from var(--color-card) l c h / 1) 55%,
+      oklch(from var(--color-card) l calc(l - 0.06) c h / 1) 100%
+    );
+  }
+
+  /* Ensure clear-but-subtle gradient in dark theme as well */
+  .dark .wh-header {
+    background: linear-gradient(
+      to right,
+      oklch(from var(--color-card) l calc(l + 0.035) c h / 1) 0%,
+      oklch(from var(--color-card) l c h / 1) 55%,
+      oklch(from var(--color-card) l calc(l - 0.035) c h / 1) 100%
+    );
   }
   
   /* Gradient button helpers */
@@ -243,6 +264,24 @@
   --ag-border-radius: var(--radius-md);
 }
 
+/* Cleaner workspace grid: remove heavy borders/lines */
+.wh-workspace-grid {
+  --ag-border-color: transparent;
+  --ag-secondary-border-color: transparent;
+  --ag-row-border-color: transparent;
+}
+.wh-workspace-grid .ag-center-cols-container .ag-row:not(.ag-row-selected) {
+  border-bottom: 1px solid oklch(from var(--color-border) l calc(l - 0.08) c h / 0.35);
+}
+.dark .wh-workspace-grid .ag-center-cols-container .ag-row:not(.ag-row-selected) {
+  border-bottom: 1px solid oklch(from var(--color-border) l calc(l + 0.08) c h / 0.25);
+}
+
+/* Subtle underline for workspace grid header */
+.wh-workspace-grid .ag-header {
+  border-bottom: 1px solid var(--color-border);
+}
+
 .ag-theme-quartz-dark {
   /* Reuse most light theme mappings, but reference .dark variables implicitly via CSS cascade */
   /* Variables unique to dark theme or needing specific override */
@@ -302,6 +341,23 @@
   .wh-settings-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
     background-color: var(--ag-row-hover-color) !important;
     filter: saturate(1.05);
+  }
+
+  /* Ensure grid containers have proper sizing */
+  .wh-settings-grid {
+    min-height: 400px;
+  }
+
+  /* Improve grid body scrolling */
+  .wh-settings-grid .ag-body-viewport {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
+
+  /* Ensure grid has proper minimum width for columns */
+  .wh-settings-grid .ag-header-viewport,
+  .wh-settings-grid .ag-body-viewport {
+    min-width: 100%;
   }
 
   ::-webkit-scrollbar-track {
@@ -367,3 +423,133 @@
     background: oklch(0.18 0.04 177.71);
   }
 }
+
+
+/* Keyframes for slide out to left with spring bounce */
+@keyframes slideOutLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    display: block;
+  }
+  40% {
+    opacity: 0.7;
+    transform: translateX(-30%);
+  }
+  70% {
+    opacity: 0.3;
+    transform: translateX(-120%); /* Overshoot */
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-100%); /* Bounce back */
+    display: none;
+  }
+}
+
+
+/* Subtle background pattern for sidebar surfaces */
+@layer utilities {
+  .bg-sidebar {
+    /* Very subtle dot grid; tuned for light theme */
+    background-image:
+      radial-gradient(hsl(0 0% 0% / 0.045) 1px, transparent 1px),
+      radial-gradient(hsl(0 0% 0% / 0.03) 1px, transparent 1px);
+    background-position: 0 0, 6px 6px;
+    background-size: 12px 12px;
+  }
+
+  .dark .bg-sidebar {
+    /* Slightly brighter dots on dark to ensure visibility */
+    background-image:
+      radial-gradient(hsl(0 0% 100% / 0.075) 1px, transparent 1px),
+      radial-gradient(hsl(0 0% 100% / 0.05) 1px, transparent 1px);
+  }
+}
+
+/* Modern list-card styling for AG Grid */
+.ag-theme-quartz.wh-modern-grid,
+.ag-theme-quartz-dark.wh-modern-grid {
+  --ag-row-border-color: transparent;
+  --ag-border-color: transparent;
+  --ag-secondary-border-color: transparent;
+}
+
+/* Row as card: rounded, subtle elevation, divider-less */
+.wh-modern-grid .ag-center-cols-container .ag-row {
+  /* Use horizontal margins only to avoid AG Grid row stacking issues */
+  margin: 0 8px;
+  border-radius: var(--radius-md);
+  background-color: oklch(from var(--color-card) l c h / 0.6);
+  box-shadow: 0 1px 0 oklch(from var(--color-background) l calc(l - 0.06) c h / 0.6);
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.dark .wh-modern-grid .ag-center-cols-container .ag-row {
+  background-color: oklch(from var(--color-card) l calc(l - 0.02) c h / 0.75);
+  box-shadow: 0 1px 0 oklch(from var(--color-background) l calc(l + 0.06) c h / 0.25);
+}
+
+/* Hover and selection polish */
+.wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+  background-color: oklch(from var(--color-secondary) l c h / 0.55) !important;
+  box-shadow: 0 4px 14px oklch(from var(--color-background) l calc(l - 0.1) c h / 0.18);
+  transform: translateY(-1px);
+}
+
+.wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
+  background-color: oklch(from var(--color-accent) l c h / 0.22) !important;
+  box-shadow: 0 6px 16px oklch(from var(--color-background) l calc(l - 0.12) c h / 0.22);
+}
+
+/* Reduce gridlines and header chrome */
+.wh-modern-grid .ag-header {
+  background: transparent;
+  border-bottom: none;
+}
+
+.wh-modern-grid .ag-header .ag-header-cell,
+.wh-modern-grid .ag-header .ag-header-group-cell {
+  background: transparent;
+}
+
+/* Compact, friendly cell paddings */
+.wh-modern-grid .ag-cell {
+  padding-block: 10px;
+}
+
+/* Make drag handles and resize lines subtle */
+.wh-modern-grid .ag-header .ag-header-cell-resize {
+  opacity: 0.25;
+}
+
+/* Zebra hover nuance: faint divider on alternating rows only when not selected */
+.wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
+  box-shadow: inset 0 -1px 0 oklch(from var(--color-border) l calc(l - 0.06) c h / 0.25);
+}
+
+/* Soft blurred header strip to separate from content without hard border */
+.wh-modern-grid .ag-header-viewport {
+  backdrop-filter: saturate(1.1) blur(4px);
+  background: linear-gradient(
+    to bottom,
+    oklch(from var(--color-background) l calc(l + 0.02) c h / 0.75),
+    oklch(from var(--color-background) l c h / 0.55)
+  );
+  border-bottom: 1px solid oklch(from var(--color-border) l calc(l - 0.02) c h / 0.6);
+}
+
+/* Better keyboard focus ring on cells */
+.wh-modern-grid .ag-cell:focus-within {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -2px;
+  border-radius: calc(var(--radius-md) - 2px);
+}
+
+/* Density controls */
+.wh-modern-grid.wh-density-compact .ag-center-cols-container .ag-row { margin: 0 6px; }
+.wh-modern-grid.wh-density-compact .ag-cell { padding-block: 6px; }
+
+.wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 10px; }
+.wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 12px; }
+

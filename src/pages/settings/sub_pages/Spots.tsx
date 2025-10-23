@@ -1,23 +1,25 @@
-import { useMemo } from "react";
-import { useSelector } from "react-redux";
+import { useMemo, useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot, faPlus, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
+import { RootState, AppDispatch } from "@/store/store";
+import { genericActions } from "@/store/genericSlices";
 import { Spot } from "@/store/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer
+  createActionsCellRenderer,
+  TextField,
+  CheckboxField,
+  SelectField,
+  ColorIndicatorCellRenderer
 } from "../components";
+import { UrlTabs } from "@/components/ui/url-tabs";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -39,13 +41,14 @@ const SpotNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Spots() {
+  const dispatch = useDispatch<AppDispatch>();
   // Redux state for related data
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const { value: spotTypes } = useSelector((state: RootState) => (state as any).spotTypes || { value: [] });
   
   // Use shared state management
   const {
     items: spots,
-    filteredItems,
     loading,
     error,
     searchQuery,
@@ -71,73 +74,240 @@ function Spots() {
     searchFields: ['name']
   });
 
+  // Enhanced spots data with hierarchy path for tree data
+  const hierarchyData = useMemo(() => {
+    const spotById = new Map<number, Spot>();
+    spots.forEach(spot => spotById.set(spot.id, spot));
+
+    const buildPath = (spot: Spot) => {
+      const path: string[] = [];
+      let current: Spot | undefined = spot;
+      const visited = new Set<number>();
+      while (current) {
+        if (visited.has(current.id)) break; // guard against cycles
+        visited.add(current.id);
+        path.unshift(current.name || `Spot ${current.id}`);
+        current = current.parent_id ? spotById.get(current.parent_id) : undefined;
+      }
+      return path;
+    };
+
+    return spots.map(spot => ({
+      ...spot,
+      spot_type_name: (spotTypes as any[]).find((t) => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`,
+      spot_type_color: (spotTypes as any[]).find((t) => t.id === spot.spot_type_id)?.color ?? undefined,
+      hierarchyPath: buildPath(spot)
+    }));
+  }, [spots, spotTypes]);
+
+  // Apply search to hierarchy data
+  const searchableHierarchyData = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return hierarchyData;
+    }
+    return hierarchyData.filter(spot =>
+      spot.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [hierarchyData, searchQuery]);
+
+
+
+  // Form state for controlled components
+  const [createFormData, setCreateFormData] = useState<{
+    name: string;
+    spot_type_id: string;
+    parent_id: string;
+    is_branch: boolean;
+  }>({
+    name: '',
+    spot_type_id: '1',
+    parent_id: '',
+    is_branch: false
+  });
+
+  // Dropdown options for parent spot selection
+  const ROOT_VALUE = '__ROOT__';
+  const parentSpotOptions = useMemo(() => {
+    return [
+      { value: ROOT_VALUE, label: 'Root' },
+      ...spots.map((s) => ({ value: String(s.id), label: s.name }))
+    ];
+  }, [spots]);
+
+  const editParentSpotOptions = useMemo(() => {
+    if (!editingSpot) return parentSpotOptions;
+    return parentSpotOptions.filter((opt) => opt.value === '' || opt.value !== String(editingSpot.id));
+  }, [parentSpotOptions, editingSpot]);
+
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    spot_type_id: string;
+    parent_id: string;
+    is_branch: boolean;
+  }>({
+    name: '',
+    spot_type_id: '1',
+    parent_id: '',
+    is_branch: false
+  });
+
+  // Update edit form data when editing spot changes
+  useEffect(() => {
+    if (editingSpot) {
+      setEditFormData({
+        name: editingSpot.name || '',
+        spot_type_id: editingSpot.spot_type_id?.toString() || '1',
+        parent_id: editingSpot.parent_id?.toString() || '',
+        is_branch: editingSpot.is_branch || false
+      });
+    }
+  }, [editingSpot]);
+
   // Helper functions
   const getSpotTaskCount = (spotId: number) => {
     return tasks.filter((task: any) => task.spot_id === spotId).length;
   };
 
-  // Column definitions for AG Grid
+  // Column definitions for AG Grid (tree data)
   const colDefs = useMemo<ColDef[]>(() => [
-    { 
-      field: 'name', 
-      headerName: 'Spot', 
-      flex: 2, 
-      minWidth: 200, 
-      cellRenderer: SpotNameCellRenderer 
-    },
-    // Type column removed per request (no corresponding DB field)
     {
-      field: 'spot_type_id', 
-      headerName: 'Spot Type', 
-      width: 120,
-      valueFormatter: (p) => `Type ${p.value}`
+      headerName: 'Spot',
+      field: 'name',
+      flex: 2,
+      minWidth: 280,
+      cellRenderer: 'agGroupCellRenderer',
+      cellRendererParams: {
+        suppressCount: true,
+        innerRenderer: SpotNameCellRenderer
+      },
+      rowDrag: true
     },
     {
-      field: 'parent_id', 
-      headerName: 'Parent', 
-      width: 120,
-      valueFormatter: (p) => p.value ? `Spot ${p.value}` : 'Root'
+      headerName: 'Spot Type',
+      field: 'spot_type_name',
+      width: 160,
+      cellRenderer: ColorIndicatorCellRenderer as any,
+      cellRendererParams: (p: any) => ({ name: p.data?.spot_type_name, color: p.data?.spot_type_color })
     },
     // Tasks column removed per request
     // Updated column removed per request
     {
-      field: 'actions', 
-      headerName: 'Actions', 
-      width: 120,
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete
       }),
-      sortable: false, 
-      filter: false, 
-      resizable: false, 
+      sortable: false,
+      filter: false,
+      resizable: false,
       pinned: 'right'
     }
-  ], [getSpotTaskCount, handleEdit, handleDelete]);
+  ], [handleEdit, handleDelete, spotTypes]);
+
+  // Grid options for tree data with hierarchical selection
+  const gridOptions = useMemo(() => ({
+    treeData: true,
+    getDataPath: (data: any) => data.hierarchyPath,
+    groupDefaultExpanded: 1,
+    animateRows: true,
+    getRowId: (params: any) => params?.data?.id != null ? String(params.data.id) : undefined,
+    suppressRowClickSelection: true,
+    rowDragManaged: true,
+    onCellDoubleClicked: (params: any) => {
+      if (params?.colDef?.field === 'spot_type_color' && params?.data?.spot_type_id) {
+        const type = (spotTypes as any[]).find((t) => t.id === params.data.spot_type_id);
+        if (type) {
+          setEditingSpotType({ id: type.id, name: type.name });
+          setEditingSpotTypeColor(type.color || '#000000');
+          setIsEditSpotTypeOpen(true);
+        }
+      }
+    },
+    onRowDragEnd: async (event: any) => {
+      const dragged = event?.node?.data;
+      if (!dragged) return;
+      const overNode = event?.overNode;
+      const newParentId: number | null = overNode?.data?.id ?? null;
+      if (newParentId === dragged.id) return; // cannot parent to self
+
+      // Build quick lookup for cycle prevention
+      const spotById = new Map<number, Spot>(spots.map(s => [s.id, s]));
+      const isDescendantOf = (childId: number, ancestorId: number): boolean => {
+        let current = spotById.get(childId)?.parent_id ?? null;
+        const visited = new Set<number>();
+        while (current != null) {
+          if (current === ancestorId) return true;
+          if (visited.has(current)) break; // guard
+          visited.add(current);
+          current = spotById.get(current)?.parent_id ?? null;
+        }
+        return false;
+      };
+
+      if (newParentId != null && isDescendantOf(newParentId, dragged.id)) {
+        return; // prevent cycles
+      }
+
+      // Only update if parent actually changed
+      const currentParent = spotById.get(dragged.id)?.parent_id ?? null;
+      if (currentParent !== newParentId) {
+        await updateItem(dragged.id, { parent_id: newParentId });
+      }
+    }
+  }), [spotTypes, spots, updateItem]);
+
+  // No auto group column; first column renders the hierarchy
+
+  const rowSelection = useMemo(() => ({
+    mode: 'multiRow',
+    groupSelects: 'filteredDescendants' as const,
+  }), []);
+
+  // Spot Type quick edit dialog state
+  const [isEditSpotTypeOpen, setIsEditSpotTypeOpen] = useState(false);
+  const [editingSpotType, setEditingSpotType] = useState<{ id: number; name: string } | null>(null);
+  const [editingSpotTypeColor, setEditingSpotTypeColor] = useState<string>("#000000");
+
+  const handleUpdateSpotType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSpotType) return;
+    await dispatch((genericActions as any).spotTypes.updateAsync({ id: editingSpotType.id, updates: { color: editingSpotTypeColor } }));
+    setIsEditSpotTypeOpen(false);
+    setEditingSpotType(null);
+  };
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
+
     const spotData = {
-      name: formData.get('name') as string,
-      parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : null,
-      spot_type_id: parseInt(formData.get('spot_type_id') as string) || 1,
-      is_branch: formData.get('is_branch') === 'on'
+      name: createFormData.name,
+      parent_id: createFormData.parent_id ? parseInt(createFormData.parent_id) : null,
+      spot_type_id: parseInt(createFormData.spot_type_id) || 1,
+      is_branch: createFormData.is_branch
     };
     await createItem(spotData);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      spot_type_id: '1',
+      parent_id: '',
+      is_branch: false
+    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSpot) return;
-    
-    const formData = new FormData(e.target as HTMLFormElement);
+
     const updates = {
-      name: formData.get('name') as string,
-      parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id') as string) : null,
-      spot_type_id: parseInt(formData.get('spot_type_id') as string) || 1,
-      is_branch: formData.get('is_branch') === 'on'
+      name: editFormData.name,
+      parent_id: editFormData.parent_id ? parseInt(editFormData.parent_id) : null,
+      spot_type_id: parseInt(editFormData.spot_type_id) || 1,
+      is_branch: editFormData.is_branch
     };
     await updateItem(editingSpot.id, updates);
   };
@@ -151,7 +321,7 @@ function Spots() {
       <div>
         <div className="font-medium">{spot.name}</div>
         <div className="text-sm text-muted-foreground">
-          {spot.is_branch ? 'Branch' : 'Location'} • Type {spot.spot_type_id}
+          {spot.is_branch ? 'Branch' : 'Location'} • {(spotTypes as any[]).find(t => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`}
           {spot.parent_id && ` • Parent: Spot ${spot.parent_id}`}
         </div>
         <div className="flex items-center space-x-2 mt-1">
@@ -161,10 +331,50 @@ function Spots() {
     </div>
   );
 
+  // Define tabs for URL persistence
+  const spotsTabs = [
+    {
+      value: 'main',
+      label: 'Spots',
+      content: (
+        <div className="flex-1 min-h-0 flex flex-col space-y-4">
+          <SettingsGrid
+            rowData={searchableHierarchyData}
+            columnDefs={colDefs}
+            gridOptions={gridOptions}
+            rowSelection={rowSelection as any}
+            noRowsMessage="No spots found"
+            onRowDoubleClicked={handleEdit}
+            className="flex-1 min-h-0"
+            height="100%"
+          />
+        </div>
+      )
+    },
+    {
+      value: 'branches',
+      label: 'Branches',
+      content: (
+        <div className="flex-1 min-h-0 flex flex-col space-y-4">
+          <SettingsGrid
+            rowData={searchableHierarchyData.filter((s: any) => s.is_branch)}
+            columnDefs={colDefs}
+            gridOptions={gridOptions}
+            rowSelection={rowSelection as any}
+            noRowsMessage="No branches found"
+            onRowDoubleClicked={handleEdit}
+            className="flex-1 min-h-0"
+            height="100%"
+          />
+        </div>
+      )
+    }
+  ];
+
   return (
     <SettingsLayout
       title="Spots"
-      description="Set up locations and spot management"
+      description="Set up hierarchical locations and spot management with row grouping"
       icon={faLocationDot}
       iconColor="#10b981"
       search={{
@@ -185,11 +395,12 @@ function Spots() {
       } : undefined}
       statistics={{
         title: "Spot Statistics",
-        description: "Overview of your locations",
+        description: "Overview of your hierarchical locations",
         items: [
           { label: "Total Spots", value: spots.length },
           { label: "Total Tasks", value: tasks.length },
-          { label: "Avg Tasks/Spot", value: spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0 }
+          { label: "Avg Tasks/Spot", value: spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0 },
+          { label: "Root Spots", value: spots.filter(s => !s.parent_id).length }
         ]
       }}
       headerActions={
@@ -207,13 +418,15 @@ function Spots() {
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={colDefs}
-        noRowsMessage="No spots found"
+      <UrlTabs
+        tabs={spotsTabs}
+        defaultValue="main"
+        basePath="/settings/spots"
+        className="flex-1 h-full flex flex-col"
       />
 
-      {/* Create Spot Dialog */}
+      {/* Create Spot Dialog */
+      }
       <SettingsDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
@@ -226,43 +439,37 @@ function Spots() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <Input id="name" name="name" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="spot_type_id" className="text-right">Spot Type</Label>
-            <Input 
-              id="spot_type_id" 
-              name="spot_type_id"
-              type="number" 
-              defaultValue="1"
-              className="col-span-3" 
-              min="1" 
+          <TextField
+            id="name"
+            label="Name"
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
+            required
+          />
+          <SelectField
+            id="spot_type_id"
+            label="Spot Type"
+            value={createFormData.spot_type_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, spot_type_id: value }))}
+            options={(spotTypes as any[]).map((st) => ({ value: st.id, label: st.name }))}
+            placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
+            required
+          />
+            <SelectField
+              id="parent_id"
+              label="Parent Spot"
+              value={createFormData.parent_id || ROOT_VALUE}
+              onChange={(value) => setCreateFormData(prev => ({ ...prev, parent_id: value === ROOT_VALUE ? '' : value }))}
+              options={parentSpotOptions}
+              placeholder="None (Root)"
             />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="parent_id" className="text-right">Parent ID</Label>
-            <Input 
-              id="parent_id" 
-              name="parent_id"
-              type="number" 
-              className="col-span-3" 
-              placeholder="Leave empty for root" 
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_branch" className="text-right">Is Branch</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input 
-                id="is_branch" 
-                name="is_branch"
-                type="checkbox" 
-                className="rounded" 
-              />
-              <Label htmlFor="is_branch" className="text-sm">This is a branch location</Label>
-            </div>
-          </div>
+          <CheckboxField
+            id="is_branch"
+            label="Is Branch"
+            checked={createFormData.is_branch}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_branch: checked }))}
+            description="This is a branch location"
+          />
         </div>
       </SettingsDialog>
 
@@ -280,51 +487,70 @@ function Spots() {
       >
         {editingSpot && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <Input
-                id="edit-name"
-                name="name"
-                defaultValue={editingSpot.name}
-                className="col-span-3"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-spot_type_id" className="text-right">Spot Type</Label>
-              <Input
-                id="edit-spot_type_id"
-                name="spot_type_id"
-                type="number"
-                defaultValue={editingSpot.spot_type_id}
-                className="col-span-3"
-                min="1"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-parent_id" className="text-right">Parent ID</Label>
-              <Input
-                id="edit-parent_id"
-                name="parent_id"
-                type="number"
-                defaultValue={editingSpot.parent_id || ''}
-                className="col-span-3"
-                placeholder="Leave empty for root"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-is_branch" className="text-right">Is Branch</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input
-                  id="edit-is_branch"
-                  name="is_branch"
-                  type="checkbox"
-                  defaultChecked={editingSpot.is_branch}
-                  className="rounded"
-                />
-                <Label htmlFor="edit-is_branch" className="text-sm">This is a branch location</Label>
-              </div>
-            </div>
+            <TextField
+              id="edit-name"
+              label="Name"
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+              required
+            />
+            <SelectField
+              id="edit-spot_type_id"
+              label="Spot Type"
+              value={editFormData.spot_type_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, spot_type_id: value }))}
+              options={(spotTypes as any[]).map((st) => ({ value: st.id, label: st.name }))}
+              placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
+              required
+            />
+            <SelectField
+              id="edit-parent_id"
+              label="Parent Spot"
+              value={editFormData.parent_id || ROOT_VALUE}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, parent_id: value === ROOT_VALUE ? '' : value }))}
+              options={editParentSpotOptions}
+              placeholder="None (Root)"
+            />
+            <CheckboxField
+              id="edit-is_branch"
+              label="Is Branch"
+              checked={editFormData.is_branch}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_branch: checked }))}
+              description="This is a branch location"
+            />
+          </div>
+        )}
+      </SettingsDialog>
+
+      {/* Edit Spot Type Color Dialog */}
+      <SettingsDialog
+        open={isEditSpotTypeOpen}
+        onOpenChange={setIsEditSpotTypeOpen}
+        type="edit"
+        title={editingSpotType ? `Edit Spot Type: ${editingSpotType.name}` : 'Edit Spot Type'}
+        description="Update the spot type color."
+        onSubmit={handleUpdateSpotType}
+        isSubmitting={isSubmitting}
+        error={formError}
+        submitDisabled={!editingSpotType}
+      >
+        {editingSpotType && (
+          <div className="grid gap-4">
+            <TextField
+              id="edit-spot-type-name"
+              label="Name"
+              value={editingSpotType.name}
+              onChange={(value) => setEditingSpotType(prev => prev ? { ...prev, name: value } : prev)}
+              required
+            />
+            <TextField
+              id="edit-spot-type-color"
+              label="Color"
+              type="color"
+              value={editingSpotTypeColor}
+              onChange={(value) => setEditingSpotTypeColor(value)}
+              required
+            />
           </div>
         )}
       </SettingsDialog>

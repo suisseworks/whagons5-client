@@ -172,13 +172,19 @@ export class GenericCache {
 			// Signal hydration start/end to coordinate readers
 			const end = (DB as any).startHydration?.(this.store) || (() => {});
 			try {
-				// Prune local rows that are no longer present in server response (e.g., soft-deleted)
-				const existing = await this.getAll();
-				const fetchedIdSet = new Set<any>(rows.map((r) => this.getId(r)));
-				for (const localRow of existing) {
-					const idVal = this.getId(localRow);
-					if (!fetchedIdSet.has(idVal)) {
-						try { await DB.delete(this.store, idVal as any); } catch {}
+				// Determine if this fetch is partial (has filters). If partial, avoid pruning
+				// local rows not present in the response to prevent race conditions where
+				// a concurrent filtered fetch overwrites a recently added row.
+				const isPartialFetch = params && Object.keys(params).length > 0;
+				if (!isPartialFetch) {
+					// Full fetch: prune local rows that are no longer present in server response
+					const existing = await this.getAll();
+					const fetchedIdSet = new Set<any>(rows.map((r) => this.getId(r)));
+					for (const localRow of existing) {
+						const idVal = this.getId(localRow);
+						if (!fetchedIdSet.has(idVal)) {
+							try { await DB.delete(this.store, idVal as any); } catch {}
+						}
 					}
 				}
 				await DB.bulkPut(this.store, rows);

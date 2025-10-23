@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -6,14 +6,15 @@ import { faArrowUpWideShort, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  ColorIndicatorCellRenderer
+  ColorIndicatorCellRenderer,
+  TextField,
+  SelectField
 } from "../components";
 
 const PriorityNameCellRenderer = (props: ICellRendererParams) => {
@@ -26,6 +27,7 @@ const PriorityNameCellRenderer = (props: ICellRendererParams) => {
 
 function Priorities() {
   const { value: priorities } = useSelector((state: RootState) => state.priorities);
+  const { value: categories } = useSelector((state: RootState) => state.categories);
 
   const {
     filteredItems,
@@ -54,6 +56,38 @@ function Priorities() {
     searchFields: ["name"]
   });
 
+  // Form state for controlled components
+  const [createFormData, setCreateFormData] = useState<{
+    name: string;
+    color: string;
+    category_id: string;
+  }>({
+    name: '',
+    color: '#ef4444',
+    category_id: ''
+  });
+
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    color: string;
+    category_id: string;
+  }>({
+    name: '',
+    color: '#ef4444',
+    category_id: ''
+  });
+
+  // Update edit form data when editing item changes
+  useEffect(() => {
+    if (editingItem) {
+      setEditFormData({
+        name: editingItem.name || '',
+        color: editingItem.color || '#ef4444',
+        category_id: editingItem.category_id?.toString() || ''
+      });
+    }
+  }, [editingItem]);
+
   const columns = useMemo<ColDef[]>(() => [
     {
       field: "name",
@@ -63,16 +97,40 @@ function Priorities() {
       cellRenderer: PriorityNameCellRenderer
     },
     {
-      field: "level",
-      headerName: "Level",
-      width: 100,
+      colId: "category_name",
+      headerName: "Category",
+      flex: 2,
+      minWidth: 200,
+      rowGroup: true,
+      rowGroupIndex: 0,
+      valueGetter: (params: any) => {
+        const catId = params.data?.category_id as number | null | undefined;
+        if (!catId) return 'Unassigned';
+        const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
+        return cat?.name || 'Unassigned';
+      },
+      cellRenderer: (params: ICellRendererParams) => {
+        const catId = params.data?.category_id as number | null | undefined;
+        if (!catId) {
+          return <span className="text-muted-foreground">Unassigned</span>;
+        }
+        const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
+        if (!cat) {
+          return <span className="text-muted-foreground">Unassigned</span>;
+        }
+        return (
+          <ColorIndicatorCellRenderer value={cat.name} name={cat.name} color={cat.color || "#6b7280"} />
+        );
+      },
+      comparator: (a: any, b: any) => String(a || '').localeCompare(String(b || '')),
       sortable: true,
       filter: true
     },
     {
       field: "actions",
       headerName: "Actions",
-      width: 120,
+      width: 100, // Fixed compact width for icons only
+      suppressSizeToFit: true, // Lock size, no auto-expansion
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete
@@ -82,30 +140,37 @@ function Priorities() {
       resizable: false,
       pinned: "right"
     }
-  ], [handleEdit, handleDelete]);
+  ], [handleEdit, handleDelete, categories]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+
     const data = {
-      name: String(formData.get("name") || ""),
-      color: String(formData.get("color") || "#6b7280"),
-      level: formData.get("level") ? parseInt(String(formData.get("level"))) : null
+      name: createFormData.name,
+      color: createFormData.color,
+      category_id: createFormData.category_id ? parseInt(createFormData.category_id) : null
     } as Omit<Priority, "id" | "created_at" | "updated_at">;
+
     await createItem(data as any);
+
+    // Reset form after successful creation
+    setCreateFormData({
+      name: '',
+      color: '#ef4444',
+      category_id: ''
+    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+
     const updates = {
-      name: String(formData.get("name") || editingItem.name),
-      color: String(formData.get("color") || editingItem.color || "#6b7280"),
-      level: formData.get("level") ? parseInt(String(formData.get("level"))) : editingItem.level ?? null
+      name: editFormData.name,
+      color: editFormData.color,
+      category_id: editFormData.category_id ? parseInt(editFormData.category_id) : editingItem.category_id ?? null
     } as Partial<Priority>;
+
     await updateItem(editingItem.id, updates);
   };
 
@@ -131,14 +196,6 @@ function Priorities() {
       icon={faArrowUpWideShort}
       iconColor="#ef4444"
       backPath="/settings"
-      search={{
-        placeholder: "Search priorities...",
-        value: searchQuery,
-        onChange: (value: string) => {
-          setSearchQuery(value);
-          handleSearch(value);
-        }
-      }}
       loading={{ isLoading: loading, message: "Loading priorities..." }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       statistics={{
@@ -157,6 +214,10 @@ function Priorities() {
       <SettingsGrid
         rowData={filteredItems}
         columnDefs={columns}
+        gridOptions={{
+          groupDisplayType: 'groupRows',
+          groupDefaultExpanded: -1
+        }}
         noRowsMessage="No priorities found"
       />
 
@@ -173,18 +234,28 @@ function Priorities() {
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <input id="name" name="name" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="color" className="text-right">Color</Label>
-            <input id="color" name="color" type="color" defaultValue="#ef4444" className="col-span-3 h-9 w-16 p-0 border-0 bg-transparent" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="level" className="text-right">Level</Label>
-            <input id="level" name="level" type="number" min="0" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" placeholder="Optional numeric level" />
-          </div>
+          <TextField
+            id="name"
+            label="Name"
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
+            required
+          />
+          <TextField
+            id="color"
+            label="Color"
+            type="color"
+            value={createFormData.color}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
+          />
+          <SelectField
+            id="category"
+            label="Category"
+            value={createFormData.category_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, category_id: value }))}
+            placeholder="Unassigned"
+            options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
+          />
         </div>
       </SettingsDialog>
 
@@ -202,18 +273,28 @@ function Priorities() {
       >
         {editingItem && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <input id="edit-name" name="name" defaultValue={editingItem.name} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <input id="edit-color" name="color" type="color" defaultValue={(editingItem.color as string) || "#ef4444"} className="col-span-3 h-9 w-16 p-0 border-0 bg-transparent" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-level" className="text-right">Level</Label>
-              <input id="edit-level" name="level" type="number" min="0" defaultValue={typeof editingItem.level === "number" ? editingItem.level : undefined} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
+            <TextField
+              id="edit-name"
+              label="Name"
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+              required
+            />
+            <TextField
+              id="edit-color"
+              label="Color"
+              type="color"
+              value={editFormData.color}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
+            />
+            <SelectField
+              id="edit-category"
+              label="Category"
+              value={editFormData.category_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, category_id: value }))}
+              placeholder="Unassigned"
+              options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
+            />
           </div>
         )}
       </SettingsDialog>

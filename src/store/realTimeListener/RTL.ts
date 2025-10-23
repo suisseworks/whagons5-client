@@ -452,7 +452,7 @@ export class RealTimeListener {
       switch (operation) {
         case 'INSERT':
           if (data.new_data) {
-            console.log(`RTL: Processing INSERT for ${table}`, {
+            this.debugLog(`Processing INSERT for ${table}`, {
               newData: data.new_data,
               hasId: data.new_data.id !== undefined && data.new_data.id !== null,
               idValue: data.new_data.id,
@@ -463,7 +463,7 @@ export class RealTimeListener {
             });
 
             // Log the complete new_data object to see what's different
-            console.log(`RTL: Full ${table} INSERT data:`, JSON.stringify(data.new_data, null, 2));
+            this.debugLog(`Full ${table} INSERT data:`, JSON.stringify(data.new_data, null, 2));
 
             // Check if the data has a valid ID before proceeding
             if (data.new_data.id === undefined || data.new_data.id === null) {
@@ -472,7 +472,7 @@ export class RealTimeListener {
             }
 
             // Additional validation: Check if this ID already exists in IndexedDB
-            console.log(`RTL: About to add ${table} with ID ${data.new_data.id} to IndexedDB`);
+            this.debugLog(`About to add ${table} with ID ${data.new_data.id} to IndexedDB`);
 
             try {
                 const existing = await cache.getAll();
@@ -497,7 +497,7 @@ export class RealTimeListener {
           break;
         case 'UPDATE':
           if (data.new_data && data.new_data.id != null) {
-            console.log(`RTL: Processing UPDATE for ${table}`, {
+            this.debugLog(`Processing UPDATE for ${table}`, {
               newData: data.new_data,
               id: data.new_data.id
             });
@@ -505,7 +505,7 @@ export class RealTimeListener {
             try {
               const dbg = localStorage.getItem('wh-debug-cache') === 'true';
               if (dbg) {
-                console.log('RTL: pre-cache.update payload check', {
+                this.debugLog('pre-cache.update payload check', {
                   table,
                   idPresent: data.new_data.id !== undefined && data.new_data.id !== null,
                   idType: typeof data.new_data.id,
@@ -519,7 +519,7 @@ export class RealTimeListener {
           break;
         case 'DELETE':
           if (data.old_data && data.old_data.id != null) {
-            console.log(`RTL: Processing DELETE for ${table}`, {
+            this.debugLog(`Processing DELETE for ${table}`, {
               oldData: data.old_data,
               id: data.old_data.id
             });

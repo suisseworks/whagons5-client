@@ -28,7 +28,7 @@ export default function SettingsHeader({
   }, [navigate, onBack]);
 
   return (
-    <div className="space-y-2 py-6 border-b border-border">
+    <div className="space-y-2 py-2 border-b border-border">
       <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
         <button
           onClick={handleBack}

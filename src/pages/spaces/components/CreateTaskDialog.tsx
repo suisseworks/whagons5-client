@@ -30,6 +30,9 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
   const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
   const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
+  const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
+
+  const currentWorkspace = workspaces.find((w: any) => w.id === workspaceId);
 
   const workspaceCategories = useMemo(() => categories.filter((c: any) => c.workspace_id === workspaceId), [categories, workspaceId]);
 
@@ -91,13 +94,17 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   // }, [categoryPriorities, priorityId]);
 
   const workspaceTemplates = useMemo(() => {
-    // Templates don't include workspace_id directly; infer via category.workspace_id
-    return templates.filter((t: any) => {
-      if (t?.enabled === false) return false;
-      const cat = categories.find((c: any) => c.id === t.category_id);
-      return cat?.workspace_id === workspaceId;
+    // Only show templates for workspaces of type "DEFAULT"
+    if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
+      return [];
+    }
+
+    // Templates are matched to workspace by category_id
+    return templates.filter((template: any) => {
+      if (template?.enabled === false) return false;
+      return template.category_id === currentWorkspace.category_id;
     });
-  }, [templates, categories, workspaceId]);
+  }, [templates, currentWorkspace]);
 
   const workspaceUsers = useMemo(() => {
     const list = users.filter((u: any) => !u.workspace_id || u.workspace_id === workspaceId);
@@ -203,7 +210,8 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         due_date: dueDate || null,
         expected_duration: (() => {
           const t = workspaceTemplates.find((x: any) => x.id === templateId);
-          return t?.default_duration ?? 0;
+          const v = t?.expected_duration ?? t?.default_duration ?? 0;
+          return Number.isFinite(v) ? v : 0;
         })(),
         response_date: null,
         resolution_date: null,
@@ -236,7 +244,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
             <Label>Template *</Label>
             <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
               <SelectTrigger>
-                <SelectValue placeholder={workspaceTemplates.length ? 'Select template' : 'No templates available'} />
+                <SelectValue placeholder={
+                  !currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                    ? 'Templates only available for default workspaces'
+                    : workspaceTemplates.length
+                      ? 'Select template'
+                      : 'No templates available'
+                } />
               </SelectTrigger>
               <SelectContent>
                 {workspaceTemplates.map((t: any) => (
@@ -245,7 +259,12 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
               </SelectContent>
             </Select>
             {!workspaceTemplates.length && (
-              <div className="text-xs text-muted-foreground">No templates available in this workspace. Enable or create templates first.</div>
+              <div className="text-xs text-muted-foreground">
+                {!currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                  ? 'Templates are only available for default workspaces.'
+                  : 'No templates available in this workspace. Enable or create templates first.'
+                }
+              </div>
             )}
           </div>
 
@@ -258,7 +277,16 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                 )}
                 {(() => { const t = workspaceTemplates.find((x: any) => x.id === templateId); const team = teams.find((tm: any) => tm.id === t?.team_id); return t?.team_id ? (<Badge variant="secondary">Team: {team?.name || t.team_id}</Badge>) : null; })()}
                 {(() => { const p = priorities.find((x: any) => x.id === priorityId); return priorityId ? (<Badge variant="secondary">Priority: {p?.name || priorityId}</Badge>) : null; })()}
-                {(() => { const t = workspaceTemplates.find((x: any) => x.id === templateId); return t?.default_duration ? (<Badge variant="secondary">Duration: {t.default_duration} min</Badge>) : null; })()}
+                {(() => {
+                  const t = workspaceTemplates.find((x: any) => x.id === templateId);
+                  const d = t?.expected_duration ?? t?.default_duration;
+                  if (!d || !Number.isFinite(d) || d <= 0) return null;
+                  const hours = Math.floor(Number(d) / 60);
+                  const minutes = Number(d) % 60;
+                  const hh = String(hours).padStart(2, '0');
+                  const mm = String(minutes).padStart(2, '0');
+                  return (<Badge variant="secondary">Duration: {hh}:{mm}</Badge>);
+                })()}
                 {(() => { const sid = categoryInitialStatusId; if (!sid) return null; const st = statuses.find((s: any) => s.id === sid); return (<Badge variant="secondary">Initial Status: {st?.name || sid}</Badge>); })()}
               </div>
             </div>

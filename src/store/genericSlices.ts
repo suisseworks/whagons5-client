@@ -41,7 +41,7 @@ const genericSliceConfigs = [
     { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','sla_id','category_id','updated_at'] },
     { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','parent_id','spot_type_id','is_branch','updated_at'] },
     { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','updated_at'] },
-    { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','updated_at'] },
+    { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','color','updated_at'] },
     { name: 'statusTransitions', table: 'wh_status_transitions', endpoint: '/status-transitions', store: 'status_transitions', hashFields: ['id','status_transition_group_id','from_status','to_status','initial','updated_at'] },
     { name: 'statusTransitionGroups', table: 'wh_status_transition_groups', endpoint: '/status-transition-groups', store: 'status_transition_groups', hashFields: ['id','name','description','is_default','is_active','updated_at'] },
 
@@ -64,12 +64,16 @@ const genericSliceConfigs = [
 
     // Core Entities (converted from custom to generic)
     { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','updated_at'] },
-    { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-field-assignments', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
+    { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-custom-fields', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','updated_at'] },
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
+
+    // Approvals (config + templates)
+    { name: 'statusApprovalConfig', table: 'wh_status_approval_config', endpoint: '/status-approval-config', store: 'status_approval_config', hashFields: ['id','status_id','has_approval_context','approval_config','auto_advance','next_status_on_approve','next_status_on_reject','next_status_on_timeout','blocks_editing','blocks_deletion','blocks_reassignment','updated_at'] },
+    { name: 'approvalTemplates', table: 'wh_approval_templates', endpoint: '/approval-templates', store: 'approval_templates', hashFields: ['id','name','category_id','template_config','is_active','is_default','created_by','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -120,6 +124,8 @@ export const {
     templates,
     messages,
     workspaces,
+    statusApprovalConfig,
+    approvalTemplates,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -176,6 +182,8 @@ export const genericEventNames = {
     templates: genericSlices.slices.templates.eventNames,
     messages: genericSlices.slices.messages.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
+    statusApprovalConfig: genericSlices.slices.statusApprovalConfig.eventNames,
+    approvalTemplates: genericSlices.slices.approvalTemplates.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -223,4 +231,6 @@ export const genericActions = {
     templates: genericSlices.slices.templates.actions,
     messages: genericSlices.slices.messages.actions,
     workspaces: genericSlices.slices.workspaces.actions,
+    statusApprovalConfig: genericSlices.slices.statusApprovalConfig.actions,
+    approvalTemplates: genericSlices.slices.approvalTemplates.actions,
 } as const;

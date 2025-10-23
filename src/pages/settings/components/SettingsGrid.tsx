@@ -1,10 +1,11 @@
-import React, { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { RowGroupingModule, TreeDataModule } from 'ag-grid-enterprise';
 
-// Register AG Grid modules
-ModuleRegistry.registerModules([AllCommunityModule]);
+// Register AG Grid modules (community + enterprise needed for grouping/tree)
+ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataModule]);
 
 export interface SettingsGridProps<T = any> {
   rowData: T[];
@@ -14,18 +15,22 @@ export interface SettingsGridProps<T = any> {
   className?: string;
   noRowsMessage?: string;
   defaultColDef?: ColDef;
-  rowSelection?: 'single' | 'multiple';
+  rowSelection?: 'single' | 'multiple' | any; // allow object config per example
   onSelectionChanged?: (selectedRows: T[]) => void;
   onRowDoubleClicked?: (row: T) => void;
   onCellValueChanged?: (event: any) => void;
+  autoGroupColumnDef?: ColDef;
+  gridOptions?: any;
+  quickFilterText?: string;
+  style?: React.CSSProperties;
 }
 
 export function SettingsGrid<T = any>({
   rowData,
   columnDefs,
   onGridReady,
-  height = "400px",
-  className = "",
+  height,
+  className,
   noRowsMessage = "No data found",
   defaultColDef = {
     sortable: true,
@@ -35,7 +40,11 @@ export function SettingsGrid<T = any>({
   rowSelection,
   onSelectionChanged,
   onRowDoubleClicked,
-  onCellValueChanged
+  onCellValueChanged,
+  autoGroupColumnDef,
+  gridOptions,
+  quickFilterText,
+  style
 }: SettingsGridProps<T>) {
   const gridRef = useRef<AgGridReact>(null);
 
@@ -45,6 +54,7 @@ export function SettingsGrid<T = any>({
     }
     onGridReady?.(params);
   }, [onGridReady]);
+
 
   // Handle window resize
   useEffect(() => {
@@ -59,7 +69,10 @@ export function SettingsGrid<T = any>({
   }, []);
 
   return (
-    <div className={`ag-theme-quartz wh-settings-grid w-full ${className}`} style={{ height }}>
+    <div
+      className={`ag-theme-quartz wh-settings-grid wh-modern-grid wh-density-comfortable w-full ${className ?? ""}`}
+      style={{ height: height ?? "100%", ...(style ?? {}) }}
+    >
       <AgGridReact
         ref={gridRef}
         rowData={rowData}
@@ -70,8 +83,14 @@ export function SettingsGrid<T = any>({
         animateRows={true}
         rowHeight={50}
         headerHeight={44}
-        defaultColDef={defaultColDef}
+        defaultColDef={{
+          ...defaultColDef,
+          resizable: true
+        }}
         onCellValueChanged={onCellValueChanged}
+        autoGroupColumnDef={autoGroupColumnDef}
+        {...(gridOptions || {})}
+        quickFilterText={quickFilterText}
         onSelectionChanged={() => {
           if (gridRef.current?.api && onSelectionChanged) {
             const selected = gridRef.current.api.getSelectedRows() as T[];
@@ -79,8 +98,8 @@ export function SettingsGrid<T = any>({
           }
         }}
         onRowDoubleClicked={(event: any) => {
-          if (onRowDoubleClicked) {
-            onRowDoubleClicked(event?.data as T);
+          if (onRowDoubleClicked && event?.data) {
+            onRowDoubleClicked(event.data as T);
           }
         }}
         noRowsOverlayComponent={() => (

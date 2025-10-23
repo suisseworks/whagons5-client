@@ -10,21 +10,14 @@ import {
 import { User } from '../types/user';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store/store';
-// Custom slice with advanced features (tasks only)
-// import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
-
-// Generic slices actions (handles all other tables)
-import { genericActions, genericCaches } from '@/store/genericSlices';
-import { GenericCache } from '@/store/indexedDB/GenericCache';
 
 // Custom caches with advanced features
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
 import {
   zeroizeKeys,
 } from '@/crypto/crypto';
 import { DB } from '@/store/indexedDB/DB';
-import { verifyManifest } from '@/lib/manifestVerify';
+import { DataManager } from '@/store/DataManager';
 
 // Define context types
 interface AuthContextType {
@@ -32,6 +25,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   userLoading: boolean;
+  hydrating: boolean;
   refetchUser: () => Promise<void>;
 }
 
@@ -48,6 +42,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [userLoading, setUserLoading] = useState<boolean>(false);
+  const [hydrating, setHydrating] = useState<boolean>(false);
   const dispatch = useDispatch<AppDispatch>();
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
@@ -76,77 +71,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userData);
         // console.log('AuthContext: User data loaded successfully');
 
-        if (!userData?.tenant_domain_prefix) {
-          return;
-        }
-        console.log(firebaseUser.uid)
-        let result = await DB.init(firebaseUser.uid);
-        console.log('DB.init: result', result);
-        if (!result) {
-          console.warn('DB failed to initialize, deferring cache hydration');
-          return;
-        }
-
-        // Explicitly wait for DB readiness to avoid races during first login
-        const ready = await DB.whenReady();
-        if (!ready) {
-          console.warn('DB not ready after init, deferring cache hydration');
-          return;
-        }
-
-
-
-        try {
-          // Validate only core keys, then refresh those slices
-          const coreKeys = [
-            'workspaces',
-            'teams',
-            'categories',
-            'templates',
-            'statuses',
-            'statusTransitions',
-            'statusTransitionGroups',
-            'priorities',
-            'slas',
-            'spots',
-            'users'
-          ] as const;
-          const caches: GenericCache[] = coreKeys.map((k) => genericCaches[k]);
-          await GenericCache.validateMultiple(caches);
-
-          for (const key of coreKeys) {
-            await dispatch((genericActions as any)[key].getFromIndexedDB());
-          }
-        } catch (e) {
-          console.warn('AuthProvider: cache validate failed', e);
-        }
-
-        // Initialize and validate tasks AFTER core caches are ready
-        await TasksCache.init();
-        await TasksCache.validateTasks();
-
-
-        // Manifest verify LAST to avoid racing with decryption/hydration
-        try {
-          const manifestResp = await apiClient.get('/sync/manifest');
-          if (manifestResp.status === 200) {
-            const m = manifestResp.data?.data || manifestResp.data;
-            const ok = await verifyManifest(m);
-            if (!ok) {
-              console.warn('Manifest signature invalid');
+        // Kick off background hydration so UI can render immediately
+        (async () => {
+          try {
+            setHydrating(true);
+            if (!userData?.tenant_domain_prefix) {
+              return;
             }
+            console.log(firebaseUser.uid);
+            const result = await DB.init(firebaseUser.uid);
+            console.log('DB.init: result', result);
+            if (!result) {
+              console.warn('DB failed to initialize, deferring cache hydration');
+              return;
+            }
+
+            // Explicitly wait for DB readiness to avoid races during first login
+            const ready = await DB.whenReady();
+            if (!ready) {
+              console.warn('DB not ready after init, deferring cache hydration');
+              return;
+            }
+
+            const dataManager = new DataManager(dispatch);
+            await dataManager.loadCoreFromIndexedDB();
+
+            // Background validation
+            (async () => {
+              try {
+                await dataManager.validateAndRefresh();
+              } catch (e) {
+                console.warn('AuthProvider: validation failed', e);
+              }
+            })();
+
+            // Verify manifest
+            try {
+              await dataManager.verifyManifest();
+            } catch (e) {
+              console.warn('Manifest fetch/verify failed (continuing):', e);
+            }
+
+            // Category-field-assignments are fetched per category on demand and cached via GenericCache
+            const rtl = new RealTimeListener(
+              // {
+              //   debug: true,
+              // }
+            );
+            rtl.connectAndHold();
+          } catch (err) {
+            console.warn('AuthProvider: background hydration failed', err);
+          } finally {
+            setHydrating(false);
           }
-        } catch (e) {
-          console.warn('Manifest fetch/verify failed (continuing):', e);
-        }
+        })();
 
-
-        console.log("here")
-
-        // Category-field-assignments are fetched per category on demand and cached via GenericCache
-
-        const rtl = new RealTimeListener({ debug: true });
-        rtl.connectAndHold();
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user data:', error);
@@ -197,6 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         user,
         loading,
         userLoading,
+        hydrating,
         refetchUser,
       }}
     >

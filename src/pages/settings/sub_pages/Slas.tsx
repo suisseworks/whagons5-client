@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faStopwatch, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -94,13 +94,7 @@ function Slas() {
     searchFields: ["type", "notify_to"] as (keyof SlaAlertRow)[]
   });
 
-  // Hydrate from IndexedDB then refresh from API
-  useEffect(() => {
-    dispatch(genericActions.slas.getFromIndexedDB());
-    dispatch(genericActions.slas.fetchFromAPI({ per_page: 1000 }));
-    dispatch(genericActions.slaAlerts.getFromIndexedDB());
-    dispatch(genericActions.slaAlerts.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
+  // Remove the loading useEffects, rely on pre-loaded state.
 
   const columns = useMemo<ColDef[]>(() => [
     { field: "name", headerName: "Name", flex: 2, minWidth: 200 },
@@ -214,15 +208,19 @@ function Slas() {
       iconColor="#14b8a6"
       backPath="/settings"
     >
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as any)}
+        className="h-full flex-1 min-h-0 flex flex-col"
+      >
         <TabsList>
           <TabsTrigger value="slas">SLAs</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="slas">
-          <div className="mt-4" />
-          <div className="flex justify-between items-center mb-3">
+        <TabsContent value="slas" className="flex-1 min-h-0 flex flex-col space-y-4">
+          <div className="mt-1" />
+          <div className="flex justify-between items-center">
             <div className="text-sm text-muted-foreground">Manage SLA definitions</div>
             <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
               <FontAwesomeIcon icon={faPlus} className="mr-2" />
@@ -233,12 +231,15 @@ function Slas() {
             rowData={filteredItems}
             columnDefs={columns}
             noRowsMessage="No SLAs found"
+            className="flex-1 min-h-0"
+            height="100%"
+            onRowDoubleClicked={handleEdit as any}
           />
         </TabsContent>
 
-        <TabsContent value="alerts">
-          <div className="mt-4" />
-          <div className="flex flex-wrap items-center gap-3 mb-3">
+        <TabsContent value="alerts" className="flex-1 min-h-0 flex flex-col space-y-4">
+          <div className="mt-1" />
+          <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm">SLA:</div>
             <select
               className="border rounded-md px-2 py-1 bg-background"
@@ -260,6 +261,9 @@ function Slas() {
             rowData={visibleAlerts}
             columnDefs={alertColumns}
             noRowsMessage={selectedSlaId ? "No alerts for this SLA" : "Select an SLA to view alerts"}
+            className="flex-1 min-h-0"
+            height="100%"
+            onRowDoubleClicked={handleEditAlert as any}
           />
         </TabsContent>
       </Tabs>

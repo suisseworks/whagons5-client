@@ -48,6 +48,7 @@ export interface Template {
     sla_id: number | null;
     default_spot_id?: number | null;
     default_user_ids?: number[] | null;
+    expected_duration?: number | null;
     // Legacy/previous fields kept optional for compatibility during transition
     description?: string | null;
     team_id?: number;
@@ -82,6 +83,9 @@ export interface Task {
     // Store responsible user IDs as JSON array for efficient storage
     // Most tasks have few responsible users, so this avoids a large junction table
     user_ids: number[] | null;
+    // Approval workflow fields
+    approval_metadata?: any | null; // JSON metadata for approval workflows
+    approval_metadata_updated_at?: string | null; // Timestamp for approval metadata updates
     created_at: string;
     updated_at: string;
 }
@@ -104,6 +108,8 @@ export interface Priority {
     name: string;
     color?: string | null;
     level?: number | null;
+    category_id?: number | null;
+    sla_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
 }
@@ -446,5 +452,19 @@ export interface Exception {
     resolved_at?: string | null;
     resolved_by?: number | null;
     created_at: string;
+}
+
+// Workflow Management (Coming Soon)
+export interface Workflow {
+    id: number;
+    name: string;
+    description?: string | null;
+    workspace_id?: number | null;
+    is_active: boolean;
+    trigger_conditions?: string | null; // JSON conditions for when workflow runs
+    actions?: string | null; // JSON array of actions to perform
+    created_by?: number | null;
+    created_at: string;
+    updated_at: string;
 }
 

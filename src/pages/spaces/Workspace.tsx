@@ -1,31 +1,64 @@
 import { useState, useRef, useEffect } from 'react';
-import { useMatch, useLocation } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocation } from 'react-router-dom';
+import { UrlTabs } from '@/components/ui/url-tabs';
 import { ClipboardList, Settings, Plus } from 'lucide-react';
-import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
+import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import { Input } from '@/components/ui/input';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import { motion, useAnimation } from 'motion/react';
 
 export const Workspace = () => {
-  const match = useMatch('/workspace/:id');
-  const id = (match && (match.params as any)?.id) as string | undefined;
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState('grid');
+
+  // Extract workspace ID from the current path
+  const getWorkspaceIdFromPath = (pathname: string): string | undefined => {
+    const match = pathname.match(/\/workspace\/([^/?]+)/);
+    return match ? match[1] : undefined;
+  };
+
+  const id = getWorkspaceIdFromPath(location.pathname);
   // State to store the fetched data
+  const [activeTab, setActiveTab] = useState('grid');
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
+  const tableRef = useRef<WorkspaceTableHandle | null>(null);
+  const [showClearFilters, setShowClearFilters] = useState(false);
   const [openCreateTask, setOpenCreateTask] = useState(false);
 
+  const gridControls = useAnimation();
+
+  // Handle grid animation based on current tab
+  useEffect(() => {
+    if (activeTab === 'grid') {
+      gridControls.start({ x: 0 });
+    } else {
+      gridControls.start({
+        x: "-80vw",
+        transition: {
+          type: "spring",
+          stiffness: 100,
+          damping: 10
+        }
+      });
+    }
+  }, [activeTab, gridControls]);
+
+  //
   // Clear cache when workspace ID changes
   useEffect(() => {
     if (id) {
       console.log(`Switching to workspace ${id}, clearing cache`);
       rowCache.current.clear();
     }
-  }, [id]);
-
+    if (activeTab === 'grid') {
+      gridControls.start({
+        opacity: 0.3,
+        transition: { duration: 0.2, repeat: 1, repeatType: "reverse", ease: "easeInOut" }
+      });
+    }
+  }, [id, location.pathname]);
   // Debug logging
   console.log('Workspace component - id:', id, 'typeof:', typeof id);
   console.log('Current path:', location.pathname);
@@ -33,22 +66,41 @@ export const Workspace = () => {
   // Check if this is the "all" workspace route
   const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
 
-  // Handle invalid workspace ID - simplified validation
-  if (!id && !isAllWorkspaces) {
-    console.log('No workspace ID provided and not all workspaces route');
+  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
+  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+
+  // Persist and restore search text globally
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved != null) setSearchText(saved);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      if (searchText) {
+        localStorage.setItem(key, searchText);
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  }, [searchText]);
+
+  if (invalidWorkspaceRoute) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
-          <p className="text-gray-600 mt-2">ID: "{id}" - Please check the URL and try again.</p>
+          <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
         </div>
       </div>
     );
   }
 
-  // Additional validation for numeric IDs (but allow 'all' or all workspaces route)
-  if (!isAllWorkspaces && isNaN(Number(id))) {
-    console.log('Invalid workspace ID detected:', id);
+  if (invalidWorkspaceId) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -59,50 +111,74 @@ export const Workspace = () => {
     );
   }
 
-
-  return (
-    <Tabs defaultValue="grid" className="w-full h-full flex flex-col" onValueChange={setActiveTab} value={activeTab}>
-      <TabsList className="w-fit h-12 flex-shrink-0">
-        <TabsTrigger value="grid" className="flex items-center gap-2">
+  // Define tabs for URL persistence
+  const workspaceTabs = [
+    {
+      value: 'grid',
+      label: (
+        <div className="flex items-center gap-2">
           <ClipboardList />
           Tasks
-        </TabsTrigger>
-        <TabsTrigger value="list" className="flex items-center gap-2">
+        </div>
+      ),
+      content: (
+        <motion.div
+          className='flex-1 h-full'
+          animate={gridControls}
+        >
+          <WorkspaceTable 
+            ref={tableRef}
+            rowCache={rowCache} 
+            workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
+            searchText={searchText}
+            onFiltersChanged={(active) => setShowClearFilters(!!active)}
+          />
+        </motion.div>
+      )
+    },
+    {
+      value: 'list',
+      label: (
+        <div className="flex items-center gap-2">
           <Settings />
           Settings
-        </TabsTrigger>
-      </TabsList>
-      <div className="flex items-center gap-3 mb-3">
+        </div>
+      ),
+      content: (
+        <motion.div
+          exit={{ x: "-80vw" }}
+          initial={{ x: "80vw" }}
+          animate={{ x: 0 }}
+        >
+          <SettingsComponent workspaceId={id} />
+        </motion.div>
+      )
+    }
+  ];
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex items-center gap-6 mb-4">
         <Input
           placeholder="Search tasks..."
-          className="max-w-sm"
+          className="max-w-sm h-12"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        {/* Mobile FAB substitute: visible on small screens */}
-        {!isAllWorkspaces && !isNaN(Number(id)) && (
-          <button
-            className="ml-auto sm:hidden inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground"
-            onClick={() => setOpenCreateTask(true)}
-            title="Create Task"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New
-          </button>
-        )}
+      </div>
+      <div className='flex h-full'>
+        <UrlTabs
+          tabs={workspaceTabs}
+          defaultValue="grid"
+          basePath={`/workspace/${id}`}
+          pathMap={{ grid: '', list: '/settings' }}
+          className="w-full h-full flex flex-col"
+          onValueChange={setActiveTab}
+          showClearFilters={showClearFilters}
+          onClearFilters={() => tableRef.current?.clearFilters()}
+        />
       </div>
 
-      <TabsContent
-        forceMount
-        className='flex-1 h-0'
-        value="grid"
-        style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
-      >
-        <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
-      </TabsContent>
-      <TabsContent value="list" className="flex-1 h-0">
-        <SettingsComponent />
-      </TabsContent>
       {/* Floating Action Button for mobile (bottom-right) */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (
         <>
@@ -116,8 +192,7 @@ export const Workspace = () => {
           <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
         </>
       )}
-    </Tabs>
-
+    </div>
 
   );
 };
