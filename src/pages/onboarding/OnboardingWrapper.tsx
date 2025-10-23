@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/whagonsApi';
 import { User, OnboardingData, InitializationStage } from '@/types/user';
@@ -33,6 +33,32 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     url_picture: user.url_picture,
   });
   const [loading, setLoading] = useState<boolean>(false);
+  const [bgIndex, setBgIndex] = useState<number>(0);
+  const [quoteIndex, setQuoteIndex] = useState<number>(0);
+
+  const backgroundImages = useMemo(() => [
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1464822759844-d150f39ac1a2?auto=format&fit=crop&w=1920&q=80',
+    'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&w=1920&q=80'
+  ], []);
+  const quotes = useMemo(() => [
+    'Build momentum. One small step at a time.',
+    'Clarity comes from action, not thought.',
+    'Start where you are. Use what you have. Do what you can.',
+    'Focus on progress, not perfection.',
+    'The journey of a thousand miles begins with a single step.',
+    'Done is better than perfect.',
+    'Your future self will thank you for starting today.',
+    'Success is the sum of small efforts, repeated day in and day out.',
+    'Dream big. Start small. Act now.'
+  ], []);
 
   const syncCachesAndStore = async () => {
     // Ensure tasks cache is ready only; core slices are hydrated by AuthProvider
@@ -56,6 +82,11 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       setCurrentStep(user.email ? 0 : -1); // -1 for email verification if needed
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    setBgIndex(Math.floor(Math.random() * backgroundImages.length));
+    setQuoteIndex(Math.floor(Math.random() * quotes.length));
+  }, [backgroundImages.length, quotes.length]);
 
   const updateOnboardingData = (data: Partial<OnboardingData>) => {
     setOnboardingData(prev => ({ ...prev, ...data }));
@@ -236,64 +267,71 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 relative bg-no-repeat bg-cover bg-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20" style={{ backgroundImage: "url('/whagons.svg')" }}>
-      {/* Background overlay for better content readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-transparent to-white/60 dark:from-gray-900/80 dark:via-transparent dark:to-gray-900/60"></div>
-
-      {/* Small logo in top left corner */}
-      <div className="absolute top-6 left-6 z-10">
-        <div className="flex items-center">
-          <WhagonsCheck width={28} height={14} color="#27C1A7" />
-          <div className="text-sm pl-1.5 font-semibold text-[#27C1A7]" style={{ fontFamily: 'Montserrat' }}>
-            Whagons
+    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2">
+      {/* Left: photo with quote */}
+      <div className="relative hidden lg:block">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${backgroundImages[bgIndex]})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60" />
+        <div className="relative z-10 h-full flex flex-col justify-between p-10">
+          <div />
+          <div>
+            <div className="text-white/90 text-lg mb-1">Welcome to</div>
+            <h1 className="text-4xl font-semibold tracking-tight leading-none text-white">Whagons</h1>
+            <p className="mt-8 text-2xl leading-snug text-white max-w-xl">{quotes[quoteIndex]}</p>
+          </div>
+          <div className="flex items-center gap-2 text-white/80">
+            <WhagonsCheck width={28} height={14} color="#27C1A7" />
+            <span className="text-sm font-semibold">Whagons</span>
           </div>
         </div>
       </div>
 
-      <div className="w-full max-w-md z-10 relative">
-        <div className="text-center mb-10">
-          <div className="space-y-3">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Welcome to Whagons
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Let's get your account set up
-            </p>
+      {/* Right: form card */}
+      <div className="relative flex items-center justify-center px-6 py-10 bg-[url('/images/onboarding/gradient-waves.svg')] bg-cover bg-center">
+        <div className="absolute inset-0 pointer-events-none bg-white/65 dark:bg-gray-900/70 backdrop-blur-sm" />
+        <div className="relative w-full max-w-md z-10">
+          <div className="text-center mb-10">
+            <div className="space-y-3">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome to Whagons</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Let's get your account set up</p>
+            </div>
           </div>
-        </div>
 
-        {/* Progress indicator */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between">
-            {[0, 1, 2].map((step) => (
-              <div key={step} className="flex items-center">
-                <button
-                  onClick={() => handleStepClick(step)}
-                  disabled={step > currentStep}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200 ${
-                    step <= currentStep
-                      ? 'bg-primary text-white cursor-pointer hover:bg-primary/90 shadow-lg'
-                      : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
-                  } ${step < currentStep ? 'hover:scale-105' : ''}`}
-                >
-                  {step + 1}
-                </button>
-                {step < 2 && (
-                  <div
-                    className={`w-16 h-1 mx-3 rounded-full ${
-                      step < currentStep
-                        ? 'bg-primary'
-                        : 'bg-gray-200 dark:bg-gray-700'
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+          <div className="mb-10">
+            <div className="flex items-center justify-between">
+              {[0, 1, 2].map((step) => (
+                <div key={step} className="flex items-center">
+                  <button
+                    onClick={() => handleStepClick(step)}
+                    disabled={step > currentStep}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200 ${
+                      step <= currentStep
+                        ? 'bg-primary text-white cursor-pointer hover:bg-primary/90 shadow-lg'
+                        : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                    } ${step < currentStep ? 'hover:scale-105' : ''}`}
+                  >
+                    {step + 1}
+                  </button>
+                  {step < 2 && (
+                    <div
+                      className={`w-16 h-1 mx-3 rounded-full ${
+                        step < currentStep
+                          ? 'bg-primary'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                      }`}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/20 dark:border-gray-700/20 p-8">
-          {renderStep()}
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-8">
+            {renderStep()}
+          </div>
         </div>
       </div>
     </div>

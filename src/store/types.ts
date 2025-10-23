@@ -18,6 +18,10 @@ export interface Team {
     name: string;
     description: string | null;
     color: string | null;
+    icon?: string | null;
+    is_active?: boolean;
+    parent_team_id?: number | null;
+    team_lead_id?: number | null;
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
@@ -83,9 +87,7 @@ export interface Task {
     // Store responsible user IDs as JSON array for efficient storage
     // Most tasks have few responsible users, so this avoids a large junction table
     user_ids: number[] | null;
-    // Approval workflow fields
-    approval_metadata?: any | null; // JSON metadata for approval workflows
-    approval_metadata_updated_at?: string | null; // Timestamp for approval metadata updates
+    
     created_at: string;
     updated_at: string;
 }

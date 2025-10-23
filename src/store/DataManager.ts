@@ -18,6 +18,7 @@ const coreKeys = [
   'slas',
   'spots',
   'users',
+  'jobPositions',
   'forms',
   'formVersions',
   'workflows',

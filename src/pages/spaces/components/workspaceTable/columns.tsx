@@ -43,9 +43,16 @@ export function buildWorkspaceColumns(opts: any) {
       cellRenderer: (p: any) => {
         const name = p.data?.name || '';
         const description = p.data?.description || '';
+        const statusMeta = statusMap[p.data?.status_id as number];
+        const statusColor = statusMeta?.color;
         return (
           <div className="flex flex-col gap-1 py-1">
-            <div className="font-semibold text-base text-foreground">{name}</div>
+            <div className="flex items-center gap-2">
+              {statusColor && (
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: statusColor }} />
+              )}
+              <div className="font-semibold text-base text-foreground truncate" title={name}>{name}</div>
+            </div>
             {description && (
               <div
                 className="text-xs text-muted-foreground/70"
@@ -102,9 +109,9 @@ export function buildWorkspaceColumns(opts: any) {
           />
         );
       },
-      width: 160,
-      minWidth: 110,
-      maxWidth: 200,
+      width: 200,
+      minWidth: 140,
+      maxWidth: 240,
     },
     {
       field: 'priority_id',

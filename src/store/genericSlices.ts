@@ -23,7 +23,7 @@ const genericSliceConfigs = [
     { name: 'fieldOptions', table: 'wh_field_options', endpoint: '/field-options', store: 'field_options', hashFields: ['id','name','version','data','enabled','created_by','updated_at'] },
 
     // User Management
-    { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','team_id','role_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
+    { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','team_id','role_id','job_position_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
     { name: 'roles', table: 'wh_roles', endpoint: '/roles', store: 'roles', hashFields: ['id','name','description','updated_at'] },
     { name: 'permissions', table: 'wh_permissions', endpoint: '/permissions', store: 'permissions', hashFields: ['id','name','key','group','type','updated_at'] },
     { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','role_id','updated_at'] },
@@ -67,14 +67,13 @@ const genericSliceConfigs = [
     { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','updated_at'] },
     { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-custom-fields', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
-    { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','updated_at'] },
+    { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
 
-    // Approvals (config + templates)
-    { name: 'statusApprovalConfig', table: 'wh_status_approval_config', endpoint: '/status-approval-config', store: 'status_approval_config', hashFields: ['id','status_id','has_approval_context','approval_config','auto_advance','next_status_on_approve','next_status_on_reject','next_status_on_timeout','blocks_editing','blocks_deletion','blocks_reassignment','updated_at'] },
-    { name: 'approvalTemplates', table: 'wh_approval_templates', endpoint: '/approval-templates', store: 'approval_templates', hashFields: ['id','name','category_id','template_config','is_active','is_default','created_by','updated_at'] },
+    // Job Positions
+    { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','reports_to_position_id','is_active','description','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -126,8 +125,7 @@ export const {
     templates,
     messages,
     workspaces,
-    statusApprovalConfig,
-    approvalTemplates,
+    jobPositions,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -185,8 +183,7 @@ export const genericEventNames = {
     templates: genericSlices.slices.templates.eventNames,
     messages: genericSlices.slices.messages.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
-    statusApprovalConfig: genericSlices.slices.statusApprovalConfig.eventNames,
-    approvalTemplates: genericSlices.slices.approvalTemplates.eventNames,
+    jobPositions: genericSlices.slices.jobPositions.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -235,6 +232,5 @@ export const genericActions = {
     templates: genericSlices.slices.templates.actions,
     messages: genericSlices.slices.messages.actions,
     workspaces: genericSlices.slices.workspaces.actions,
-    statusApprovalConfig: genericSlices.slices.statusApprovalConfig.actions,
-    approvalTemplates: genericSlices.slices.approvalTemplates.actions,
+    jobPositions: genericSlices.slices.jobPositions.actions,
 } as const;

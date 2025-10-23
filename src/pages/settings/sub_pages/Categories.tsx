@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -9,6 +9,7 @@ import {
   faCubes
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
+import { genericActions } from '@/store/genericSlices';
 import { Category, Task, Team, StatusTransitionGroup, Sla } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -101,12 +102,22 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Categories() {
+  const dispatch = useDispatch();
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
   const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
   const slasState = useSelector((state: RootState) => (state as any).slas) as { value?: Sla[] } | undefined;
   const slas: Sla[] = slasState?.value ?? [];
+
+  // Ensure local IndexedDB hydration on mount (no network requests)
+  useEffect(() => {
+    dispatch((genericActions as any).categories.getFromIndexedDB());
+    dispatch((genericActions as any).teams.getFromIndexedDB());
+    dispatch((genericActions as any).slas.getFromIndexedDB());
+    dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
+    dispatch((genericActions as any).categoryFieldAssignments.getFromIndexedDB());
+  }, [dispatch]);
 
   // Use shared state management
   const {

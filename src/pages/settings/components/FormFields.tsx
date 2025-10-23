@@ -248,11 +248,14 @@ export function SelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
-              {option.label}
-            </SelectItem>
-          ))}
+          {options.map((option) => {
+            const val = String(option.value);
+            return (
+              <SelectItem key={`${id}-${val}`} value={val} disabled={option.disabled}>
+                {option.label}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </FormField>

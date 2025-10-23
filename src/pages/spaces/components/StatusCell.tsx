@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import blockShuffle from '@/assets/block-3-shuffle.svg';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -44,6 +43,36 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     color: color
   };
 
+  // Build a compact, high-contrast pill to improve visibility.
+  // Use a subtle tinted background blended with the card color to avoid heavy fills (e.g., red-on-red).
+  const tintedBackground = color
+    ? `color-mix(in oklab, var(--color-card) 90%, ${color} 10%)`
+    : undefined;
+  const StatusPill = (
+    <div
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 border"
+      style={{ background: tintedBackground, color: color, borderColor: color }}
+    >
+      {isWorkingStatus ? (
+        <span className="relative inline-flex items-center justify-center h-3.5 w-3.5" aria-busy="true">
+          <span
+            className="absolute inline-block rounded-full animate-ping"
+            style={{ backgroundColor: color, opacity: 0.35, height: '10px', width: '10px' }}
+          />
+          <span
+            className="absolute inline-block rounded-full"
+            style={{ height: '10px', width: '10px', border: `2px solid ${color}` }}
+          />
+        </span>
+      ) : meta?.icon ? (
+        <FontAwesomeIcon icon={icon} className="text-[11px]" style={{ color }} />
+      ) : (
+        <span className="text-[10px] leading-none" style={{ color }}>●</span>
+      )}
+      <span className="text-sm font-semibold tracking-wide">{name}</span>
+    </div>
+  );
+
   const items = useMemo(() => {
     return allowedNext
       .map((id) => ({ id, meta: statusMap[id] }))
@@ -60,16 +89,10 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
                 <MultiStateBadge
                   state={animationState}
                   customStatus={customStatusConfig}
+                  customComponent={StatusPill}
                   className="cursor-pointer"
                 />
-                {/* {isWorkingStatus && (
-                  <img
-                    src={blockShuffle}
-                    alt=""
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                  />
-                )} */}
+                {/* optional right-side animation removed by request */}
               </div>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -112,14 +135,7 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
                   )}
                   <span className="inline-flex items-center gap-1">
                     <span>{meta?.name || `#${id}`}</span>
-                    {meta?.action?.toUpperCase?.() === 'WORKING' && (
-                      <img
-                        src={blockShuffle}
-                        alt=""
-                        aria-hidden="true"
-                        className="h-3 w-3"
-                      />
-                    )}
+                    {/* removed moving image for WORKING status */}
                   </span>
                 </span>
               </Button>

@@ -16,10 +16,12 @@ import Teams from '@/pages/settings/sub_pages/Teams';
 import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';
 import Users from '@/pages/settings/sub_pages/Users';
+import JobPositions from '@/pages/settings/sub_pages/JobPositions';
 import Statuses from '@/pages/settings/sub_pages/Statuses';
 import Priorities from '@/pages/settings/sub_pages/Priorities';
 import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
+import Approvals from '@/pages/settings/sub_pages/Approvals';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 // Messages removed
@@ -74,11 +76,13 @@ export const HomeRoutes = () => {
           <Route path="/settings/teams" element={<Teams />} />
           <Route path="/settings/spots" element={<Spots />} />
           <Route path="/settings/spots/types" element={<SpotTypes />} />
+          <Route path="/settings/job-positions" element={<JobPositions />} />
           <Route path="/settings/users" element={<Users />} /> 
           <Route path="/settings/statuses" element={<Statuses />} />
           <Route path="/settings/priorities" element={<Priorities />} />
           <Route path="/settings/slas" element={<Slas />} />
           <Route path="/settings/workflows" element={<Workflows />} />
+          <Route path="/settings/approvals" element={<Approvals />} />
           <Route path="/settings/test" element={<TestPage />} />
         </Routes>
       </MainLayout>

@@ -20,7 +20,8 @@ import {
   faDiagramProject,
   faCalendar,
   faRocket,
-  faTrophy
+  faTrophy,
+  faSquareCheck
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useState } from "react";
@@ -169,6 +170,15 @@ function Settings() {
       color: 'text-pink-500'
     },
     {
+      id: 'approvals',
+      title: 'Approvals',
+      icon: faSquareCheck,
+      count: 0,
+      description: 'Configure task approvals',
+      color: 'text-emerald-500'
+    },
+    
+    {
       id: 'workflows',
       title: 'Workflows',
       icon: faDiagramProject,
@@ -307,6 +317,10 @@ function Settings() {
       case 'workflows':
         navigate('/settings/workflows');
         break;
+      case 'approvals':
+        navigate('/settings/approvals');
+        break;
+      
       case 'spots':
         navigate('/settings/spots');
         break;
