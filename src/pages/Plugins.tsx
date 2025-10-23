@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers } from '@fortawesome/free-solid-svg-icons';
 
 function Plugins() {
 	const navigate = useNavigate();
@@ -37,6 +37,20 @@ function Plugins() {
 						<div className="space-y-1.5">
 							<CardTitle className="text-xl">Assets</CardTitle>
 							<CardDescription>Asset tracking, inspections and maintenance</CardDescription>
+						</div>
+					</CardHeader>
+				</Card>
+
+				<Card className="cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[160px] overflow-hidden">
+					<CardHeader className="space-y-3">
+						<div className="flex items-center justify-between">
+							<div className="text-4xl text-violet-500 group-hover:scale-110 transition-transform duration-200">
+								<FontAwesomeIcon icon={faUsers} />
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<CardTitle className="text-xl">TeamConnect</CardTitle>
+							<CardDescription>Team collaboration and directory integration</CardDescription>
 						</div>
 					</CardHeader>
 				</Card>

@@ -6,6 +6,7 @@ import {
   api as apiClient,
   getTokenForUser,
   initializeAuth,
+  updateAuthToken,
 } from '../api/whagonsApi';
 import { User } from '../types/user';
 import { useDispatch } from 'react-redux';
@@ -65,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // console.log('AuthContext: Fetching user data...');
-      const response = await apiClient.get('/users/me');
+      let response = await apiClient.get('/users/me');
       if (response.status === 200) {
         const userData = response.data.data || response.data;
         setUser(userData);
@@ -75,9 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         (async () => {
           try {
             setHydrating(true);
-            if (!userData?.tenant_domain_prefix) {
-              return;
-            }
+            // Proceed with hydration even if tenant_domain_prefix is missing
             console.log(firebaseUser.uid);
             const result = await DB.init(firebaseUser.uid);
             console.log('DB.init: result', result);
@@ -95,6 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             const dataManager = new DataManager(dispatch);
             await dataManager.loadCoreFromIndexedDB();
+
 
             // Background validation
             (async () => {
@@ -126,10 +126,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         })();
 
+      } else {
+        throw new Error('Unexpected status for /users/me');
       }
     } catch (error) {
-      console.error('AuthContext: Error fetching user data:', error);
-      setUser(null);
+      console.error('AuthContext: Error fetching user data (will try re-login):', error);
+      try {
+        // Force a fresh token and login, then retry once
+        const freshIdToken = await firebaseUser.getIdToken(true);
+        const loginResp = await apiClient.post('/login', { token: freshIdToken });
+        if (loginResp?.status === 200 && loginResp?.data?.token) {
+          updateAuthToken(loginResp.data.token);
+        }
+        const retry = await apiClient.get('/users/me');
+        if (retry.status === 200) {
+          const userData = retry.data.data || retry.data;
+          setUser(userData);
+        } else {
+          setUser(null);
+        }
+      } catch (err2) {
+        console.error('AuthContext: re-login retry failed:', err2);
+        setUser(null);
+      }
     } finally {
       setUserLoading(false);
     }

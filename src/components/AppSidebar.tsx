@@ -17,9 +17,9 @@ import {
   Plus,
   ChevronDown,
   BarChart3,
-  MessageSquareMore,
   Layers,
   Plug,
+  Users2,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -36,8 +36,7 @@ import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
-import { messageBoardsService } from '@/pages/messages/messageBoards';
-import CreateBoardDialog from '@/pages/messages/CreateBoardDialog';
+// Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarDummy from './AppSidebarDummy';
 
@@ -112,8 +111,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
-  const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
-  const [createBoardOpen, setCreateBoardOpen] = useState(false);
+  // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
+  // const [createBoardOpen, setCreateBoardOpen] = useState(false);
 
   const workspacesState = useSelector(
     (state: RootState) => state.workspaces
@@ -185,14 +184,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     iconService.preloadCommonIcons();
   }, []);
 
-  // Load message boards
-  useEffect(() => {
-    const load = () => { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch { } };
-    load();
-    const onUpdate = () => load();
-    window.addEventListener('wh-boards-updated', onUpdate);
-    return () => window.removeEventListener('wh-boards-updated', onUpdate);
-  }, []);
+  // Messages removed
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -351,87 +343,41 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               pathname={pathname}
               getWorkspaceIcon={getWorkspaceIcon}
             />
-          {/* Messages & Boards (collapsible like Spaces) */}
-          <Collapsible defaultOpen={false} className="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild className="text-sm font-normal">
-                <div
-                  className={`flex items-center w-full pr-3 transition-all duration-300 ${isCollapsed ? 'justify-center px-0' : 'justify-between'
-                  }`}
+          {/* TeamConnect (replaces Messages) */}
+          <SidebarGroup>
+            {(!isCollapsed || isMobile) && (
+              <div className="px-3 py-2">
+                <Link
+                  to={`/teamconnect`}
+                  className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${pathname === `/teamconnect`
+                      ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
                 >
-                  <CollapsibleTrigger
-                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${isCollapsed && !isMobile
-                        ? 'flex-col justify-center ml-0 px-2'
-                        : 'justify-start flex-1'
-                    }`}
-                  >
-                    {isCollapsed && !isMobile ? (
-                      <div className="flex flex-col items-center">
-                        <MessageSquareMore className="text-sidebar-foreground w-5 h-5 mb-1" />
-                      </div>
-                    ) : (
-                      <>
-                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
-                        <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
-                          <MessageSquareMore className="w-4 h-4 mr-2" />
-                          Messages
-                        </span>
-                      </>
-                    )}
-                  </CollapsibleTrigger>
+                  <span>
+                    <Users2 className="w-4 h-4" />
+                  </span>
+                  <span>TeamConnect</span>
+                </Link>
+              </div>
+            )}
 
-                  {showExpandedContent && (
-                    <Button 
-                    // variant="ghost" 
-                    // size="icon" 
-                    className="h-6 w-6" 
-                    title="New Board" 
-                    onClick={() => setCreateBoardOpen(true)}>
-                      <Plus size={16} />
-                    </Button>
-                  )}
-                </div>
-              </SidebarGroupLabel>
-
-              <CollapsibleContent keepRendered>
-                {(!isCollapsed || isMobile) && (
-                  <div className="px-3 py-2">
-                    <Link
-                      to={`/messages`}
-                      className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${pathname === `/messages`
-                          ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                      } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-                    >
-                      <span>
-                        <MessageSquareMore className="w-4 h-4" />
-                      </span>
-                      <span>All Messages</span>
-                    </Link>
-                  </div>
-                )}
-
-                {(!isCollapsed || isMobile) && boards.length > 0 && (
-                  <div className="px-3 py-1 space-y-1">
-                    {boards.map((b) => (
-                      <div
-                        key={`mb-${b.id}`}
-                        className="flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-9 px-3"
-                      >
-                        <Link
-                          to={`/messages/board/${b.id}`}
-                          className={`flex-1 group flex items-center space-x-2 rounded-md transition-colors h-9 -mx-3 px-3 ${pathname === `/messages/board/${b.id}` ? 'bg-primary/15 text-primary border-l-4 border-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                          }`}
-                        >
-                          <span className="truncate">{b.name}</span>
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
+            {/* Collapsed icon only */}
+            {isCollapsed && !isMobile && (
+              <div className="px-2 flex justify-center">
+                <Link
+                  to={`/teamconnect`}
+                  className={`flex items-center justify-center w-10 h-10 rounded text-xs font-medium transition-colors ${pathname === `/teamconnect`
+                      ? 'bg-primary/20 text-primary border border-primary/40'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  }`}
+                  title={'TeamConnect'}
+                >
+                  <Users2 className="w-5 h-5 text-[#27C1A7]" />
+                </Link>
+              </div>
+            )}
+          </SidebarGroup>
 
           {/* <AppSidebarDummy /> */}
         </SidebarGroup>
@@ -553,7 +499,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <CreateBoardDialog open={createBoardOpen} onOpenChange={(o) => { setCreateBoardOpen(o); if (!o) { try { setBoards(messageBoardsService.list().map(b => ({ id: String(b.id), name: b.name }))); } catch { } } }} />
+        {/* Messages create board dialog removed */}
 
         {showExpandedContent && (
           <div className="px-2 py-1 text-xs text-muted-foreground">

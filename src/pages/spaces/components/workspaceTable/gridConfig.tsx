@@ -8,7 +8,7 @@ export const GRID_STYLES = {
 };
 
 export const GRID_CONSTANTS = {
-  ROW_HEIGHT: 70,
+  ROW_HEIGHT: 88,
   HEADER_HEIGHT: 44,
   ROW_BUFFER: 50,
   CLIENT_THRESHOLD: 1000,

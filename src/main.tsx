@@ -11,6 +11,9 @@ import { registerSW } from 'virtual:pwa-register';
 // import { genericActions } from './store/genericSlices';
 import { applyEncryptionConfig } from './config/encryptionConfig';
 
+// Initialize encryption configuration BEFORE app boot so caches hydrate correctly
+applyEncryptionConfig();
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
     <Provider store={store}>
@@ -22,9 +25,6 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </Provider>
   // {/* </React.StrictMode>, */}
 );
-
-// Initialize encryption configuration
-applyEncryptionConfig();
 
 // Register PWA in production only
 if (import.meta.env.VITE_DEVELOPMENT !== 'true') {

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -9,7 +9,8 @@ import {
   faCubes
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { Category, Task, Team, StatusTransitionGroup } from "@/store/types";
+import { genericActions } from '@/store/genericSlices';
+import { Category, Task, Team, StatusTransitionGroup, Sla } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconService } from '@/database/iconService';
@@ -34,6 +35,7 @@ interface CategoryFormData {
   icon: string;
   enabled: boolean;
   team_id: string;
+  sla_id: string;
   status_transition_group_id: string;
 }
 
@@ -75,7 +77,12 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
         className="w-4 h-4"
         style={{ color: categoryColor }}
       />
-      <span>{categoryName}</span>
+      <div className="flex flex-col leading-tight">
+        <span className={props.data?.enabled === false ? "line-through text-muted-foreground" : undefined}>{categoryName}</span>
+        {props.data?.description ? (
+          <span className="text-xs text-muted-foreground truncate">{props.data.description}</span>
+        ) : null}
+      </div>
     </div>
   );
 };
@@ -95,10 +102,22 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Categories() {
+  const dispatch = useDispatch();
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
   const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
+  const slasState = useSelector((state: RootState) => (state as any).slas) as { value?: Sla[] } | undefined;
+  const slas: Sla[] = slasState?.value ?? [];
+
+  // Ensure local IndexedDB hydration on mount (no network requests)
+  useEffect(() => {
+    dispatch((genericActions as any).categories.getFromIndexedDB());
+    dispatch((genericActions as any).teams.getFromIndexedDB());
+    dispatch((genericActions as any).slas.getFromIndexedDB());
+    dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
+    dispatch((genericActions as any).categoryFieldAssignments.getFromIndexedDB());
+  }, [dispatch]);
 
   // Use shared state management
   const {
@@ -129,6 +148,8 @@ function Categories() {
     searchFields: ['name', 'description']
   });
 
+ 
+
   // Form state for create dialog
   const [createFormData, setCreateFormData] = useState<CategoryFormData>({
     name: '',
@@ -137,6 +158,7 @@ function Categories() {
     icon: 'fas fa-tags',
     enabled: true,
     team_id: '',
+    sla_id: '',
     status_transition_group_id: ''
   });
 
@@ -148,6 +170,7 @@ function Categories() {
     icon: 'fas fa-tags',
     enabled: true,
     team_id: '',
+    sla_id: '',
     status_transition_group_id: ''
   });
 
@@ -161,6 +184,7 @@ function Categories() {
         icon: editingCategory.icon || 'fas fa-tags',
         enabled: editingCategory.enabled ?? true,
         team_id: editingCategory.team_id?.toString() || '',
+        sla_id: editingCategory.sla_id?.toString() || '',
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
       });
     }
@@ -216,12 +240,7 @@ function Categories() {
       minWidth: 150,
       cellRenderer: CategoryNameCellRenderer
     },
-    { 
-      field: 'description', 
-      headerName: 'Description',
-      flex: 2,
-      minWidth: 150
-    },
+    // Description column removed; description now shown under name
     // Fields column removed per request
     {
       field: 'team_id',
@@ -245,6 +264,22 @@ function Categories() {
             <span>{team?.name || `Team ${teamId}`}</span>
           </div>
         );
+      },
+      sortable: true,
+      filter: true
+    },
+    {
+      field: 'sla_id',
+      headerName: 'SLA',
+      flex: 1.2,
+      minWidth: 180,
+      cellRenderer: (params: ICellRendererParams) => {
+        const slaId = params.value as number | null | undefined;
+        if (!slaId) {
+          return '' as any;
+        }
+        const sla = slas.find((s: Sla) => s.id === Number(slaId));
+        return <span>{sla?.name || `SLA ${slaId}`}</span>;
       },
       sortable: true,
       filter: true
@@ -298,7 +333,7 @@ function Categories() {
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
+  ], [teams, slas, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -319,7 +354,7 @@ function Categories() {
       enabled: createFormData.enabled,
       team_id: parseInt(createFormData.team_id),
       workspace_id: 1,
-      sla_id: 1,
+      sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
       status_transition_group_id: parseInt(createFormData.status_transition_group_id),
       deleted_at: null
     };
@@ -333,6 +368,7 @@ function Categories() {
       icon: 'fas fa-tags',
       enabled: true,
       team_id: '',
+      sla_id: '',
       status_transition_group_id: ''
     });
   };
@@ -349,7 +385,7 @@ function Categories() {
       enabled: editFormData.enabled,
       team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
       workspace_id: 1,
-      sla_id: 1,
+      sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
       status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined
     };
     await updateItem(editingCategory.id, updates);
@@ -464,6 +500,15 @@ function Categories() {
         noRowsMessage="No categories found"
         rowSelection="single"
         onRowDoubleClicked={(row: any) => handleEdit(row)}
+        gridOptions={{
+          getRowStyle: (params: any) => {
+            const isEnabled = Boolean(params?.data?.enabled);
+            if (!isEnabled) {
+              return { opacity: 0.6 } as any;
+            }
+            return undefined as any;
+          }
+        }}
       />
 
       {/* Search Input - Original Location */}
@@ -532,6 +577,17 @@ function Categories() {
               label: team.name
             }))}
             required
+          />
+          <SelectField
+            id="sla"
+            label="SLA"
+            value={createFormData.sla_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
+            placeholder="Select SLA…"
+            options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
+              value: s.id.toString(),
+              label: s.name
+            }))]}
           />
           <SelectField
             id="status-group"
@@ -606,6 +662,17 @@ function Categories() {
               value: team.id.toString(),
               label: team.name
             }))}
+          />
+          <SelectField
+            id="edit-sla"
+            label="SLA"
+            value={editFormData.sla_id}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
+            placeholder="Select SLA…"
+            options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
+              value: s.id.toString(),
+              label: s.name
+            }))]}
           />
           <SelectField
             id="edit-status-group"

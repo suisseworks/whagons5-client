@@ -71,12 +71,9 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     if (!category) return;
     try {
       await Promise.all([
-        dispatch(genericActions.customFields.getFromIndexedDB()),
-        dispatch(genericActions.categoryFieldAssignments.getFromIndexedDB()),
-      ]);
-      await Promise.all([
-        dispatch(genericActions.customFields.fetchFromAPI() as any),
-        dispatch(genericActions.categoryFieldAssignments.fetchFromAPI({ category_id: category.id }) as any),
+        dispatch(genericActions.customFields.getFromIndexedDB() as any),
+        // If category-specific assignments must be fetched remotely, replace with getFromIndexedDB too
+        dispatch(genericActions.categoryFieldAssignments.getFromIndexedDB() as any),
       ]);
       await refreshFromCache();
     } catch (e) {

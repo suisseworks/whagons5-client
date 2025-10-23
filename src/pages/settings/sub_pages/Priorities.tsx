@@ -214,6 +214,7 @@ function Priorities() {
       <SettingsGrid
         rowData={filteredItems}
         columnDefs={columns}
+        onRowClicked={handleEdit}
         gridOptions={{
           groupDisplayType: 'groupRows',
           groupDefaultExpanded: -1

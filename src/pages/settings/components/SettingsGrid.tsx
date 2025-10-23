@@ -17,12 +17,15 @@ export interface SettingsGridProps<T = any> {
   defaultColDef?: ColDef;
   rowSelection?: 'single' | 'multiple' | any; // allow object config per example
   onSelectionChanged?: (selectedRows: T[]) => void;
+  onRowClicked?: (row: T) => void;
   onRowDoubleClicked?: (row: T) => void;
   onCellValueChanged?: (event: any) => void;
   autoGroupColumnDef?: ColDef;
   gridOptions?: any;
   quickFilterText?: string;
   style?: React.CSSProperties;
+  rowHeight?: number;
+  zebraRows?: boolean;
 }
 
 export function SettingsGrid<T = any>({
@@ -39,12 +42,15 @@ export function SettingsGrid<T = any>({
   },
   rowSelection,
   onSelectionChanged,
+  onRowClicked,
   onRowDoubleClicked,
   onCellValueChanged,
   autoGroupColumnDef,
   gridOptions,
   quickFilterText,
-  style
+  style,
+  rowHeight,
+  zebraRows
 }: SettingsGridProps<T>) {
   const gridRef = useRef<AgGridReact>(null);
 
@@ -81,7 +87,7 @@ export function SettingsGrid<T = any>({
         rowSelection={rowSelection}
         suppressColumnVirtualisation={true}
         animateRows={true}
-        rowHeight={50}
+        rowHeight={rowHeight ?? 50}
         headerHeight={44}
         defaultColDef={{
           ...defaultColDef,
@@ -91,10 +97,22 @@ export function SettingsGrid<T = any>({
         autoGroupColumnDef={autoGroupColumnDef}
         {...(gridOptions || {})}
         quickFilterText={quickFilterText}
+        getRowStyle={zebraRows ? (params: any) => {
+          const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+          if (params.node.rowIndex % 2 === 0) {
+            return { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' };
+          }
+          return undefined as any;
+        } : undefined}
         onSelectionChanged={() => {
           if (gridRef.current?.api && onSelectionChanged) {
             const selected = gridRef.current.api.getSelectedRows() as T[];
             onSelectionChanged(selected);
+          }
+        }}
+        onRowClicked={(event: any) => {
+          if (onRowClicked && event?.data) {
+            onRowClicked(event.data as T);
           }
         }}
         onRowDoubleClicked={(event: any) => {
