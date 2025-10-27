@@ -30,13 +30,13 @@ export function buildWorkspaceColumns(opts: any) {
     );
   };
 
-  const groupByStatus: boolean = false;
+  // groupByStatus can be toggled later if we add grouping by status
 
   return ([
     {
       field: 'name',
       headerName: 'Task',
-      flex: 2.5,
+      flex: 3.2,
       filter: false,
       wrapText: true,
       autoHeight: true,
@@ -49,9 +49,12 @@ export function buildWorkspaceColumns(opts: any) {
           <div className="flex flex-col gap-1 py-1">
             <div className="flex items-center gap-2">
               {statusColor && (
-                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: statusColor }} />
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: statusColor, boxShadow: '0 0 0 1px var(--color-border)' }}
+                />
               )}
-              <div className="font-semibold text-base text-foreground truncate" title={name}>{name}</div>
+              <div className="font-semibold text-lg text-foreground truncate" title={name}>{name}</div>
             </div>
             {description && (
               <div
@@ -69,7 +72,7 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      minWidth: 300,
+      minWidth: 340,
     },
     {
       field: 'status_id',
@@ -139,12 +142,25 @@ export function buildWorkspaceColumns(opts: any) {
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
         const color = meta?.color || '#6B7280';
+        const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+        const bgTint = color ? (isDark
+          ? `color-mix(in oklab, var(--color-card) 92%, ${color} 8%)`
+          : `color-mix(in oklab, var(--color-card) 85%, ${color} 15%)`
+        ) : undefined;
+        const borderClr = color ? (isDark
+          ? `color-mix(in oklab, ${color} 65%, var(--color-card) 35%)`
+          : color
+        ) : undefined;
+        const textClr = color ? (isDark
+          ? `color-mix(in oklab, ${color} 78%, white 22%)`
+          : color
+        ) : undefined;
         return (
           <div className="flex items-center h-full py-2">
             <Badge
               variant="outline"
-              style={{ borderColor: color, color: color, backgroundColor: `${color}10` }}
-              className="text-xs px-2 py-0.5 font-medium leading-tight truncate max-w-[90px]"
+              style={{ borderColor: borderClr, color: textClr, background: bgTint }}
+              className="border-2 rounded-md text-sm px-3 py-1 font-semibold leading-tight truncate max-w-[110px]"
               title={name}
             >
               {name}
@@ -159,7 +175,7 @@ export function buildWorkspaceColumns(opts: any) {
     {
       field: 'user_ids',
       headerName: 'Responsible',
-      flex: 1,
+      flex: 0.85,
       filter: false,
       cellRenderer: (p: any) => {
         if (!usersLoaded) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
@@ -197,7 +213,7 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      minWidth: 140,
+      minWidth: 120,
     },
     {
       field: 'due_date',
@@ -243,28 +259,6 @@ export function buildWorkspaceColumns(opts: any) {
         return (<div className="flex items-center h-full py-2"><span className="text-sm text-muted-foreground">{name}</span></div>);
       },
       minWidth: 100,
-    },
-    {
-      field: 'response_date',
-      headerName: 'Response',
-      filter: false,
-      cellRenderer: (p: any) => {
-        const responseDate = p.data?.response_date;
-        const formatted = formatDueDate(responseDate);
-        return (<div className="flex items-center h-full py-2"><span className="text-sm text-muted-foreground">{responseDate ? formatted.replace('Due ', 'Responded ').replace('overdue', 'late') : 'No response'}</span></div>);
-      },
-      minWidth: 140,
-    },
-    {
-      field: 'resolution_date',
-      headerName: 'Resolution',
-      filter: false,
-      cellRenderer: (p: any) => {
-        const resolutionDate = p.data?.resolution_date;
-        const formatted = formatDueDate(resolutionDate);
-        return (<div className="flex items-center h-full py-2"><span className="text-sm text-muted-foreground">{resolutionDate ? formatted.replace('Due ', 'Resolved ').replace('overdue', 'late') : 'No resolution'}</span></div>);
-      },
-      width: 150,
     },
   ]);
 }

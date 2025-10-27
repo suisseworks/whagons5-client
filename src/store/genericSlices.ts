@@ -65,7 +65,7 @@ const genericSliceConfigs = [
 
     // Core Entities (converted from custom to generic)
     { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','updated_at'] },
-    { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-custom-fields', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
+    { name: 'categoryCustomFields', table: 'wh_category_custom_field', endpoint: '/category-custom-fields', store: 'category_custom_fields', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','updated_at'] },
@@ -119,7 +119,7 @@ export const {
     exceptions,
     // Core entities (converted from custom)
     categories,
-    categoryFieldAssignments,
+    categoryCustomFields,
     customFields,
     teams,
     templates,
@@ -177,7 +177,7 @@ export const genericEventNames = {
     exceptions: genericSlices.slices.exceptions.eventNames,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.eventNames,
-    categoryFieldAssignments: genericSlices.slices.categoryFieldAssignments.eventNames,
+    categoryCustomFields: genericSlices.slices.categoryCustomFields.eventNames,
     customFields: genericSlices.slices.customFields.eventNames,
     teams: genericSlices.slices.teams.eventNames,
     templates: genericSlices.slices.templates.eventNames,
@@ -226,7 +226,7 @@ export const genericActions = {
     exceptions: genericSlices.slices.exceptions.actions,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.actions,
-    categoryFieldAssignments: genericSlices.slices.categoryFieldAssignments.actions,
+    categoryCustomFields: genericSlices.slices.categoryCustomFields.actions,
     customFields: genericSlices.slices.customFields.actions,
     teams: genericSlices.slices.teams.actions,
     templates: genericSlices.slices.templates.actions,

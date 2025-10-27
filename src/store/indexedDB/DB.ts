@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.5';
+const CURRENT_DB_VERSION = '1.9.7';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -132,12 +132,12 @@ export class DB {
           if (!db.objectStoreNames.contains('tags')) {
             db.createObjectStore('tags', { keyPath: 'id' });
           }
-          // Custom fields and category-field-assignments (GenericCache-backed)
+          // Custom fields and category custom fields (GenericCache-backed)
           if (!db.objectStoreNames.contains('custom_fields')) {
             db.createObjectStore('custom_fields', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('category_field_assignments')) {
-            db.createObjectStore('category_field_assignments', {
+          if (!db.objectStoreNames.contains('category_custom_fields')) {
+            db.createObjectStore('category_custom_fields', {
               keyPath: 'id',
             });
           }
@@ -424,7 +424,7 @@ export class DB {
       | 'spots'
       | 'tags'
       | 'custom_fields'
-      | 'category_field_assignments'
+      | 'category_custom_fields'
       | 'users'
       | 'roles'
       | 'permissions'
@@ -478,7 +478,7 @@ export class DB {
       | 'spots'
       | 'tags'
       | 'custom_fields'
-      | 'category_field_assignments'
+      | 'category_custom_fields'
       | 'users'
       | 'roles'
       | 'permissions'

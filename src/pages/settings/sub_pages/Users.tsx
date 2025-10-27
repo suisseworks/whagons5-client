@@ -16,8 +16,8 @@ interface UserData {
   email: string;
   team_id?: number | null;
   role_id?: number | null;
-  job_position_id?: string | null;
-  job_position?: { id: string; title: string } | null;
+  job_position_id?: number | null;
+  job_position?: { id: number; title: string } | null;
   organization_name?: string | null;
   is_admin?: boolean;
   has_active_subscription?: boolean;
@@ -115,7 +115,7 @@ function Users() {
         name: editingUser.name || '',
         email: editingUser.email || '',
         team_id: editingUser.team_id?.toString() || '',
-        job_position_id: editingUser.job_position_id || '',
+        job_position_id: editingUser.job_position_id != null ? editingUser.job_position_id.toString() : '',
         organization_name: editingUser.organization_name || '',
         is_admin: !!editingUser.is_admin,
         has_active_subscription: !!editingUser.has_active_subscription
@@ -195,10 +195,11 @@ function Users() {
       flex: 2,
       minWidth: 220,
       cellRenderer: (params: ICellRendererParams) => {
-        const id = params.value as string | undefined;
-        if (!id) return <span className="text-muted-foreground">No Job Position</span>;
-        const jp = jobPositions.find((p: any) => p.id === id);
-        return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || id}</Badge>;
+        const idVal = params.value as number | string | undefined;
+        if (idVal == null || idVal === '') return <span className="text-muted-foreground">No Job Position</span>;
+        const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
+        const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
+        return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
       }
     },
     {
@@ -230,7 +231,7 @@ function Users() {
       resizable: false,
       pinned: 'right'
     }
-  ]), [teams, handleEdit, handleDelete]);
+  ]), [teams, jobPositions, handleEdit, handleDelete]);
 
   // Render entity preview for delete dialog
   const renderUserPreview = (user: UserData) => (
@@ -288,7 +289,7 @@ function Users() {
       name: createFormData.name,
       email: createFormData.email,
       team_id: createFormData.team_id ? Number(createFormData.team_id) : null,
-      job_position_id: createFormData.job_position_id || null,
+      job_position_id: createFormData.job_position_id ? Number(createFormData.job_position_id) : null,
       role_id: null, // Not used in this form
       organization_name: createFormData.organization_name || null,
       is_admin: createFormData.is_admin,
@@ -318,7 +319,7 @@ function Users() {
       name: editFormData.name,
       email: editFormData.email,
       team_id: editFormData.team_id ? Number(editFormData.team_id) : null,
-      job_position_id: editFormData.job_position_id || null,
+      job_position_id: editFormData.job_position_id ? Number(editFormData.job_position_id) : null,
       role_id: null, // Not used in this form
       organization_name: editFormData.organization_name || null,
       is_admin: editFormData.is_admin,
@@ -432,7 +433,7 @@ function Users() {
             onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
             placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
             options={jobPositions.map((jp: any) => ({
-              value: jp.id,
+              value: jp.id?.toString?.() ?? String(jp.id),
               label: jp.title
             }))}
           />
@@ -506,7 +507,7 @@ function Users() {
               onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
               placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
               options={jobPositions.map((jp: any) => ({
-                value: jp.id,
+                value: jp.id?.toString?.() ?? String(jp.id),
                 label: jp.title
               }))}
             />

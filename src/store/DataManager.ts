@@ -22,6 +22,7 @@ const coreKeys = [
   'forms',
   'formVersions',
   'customFields',
+  'categoryCustomFields',
 ] as const;
 
 export class DataManager {

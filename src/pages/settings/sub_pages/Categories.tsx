@@ -105,7 +105,7 @@ function Categories() {
   const dispatch = useDispatch();
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
-  const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: any[] };
+  const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: any[] };
   const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
   const slasState = useSelector((state: RootState) => (state as any).slas) as { value?: Sla[] } | undefined;
   const slas: Sla[] = slasState?.value ?? [];
@@ -116,7 +116,7 @@ function Categories() {
     dispatch((genericActions as any).teams.getFromIndexedDB());
     dispatch((genericActions as any).slas.getFromIndexedDB());
     dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
-    dispatch((genericActions as any).categoryFieldAssignments.getFromIndexedDB());
+    dispatch((genericActions as any).categoryCustomFields.getFromIndexedDB());
   }, [dispatch]);
 
   // Use shared state management
@@ -196,13 +196,13 @@ function Categories() {
 
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};
-    (categoryFieldAssignments as any[]).forEach((a) => {
+    (categoryCustomFields as any[]).forEach((a) => {
       const cid = Number((a as any)?.category_id ?? (a as any)?.categoryId);
       if (!Number.isFinite(cid)) return;
       map[cid] = (map[cid] || 0) + 1;
     });
     return map;
-  }, [categoryFieldAssignments]);
+  }, [categoryCustomFields]);
 
   const openManageFields = (category: Category) => {
     setFieldsCategory(category);

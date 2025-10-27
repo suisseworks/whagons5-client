@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MultiStateBadge } from '@/animated/Status';
+import { MultiStateBadge, AnimatedSpinner } from '@/animated/Status';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string };
 
@@ -43,33 +43,45 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     color: color
   };
 
-  // Build a compact, high-contrast pill to improve visibility.
-  // Use a subtle tinted background blended with the card color to avoid heavy fills (e.g., red-on-red).
+  // Build a compact pill with theme-aware contrast.
+  // In dark mode, use a softer mix for bg and slightly softened border/text to reduce harshness.
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   const tintedBackground = color
-    ? `color-mix(in oklab, var(--color-card) 90%, ${color} 10%)`
+    ? (isDark
+      ? `color-mix(in oklab, var(--color-card) 94%, ${color} 6%)`
+      : `color-mix(in oklab, var(--color-card) 85%, ${color} 15%)`)
+    : undefined;
+  const pillBorderColor = color
+    ? (isDark
+      ? `color-mix(in oklab, ${color} 60%, var(--color-card) 40%)`
+      : color)
+    : undefined;
+  const pillTextColor = color
+    ? (isDark
+      ? `color-mix(in oklab, ${color} 72%, white 28%)`
+      : color)
     : undefined;
   const StatusPill = (
     <div
-      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 border"
-      style={{ background: tintedBackground, color: color, borderColor: color }}
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 border-2"
+      style={{ background: tintedBackground, color: pillTextColor, borderColor: pillBorderColor }}
     >
       {isWorkingStatus ? (
-        <span className="relative inline-flex items-center justify-center h-3.5 w-3.5" aria-busy="true">
+        <span className="relative inline-flex items-center justify-center h-4 w-4" aria-busy="true">
           <span
             className="absolute inline-block rounded-full animate-ping"
-            style={{ backgroundColor: color, opacity: 0.35, height: '10px', width: '10px' }}
+            style={{ backgroundColor: pillBorderColor, opacity: isDark ? 0.35 : 0.45, height: '16px', width: '16px' }}
           />
-          <span
-            className="absolute inline-block rounded-full"
-            style={{ height: '10px', width: '10px', border: `2px solid ${color}` }}
-          />
+          <span className="absolute inline-flex items-center justify-center" style={{ height: '16px', width: '16px', color: pillTextColor }}>
+            <AnimatedSpinner />
+          </span>
         </span>
       ) : meta?.icon ? (
-        <FontAwesomeIcon icon={icon} className="text-[11px]" style={{ color }} />
+        <FontAwesomeIcon icon={icon} className="text-[11px]" style={{ color: pillTextColor }} />
       ) : (
-        <span className="text-[10px] leading-none" style={{ color }}>●</span>
+        <span className="text-[10px] leading-none" style={{ color: pillTextColor }}>●</span>
       )}
-      <span className="text-sm font-semibold tracking-wide">{name}</span>
+      <span className="text-sm font-semibold tracking-wide uppercase">{name}</span>
     </div>
   );
 

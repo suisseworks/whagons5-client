@@ -4,7 +4,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faSpinner, faTrash, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
@@ -39,7 +38,7 @@ export interface CategoryFieldsManagerProps {
 export function CategoryFieldsManager({ open, onOpenChange, category }: CategoryFieldsManagerProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { value: customFields } = useSelector((state: RootState) => state.customFields) as { value: CustomField[] };
-  const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: CategoryFieldAssignment[] };
+  const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: CategoryFieldAssignment[] };
   
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [newFieldId, setNewFieldId] = useState<string>("");
@@ -48,6 +47,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const [localAssignments, setLocalAssignments] = useState<CategoryFieldAssignment[]>([]);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const lastMutationRef = React.useRef<number>(0);
+  const [deleteTarget, setDeleteTarget] = useState<CategoryFieldAssignment | null>(null);
 
   // Accessors tolerant to API shape differences (snake_case vs camelCase)
   const getCategoryId = (a: any): number => Number(a?.category_id ?? a?.categoryId ?? a?.categoryID ?? a?.categoryid);
@@ -56,11 +56,11 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const currentAssignments = useMemo(() => {
     if (!category) return [] as CategoryFieldAssignment[];
     const cid = Number(category.id);
-    const source = localAssignments.length ? localAssignments : (categoryFieldAssignments as CategoryFieldAssignment[]);
+    const source = localAssignments.length ? localAssignments : (categoryCustomFields as CategoryFieldAssignment[]);
     return source
       .filter(a => getCategoryId(a) === cid)
       .sort((a, b) => ((a as any).order ?? 0) - ((b as any).order ?? 0));
-  }, [localAssignments, categoryFieldAssignments, category]);
+  }, [localAssignments, categoryCustomFields, category]);
 
   const assignedFieldIds = useMemo(() => new Set(currentAssignments.map(a => getFieldId(a))), [currentAssignments]);
   const availableFields = useMemo(() => {
@@ -71,9 +71,8 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     if (!category) return;
     try {
       await Promise.all([
-        dispatch(genericActions.customFields.getFromIndexedDB() as any),
-        // If category-specific assignments must be fetched remotely, replace with getFromIndexedDB too
-        dispatch(genericActions.categoryFieldAssignments.getFromIndexedDB() as any),
+        dispatch(genericActions.customFields.fetchFromAPI() as any),
+        dispatch(genericActions.categoryCustomFields.fetchFromAPI() as any),
       ]);
       await refreshFromCache();
     } catch (e) {
@@ -92,12 +91,12 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const refreshFromCache = useCallback(async () => {
     if (!category) return;
     try {
-      const rows = await genericCaches.categoryFieldAssignments.getAll();
+      const rows = await genericCaches.categoryCustomFields.getAll();
       const cid = Number(category.id);
       const filtered = rows.filter((r: any) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
       if (filtered.length === 0) {
         // Fallback to Redux state if cache is empty (e.g., encryption not ready)
-        const reduxRows = (categoryFieldAssignments as any[]).filter((r) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
+        const reduxRows = (categoryCustomFields as any[]).filter((r) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
         const recentlyMutated = Date.now() - lastMutationRef.current < 2000;
         if (reduxRows.length) {
           // Merge with local (preserve optimistic entries)
@@ -149,7 +148,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   // Subscribe to generic events to keep the dialog in sync
   React.useEffect(() => {
     if (!open || !category) return;
-    const names = genericEventNames.categoryFieldAssignments;
+    const names = genericEventNames.categoryCustomFields;
     const off1 = genericEvents.on(names.CREATED, refreshFromCache);
     const off2 = genericEvents.on(names.UPDATED, refreshFromCache);
     const off3 = genericEvents.on(names.DELETED, refreshFromCache);
@@ -180,7 +179,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
       };
       setLocalAssignments(prev => [...prev, optimistic]);
 
-      const saved = await dispatch(genericActions.categoryFieldAssignments.addAsync({
+      const saved = await dispatch(genericActions.categoryCustomFields.addAsync({
         field_id: parseInt(newFieldId, 10),
         custom_field_id: parseInt(newFieldId, 10),
         category_id: Number(category.id),
@@ -205,7 +204,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         const resp = await api.get('/category-field-assignments', { params: { category_id: Number(category.id), per_page: 1000 } });
         const serverRows = (resp.data?.data ?? resp.data?.rows ?? resp.data) as any[];
         console.log('[CFM] server list', serverRows);
-        const cacheRows = await genericCaches.categoryFieldAssignments.getAll();
+      const cacheRows = await genericCaches.categoryCustomFields.getAll();
         console.log('[CFM] cache list (all)', cacheRows);
         const cid = Number(category.id);
         console.log('[CFM] cache list (filtered)', cacheRows.filter((r: any) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid));
@@ -226,7 +225,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const removeAssignment = async (assignment: CategoryFieldAssignment) => {
     setAssignSubmitting(true);
     try {
-      await dispatch(genericActions.categoryFieldAssignments.removeAsync(assignment.id)).unwrap();
+      await dispatch(genericActions.categoryCustomFields.removeAsync(assignment.id)).unwrap();
       await refreshFromCache();
     } catch (e) {
       console.error('Error removing assignment', e);
@@ -237,7 +236,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
 
   const updateAssignment = async (assignmentId: number, updates: Partial<CategoryFieldAssignment>) => {
     try {
-      await dispatch(genericActions.categoryFieldAssignments.updateAsync({ id: assignmentId, updates } as any)).unwrap();
+      await dispatch(genericActions.categoryCustomFields.updateAsync({ id: assignmentId, updates } as any)).unwrap();
       await refreshFromCache();
     } catch (e) {
       console.error('Error updating assignment', e);
@@ -407,7 +406,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
 
   return (
     <Dialog open={open} onOpenChange={closeDialog}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Manage Fields{category ? ` • ${category.name}` : ''}</DialogTitle>
           <DialogDescription>
@@ -481,7 +480,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
                         {renderDefaultValueEditor(a, f)}
                       </div>
                       <div className="col-span-1 flex items-center justify-end gap-1">
-                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => removeAssignment(a)} title="Remove field" aria-label="Remove field">
+                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(a)} title="Remove field" aria-label="Remove field">
                           <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -497,6 +496,27 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
           <Button variant="outline" onClick={closeDialog}>Close</Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Confirm delete assignment */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove field from category</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const fid = deleteTarget ? getFieldId(deleteTarget) : null;
+                const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
+                const name = f?.name || (fid != null ? `Field #${fid}` : 'this field');
+                return `Are you sure you want to remove "${name}" from ${category?.name ?? 'this category'}? This does not delete the custom field itself.`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={async () => { if (deleteTarget) { await removeAssignment(deleteTarget); setDeleteTarget(null); } }}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
