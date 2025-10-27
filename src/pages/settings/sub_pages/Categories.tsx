@@ -494,23 +494,25 @@ function Categories() {
         </div>
       }
     >
-      <div className="flex-1 min-h-0">
-        <SettingsGrid
-          rowData={filteredItems}
-          columnDefs={colDefs}
-          noRowsMessage="No categories found"
-          rowSelection="single"
-          onRowDoubleClicked={(row: any) => handleEdit(row)}
-          gridOptions={{
-            getRowStyle: (params: any) => {
-              const isEnabled = Boolean(params?.data?.enabled);
-              if (!isEnabled) {
-                return { opacity: 0.6 } as any;
+      <div className="flex h-full flex-col">
+        <div className="flex-1 min-h-0">
+          <SettingsGrid
+            rowData={filteredItems}
+            columnDefs={colDefs}
+            noRowsMessage="No categories found"
+            rowSelection="single"
+            onRowDoubleClicked={(row: any) => handleEdit(row)}
+            gridOptions={{
+              getRowStyle: (params: any) => {
+                const isEnabled = Boolean(params?.data?.enabled);
+                if (!isEnabled) {
+                  return { opacity: 0.6 } as any;
+                }
+                return undefined as any;
               }
-              return undefined as any;
-            }
-          }}
-        />
+            }}
+          />
+        </div>
       </div>
 
       {/* Search Input - Original Location */}
