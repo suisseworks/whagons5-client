@@ -211,16 +211,18 @@ function Priorities() {
         </Button>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={columns}
-        onRowClicked={handleEdit}
-        gridOptions={{
-          groupDisplayType: 'groupRows',
-          groupDefaultExpanded: -1
-        }}
-        noRowsMessage="No priorities found"
-      />
+      <div className="flex-1 min-h-0">
+        <SettingsGrid
+          rowData={filteredItems}
+          columnDefs={columns}
+          onRowClicked={handleEdit}
+          gridOptions={{
+            groupDisplayType: 'groupRows',
+            groupDefaultExpanded: -1
+          }}
+          noRowsMessage="No priorities found"
+        />
+      </div>
 
       {/* Create Dialog */}
       <SettingsDialog

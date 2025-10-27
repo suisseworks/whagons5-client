@@ -105,6 +105,7 @@ function Statuses() {
   // Form state
   const [formName, setFormName] = useState("");
   const [formAction, setFormAction] = useState("");
+  const [formSemanticType, setFormSemanticType] = useState<string | null>(null);
   const [formColor, setFormColor] = useState("#888888");
   const [formIcon, setFormIcon] = useState("fas fa-circle");
   const [formInitial, setFormInitial] = useState(false);
@@ -116,6 +117,7 @@ function Statuses() {
   // Toast removed
   // Backend enum values for status.action
   const allowedActions = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
+  const allowedSemantics = ['pending_review','in_approval','approved','rejected','canceled','expired'] as const;
 
   
   // Load persisted view and group, and save changes
@@ -161,6 +163,8 @@ function Statuses() {
     setSelectedStatus(row);
     setFormName(row.name || "");
     setFormAction(row.action || "");
+    setFormSemanticType(row.semantic_type || null);
+    setFormSemanticType(row.semantic_type || null);
     setFormColor(row.color || "#888888");
     setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
     setFormInitial(!!row.initial);
@@ -194,6 +198,7 @@ function Statuses() {
       );
     } },
     { headerName: "Action", field: "action", flex: 1, minWidth: 140 },
+    { headerName: "Semantic", field: "semantic_type", flex: 1, minWidth: 160 },
     // Icon column removed; icon shown with color inside Name
     { headerName: "System", field: "system", width: 110 },
     {
@@ -281,8 +286,9 @@ function Statuses() {
     return statuses.filter((s: any) => {
       const name = String(s?.name || '').toLowerCase();
       const action = String(s?.action || '').toLowerCase();
+      const semantic = String(s?.semantic_type || '').toLowerCase();
       const icon = String(s?.icon || '').toLowerCase();
-      return name.includes(q) || action.includes(q) || icon.includes(q);
+      return name.includes(q) || action.includes(q) || semantic.includes(q) || icon.includes(q);
     });
   }, [statuses, searchQuery]);
 
@@ -328,26 +334,28 @@ function Statuses() {
       value: 'statuses',
       label: 'Statuses',
       content: (
-        <div className="space-y-4">
-          <SettingsGrid
-            rowData={filteredStatuses}
-            columnDefs={columns}
-            height="520px"
-            noRowsMessage="No statuses found"
-            rowSelection="single"
-            onSelectionChanged={(rows) => setSelectedStatus(rows?.[0] || null)}
-            onRowDoubleClicked={(row) => {
-              setSelectedStatus(row);
-              setFormName(row.name || "");
-              setFormAction(row.action || "");
-              setFormColor(row.color || "#888888");
-              setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
-              setFormInitial(!!row.initial);
-              setFormSystem(!!row.system);
-              setFormError(null);
-              setEditOpen(true);
-            }}
-          />
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0">
+            <SettingsGrid
+              rowData={filteredStatuses}
+              columnDefs={columns}
+              noRowsMessage="No statuses found"
+              rowSelection="single"
+              onSelectionChanged={(rows) => setSelectedStatus(rows?.[0] || null)}
+              onRowDoubleClicked={(row) => {
+                setSelectedStatus(row);
+                setFormName(row.name || "");
+                setFormAction(row.action || "");
+                setFormSemanticType(row.semantic_type || null);
+                setFormColor(row.color || "#888888");
+                setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
+                setFormInitial(!!row.initial);
+                setFormSystem(!!row.system);
+                setFormError(null);
+                setEditOpen(true);
+              }}
+            />
+          </div>
         </div>
       )
     },
@@ -502,7 +510,7 @@ function Statuses() {
       icon={faSitemap}
       iconColor="#f59e0b"
       backPath="/settings"
-      wrapChildrenFullHeight={activeTab === 'transitions'}
+      wrapChildrenFullHeight={true}
       search={{
         placeholder: "Search statuses...",
         value: searchQuery,
@@ -523,6 +531,7 @@ function Statuses() {
           <Button size="sm" onClick={() => {
             setFormName("");
             setFormAction("");
+            setFormSemanticType(null);
             setFormColor("#888888");
             setFormIcon("fas fa-circle");
             setFormInitial(false);
@@ -571,6 +580,7 @@ function Statuses() {
               const payload: any = {
                 name: formName.trim(),
                 action: normalizedAction,
+                semantic_type: formSemanticType || null,
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
@@ -591,6 +601,7 @@ function Statuses() {
       >
         <TextField label="Name" value={formName} onChange={setFormName} required />
         <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+        <SelectField label="Semantic" value={formSemanticType ?? 'none'} onChange={(v) => setFormSemanticType(v === 'none' ? null : v)} options={[{ value: 'none', label: 'None' }, ...allowedSemantics.map(s => ({ value: s, label: s }))]} />
         <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
         <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
@@ -624,6 +635,7 @@ function Statuses() {
               const updates: any = {
                 name: formName.trim(),
                 action: normalizedAction,
+                semantic_type: formSemanticType || null,
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
@@ -644,6 +656,7 @@ function Statuses() {
       >
         <TextField label="Name" value={formName} onChange={setFormName} required />
         <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+      <SelectField label="Semantic" value={formSemanticType ?? 'none'} onChange={(v) => setFormSemanticType(v === 'none' ? null : v)} options={[{ value: 'none', label: 'None' }, ...allowedSemantics.map(s => ({ value: s, label: s }))]} />
         <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
         <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />

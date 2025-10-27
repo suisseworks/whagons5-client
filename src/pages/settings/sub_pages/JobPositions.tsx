@@ -133,12 +133,14 @@ function JobPositions() {
         items: [ { label: 'Total Positions', value: items.length } ]
       }}
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={columns as any}
-        noRowsMessage="No positions found"
-        onRowDoubleClicked={(row: any) => handleEdit((row as any)?.data ?? row)}
-      />
+      <div className="flex-1 min-h-0">
+        <SettingsGrid
+          rowData={filteredItems}
+          columnDefs={columns as any}
+          noRowsMessage="No positions found"
+          onRowDoubleClicked={(row: any) => handleEdit((row as any)?.data ?? row)}
+        />
+      </div>
 
       <SettingsDialog
         open={isCreateDialogOpen}

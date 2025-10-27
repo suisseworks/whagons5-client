@@ -366,13 +366,15 @@ function Teams() {
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={colDefs}
-        noRowsMessage="No teams found"
-        rowSelection="single"
-        onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
-      />
+      <div className="flex-1 min-h-0">
+        <SettingsGrid
+          rowData={filteredItems}
+          columnDefs={colDefs}
+          noRowsMessage="No teams found"
+          rowSelection="single"
+          onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
+        />
+      </div>
 
       {/* Create Team Dialog */}
       <SettingsDialog

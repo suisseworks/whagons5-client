@@ -96,6 +96,7 @@ export interface Status {
     id: number;
     name: string;
     action: 'NONE' | 'WORKING' | 'PAUSED' | 'FINISHED';
+    semantic_type?: string | null;
     color?: string | null;
     icon?: string | null;
     system: boolean;

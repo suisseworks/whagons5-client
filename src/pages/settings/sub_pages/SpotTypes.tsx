@@ -112,12 +112,14 @@ function SpotTypes() {
         </Button>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={colDefs}
-        noRowsMessage="No spot types found"
-        onRowDoubleClicked={handleEdit}
-      />
+      <div className="flex-1 min-h-0">
+        <SettingsGrid
+          rowData={filteredItems}
+          columnDefs={colDefs}
+          noRowsMessage="No spot types found"
+          onRowDoubleClicked={handleEdit}
+        />
+      </div>
 
       <SettingsDialog
         open={isCreateDialogOpen}

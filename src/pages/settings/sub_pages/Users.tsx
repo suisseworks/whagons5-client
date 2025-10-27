@@ -379,13 +379,14 @@ function Users() {
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={columnDefs}
-        noRowsMessage="No users found"
-        height="500px"
-        onRowDoubleClicked={(row: UserData) => handleEdit(row)}
-      />
+      <div className="flex-1 min-h-0">
+        <SettingsGrid
+          rowData={filteredItems}
+          columnDefs={columnDefs}
+          noRowsMessage="No users found"
+          onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+        />
+      </div>
 
       {/* Create User Dialog */}
       <SettingsDialog
