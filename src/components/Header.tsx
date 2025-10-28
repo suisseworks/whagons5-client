@@ -21,6 +21,8 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { MultiStateBadge } from "@/animated/Status";
 import AssistantWidget from '@/components/AssistantWidget';
 import { Bot } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { iconService } from '@/database/iconService';
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -82,17 +84,35 @@ function Header() {
     }, [location.pathname]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
-    const { currentWorkspaceName, currentWorkspaceId } = useMemo(() => {
+    const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
         // Supports /workspace/:id and /workspace/all
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
         const allMatch = /\/workspace\/all$/.test(location.pathname);
-        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null };
-        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null };
+        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
+        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
         const wid = parseInt(numMatch![1], 10);
         const ws = workspaces.find((w: any) => w.id === wid);
-        return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid };
+        return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
     }, [location.pathname, workspaces]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
+
+    const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                if (currentWorkspaceIcon) {
+                    const icon = await iconService.getIcon(currentWorkspaceIcon);
+                    if (!cancelled) setWorkspaceIcon(icon);
+                } else {
+                    if (!cancelled) setWorkspaceIcon(null);
+                }
+            } catch {
+                if (!cancelled) setWorkspaceIcon(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [currentWorkspaceIcon]);
 
     // Hydration status badge: processing while hydrating, success briefly when done, hidden otherwise
     const [hydrationState, setHydrationState] = useState<"start" | "processing" | "success" | "error" | "custom">("custom");
@@ -229,7 +249,14 @@ function Header() {
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
                         <div className="flex items-center space-x-2">
-                            <h1 className="text-lg sm:text-xl font-semibold truncate max-w-[20rem]">
+                            {workspaceIcon && (
+                                <FontAwesomeIcon
+                                    icon={workspaceIcon}
+                                    className="flex-shrink-0 text-xl sm:text-3xl lg:text-4xl leading-none"
+                                    style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
+                                />
+                            )}
+                            <h1 className="font-title tracking-tight text-xl sm:text-3xl lg:text-4xl font-extrabold truncate max-w-[32rem]">
                                 {currentWorkspaceName}
                             </h1>
                             {hydrationBadge}

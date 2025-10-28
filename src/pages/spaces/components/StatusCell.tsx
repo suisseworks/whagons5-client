@@ -46,16 +46,8 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
   // Build a compact pill with theme-aware contrast.
   // In dark mode, use a softer mix for bg and slightly softened border/text to reduce harshness.
   const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  const tintedBackground = color
-    ? (isDark
-      ? `color-mix(in oklab, var(--color-card) 94%, ${color} 6%)`
-      : `color-mix(in oklab, var(--color-card) 85%, ${color} 15%)`)
-    : undefined;
-  const pillBorderColor = color
-    ? (isDark
-      ? `color-mix(in oklab, ${color} 60%, var(--color-card) 40%)`
-      : color)
-    : undefined;
+  const tintedBackground = "transparent";
+  const pillBorderColor = "transparent";
   const pillTextColor = color
     ? (isDark
       ? `color-mix(in oklab, ${color} 72%, white 28%)`
@@ -63,7 +55,7 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     : undefined;
   const StatusPill = (
     <div
-      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 border-2"
+      className="inline-flex items-center gap-2 rounded-md px-2 py-0"
       style={{ background: tintedBackground, color: pillTextColor, borderColor: pillBorderColor }}
     >
       {isWorkingStatus ? (
@@ -81,7 +73,7 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
       ) : (
         <span className="text-[10px] leading-none" style={{ color: pillTextColor }}>●</span>
       )}
-      <span className="text-sm font-semibold tracking-wide uppercase">{name}</span>
+      <span className="text-xs font-semibold tracking-wide uppercase leading-none">{name}</span>
     </div>
   );
 
@@ -97,7 +89,7 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <div className="flex items-center h-full py-2 gap-2">
+              <div className="flex items-center h-full py-1 gap-2">
                 <MultiStateBadge
                   state={animationState}
                   customStatus={customStatusConfig}

@@ -38,15 +38,15 @@ export function buildWorkspaceColumns(opts: any) {
       headerName: 'Task',
       flex: 3.2,
       filter: false,
-      wrapText: true,
-      autoHeight: true,
+      wrapText: false,
+      autoHeight: false,
       cellRenderer: (p: any) => {
         const name = p.data?.name || '';
         const description = p.data?.description || '';
         const statusMeta = statusMap[p.data?.status_id as number];
         const statusColor = statusMeta?.color;
         return (
-          <div className="flex flex-col gap-1 py-1">
+          <div className="flex flex-col gap-0.5 py-0.5">
             <div className="flex items-center gap-2">
               {statusColor && (
                 <span
@@ -54,21 +54,14 @@ export function buildWorkspaceColumns(opts: any) {
                   style={{ backgroundColor: statusColor, boxShadow: '0 0 0 1px var(--color-border)' }}
                 />
               )}
-              <div className="font-semibold text-lg text-foreground truncate" title={name}>{name}</div>
+              <HoverPopover content={(
+                <div className="max-w-[420px] text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                  {description || 'No description'}
+                </div>
+              )}>
+                <div className="font-semibold text-base leading-tight text-foreground truncate cursor-default" title={name}>{name}</div>
+              </HoverPopover>
             </div>
-            {description && (
-              <div
-                className="text-xs text-muted-foreground/70"
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {description}
-              </div>
-            )}
           </div>
         );
       },
@@ -112,9 +105,9 @@ export function buildWorkspaceColumns(opts: any) {
           />
         );
       },
-      width: 200,
-      minWidth: 140,
-      maxWidth: 240,
+      width: 160,
+      minWidth: 120,
+      maxWidth: 200,
     },
     {
       field: 'priority_id',
@@ -137,7 +130,7 @@ export function buildWorkspaceColumns(opts: any) {
         },
       },
       cellRenderer: (p: any) => {
-        if (!prioritiesLoaded || p.value == null) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
+        if (!prioritiesLoaded || p.value == null) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
         const meta: any = priorityMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
@@ -160,7 +153,7 @@ export function buildWorkspaceColumns(opts: any) {
             <Badge
               variant="outline"
               style={{ borderColor: borderClr, color: textClr, background: bgTint }}
-              className="border-2 rounded-md text-sm px-3 py-1 font-semibold leading-tight truncate max-w-[110px]"
+              className="border rounded-md text-xs px-2 py-0.5 font-medium leading-tight truncate max-w-[100px]"
               title={name}
             >
               {name}
@@ -168,8 +161,8 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      width: 110,
-      minWidth: 72,
+      width: 96,
+      minWidth: 68,
       maxWidth: 120,
     },
     {
@@ -186,7 +179,7 @@ export function buildWorkspaceColumns(opts: any) {
         const displayUsers = users.slice(0, 3);
         const remainingCount = users.length - displayUsers.length;
         return (
-          <div className="flex items-center h-full py-2 gap-2">
+            <div className="flex items-center h-full py-0.5 gap-2">
             <div className="flex items-center -space-x-2">
               {displayUsers.map((user: any) => (
                 <HoverPopover key={user.id} content={(
@@ -198,15 +191,15 @@ export function buildWorkspaceColumns(opts: any) {
                     <span className="text-base font-medium text-popover-foreground text-center">{getUserDisplayName(user)}</span>
                   </div>
                 )}>
-                  <Avatar className="h-8 w-8 border border-background hover:border-primary transition-colors cursor-pointer">
+                  <Avatar className="h-7 w-7 border border-background hover:border-primary transition-colors cursor-pointer">
                     <AvatarImg user={user} />
-                    <AvatarFallback className="text-xs">{getUserInitials(user)}</AvatarFallback>
+                    <AvatarFallback className="text-[10px]">{getUserInitials(user)}</AvatarFallback>
                   </Avatar>
                 </HoverPopover>
               ))}
               {remainingCount > 0 && (
-                <div className="h-8 w-8 rounded-full bg-muted border border-background flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground font-medium">+{remainingCount}</span>
+                <div className="h-7 w-7 rounded-full bg-muted border border-background flex items-center justify-center">
+                  <span className="text-[10px] text-muted-foreground font-medium">+{remainingCount}</span>
                 </div>
               )}
             </div>
@@ -251,12 +244,12 @@ export function buildWorkspaceColumns(opts: any) {
         },
       },
       cellRenderer: (p: any) => {
-        if (!spotsLoaded) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
-        if (p.value == null) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
+        if (!spotsLoaded) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
+        if (p.value == null) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
         const meta: any = spotMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
-        return (<div className="flex items-center h-full py-2"><span className="text-sm text-muted-foreground">{name}</span></div>);
+        return (<div className="flex items-center h-full py-1"><span className="text-sm text-muted-foreground">{name}</span></div>);
       },
       minWidth: 100,
     },

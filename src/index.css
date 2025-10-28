@@ -19,12 +19,12 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.95 0.008 45); /* Softer off-white background */
-  --foreground: oklch(0.1 0.02 25); /* Even darker text for maximum contrast */
-  --card: oklch(0.96 0.008 45); /* Softer off-white cards */
-  --card-foreground: oklch(0.1 0.02 25); /* Even darker card text */
-  --popover: oklch(0.96 0.008 45);
-  --popover-foreground: oklch(0.1 0.02 25); /* Even darker popover text */
+  --background: #ffffff; /* Pure white app background */
+  --foreground: oklch(0.1 0.02 25); /* Dark text for high contrast */
+  --card: #ffffff; /* Cards match background for flat look */
+  --card-foreground: oklch(0.1 0.02 25);
+  --popover: #ffffff;
+  --popover-foreground: oklch(0.1 0.02 25);
   --primary: oklch(0.72 0.12 195); /* Teal primary */
   --primary-foreground: oklch(1 0 0); /* White text on primary */
   --secondary: oklch(0.93 0.02 195); /* Softer teal-tinted background */
@@ -246,7 +246,8 @@
   --ag-header-column-resize-handle-color: var(--color-border);
   --ag-odd-row-background-color: var(--color-muted);
   --ag-row-border-color: var(--color-border);
-  --ag-selected-row-background-color: oklch(from var(--color-accent) l c h / 0.15); /* Semi-transparent accent */
+  /* Light gray selection (pure neutral, no tint) */
+  --ag-selected-row-background-color: hsl(0 0% 95%);
   --ag-range-selection-border-color: var(--color-accent);
   --ag-input-focus-border-color: var(--color-ring);
   --ag-border-color: var(--color-border);
@@ -285,7 +286,7 @@
 .ag-theme-quartz-dark {
   /* Reuse most light theme mappings, but reference .dark variables implicitly via CSS cascade */
   /* Variables unique to dark theme or needing specific override */
-  --ag-selected-row-background-color: oklch(from var(--color-accent) l c h / 0.2); /* Slightly more opaque for dark */
+  --ag-selected-row-background-color: hsl(0 0% 22%);
   --ag-input-disabled-background-color: oklch(from var(--color-background) l calc(l - 0.02) c h); /* Slightly darker background */
 }
 
@@ -492,14 +493,21 @@
 
 /* Hover and selection polish */
 .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  background-color: oklch(from var(--color-secondary) l c h / 0.55) !important;
+  /* Very light neutral hover */
+  background-color: hsl(0 0% 97%) !important;
   box-shadow: 0 4px 14px oklch(from var(--color-background) l calc(l - 0.1) c h / 0.18);
   transform: translateY(-1px);
 }
 
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: oklch(from var(--color-accent) l c h / 0.22) !important;
+  background-color: hsl(0 0% 95%) !important; /* force pure light gray */
+  border-color: hsl(0 0% 85%);
   box-shadow: 0 6px 16px oklch(from var(--color-background) l calc(l - 0.12) c h / 0.22);
+}
+
+/* Ensure cells inherit the same gray without theme mixing */
+.wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell {
+  background-color: hsl(0 0% 95%) !important;
 }
 
 /* Reduce gridlines and header chrome */
@@ -515,7 +523,7 @@
 
 /* Compact, friendly cell paddings */
 .wh-modern-grid .ag-cell {
-  padding-block: 10px;
+  padding-block: 8px;
 }
 
 /* Make status cells stand out slightly */
@@ -553,7 +561,7 @@
 
 /* Density controls */
 .wh-modern-grid.wh-density-compact .ag-center-cols-container .ag-row { margin: 0 6px; }
-.wh-modern-grid.wh-density-compact .ag-cell { padding-block: 6px; }
+.wh-modern-grid.wh-density-compact .ag-cell { padding-block: 4px; }
 
 .wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 10px; }
 .wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 12px; }
