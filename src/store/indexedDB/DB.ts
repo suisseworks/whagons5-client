@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.7';
+const CURRENT_DB_VERSION = '1.9.8';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -206,6 +206,11 @@ export class DB {
           }
 
           
+
+          // Approvals
+          if (!db.objectStoreNames.contains('approvals')) {
+            db.createObjectStore('approvals', { keyPath: 'id' });
+          }
 
           // Custom Fields & Values
           if (!db.objectStoreNames.contains('spot_custom_fields')) {

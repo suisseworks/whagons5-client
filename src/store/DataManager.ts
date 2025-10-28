@@ -16,6 +16,7 @@ const coreKeys = [
   'statusTransitionGroups',
   'priorities',
   'slas',
+  'approvals',
   'spots',
   'users',
   'jobPositions',
