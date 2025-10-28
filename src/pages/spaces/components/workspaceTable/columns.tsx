@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { CalendarDays, CheckCircle2, Edit3, UserRound, MoreHorizontal } from 'lucide-react';
 
 export function buildWorkspaceColumns(opts: any) {
   const {
@@ -18,10 +19,11 @@ export function buildWorkspaceColumns(opts: any) {
     statusMap,
     usersLoaded,
     getUsersFromIds,
-    formatDueDate,
     spotMap,
     spotsLoaded,
     userMap,
+    getDoneStatusId,
+    groupField,
   } = opts;
 
   const AvatarImg = ({ user }: { user: any }) => {
@@ -32,11 +34,11 @@ export function buildWorkspaceColumns(opts: any) {
 
   // groupByStatus can be toggled later if we add grouping by status
 
-  return ([
+  const cols = ([
     {
       field: 'name',
       headerName: 'Task',
-      flex: 3.2,
+      flex: 2.2,
       filter: false,
       wrapText: false,
       autoHeight: false,
@@ -65,7 +67,7 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      minWidth: 340,
+      minWidth: 280,
     },
     {
       field: 'status_id',
@@ -161,9 +163,9 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      width: 96,
-      minWidth: 68,
-      maxWidth: 120,
+      width: 130,
+      minWidth: 120,
+      maxWidth: 180,
     },
     {
       field: 'user_ids',
@@ -191,7 +193,7 @@ export function buildWorkspaceColumns(opts: any) {
                     <span className="text-base font-medium text-popover-foreground text-center">{getUserDisplayName(user)}</span>
                   </div>
                 )}>
-                  <Avatar className="h-7 w-7 border border-background hover:border-primary transition-colors cursor-pointer">
+                  <Avatar className="h-7 w-7 border border-background hover:border-primary transition-colors cursor-pointer" title={getUserDisplayName(user)}>
                     <AvatarImg user={user} />
                     <AvatarFallback className="text-[10px]">{getUserInitials(user)}</AvatarFallback>
                   </Avatar>
@@ -214,20 +216,37 @@ export function buildWorkspaceColumns(opts: any) {
       filter: false,
       cellRenderer: (p: any) => {
         const dueDate = p.data?.due_date;
-        const formatted = formatDueDate(dueDate);
+        if (!dueDate) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="text-sm text-muted-foreground">No due date</span>
+            </div>
+          );
+        }
+        const d = dayjs(dueDate);
+        const now = dayjs();
+        const isOverdue = d.isBefore(now, 'day');
+        const daysDiff = d.diff(now, 'day');
+        const urgent = !isOverdue && daysDiff <= 2;
+        const colorCls = isOverdue ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-muted-foreground';
         return (
-          <div className="flex items-center h-full py-2">
-            <span className={`text-sm ${dueDate && dayjs(dueDate).isBefore(dayjs()) ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>{formatted}</span>
+          <div className="flex items-center h-full py-2 gap-2" title={`${d.format('MMM D, YYYY')} • ${d.fromNow()}`}>
+            <CalendarDays className={`h-4 w-4 ${colorCls}`} aria-hidden="true" />
+            <span className={`text-sm ${colorCls}`}>
+              {d.format('MMM D')} <span className="text-xs text-muted-foreground">({d.fromNow()})</span>
+            </span>
           </div>
         );
       },
-      minWidth: 140,
+      minWidth: 160,
     },
     {
       field: 'spot_id',
       headerName: 'Location',
       sortable: true,
       filter: 'agSetColumnFilter',
+      rowGroup: groupField === 'spot_id' ? true : undefined,
+      hide: groupField === 'spot_id' ? true : undefined,
       valueFormatter: (p: any) => {
         const meta: any = spotMap[p.value as number];
         return meta?.name || `#${p.value}`;
@@ -253,7 +272,70 @@ export function buildWorkspaceColumns(opts: any) {
       },
       minWidth: 100,
     },
+    {
+      field: 'actions',
+      headerName: '',
+      sortable: false,
+      filter: false,
+      width: 140,
+      minWidth: 120,
+      maxWidth: 160,
+      pinned: 'right',
+      cellRenderer: (p: any) => {
+        const row = p.data;
+        if (!row) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
+        const doneId = typeof getDoneStatusId === 'function' ? getDoneStatusId() : undefined;
+        return (
+          <div className="flex items-center h-full py-1 gap-2 justify-end pr-1">
+            <button
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Mark complete"
+              title="Mark complete"
+              onClick={(e) => { e.stopPropagation(); if (doneId != null) handleChangeStatus(row, doneId); }}
+            >
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            </button>
+            <button
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Edit"
+              title="Edit"
+              onClick={(e) => { e.stopPropagation(); }}
+            >
+              <Edit3 className="h-4 w-4" />
+            </button>
+            <button
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Reassign"
+              title="Reassign"
+              onClick={(e) => { e.stopPropagation(); }}
+            >
+              <UserRound className="h-4 w-4" />
+            </button>
+            <button
+              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="More options"
+              title="More options"
+              onClick={(e) => { e.stopPropagation(); }}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      },
+    },
   ]);
+
+  // Apply grouping to status or priority when selected
+  if (groupField === 'status_id') {
+    const c = cols.find((x: any) => x.field === 'status_id');
+    if (c) { c.rowGroup = true; c.hide = true; }
+  }
+  if (groupField === 'priority_id') {
+    const c = cols.find((x: any) => x.field === 'priority_id');
+    if (c) { c.rowGroup = true; c.hide = true; }
+  }
+
+  return cols;
 }
 
 

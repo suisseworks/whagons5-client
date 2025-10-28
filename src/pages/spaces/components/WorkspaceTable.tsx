@@ -72,6 +72,8 @@ const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default
 export type WorkspaceTableHandle = {
   clearFilters: () => void;
   hasFilters: () => boolean;
+  setFilterModel: (model: any) => void;
+  getFilterModel: () => any;
 };
 
 const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
@@ -79,11 +81,21 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   workspaceId: string;
   searchText?: string;
   onFiltersChanged?: (active: boolean) => void;
+  onSelectionChanged?: (selectedIds: number[]) => void;
+  rowHeight?: number;
+  groupBy?: 'none' | 'spot_id' | 'status_id' | 'priority_id';
+  collapseGroups?: boolean;
+  onReady?: () => void;
 }>(({
   rowCache,
   workspaceId,
   searchText = '',
-  onFiltersChanged
+  onFiltersChanged,
+  onSelectionChanged,
+  rowHeight,
+  groupBy = 'none',
+  collapseGroups = true,
+  onReady,
 }, ref): React.ReactNode => {
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
@@ -209,6 +221,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return set ? Array.from(set.values()) : [];
   }, [categoryToGroup, transitionsByGroupFrom]);
 
+  const getDoneStatusId = useCallback((): number | undefined => {
+    const statusesArr = globalStatusesRef.current || [];
+    const byAction = statusesArr.find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE');
+    if (byAction?.id != null) return Number(byAction.id);
+    const byName = statusesArr.find((s: any) => String((s as any).name || '').toLowerCase().includes('done'));
+    if (byName?.id != null) return Number(byName.id);
+    return undefined;
+  }, []);
+
   const handleChangeStatus = useCallback(async (task: any, toStatusId: number): Promise<boolean> => {
     if (!task || Number(task.status_id) === Number(toStatusId)) return true;
     try {
@@ -229,6 +250,24 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   useEffect(() => {
     const runDecision = async () => {
+      // Force client-side mode when grouping is enabled (row grouping unsupported in Infinite Row Model)
+      if (groupBy && groupBy !== 'none') {
+        setUseClientSide(true);
+        try {
+          if (!TasksCache.initialized) await TasksCache.init();
+          const baseParams: any = { search: searchText };
+          if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+          const totalFiltered = countResp?.rowCount ?? 0;
+          const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+          setClientRows(rowsResp?.rows || []);
+        } catch (e) {
+          console.warn('Failed to load client-side rows for grouping', e);
+          setClientRows([]);
+        }
+        return;
+      }
+
       const result = await decideMode();
       setUseClientSide(result.useClientSide);
       if (result.useClientSide && result.totalFiltered > 0) {
@@ -251,7 +290,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       }
     };
     runDecision();
-  }, [workspaceId, searchText, decideMode]);
+  }, [workspaceId, searchText, decideMode, groupBy]);
 
 
   // Removed on-mount loads; AuthProvider hydrates core slices
@@ -299,17 +338,37 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     spotMap,
     spotsLoaded: metadataLoadedFlags.spotsLoaded,
     userMap,
+    getDoneStatusId,
+    groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
   } as any), [
     statusMap, priorityMap, spotMap, userMap,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 
   // Initialize filter persistence helpers
   const suppressPersistRef = useRef(false);
+
+  // Group column and row styles must be defined before any conditional return to preserve hook order
+  const autoGroupColumnDef = useMemo(() => ({
+    headerName: groupBy === 'status_id' ? 'Status' : groupBy === 'priority_id' ? 'Priority' : 'Location',
+    minWidth: 220,
+    cellRendererParams: {
+      suppressCount: false,
+    },
+  }), [groupBy]);
+
+  const getRowStyle = useCallback((params: any) => {
+    if (params?.node?.group) return undefined;
+    const prId = Number(params?.data?.priority_id);
+    const prMeta = priorityMapRef.current[prId];
+    const color = prMeta?.color;
+    if (!color) return undefined;
+    return { borderLeft: `4px solid ${color}` } as React.CSSProperties;
+  }, []);
 
   const getRows = useMemo(
     () =>
@@ -409,6 +468,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     setTimeout(() => {
       suppressPersistRef.current = false;
     }, 0);
+
+    try { onReady?.(); } catch {}
   }, [getRows, useClientSide, onFiltersChanged, refreshGrid]);
 
   // Expose imperative methods
@@ -423,6 +484,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       try {
         return !!gridRef.current?.api?.isAnyFilterPresent();
       } catch { return false; }
+    },
+    setFilterModel: (model: any) => {
+      if (!gridRef.current?.api) return;
+      gridRef.current.api.setFilterModel(model || null);
+      onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+      refreshGrid();
+    },
+    getFilterModel: () => {
+      try { return gridRef.current?.api?.getFilterModel?.() || {}; } catch { return {}; }
     }
   }), [refreshGrid, onFiltersChanged]);
 
@@ -431,7 +501,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return createLoadingSpinner();
   }
 
-  const gridOptions = createGridOptions(useClientSide, clientRows);
+  const gridOptions = createGridOptions(useClientSide, clientRows, collapseGroups);
+
+  
 
   return createGridContainer(
     <Suspense fallback={<div>Loading AgGridReact...</div>}>
@@ -440,22 +512,43 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         ref={gridRef}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
-        rowHeight={GRID_CONSTANTS.ROW_HEIGHT}
+        rowHeight={rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}
         headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
         rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
         {...gridOptions}
+        autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
+        rowSelection={'multiple'}
+        suppressRowClickSelection={true}
+        getRowStyle={getRowStyle}
         onGridReady={onGridReady}
         onFirstDataRendered={() => {
           if (!gridRef.current?.api) return;
           onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+          const count = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
+          if (count === 0) gridRef.current.api.showNoRowsOverlay?.(); else gridRef.current.api.hideOverlay?.();
         }}
         onFilterChanged={(e: any) => {
           if (suppressPersistRef.current) return;
           onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
+          const count = e.api.getDisplayedRowCount?.() ?? 0;
+          if (count === 0) e.api.showNoRowsOverlay?.(); else e.api.hideOverlay?.();
+        }}
+        onModelUpdated={(e: any) => {
+          const api = e.api;
+          const count = api.getDisplayedRowCount?.() ?? 0;
+          if (count === 0) api.showNoRowsOverlay?.(); else api.hideOverlay?.();
+        }}
+        onSelectionChanged={(e: any) => {
+          if (!onSelectionChanged) return;
+          try {
+            const rows = e.api.getSelectedRows?.() || [];
+            const ids = rows.map((r: any) => Number(r.id)).filter((n: any) => Number.isFinite(n));
+            onSelectionChanged(ids);
+          } catch { onSelectionChanged([] as number[]); }
         }}
         animateRows={true}
         suppressColumnVirtualisation={true}
-        suppressNoRowsOverlay={true}
+        suppressNoRowsOverlay={false}
         loading={false}
       />
     </Suspense>

@@ -56,13 +56,13 @@ export const createDefaultColDef = () => ({
   floatingFilter: false,
 });
 
-export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []) => ({
+export const createGridOptions = (useClientSide: boolean, clientRows: any[] = [], collapseGroups: boolean = true) => ({
   ...(useClientSide ? {
     // Client-Side Row Model
     rowData: clientRows,
     getRowId: (params: any) => String(params.data.id),
     groupDisplayType: 'groupRows',
-    groupDefaultExpanded: 1,
+    groupDefaultExpanded: collapseGroups ? 0 : 1,
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,
@@ -73,6 +73,6 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   }),
   animateRows: true,
   suppressColumnVirtualisation: true,
-  suppressNoRowsOverlay: true,
+  suppressNoRowsOverlay: false,
   loading: false,
 });

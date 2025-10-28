@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon } from 'lucide-react';
+import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -11,6 +11,12 @@ import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import { Input } from '@/components/ui/input';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { motion, useAnimation } from 'motion/react';
@@ -76,6 +82,43 @@ export const Workspace = () => {
 
   const gridControls = useAnimation();
 
+  // Row density (affects grid row height)
+  const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
+    try {
+      return (localStorage.getItem('wh_workspace_density') as any) || 'compact';
+    } catch { return 'compact'; }
+  });
+  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 52 : 64;
+  useEffect(() => {
+    try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
+  }, [rowDensity]);
+
+  // Selected tasks (for bulk actions)
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Metadata for filters
+  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
+  // Grouping
+  const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>(() => {
+    try {
+      const key = `wh_workspace_group_by_${id || 'all'}`;
+      const saved = localStorage.getItem(key) as any;
+      return saved || 'none';
+    } catch { return 'none'; }
+  });
+  const [collapseGroups, setCollapseGroups] = useState<boolean>(() => {
+    try {
+      const key = `wh_workspace_group_collapse_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      return saved == null ? true : saved === 'true';
+    } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(`wh_workspace_group_by_${id || 'all'}`, groupBy); } catch {}
+  }, [groupBy, id]);
+  useEffect(() => {
+    try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
+  }, [collapseGroups, id]);
+
   // Handle grid animation based on current tab
   useEffect(() => {
     if (activeTab === 'grid') {
@@ -124,6 +167,21 @@ export const Workspace = () => {
       if (saved != null) setSearchText(saved);
     } catch {}
   }, []);
+
+  // Restore saved filters for this workspace when grid is ready
+  const appliedInitialFilters = useRef(false);
+  useEffect(() => {
+    if (appliedInitialFilters.current) return;
+    const key = `wh_workspace_filters_${id || 'all'}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved && tableRef.current) {
+        const model = JSON.parse(saved);
+        tableRef.current.setFilterModel(model);
+        appliedInitialFilters.current = true;
+      }
+    } catch {}
+  }, [id]);
 
   useEffect(() => {
     const key = `wh_workspace_search_global`;
@@ -179,6 +237,10 @@ export const Workspace = () => {
             workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
             searchText={searchText}
             onFiltersChanged={(active) => setShowClearFilters(!!active)}
+            onSelectionChanged={setSelectedIds}
+            rowHeight={computedRowHeight}
+            groupBy={groupBy}
+            collapseGroups={collapseGroups}
           />
         </motion.div>
       )
@@ -260,13 +322,60 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-center gap-6 mb-4">
+      <div className="flex items-center gap-6 mb-2">
         <Input
           placeholder="Search tasks..."
           className="max-w-sm h-12"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
+        {/* Quick filter chips */}
+        <div className="flex items-center gap-2 ml-2">
+          <Button variant="outline" size="sm" className="h-9"
+            title="All tasks"
+            onClick={() => {
+              tableRef.current?.setFilterModel(null);
+              try { localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`); } catch {}
+            }}
+          >All</Button>
+          <Button variant="outline" size="sm" className="h-9"
+            title="High priority"
+            onClick={() => {
+              const high = [...(priorities || [])].sort((a: any,b: any) => (b.level||0)-(a.level||0))[0];
+              if (!high) return;
+              const model: any = { priority_id: { filterType: 'set', values: [Number(high.id)] } };
+              tableRef.current?.setFilterModel(model);
+              try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(model)); } catch {}
+            }}
+          >High Priority</Button>
+        </div>
+        {/* Density toggles */}
+        <ToggleGroup type="single" value={rowDensity} onValueChange={(v) => v && setRowDensity(v as any)} className="ml-2">
+          <ToggleGroupItem value="compact" aria-label="Compact density" className="h-9 px-2 text-xs">C</ToggleGroupItem>
+          <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-9 px-2 text-xs">M</ToggleGroupItem>
+          <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-9 px-2 text-xs">L</ToggleGroupItem>
+        </ToggleGroup>
+        {/* Group by control */}
+        <div className="flex items-center gap-2 ml-2">
+          <Label className="text-sm text-muted-foreground">Group</Label>
+          <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+            <SelectTrigger size="sm" className="h-9">
+              <SelectValue placeholder="Group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="spot_id">Location</SelectItem>
+              <SelectItem value="status_id">Status</SelectItem>
+              <SelectItem value="priority_id">Priority</SelectItem>
+            </SelectContent>
+          </Select>
+          {groupBy !== 'none' && (
+            <div className="flex items-center gap-2">
+              <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
+              <Label className="text-sm text-muted-foreground">Collapse</Label>
+            </div>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"
@@ -288,6 +397,26 @@ export const Workspace = () => {
           </Button>
         </div>
       </div>
+      {/* Bulk actions toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center gap-2 mb-2 border rounded px-2 py-1 bg-background/60">
+          <span className="text-sm text-muted-foreground">Selected: {selectedIds.length}</span>
+          <Button variant="ghost" size="sm" title="Mark complete" aria-label="Mark complete" disabled>
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Complete
+          </Button>
+          <Button variant="ghost" size="sm" title="Reassign" aria-label="Reassign" disabled>
+            <UserRound className="h-4 w-4 mr-1" /> Reassign
+          </Button>
+          <Button variant="ghost" size="sm" title="Change priority" aria-label="Change priority" disabled>
+            <Flag className="h-4 w-4 mr-1" /> Priority
+          </Button>
+          <Button variant="ghost" size="sm" title="Reschedule" aria-label="Reschedule" disabled>
+            <CalendarDays className="h-4 w-4 mr-1" /> Reschedule
+          </Button>
+          <div className="ml-auto" />
+          <Button variant="outline" size="sm" onClick={() => setSelectedIds([])}>Clear selection</Button>
+        </div>
+      )}
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
         <div className='flex-1 min-w-0'>
 		<UrlTabs
