@@ -713,17 +713,19 @@ export class TasksCache {
         if (filterType === 'set') {
             const selected = Array.isArray(values) ? values : [];
             if (selected.length === 0) return true;
-            // Coerce types to compare consistently
+            // Normalize selected values to both numeric and string sets for robust matching
             const normalizedSelectedNums = selected.map((v: any) => {
                 const n = Number(v);
-                return isNaN(n) ? null : n;
-            });
-            // Prefer numeric comparison when possible
-            if (typeof value === 'number') {
-                return normalizedSelectedNums.includes(value);
+                return Number.isFinite(n) ? n : null;
+            }).filter((n: any) => n !== null);
+            const normalizedSelectedStrs = selected.map((v: any) => String(v));
+
+            const asNum = Number(value);
+            if (Number.isFinite(asNum) && normalizedSelectedNums.length > 0) {
+                if (normalizedSelectedNums.includes(asNum)) return true;
             }
-            // Fall back to string comparison
-            return selected.map((v: any) => String(v)).includes(String(value));
+            // Fallback to string compare
+            return normalizedSelectedStrs.includes(String(value));
         }
         
         if (type === 'inRange') {

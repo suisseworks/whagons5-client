@@ -19,6 +19,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { motion, useAnimation } from 'motion/react';
+import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
+import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 
 export const Workspace = () => {
   const location = useLocation();
@@ -105,6 +108,8 @@ export const Workspace = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   // Metadata for filters
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
+  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
+  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   // Grouping
   const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>(() => {
     try {
@@ -126,6 +131,13 @@ export const Workspace = () => {
   useEffect(() => {
     try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
   }, [collapseGroups, id]);
+
+  // Filter builder dialog
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickPresets, setQuickPresets] = useState<SavedFilterPreset[]>([]);
+  const [allPresets, setAllPresets] = useState<SavedFilterPreset[]>([]);
+  const dragIdRef = useRef<string | null>(null);
+
 
   // Handle grid animation based on current tab
   useEffect(() => {
@@ -166,6 +178,18 @@ export const Workspace = () => {
 
   const invalidWorkspaceRoute = !id && !isAllWorkspaces;
   const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+
+  // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
+  useEffect(() => {
+    const ws = isAllWorkspaces ? 'all' : (id || 'all');
+    try {
+      setQuickPresets(listPinnedPresets(ws).slice(0, 4));
+      setAllPresets(listPresets(ws));
+    } catch {
+      setQuickPresets([]);
+      setAllPresets([]);
+    }
+  }, [id, isAllWorkspaces, filtersOpen]);
 
   // Persist and restore search text globally
   useEffect(() => {
@@ -346,16 +370,82 @@ export const Workspace = () => {
               try { localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`); } catch {}
             }}
           >All</Button>
+          {quickPresets.map((p, idx) => (
+            <div
+              key={p.id}
+              draggable
+              onDragStart={() => { dragIdRef.current = p.id; }}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={() => {
+                const draggedId = dragIdRef.current;
+                dragIdRef.current = null;
+                if (!draggedId || draggedId === p.id) return;
+                const scope = isAllWorkspaces ? 'all' : (id || 'all');
+                const current = quickPresets.slice();
+                const from = current.findIndex(x => x.id === draggedId);
+                const to = idx;
+                if (from < 0 || to < 0) return;
+                const moved = current.splice(from, 1)[0];
+                current.splice(to, 0, moved);
+                setQuickPresets(current);
+                try { setPinnedOrder(scope, current.map(x => x.id)); } catch {}
+              }}
+              className="inline-flex"
+              title="Drag to reorder pinned preset"
+            >
+              <Button variant="outline" size="sm" className="h-9"
+                title={p.name}
+                onClick={() => {
+                  tableRef.current?.setFilterModel(p.model);
+                  try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(p.model)); } catch {}
+                  setSearchText('');
+                }}
+              >{p.name}</Button>
+            </div>
+          ))}
           <Button variant="outline" size="sm" className="h-9"
-            title="High priority"
-            onClick={() => {
-              const high = [...(priorities || [])].sort((a: any,b: any) => (b.level||0)-(a.level||0))[0];
-              if (!high) return;
-              const model: any = { priority_id: { filterType: 'set', values: [Number(high.id)] } };
-              tableRef.current?.setFilterModel(model);
-              try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(model)); } catch {}
-            }}
-          >High Priority</Button>
+            title="Custom filters"
+            onClick={() => setFiltersOpen(true)}
+          >Filters…</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9" title="More presets">More…</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[240px]">
+              <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
+              {allPresets.length === 0 ? (
+                <DropdownMenuItem disabled>No presets yet</DropdownMenuItem>
+              ) : (
+                allPresets.map((p) => (
+                  <DropdownMenuItem key={p.id} onClick={() => {
+                    tableRef.current?.setFilterModel(p.model);
+                    try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(p.model)); } catch {}
+                    setSearchText('');
+                  }}>
+                    {p.name}
+                  </DropdownMenuItem>
+                ))
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Pin to toolbar</DropdownMenuLabel>
+              {allPresets.map((p) => (
+                <DropdownMenuCheckboxItem
+                  key={p.id}
+                  checked={isAllWorkspaces ? isPinned('all', p.id) : isPinned(id || 'all', p.id)}
+                  onCheckedChange={() => {
+                    const scope = isAllWorkspaces ? 'all' : (id || 'all');
+                    togglePin(scope, p.id);
+                    // refresh pinned list after toggle
+                    try {
+                      setQuickPresets(listPinnedPresets(scope).slice(0, 4));
+                    } catch {}
+                  }}
+                >
+                  {p.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         {/* Density toggles */}
         {/* Density moved to Settings screen */}
@@ -463,6 +553,23 @@ export const Workspace = () => {
           </>
         )}
       </div>
+
+      <FilterBuilderDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        workspaceId={isAllWorkspaces ? 'all' : (id || 'all')}
+        statuses={(statuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
+        priorities={(priorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
+        spots={(spots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
+        currentModel={tableRef.current?.getFilterModel?.()}
+        currentSearchText={searchText}
+        onApply={(model) => {
+          tableRef.current?.setFilterModel(model);
+          try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(model)); } catch {}
+          setSearchText('');
+        }}
+      />
+
 
       {/* Floating Action Button for mobile (bottom-right) */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (

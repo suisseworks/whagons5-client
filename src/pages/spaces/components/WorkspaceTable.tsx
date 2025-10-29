@@ -33,7 +33,7 @@ import {
   createTransitionsByGroupFrom,
   createFilteredPriorities
 } from './workspaceTable/mappers';
-const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id']);
+const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'name', 'description', 'due_date']);
 
 const sanitizeFilterModel = (model: any): any => {
   if (!model || typeof model !== 'object') return {};
@@ -53,6 +53,7 @@ const normalizeFilterModelForQuery = (raw: any): any => {
     st.values = hasNonNumeric ? rawValues.map((v) => String(v)) : rawValues.map((v) => Number(v));
     fm.status_id = st;
   }
+  // Text/date filters pass through unchanged
   for (const key of ['priority_id', 'spot_id']) {
     if (fm[key]) {
       const st = { ...fm[key] } as any;
@@ -101,6 +102,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 }, ref): React.ReactNode => {
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
+  const externalFilterModelRef = useRef<any>({});
+  const debugFilters = useRef<boolean>(false);
+  useEffect(() => {
+    try { debugFilters.current = localStorage.getItem('wh-debug-filters') === 'true'; } catch { debugFilters.current = false; }
+  }, []);
   // Refs to avoid stale closures so we can refresh cache without rebinding datasource
   const searchRef = useRef<string>(searchText);
   useEffect(() => { searchRef.current = searchText; }, [searchText]);
@@ -427,6 +433,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         priorityMapRef,
         spotMapRef,
         userMapRef,
+        externalFilterModelRef,
         normalizeFilterModelForQuery,
       }),
     [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef]
@@ -454,7 +461,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         baseParams.__spotMap = spotMapRef.current;
         baseParams.__userMap = userMapRef.current;
         const activeFm = gridRef.current.api.getFilterModel?.() || {};
-        const normalizedFm = normalizeFilterModelForQuery(activeFm);
+        const mergedFm = { ...(activeFm || {}), ...(externalFilterModelRef.current || {}) };
+        const normalizedFm = normalizeFilterModelForQuery(mergedFm);
         baseParams.filterModel = normalizedFm;
         console.log('[WT Filters] refreshGrid client-side baseParams.filterModel:', normalizedFm);
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
@@ -463,6 +471,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         const rows = rowsResp?.rows || [];
         setClientRows(rows);
         gridRef.current.api.setGridOption('rowData', rows);
+        try { if (debugFilters.current) console.log('[WT Filters] client refresh rows=', rows.length, 'totalFiltered=', totalFiltered); } catch {}
       } catch (e) {
         console.warn('refreshGrid (client-side) failed', e);
       }
@@ -524,6 +533,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     clearFilters: () => {
       if (!gridRef.current?.api) return;
       gridRef.current.api.setFilterModel(null);
+      externalFilterModelRef.current = {};
       onFiltersChanged?.(false);
       refreshGrid();
     },
@@ -534,12 +544,28 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     },
     setFilterModel: (model: any) => {
       if (!gridRef.current?.api) return;
+      externalFilterModelRef.current = model || {};
+      try { if (debugFilters.current) console.log('[WT] setFilterModel external=', externalFilterModelRef.current); } catch {}
       gridRef.current.api.setFilterModel(model || null);
       onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+      try {
+        const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+        const gm = gridRef.current.api.getFilterModel?.() || {};
+        const merged = { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
+        if (merged && Object.keys(merged).length > 0) {
+          localStorage.setItem(key, JSON.stringify(merged));
+        } else {
+          localStorage.removeItem(key);
+        }
+        if (debugFilters.current) console.log('[WT] persisted model=', merged);
+      } catch {}
       refreshGrid();
     },
     getFilterModel: () => {
-      try { return gridRef.current?.api?.getFilterModel?.() || {}; } catch { return {}; }
+      try {
+        const gm = gridRef.current?.api?.getFilterModel?.() || {};
+        return { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
+      } catch { return {}; }
     }
   }), [refreshGrid, onFiltersChanged]);
 
@@ -579,6 +605,17 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
           const count = e.api.getDisplayedRowCount?.() ?? 0;
           if (count === 0) e.api.showNoRowsOverlay?.(); else e.api.hideOverlay?.();
+          try {
+            const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+            const gm = e.api.getFilterModel?.() || {};
+            const merged = { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
+            if (merged && Object.keys(merged).length > 0) {
+              localStorage.setItem(key, JSON.stringify(merged));
+            } else {
+              localStorage.removeItem(key);
+            }
+          } catch {}
+          refreshGrid();
         }}
         onModelUpdated={(e: any) => {
           const api = e.api;
