@@ -13,7 +13,6 @@ import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import { Input } from '@/components/ui/input';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -92,6 +91,15 @@ export const Workspace = () => {
   useEffect(() => {
     try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
   }, [rowDensity]);
+  // Listen for external density changes (from Settings screen)
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e?.detail as any;
+      if (v === 'compact' || v === 'comfortable' || v === 'spacious') setRowDensity(v);
+    };
+    window.addEventListener('wh:rowDensityChanged', handler);
+    return () => window.removeEventListener('wh:rowDensityChanged', handler);
+  }, []);
 
   // Selected tasks (for bulk actions)
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -350,11 +358,7 @@ export const Workspace = () => {
           >High Priority</Button>
         </div>
         {/* Density toggles */}
-        <ToggleGroup type="single" value={rowDensity} onValueChange={(v) => v && setRowDensity(v as any)} className="ml-2">
-          <ToggleGroupItem value="compact" aria-label="Compact density" className="h-9 px-2 text-xs">C</ToggleGroupItem>
-          <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-9 px-2 text-xs">M</ToggleGroupItem>
-          <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-9 px-2 text-xs">L</ToggleGroupItem>
-        </ToggleGroup>
+        {/* Density moved to Settings screen */}
         {/* Group by control */}
         <div className="flex items-center gap-2 ml-2">
           <Label className="text-sm text-muted-foreground">Group</Label>

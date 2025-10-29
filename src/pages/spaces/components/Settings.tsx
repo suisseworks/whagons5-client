@@ -1,6 +1,8 @@
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Users, Eye, Filter } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Label } from "@/components/ui/label";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
@@ -468,6 +470,27 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     <div className="h-full w-full p-4 pt-0 flex flex-col">
       <div className="mb-3 flex-shrink-0">
         <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+      </div>
+
+      {/* Table density control (affects Tasks table) */}
+      <div className="mb-4 p-3 border rounded-md bg-background">
+        <div className="flex items-center gap-3">
+          <Label>Table density</Label>
+          <ToggleGroup
+            type="single"
+            defaultValue={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_density') as any)) || 'compact'}
+            onValueChange={(v) => {
+              if (!v) return;
+              try { localStorage.setItem('wh_workspace_density', v); } catch {}
+              // Broadcast to Workspace view to update immediately
+              try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
+            }}
+          >
+            <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-2 text-xs">C</ToggleGroupItem>
+            <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
+            <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </div>
 
       <UrlTabs

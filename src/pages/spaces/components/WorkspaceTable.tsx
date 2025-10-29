@@ -86,6 +86,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   groupBy?: 'none' | 'spot_id' | 'status_id' | 'priority_id';
   collapseGroups?: boolean;
   onReady?: () => void;
+  onModeChange?: (info: { useClientSide: boolean; totalFiltered: number }) => void;
 }>(({
   rowCache,
   workspaceId,
@@ -96,6 +97,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   groupBy = 'none',
   collapseGroups = true,
   onReady,
+  onModeChange,
 }, ref): React.ReactNode => {
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
@@ -261,6 +263,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           const totalFiltered = countResp?.rowCount ?? 0;
           const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
           setClientRows(rowsResp?.rows || []);
+          try { onModeChange?.({ useClientSide: true, totalFiltered }); } catch {}
         } catch (e) {
           console.warn('Failed to load client-side rows for grouping', e);
           setClientRows([]);
@@ -270,6 +273,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
       const result = await decideMode();
       setUseClientSide(result.useClientSide);
+      try { onModeChange?.(result); } catch {}
       if (result.useClientSide && result.totalFiltered > 0) {
         try {
           if (!TasksCache.initialized) await TasksCache.init();
@@ -369,6 +373,49 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     if (!color) return undefined;
     return { borderLeft: `4px solid ${color}` } as React.CSSProperties;
   }, []);
+
+  // Re-apply or clear grouping when controls change
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    const colApi = gridRef.current?.columnApi;
+    if (!api) return;
+
+    // In infinite mode, ensure grouping is cleared visually
+    if (!useClientSide) {
+      try {
+        api.setGridOption('autoGroupColumnDef', undefined as any);
+        colApi?.setRowGroupColumns([]);
+        api.setColumnDefs(columnDefs as any);
+      } catch {}
+      return;
+    }
+
+    // Client-side mode: apply or clear
+    try {
+      if (groupBy === 'none') {
+        api.setGridOption('autoGroupColumnDef', undefined as any);
+        colApi?.setRowGroupColumns([]);
+        // show hidden group columns if previously hidden
+        colApi?.setColumnVisible('spot_id', true);
+        colApi?.setColumnVisible('status_id', true);
+        colApi?.setColumnVisible('priority_id', true);
+        api.setColumnDefs(columnDefs as any);
+        api.refreshClientSideRowModel?.('everything');
+      } else {
+        api.setGridOption('autoGroupColumnDef', autoGroupColumnDef);
+        api.setGridOption('groupDefaultExpanded', collapseGroups ? 0 : 1);
+        // Explicitly set the grouped column to ensure switch takes effect
+        const field = groupBy;
+        colApi?.setRowGroupColumns([field]);
+        // hide the grouped column to avoid duplication
+        colApi?.setColumnVisible('spot_id', field !== 'spot_id');
+        colApi?.setColumnVisible('status_id', field !== 'status_id');
+        colApi?.setColumnVisible('priority_id', field !== 'priority_id');
+        api.setColumnDefs(columnDefs as any);
+        api.refreshClientSideRowModel?.('everything');
+      }
+    } catch {}
+  }, [autoGroupColumnDef, collapseGroups, groupBy, columnDefs, useClientSide]);
 
   const getRows = useMemo(
     () =>
@@ -508,7 +555,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   return createGridContainer(
     <Suspense fallback={<div>Loading AgGridReact...</div>}>
       <AgGridReact
-        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}`}
+        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}`}
         ref={gridRef}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}
