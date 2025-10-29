@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { faSquareCheck } from "@fortawesome/free-solid-svg-icons";
+import { faSquareCheck, faUsers } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Approval, Status } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -16,6 +16,7 @@ import {
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
+  ApprovalApproversManager,
   TextField,
   TextAreaField,
   SelectField,
@@ -79,6 +80,19 @@ function Approvals() {
     if (type === 'hours') return `${value} h`;
     if (type === 'date') return value;
     return value;
+  }, []);
+
+  const [isApproversDialogOpen, setIsApproversDialogOpen] = useState(false);
+  const [approversApproval, setApproversApproval] = useState<Approval | null>(null);
+
+  const approverCountByApproval = useMemo(() => {
+    // Placeholder: will be wired to approvalApprovers slice when available
+    return new Map<number, number>();
+  }, []);
+
+  const openManageApprovers = useCallback((approval: Approval) => {
+    setApproversApproval(approval);
+    setIsApproversDialogOpen(true);
   }, []);
 
   const colDefs = useMemo<ColDef[]>(() => [
@@ -148,8 +162,18 @@ function Approvals() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 110,
+      width: 180,
       cellRenderer: createActionsCellRenderer({
+        customActions: [{
+          icon: faUsers,
+          label: (row: any) => {
+            const count = approverCountByApproval.get(Number(row?.id)) || 0;
+            return count > 0 ? `Approvers (${count})` : 'Approvers';
+          },
+          variant: 'outline',
+          onClick: (row: any) => openManageApprovers(row as Approval),
+          className: 'p-1 h-7 relative flex items-center justify-center'
+        }],
         onEdit: handleEdit,
         onDelete: handleDelete,
       }),
@@ -158,7 +182,7 @@ function Approvals() {
       resizable: false,
       pinned: 'right',
     },
-  ], [deleteItem, handleEdit, renderDeadline, statusIdToName]);
+  ], [handleEdit, handleDelete, renderDeadline, statusIdToName, approverCountByApproval, openManageApprovers]);
 
   // Form state
   const [createFormData, setCreateFormData] = useState({
@@ -283,6 +307,11 @@ function Approvals() {
     // Ensure statuses available for name mapping
     dispatch(genericActions.statuses.getFromIndexedDB());
     dispatch(genericActions.statuses.fetchFromAPI());
+    // Load users and roles for approver selection UI
+    dispatch(genericActions.users.getFromIndexedDB());
+    dispatch(genericActions.users.fetchFromAPI());
+    dispatch(genericActions.roles.getFromIndexedDB());
+    dispatch(genericActions.roles.fetchFromAPI());
   }, [dispatch]);
 
   return (
@@ -432,6 +461,13 @@ function Approvals() {
             </div>
           </div>
         )}
+      />
+
+      {/* Manage Approvers Dialog */}
+      <ApprovalApproversManager
+        open={isApproversDialogOpen}
+        onOpenChange={(open) => { if (!open) { setIsApproversDialogOpen(false); setApproversApproval(null); } else { setIsApproversDialogOpen(true); } }}
+        approval={approversApproval}
       />
     </div>
   );

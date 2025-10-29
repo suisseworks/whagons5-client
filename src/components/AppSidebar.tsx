@@ -272,7 +272,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar-header h-14 transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
+        className={`shadow-md bg-sidebar-header h-16 transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
         }`}
       >
         <div className="flex items-center justify-center w-full h-full">
@@ -283,8 +283,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             }`}
           >
             <WhagonsCheck
-              width={showExpandedContent ? 45 : 32}
-              height={showExpandedContent ? 21 : 15}
+              width={showExpandedContent ? 56 : 38}
+              height={showExpandedContent ? 26 : 18}
               color="#27C1A7"
             />
             {showExpandedContent && (

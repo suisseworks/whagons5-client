@@ -244,7 +244,7 @@ function Header() {
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-5 h-14">
+            <div className="flex items-center justify-between px-5 h-16">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
