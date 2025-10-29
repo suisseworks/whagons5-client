@@ -512,6 +512,22 @@
   background-color: hsl(0 0% 95%) !important;
 }
 
+/* Dark mode: use darker, higher-contrast selection and hover */
+.dark .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+  background-color: oklch(0.26 0.03 255) !important; /* subtle dark hover */
+  box-shadow: 0 4px 14px oklch(from var(--color-background) l calc(l + 0.06) c h / 0.22);
+}
+
+.dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
+  background-color: oklch(0.28 0.03 255) !important; /* selected slightly brighter than hover */
+  border-color: oklch(0.38 0.04 255);
+  box-shadow: 0 6px 18px oklch(from var(--color-background) l calc(l + 0.1) c h / 0.28);
+}
+
+.dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell {
+  background-color: oklch(0.28 0.03 255) !important;
+}
+
 /* Reduce gridlines and header chrome */
 .wh-modern-grid .ag-header {
   background: transparent;

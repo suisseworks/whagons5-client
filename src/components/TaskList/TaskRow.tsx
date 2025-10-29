@@ -59,6 +59,19 @@ export function TaskRow({
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
+            {(() => {
+              const statusColor = statusMap?.[Number(task?.status_id)]?.color as string | undefined;
+              const priorityName = priorityMap?.[Number(task?.priority_id)]?.name as string | undefined;
+              const initial = ((priorityName || task?.name || "").trim().charAt(0) || "").toUpperCase();
+              const baseCls = "w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-[11px] font-semibold";
+              const cls = statusColor ? `${baseCls} text-white` : `${baseCls} bg-muted text-foreground/80 border`;
+              const style = statusColor ? { backgroundColor: statusColor } : undefined;
+              return (
+                <span className={cls} style={style} aria-hidden>
+                  {initial}
+                </span>
+              );
+            })()}
             <h3
               className="text-[15px] font-medium text-foreground tracking-[-0.02em] leading-5 truncate"
               title={task?.name || "Untitled task"}

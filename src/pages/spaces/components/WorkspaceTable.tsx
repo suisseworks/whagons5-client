@@ -371,15 +371,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     },
   }), [groupBy]);
 
-  const getRowStyle = useCallback((params: any) => {
-    if (params?.node?.group) return undefined;
-    const prId = Number(params?.data?.priority_id);
-    const prMeta = priorityMapRef.current[prId];
-    const color = prMeta?.color;
-    if (!color) return undefined;
-    // Slightly thicker, flat-color line; still softened vs full priority color
-    const subtle = `color-mix(in oklab, ${color} 45%, var(--color-border) 55%)`;
-    return { borderLeft: `3px solid ${subtle}` } as React.CSSProperties;
+  const getRowStyle = useCallback((_params: any) => {
+    // Remove decorative left color bar to keep focus on the new status-colored priority initial
+    return undefined;
   }, []);
 
   // Re-apply or clear grouping when controls change

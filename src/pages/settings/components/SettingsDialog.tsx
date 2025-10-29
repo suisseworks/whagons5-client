@@ -114,7 +114,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={type === 'delete' ? "sm:max-w-[425px]" : "max-w-2xl"}>
+      <DialogContent className={type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"}>
         <DialogHeader>
           <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
             {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}

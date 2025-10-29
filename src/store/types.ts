@@ -135,6 +135,25 @@ export interface Tag {
     updated_at?: string | Date;
 }
 
+export interface Approval {
+    id: number;
+    name: string;
+    description?: string | null;
+    approval_type: 'SEQUENTIAL' | 'PARALLEL' | string;
+    require_all: boolean;
+    minimum_approvals?: number | null;
+    trigger_type: 'ON_CREATE' | 'ON_STATUS_CHANGE' | 'MANUAL' | 'CONDITIONAL' | string;
+    trigger_status_id?: number | null;
+    require_rejection_comment: boolean;
+    block_editing_during_approval: boolean;
+    deadline_type: 'hours' | 'date' | string;
+    deadline_value?: string | null;
+    is_active: boolean;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+    deleted_at?: string | Date | null;
+}
+
 // High Priority - User Management & Authentication
 export interface User {
     id: number;

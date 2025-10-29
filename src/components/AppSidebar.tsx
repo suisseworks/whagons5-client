@@ -302,7 +302,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar">
+      <SidebarContent className="bg-sidebar [background-image:radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.06)_1px,transparent_0)] dark:[background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] [background-size:14px_14px]">
         <SidebarGroup>
           {/* Everything workspace - above the Spaces dropdown */}
           {(!isCollapsed || isMobile) && (
@@ -383,7 +383,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar border-t border-sidebar-border">
+      <SidebarFooter className="bg-sidebar [background-image:radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.06)_1px,transparent_0)] dark:[background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] [background-size:14px_14px] border-t border-sidebar-border">
         {/* Section: Analytics & Plugins */}
         <SidebarGroup>
           <SidebarGroupContent>
