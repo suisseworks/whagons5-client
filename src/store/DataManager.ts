@@ -45,14 +45,7 @@ export class DataManager {
   }
 
   async validateAndRefresh() {
-    // Validate and refresh tasks
-    try {
-      await TasksCache.init();
-      await TasksCache.validateTasks();
-      await this.dispatch(getTasksFromIndexedDB());
-    } catch (e) {
-      console.warn('DataManager: tasks cache validate failed', e);
-    }
+
 
     // Validate and refresh core entities
     try {
@@ -74,6 +67,16 @@ export class DataManager {
     } catch (e) {
       console.warn('DataManager: core cache validate failed', e);
     }
+
+
+      // Validate and refresh tasks
+      try {
+        await TasksCache.init();
+        await TasksCache.validateTasks();
+        await this.dispatch(getTasksFromIndexedDB());
+      } catch (e) {
+        console.warn('DataManager: tasks cache validate failed', e);
+      }
   }
 
   async verifyManifest() {

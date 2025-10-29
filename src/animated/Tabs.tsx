@@ -115,7 +115,11 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     data-slot="tabs-content"
-    className={cn("flex-1 min-h-0 flex flex-col outline-none mt-2", className)}
+    className={cn(
+      // Keep layout sizing, but hide when not active
+      "flex-1 min-h-0 flex flex-col outline-none mt-2 data-[state=inactive]:hidden",
+      className
+    )}
     {...props}
   />
 ));

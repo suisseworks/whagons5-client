@@ -410,7 +410,14 @@ export class TasksCache {
                         try {
                             const resp = await api.get('/tasks', { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
                             const rows = (resp.data.data || resp.data.rows) as Task[];
-                            if (rows?.length) await this.addTasks(rows);
+                            if (rows?.length) {
+                                // Attach server-provided row hash so subsequent local hashing can short-circuit
+                                const rowsWithHash = rows.map(r => {
+                                    const h = serverRowMap.get(r.id);
+                                    return h ? { ...(r as any), __h: h } : r;
+                                });
+                                await this.addTasks(rowsWithHash as unknown as Task[]);
+                            }
                         } catch (e) {
                             console.warn('validateTasks: batch fetch failed', e);
                         }
@@ -440,36 +447,56 @@ export class TasksCache {
 
     // --- Integrity helpers ---
     private static hashTask(task: Task): string {
-        const normalizedUserIds = Array.isArray(task.user_ids) && task.user_ids.length
-            ? `[${[...task.user_ids].map(n => Number(n)).filter(n => Number.isFinite(n)).sort((a,b)=>a-b).join(',')}]`
+        // Prefer server-provided hash when available (attached during validation)
+        if ((task as any) && typeof (task as any).__h === 'string' && (task as any).__h.length) {
+            return (task as any).__h as string;
+        }
+
+        // Match backend canonicalization exactly
+        const normalizedUserIds = Array.isArray((task as any).user_ids) && (task as any).user_ids.length
+            ? `[${[...(task as any).user_ids]
+                .map((n: any) => Number(n))
+                .filter((n: number) => Number.isFinite(n))
+                .sort((a: number, b: number) => a - b)
+                .join(', ')}]` // note the space after comma to match jsonb::text
             : '';
+
         const row = [
             task.id,
-            task.name || '',
-            task.description || '',
-            task.workspace_id,
-            task.category_id,
-            task.team_id,
-            task.template_id || 0,
-            task.spot_id || 0,
-            task.status_id,
-            task.priority_id,
+            (task as any).name || '',
+            (task as any).description || '',
+            (task as any).workspace_id,
+            (task as any).category_id,
+            (task as any).team_id,
+            (task as any).template_id || 0,
+            (task as any).spot_id || 0,
+            (task as any).status_id,
+            (task as any).priority_id,
             normalizedUserIds,
-            
-            // start_date (UTC epoch ms, COALESCE null -> '')
-            task.start_date ? new Date(task.start_date).getTime() : '',
-            // due_date (UTC epoch ms, COALESCE null -> '')
-            task.due_date ? new Date(task.due_date).getTime() : '',
-            task.expected_duration,
-            // response_date (UTC epoch ms, COALESCE null -> '')
-            task.response_date ? new Date(task.response_date).getTime() : '',
-            // resolution_date (UTC epoch ms, COALESCE null -> '')
-            task.resolution_date ? new Date(task.resolution_date).getTime() : '',
-            task.work_duration,
-            task.pause_duration,
-            new Date(task.updated_at).getTime()
+            // Timestamps normalized to UTC epoch ms (empty string when falsy)
+            this.toUtcEpochMs((task as any).start_date),
+            this.toUtcEpochMs((task as any).due_date),
+            (task as any).expected_duration,
+            this.toUtcEpochMs((task as any).response_date),
+            this.toUtcEpochMs((task as any).resolution_date),
+            (task as any).work_duration,
+            (task as any).pause_duration,
+            this.toUtcEpochMs((task as any).updated_at)
         ].join('|');
         return sha256(row).toString(encHex);
+    }
+
+    // Normalize various timestamp inputs to UTC epoch ms string to match backend hashing
+    private static toUtcEpochMs(value: any): string {
+        if (!value) return '';
+        let vStr = String(value);
+        // If it looks like 'YYYY-MM-DD HH:mm:ss(.sss)?' without timezone, assume UTC
+        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(vStr) && !/[zZ]|[+\-]\d{2}:?\d{2}$/.test(vStr)) {
+            vStr = vStr.replace(' ', 'T') + 'Z';
+        }
+        const dt = new Date(vStr);
+        const t = dt.getTime();
+        return Number.isFinite(t) ? String(t) : '';
     }
 
     private static async computeLocalTaskBlockHashes() {

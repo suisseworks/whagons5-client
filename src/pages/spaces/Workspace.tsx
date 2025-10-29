@@ -18,14 +18,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
-import { motion, useAnimation } from 'motion/react';
+import { motion } from 'motion/react';
+import { TAB_ANIMATION, getTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
 import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import TaskListTab from '@/pages/spaces/components/TaskListTab';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const Workspace = () => {
   const location = useLocation();
@@ -39,6 +38,7 @@ export const Workspace = () => {
   const id = getWorkspaceIdFromPath(location.pathname);
   // State to store the fetched data
   const [activeTab, setActiveTab] = useState('grid');
+  const [prevActiveTab, setPrevActiveTab] = useState('grid');
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
@@ -86,7 +86,6 @@ export const Workspace = () => {
     };
   }, [isResizing, resizeStartX, resizeStartWidth]);
 
-  const gridControls = useAnimation();
 
   // Row density (affects grid row height)
   const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
@@ -203,21 +202,7 @@ export const Workspace = () => {
   const dragIdRef = useRef<string | null>(null);
 
 
-  // Handle grid animation based on current tab
-  useEffect(() => {
-    if (activeTab === 'grid') {
-      gridControls.start({ x: 0 });
-    } else {
-      gridControls.start({
-        x: "-80vw",
-        transition: {
-          type: "spring",
-          stiffness: 100,
-          damping: 10
-        }
-      });
-    }
-  }, [activeTab, gridControls]);
+
 
   //
   // Clear cache when workspace ID changes
@@ -225,12 +210,6 @@ export const Workspace = () => {
     if (id) {
       console.log(`Switching to workspace ${id}, clearing cache`);
       rowCache.current.clear();
-    }
-    if (activeTab === 'grid') {
-      gridControls.start({
-        opacity: 0.3,
-        transition: { duration: 0.2, repeat: 1, repeatType: "reverse", ease: "easeInOut" }
-      });
     }
   }, [id, location.pathname]);
   // Debug logging
@@ -320,10 +299,14 @@ export const Workspace = () => {
           Tasks
         </div>
       ),
+      forceMount: true,
       content: (
         <motion.div
           className='flex-1 h-full'
-          animate={gridControls}
+          key='grid'
+          initial={false}
+          animate={{ x: activeTab === 'grid' ? 0 : getTabInitialX(activeTab, 'grid') }}
+          transition={activeTab === 'grid' ? TAB_ANIMATION.transition : { duration: 0 }}
         >
           <WorkspaceTable 
             ref={tableRef}
@@ -348,23 +331,9 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <div className='flex-1 h-full'>
+        <motion.div className='flex-1 h-full' key='calendar' initial={{ x: getTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <CalendarViewTab workspaceId={id} />
-        </div>
-      )
-    },
-    {
-      value: 'list',
-      label: (
-        <div className="flex items-center gap-2">
-          <ClipboardList />
-          List
-        </div>
-      ),
-      content: (
-        <div className='flex-1 h-full'>
-          <TaskListTab workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
-        </div>
+        </motion.div>
       )
     },
     {
@@ -376,9 +345,9 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <div className='flex-1 h-full'>
+        <motion.div className='flex-1 h-full' key='scheduler' initial={{ x: getTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SchedulerViewTab workspaceId={id} />
-        </div>
+        </motion.div>
       )
     },
     {
@@ -390,9 +359,9 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <div className='flex-1 h-full'>
+        <motion.div className='flex-1 h-full' key='map' initial={{ x: getTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <MapViewTab workspaceId={id} />
-        </div>
+        </motion.div>
       )
     },
     {
@@ -404,9 +373,9 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <div className='flex-1 h-full'>
+        <motion.div className='flex-1 h-full' key='board' initial={{ x: getTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <TaskBoardTab workspaceId={id} />
-        </div>
+        </motion.div>
       )
     },
     {
@@ -417,7 +386,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div exit={{ x: "-80vw" }} initial={{ x: "80vw" }} animate={{ x: 0 }}>
+        <motion.div key='settings' initial={{ x: getTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SettingsComponent workspaceId={id} />
         </motion.div>
       )
@@ -611,9 +580,9 @@ export const Workspace = () => {
           tabs={workspaceTabs}
           defaultValue="grid"
           basePath={`/workspace/${id}`}
-          pathMap={{ grid: '', list: '/list', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings' }}
+          pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings' }}
           className="w-full h-full flex flex-col"
-          onValueChange={setActiveTab}
+          onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v); }}
           showClearFilters={showClearFilters}
           onClearFilters={() => tableRef.current?.clearFilters()}
         />

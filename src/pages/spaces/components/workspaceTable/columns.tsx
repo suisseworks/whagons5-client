@@ -39,26 +39,16 @@ export function buildWorkspaceColumns(opts: any) {
     {
       field: 'name',
       headerName: 'Task',
-      flex: 2.2,
+      flex: 1.2,
       filter: false,
       wrapText: false,
       autoHeight: false,
       cellRenderer: (p: any) => {
         const name = p.data?.name || '';
         const description = p.data?.description || '';
-        const statusMeta = statusMap[p.data?.status_id as number];
-        const statusColor = statusMeta?.color;
-        const priorityMeta = priorityMap[p.data?.priority_id as number];
-        const priorityInitial = ((priorityMeta?.name || name || '').trim().charAt(0) || '').toUpperCase();
-        const circleBase = "w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-[11px] font-semibold";
-        const circleClass = statusColor ? `${circleBase} text-white` : `${circleBase} bg-muted text-foreground/80 border`;
-        const circleStyle = statusColor ? { backgroundColor: statusColor as string } : undefined;
         return (
           <div className="flex flex-col gap-0.5 py-0.5">
             <div className="flex items-center gap-2">
-              <span className={circleClass} style={circleStyle} aria-hidden>
-                {priorityInitial}
-              </span>
               <HoverPopover content={(
                 <div className="max-w-[420px] text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
                   {description || 'No description'}
@@ -70,7 +60,7 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      minWidth: 280,
+      minWidth: 150,
     },
     {
       field: 'status_id',

@@ -252,15 +252,15 @@ function Header() {
                             {workspaceIcon ? (
                                 <FontAwesomeIcon
                                     icon={workspaceIcon}
-                                    className="flex-shrink-0 text-xl sm:text-3xl lg:text-4xl leading-none"
+                                    className="flex-shrink-0 text-lg sm:text-2xl lg:text-3xl leading-none"
                                     style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
                                 />
                             ) : (
                                 currentWorkspaceName === 'Everything' ? (
-                                    <Layers className="flex-shrink-0 w-7 h-7 sm:w-9 sm:h-9 lg:w-10 lg:h-10" style={{ color: '#27C1A7' }} />
+                                    <Layers className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7" style={{ color: '#27C1A7' }} />
                                 ) : null
                             )}
-                            <h1 className="font-title tracking-tight text-xl sm:text-3xl lg:text-4xl font-extrabold truncate max-w-[32rem]">
+                            <h1 className="font-title tracking-tight text-lg sm:text-2xl lg:text-3xl font-extrabold truncate max-w-[32rem]">
                                 {currentWorkspaceName}
                             </h1>
                             {hydrationBadge}
