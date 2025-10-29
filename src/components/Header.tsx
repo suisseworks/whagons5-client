@@ -10,7 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus } from "lucide-react";
+import { User, LogOut, Bell, Plus, Layers } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
@@ -244,17 +244,21 @@ function Header() {
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center justify-between px-5 h-14">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
                         <div className="flex items-center space-x-2">
-                            {workspaceIcon && (
+                            {workspaceIcon ? (
                                 <FontAwesomeIcon
                                     icon={workspaceIcon}
                                     className="flex-shrink-0 text-xl sm:text-3xl lg:text-4xl leading-none"
                                     style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
                                 />
+                            ) : (
+                                currentWorkspaceName === 'Everything' ? (
+                                    <Layers className="flex-shrink-0 w-7 h-7 sm:w-9 sm:h-9 lg:w-10 lg:h-10" style={{ color: '#27C1A7' }} />
+                                ) : null
                             )}
                             <h1 className="font-title tracking-tight text-xl sm:text-3xl lg:text-4xl font-extrabold truncate max-w-[32rem]">
                                 {currentWorkspaceName}

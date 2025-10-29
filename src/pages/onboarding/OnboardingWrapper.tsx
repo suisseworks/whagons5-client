@@ -275,7 +275,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           style={{ backgroundImage: `url(${backgroundImages[bgIndex]})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60" />
-        <div className="relative z-10 h-full flex flex-col justify-between p-10">
+        <div className="relative z-10 h-full flex flex-col justify-between p-10 lg:p-10 max-[900px]:p-6">
           <div />
           <div>
             <div className="text-white/90 text-lg mb-1">Welcome to</div>
@@ -290,17 +290,17 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       </div>
 
       {/* Right: form card */}
-      <div className="relative flex items-center justify-center px-6 py-10 bg-[url('/images/onboarding/gradient-waves.svg')] bg-cover bg-center">
+      <div className="relative flex items-center justify-center px-6 py-10 lg:py-10 max-[900px]:py-4 bg-[url('/images/onboarding/gradient-waves.svg')] bg-cover bg-center">
         <div className="absolute inset-0 pointer-events-none bg-white/65 dark:bg-gray-900/70 backdrop-blur-sm" />
         <div className="relative w-full max-w-md z-10">
-          <div className="text-center mb-10">
+          <div className="text-center mb-10 lg:mb-10 max-[900px]:mb-4">
             <div className="space-y-3">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome to Whagons</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Welcome to Whagons</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">Let's get your account set up</p>
             </div>
           </div>
 
-          <div className="mb-10">
+          <div className="mb-10 lg:mb-10 max-[900px]:mb-4">
             <div className="flex items-center justify-between">
               {[0, 1, 2].map((step) => (
                 <div key={step} className="flex items-center">
@@ -317,7 +317,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
                   </button>
                   {step < 2 && (
                     <div
-                      className={`w-16 h-1 mx-3 rounded-full ${
+                      className={`w-14 lg:w-16 max-[900px]:w-10 h-1 mx-3 rounded-full ${
                         step < currentStep
                           ? 'bg-primary'
                           : 'bg-gray-200 dark:bg-gray-700'
@@ -329,7 +329,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             </div>
           </div>
 
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-8">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-6 lg:p-8 max-[900px]:p-4">
             {renderStep()}
           </div>
         </div>
