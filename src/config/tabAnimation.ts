@@ -15,10 +15,10 @@ export const TAB_ANIMATION: TabAnimationConfig = {
   order: ['grid', 'calendar', 'scheduler', 'map', 'board', 'settings'],
   distance: '80vw',
   transition: {
-    duration: 0.10,
+    duration: 0.05,
     type: 'spring',
-    stiffness: 350,
-    damping: 30,
+    stiffness: 400,
+    damping: 32,
   },
 };
 
