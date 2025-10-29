@@ -19,7 +19,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #ffffff; /* Pure white app background */
+  --background: #ffffff; /* Pure white app content background */
   --foreground: oklch(0.1 0.02 25); /* Dark text for high contrast */
   --card: #ffffff; /* Cards match background for flat look */
   --card-foreground: oklch(0.1 0.02 25);
@@ -46,14 +46,16 @@
   --radius: 0.625rem;
   
   /* Global sidebar theme (applies to both light and dark for brand consistency) */
-  --sidebar: oklch(0.95 0.008 45); /* Softer off-white sidebar */
+  --sidebar: #F8F9FA; /* Softer modern sidebar tone */
   --sidebar-foreground: #111827; /* Gray-900 text for readability */
   --sidebar-primary: oklch(0.72 0.12 195); /* Teal highlights in sidebar */
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.93 0.01 230); /* Softer gray hover */
+  --sidebar-accent: #F1F3F5; /* Slightly darker than sidebar for hover */
   --sidebar-accent-foreground: #111827; /* Dark text on hover */
-  --sidebar-border: oklch(0.82 0.02 45); /* Slightly darker border */
+  --sidebar-border: #E5E7EB; /* Border aligns with gray-200 */
   --sidebar-ring: oklch(0.72 0.12 195 / 0.5); /* Teal focus in sidebar */
+  /* Sidebar header is pure white for logo clarity */
+  --sidebar-header: #ffffff;
   
   /* Gradient definitions for teal theme */
   --gradient-primary: linear-gradient(135deg, oklch(0.72 0.12 195) 0%, oklch(0.74 0.14 210) 100%);
@@ -96,6 +98,8 @@
   --sidebar-accent-foreground: #e5e7eb;
   --sidebar-border: oklch(0.34 0.03 255);
   --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
+  /* Dark variant: slightly more teal to read against dark */
+  --sidebar-header: color-mix(in oklab, var(--sidebar) 75%, var(--primary) 25%);
 
   /* Dark mode gradients */
   --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);
@@ -153,24 +157,21 @@
   body {
     @apply bg-background text-foreground;
   }
-  
-  /* Subtle header gradient: extremely soft, works in light and dark */
-  .wh-header {
-    background: linear-gradient(
-      to right,
-      oklch(from var(--color-card) l calc(l + 0.06) c h / 1) 0%,
-      oklch(from var(--color-card) l c h / 1) 55%,
-      oklch(from var(--color-card) l calc(l - 0.06) c h / 1) 100%
-    );
+  /* Sidebar font utility */
+  .font-montserrat {
+    font-family: 'Montserrat', sans-serif;
   }
+  
+  /* Workspace header: solid white for clean, modern look */
+  .wh-header { background: #ffffff; }
 
-  /* Ensure clear-but-subtle gradient in dark theme as well */
+  /* Dark theme: slightly stronger blend for visibility */
   .dark .wh-header {
     background: linear-gradient(
       to right,
-      oklch(from var(--color-card) l calc(l + 0.035) c h / 1) 0%,
-      oklch(from var(--color-card) l c h / 1) 55%,
-      oklch(from var(--color-card) l calc(l - 0.035) c h / 1) 100%
+      color-mix(in oklab, var(--color-background) 88%, var(--color-primary) 12%) 0%,
+      var(--color-background) 50%,
+      color-mix(in oklab, var(--color-background) 88%, var(--color-primary) 12%) 100%
     );
   }
   
@@ -451,6 +452,7 @@
 
 /* Subtle background pattern for sidebar surfaces */
 @layer utilities {
+  .bg-sidebar-header { background-color: var(--sidebar-header); }
   .bg-sidebar {
     /* Very subtle dot grid; tuned for light theme */
     background-image:

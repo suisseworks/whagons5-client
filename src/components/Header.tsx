@@ -239,7 +239,7 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/50 shadow-sm">
+        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-[#E5E7EB] shadow-sm">
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}

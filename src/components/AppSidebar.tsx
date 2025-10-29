@@ -266,13 +266,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   return (
     <Sidebar
       collapsible="icon"
-      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground`}
+      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground font-montserrat text-[1rem]`}
       overlayExpanded={overlayOnExpand && !getPinnedState()}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar h-14 transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
+        className={`shadow-md bg-sidebar-header h-14 transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
         }`}
       >
         <div className="flex items-center justify-center w-full h-full">
@@ -317,7 +317,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 <span>
                   <Layers className="w-5 h-5 text-[#27C1A7]" />
                 </span>
-                <span>Everything</span>
+                <span className="font-semibold">Everything</span>
               </Link>
             </div>
           )}
@@ -357,7 +357,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   <span>
                     <Users2 className="w-4 h-4" />
                   </span>
-                  <span>TeamConnect</span>
+                  <span className="font-semibold">TeamConnect</span>
                 </Link>
               </div>
             )}

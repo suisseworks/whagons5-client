@@ -1,9 +1,10 @@
 import dayjs from 'dayjs';
-import { Badge } from "@/components/ui/badge";
+// import { Badge } from "@/components/ui/badge";
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { CalendarDays, CheckCircle2, Edit3, UserRound, MoreHorizontal } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Edit3, UserRound, MoreHorizontal, MapPin, Flag } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function buildWorkspaceColumns(opts: any) {
   const {
@@ -138,29 +139,36 @@ export function buildWorkspaceColumns(opts: any) {
         const name = meta.name;
         const color = meta?.color || '#6B7280';
         const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-        const bgTint = color ? (isDark
-          ? `color-mix(in oklab, var(--color-card) 92%, ${color} 8%)`
-          : `color-mix(in oklab, var(--color-card) 85%, ${color} 15%)`
+        const gradient = color ? (isDark
+          ? `linear-gradient(135deg, color-mix(in oklab, ${color} 28%, #101014 72%), color-mix(in oklab, ${color} 18%, #101014 82%))`
+          : `linear-gradient(135deg, color-mix(in oklab, ${color} 22%, #ffffff 78%), color-mix(in oklab, ${color} 12%, #ffffff 88%))`
         ) : undefined;
         const borderClr = color ? (isDark
-          ? `color-mix(in oklab, ${color} 65%, var(--color-card) 35%)`
+          ? `color-mix(in oklab, ${color} 60%, var(--color-card) 40%)`
           : color
         ) : undefined;
         const textClr = color ? (isDark
           ? `color-mix(in oklab, ${color} 78%, white 22%)`
           : color
         ) : undefined;
-        return (
-          <div className="flex items-center h-full py-2">
-            <Badge
-              variant="outline"
-              style={{ borderColor: borderClr, color: textClr, background: bgTint }}
-              className="border rounded-md text-xs px-2 py-0.5 font-medium leading-tight truncate max-w-[100px]"
-              title={name}
+        const pill = (
+          <div className="inline-flex items-center h-full py-2">
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none border truncate max-w-[120px]"
+              style={{ background: gradient, borderColor: borderClr, color: textClr }}
             >
+              <Flag className="h-3 w-3" />
               {name}
-            </Badge>
+            </span>
           </div>
+        );
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>{pill}</TooltipTrigger>
+              <TooltipContent side="top">{name}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       },
       width: 130,
@@ -229,13 +237,22 @@ export function buildWorkspaceColumns(opts: any) {
         const daysDiff = d.diff(now, 'day');
         const urgent = !isOverdue && daysDiff <= 2;
         const colorCls = isOverdue ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-muted-foreground';
-        return (
-          <div className="flex items-center h-full py-2 gap-2" title={`${d.format('MMM D, YYYY')} • ${d.fromNow()}`}>
-            <CalendarDays className={`h-4 w-4 ${colorCls}`} aria-hidden="true" />
-            <span className={`text-sm ${colorCls}`}>
-              {d.format('MMM D')} <span className="text-xs text-muted-foreground">({d.fromNow()})</span>
+        const inner = (
+          <div className="flex items-center h-full py-2 gap-1.5">
+            <span className={`inline-flex items-center ${colorCls}`}>
+              <span className="inline-block h-1.5 w-1.5 rounded-full mr-1" aria-hidden style={{ backgroundColor: isOverdue ? '#dc2626' : urgent ? '#d97706' : '#9ca3af' }} />
+              <CalendarDays className="h-4 w-4 mr-1" aria-hidden={true} />
+              <span className="text-sm font-medium">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
             </span>
           </div>
+        );
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>{inner}</TooltipTrigger>
+              <TooltipContent side="top">{d.format('MMM D, YYYY')} • {d.fromNow()}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       },
       minWidth: 160,
@@ -268,7 +285,15 @@ export function buildWorkspaceColumns(opts: any) {
         const meta: any = spotMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
-        return (<div className="flex items-center h-full py-1"><span className="text-sm text-muted-foreground">{name}</span></div>);
+        const tag = (
+          <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-muted text-muted-foreground text-xs">
+            <MapPin className="h-3.5 w-3.5" />
+            <span className="truncate max-w-[140px]">{name}</span>
+          </div>
+        );
+        return (
+          <div className="flex items-center h-full py-1">{tag}</div>
+        );
       },
       minWidth: 100,
     },
@@ -287,38 +312,66 @@ export function buildWorkspaceColumns(opts: any) {
         const doneId = typeof getDoneStatusId === 'function' ? getDoneStatusId() : undefined;
         return (
           <div className="flex items-center h-full py-1 gap-2 justify-end pr-1">
-            <button
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-              aria-label="Mark complete"
-              title="Mark complete"
-              onClick={(e) => { e.stopPropagation(); if (doneId != null) handleChangeStatus(row, doneId); }}
-            >
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </button>
-            <button
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-              aria-label="Edit"
-              title="Edit"
-              onClick={(e) => { e.stopPropagation(); }}
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-            <button
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-              aria-label="Reassign"
-              title="Reassign"
-              onClick={(e) => { e.stopPropagation(); }}
-            >
-              <UserRound className="h-4 w-4" />
-            </button>
-            <button
-              className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-              aria-label="More options"
-              title="More options"
-              onClick={(e) => { e.stopPropagation(); }}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                    aria-label="Mark complete"
+                    title="Mark complete"
+                    onClick={(e) => { e.stopPropagation(); if (doneId != null) handleChangeStatus(row, doneId); }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Complete (C)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                    aria-label="Edit"
+                    title="Edit"
+                    onClick={(e) => { e.stopPropagation(); }}
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Edit (E)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                    aria-label="Reassign"
+                    title="Reassign"
+                    onClick={(e) => { e.stopPropagation(); }}
+                  >
+                    <UserRound className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Reassign (R)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
+                    aria-label="More options"
+                    title="More options"
+                    onClick={(e) => { e.stopPropagation(); }}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">More (.)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         );
       },

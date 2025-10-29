@@ -119,6 +119,8 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
   }, [workspaceSlottedItems, localWorkspaces]);
 
   useEffect(() => {
+    // Avoid wiping saved order before data loads
+    if (localWorkspaces.length === 0) return;
     const currentIds = localWorkspaces.map((workspace) => String(workspace.id));
     const saved = loadWorkspaceOrder();
     const merged = mergeOrder(saved, currentIds);
@@ -171,12 +173,15 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
 
     instance.onSwapEnd?.((event) => {
       if (!event.hasChanged) return;
-      const slotArray = event.slotItemMap?.asArray ?? pendingSlotItemMapRef.current;
+      // Prefer the new map from the event; fall back to instance/state if absent
+      const slotArray = event.newSlotItemMap?.asArray
+        ?? (swapyRef.current as any)?.slotItemMap?.asArray
+        ?? pendingSlotItemMapRef.current
+        ?? workspaceSlotItemMap;
       if (!slotArray) return;
-      pendingSlotItemMapRef.current = slotArray;
-      const orderedIds = slotArray.map(({ item }) => item);
+      pendingSlotItemMapRef.current = slotArray as SlotItemMapArray;
+      const orderedIds = (slotArray as SlotItemMapArray).map(({ item }) => item as string);
       saveWorkspaceOrder(orderedIds);
-      // scheduleApplyPendingSlotMap();
     });
 
     return () => {
@@ -334,7 +339,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                               className="w-4 h-4"
                             />
                           </span>
-                          <span className={collapsed ? 'sr-only' : 'truncate'}>{item.name}</span>
+                          <span className={collapsed ? 'sr-only' : 'truncate font-medium'}>{item.name}</span>
                         </Link>
                       </div>
                     )}

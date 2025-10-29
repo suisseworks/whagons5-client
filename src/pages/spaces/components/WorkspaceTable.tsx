@@ -377,7 +377,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     const prMeta = priorityMapRef.current[prId];
     const color = prMeta?.color;
     if (!color) return undefined;
-    return { borderLeft: `4px solid ${color}` } as React.CSSProperties;
+    // Slightly thicker, flat-color line; still softened vs full priority color
+    const subtle = `color-mix(in oklab, ${color} 45%, var(--color-border) 55%)`;
+    return { borderLeft: `3px solid ${subtle}` } as React.CSSProperties;
   }, []);
 
   // Re-apply or clear grouping when controls change

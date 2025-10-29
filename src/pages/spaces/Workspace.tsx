@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag } from 'lucide-react';
+import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -22,6 +22,10 @@ import { motion, useAnimation } from 'motion/react';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
 import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
+import TaskListTab from '@/pages/spaces/components/TaskListTab';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const Workspace = () => {
   const location = useLocation();
@@ -132,6 +136,66 @@ export const Workspace = () => {
     try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
   }, [collapseGroups, id]);
 
+  // Check if this is the "all" workspace route (needed for stats and presets)
+  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
+  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+
+  // Derived status groupings for stats
+  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
+    ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
+  const workingStatusIds: number[] = (statuses || [])
+    .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
+    .map((s: any) => Number((s as any).id))
+    .filter((n: number) => Number.isFinite(n));
+
+  // Header stats
+  const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; loading: boolean }>({ total: 0, inProgress: 0, completedToday: 0, loading: true });
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setStats((s) => ({ ...s, loading: true }));
+        if (!TasksCache.initialized) await TasksCache.init();
+        const base: any = {};
+        const ws = isAllWorkspaces ? undefined : id;
+        if (ws) base.workspace_id = ws;
+
+        const totalResp = await TasksCache.queryTasks({ ...base, startRow: 0, endRow: 0 });
+        const total = totalResp?.rowCount ?? 0;
+
+        let inProgress = 0;
+        if (workingStatusIds.length > 0) {
+          for (const sid of workingStatusIds) {
+            const r = await TasksCache.queryTasks({ ...base, status_id: sid, startRow: 0, endRow: 0 });
+            inProgress += r?.rowCount ?? 0;
+          }
+        }
+
+        let completedToday = 0;
+        if (doneStatusId != null) {
+          const midnight = new Date();
+          midnight.setHours(0, 0, 0, 0);
+          const r = await TasksCache.queryTasks({ ...base, status_id: Number(doneStatusId), updated_after: midnight.toISOString(), startRow: 0, endRow: 0 });
+          completedToday = r?.rowCount ?? 0;
+        }
+
+        if (!cancelled) setStats({ total, inProgress, completedToday, loading: false });
+      } catch {
+        if (!cancelled) setStats({ total: 0, inProgress: 0, completedToday: 0, loading: false });
+      }
+    };
+    load();
+    const unsubs = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, load),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, load),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, load),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, load),
+      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, load),
+    ];
+    return () => { cancelled = true; unsubs.forEach((u) => { try { u(); } catch {} }); };
+  }, [id, isAllWorkspaces, doneStatusId, workingStatusIds.join(',')]);
+
   // Filter builder dialog
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [quickPresets, setQuickPresets] = useState<SavedFilterPreset[]>([]);
@@ -173,11 +237,7 @@ export const Workspace = () => {
   console.log('Workspace component - id:', id, 'typeof:', typeof id);
   console.log('Current path:', location.pathname);
 
-  // Check if this is the "all" workspace route
-  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
-
-  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
-  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+  
 
   // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
   useEffect(() => {
@@ -234,6 +294,8 @@ export const Workspace = () => {
           <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
         </div>
       </div>
+      
+      
     );
   }
 
@@ -292,6 +354,20 @@ export const Workspace = () => {
       )
     },
     {
+      value: 'list',
+      label: (
+        <div className="flex items-center gap-2">
+          <ClipboardList />
+          List
+        </div>
+      ),
+      content: (
+        <div className='flex-1 h-full'>
+          <TaskListTab workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
+        </div>
+      )
+    },
+    {
       value: 'scheduler',
       label: (
         <div className="flex items-center gap-2">
@@ -333,37 +409,37 @@ export const Workspace = () => {
         </div>
       )
     },
-		{
-			value: 'list',
-			label: (
-				<div className="flex items-center gap-2" aria-label="Settings">
-					<Settings />
-				</div>
-			),
-			content: (
-				<motion.div
-					exit={{ x: "-80vw" }}
-					initial={{ x: "80vw" }}
-					animate={{ x: 0 }}
-				>
-					<SettingsComponent workspaceId={id} />
-				</motion.div>
-			)
-		}
+    {
+      value: 'settings',
+      label: (
+        <div className="flex items-center gap-2" aria-label="Settings">
+          <Settings />
+        </div>
+      ),
+      content: (
+        <motion.div exit={{ x: "-80vw" }} initial={{ x: "80vw" }} animate={{ x: 0 }}>
+          <SettingsComponent workspaceId={id} />
+        </motion.div>
+      )
+    }
   ];
 
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex items-center gap-6 mb-2">
-        <Input
-          placeholder="Search tasks..."
-          className="max-w-sm h-12"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
+        <div className="relative max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
+          <Input
+            placeholder="Search…"
+            className="h-10 pl-9 pr-14 rounded-lg border-[#E5E7EB]"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex items-center rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{navigator.platform?.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl+K'}</span>
+        </div>
         {/* Quick filter chips */}
         <div className="flex items-center gap-2 ml-2">
-          <Button variant="outline" size="sm" className="h-9"
+          <Button variant="outline" size="sm" className="h-8 rounded-full"
             title="All tasks"
             onClick={() => {
               tableRef.current?.setFilterModel(null);
@@ -393,7 +469,7 @@ export const Workspace = () => {
               className="inline-flex"
               title="Drag to reorder pinned preset"
             >
-              <Button variant="outline" size="sm" className="h-9"
+              <Button variant="outline" size="sm" className="h-8 rounded-full"
                 title={p.name}
                 onClick={() => {
                   tableRef.current?.setFilterModel(p.model);
@@ -403,7 +479,7 @@ export const Workspace = () => {
               >{p.name}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" className="h-9"
+          <Button variant="outline" size="sm" className="h-8 rounded-full"
             title="Custom filters"
             onClick={() => setFiltersOpen(true)}
           >Filters…</Button>
@@ -453,7 +529,7 @@ export const Workspace = () => {
         <div className="flex items-center gap-2 ml-2">
           <Label className="text-sm text-muted-foreground">Group</Label>
           <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-            <SelectTrigger size="sm" className="h-9">
+            <SelectTrigger size="sm" className="h-8 rounded-full px-3">
               <SelectValue placeholder="Group" />
             </SelectTrigger>
             <SelectContent>
@@ -491,6 +567,24 @@ export const Workspace = () => {
           </Button>
         </div>
       </div>
+      {/* Stats summary (compact chips) */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-card px-2.5 py-1">
+          <ClipboardList className="h-3.5 w-3.5 text-cyan-600" />
+          <span className="text-[11px] text-muted-foreground">Total</span>
+          <span className="text-sm font-semibold">{stats.loading ? '—' : stats.total.toLocaleString()}</span>
+        </div>
+        <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-card px-2.5 py-1">
+          <Clock className="h-3.5 w-3.5 text-amber-600" />
+          <span className="text-[11px] text-muted-foreground">In progress</span>
+          <span className="text-sm font-semibold">{stats.loading ? '—' : stats.inProgress.toLocaleString()}</span>
+        </div>
+        <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-card px-2.5 py-1">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+          <span className="text-[11px] text-muted-foreground">Completed today</span>
+          <span className="text-sm font-semibold">{stats.loading ? '—' : stats.completedToday.toLocaleString()}</span>
+        </div>
+      </div>
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
         <div className="flex items-center gap-2 mb-2 border rounded px-2 py-1 bg-background/60">
@@ -513,11 +607,11 @@ export const Workspace = () => {
       )}
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
         <div className='flex-1 min-w-0'>
-		<UrlTabs
+        <UrlTabs
           tabs={workspaceTabs}
           defaultValue="grid"
           basePath={`/workspace/${id}`}
-			pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', list: '/settings' }}
+          pathMap={{ grid: '', list: '/list', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings' }}
           className="w-full h-full flex flex-col"
           onValueChange={setActiveTab}
           showClearFilters={showClearFilters}
