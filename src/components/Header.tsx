@@ -211,7 +211,7 @@ function Header() {
 
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -225,7 +225,7 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -239,7 +239,7 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-[#E5E7EB] shadow-sm">
+        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/40 shadow-sm">
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}

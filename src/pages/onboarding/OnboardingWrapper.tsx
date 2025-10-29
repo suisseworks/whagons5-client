@@ -203,21 +203,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     }
   };
 
-  const handleSkipStep = async () => {
-    if (currentStep === 2) {
-      // Skipping optional step - complete onboarding
-      const success = await updateUserProfile({}, InitializationStage.COMPLETED);
-      if (success) {
-        // Refetch user, sync caches/store, then navigate
-        setLoading(true);
-        await refetchUser();
-        await syncCachesAndStore();
-        setLoading(false);
-        navigate('/');
-      }
-    }
-  };
-
   const handleStepClick = (step: number) => {
     // Only allow going back to previous steps or current step
     if (step <= currentStep) {
@@ -252,7 +237,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             data={onboardingData}
             onUpdate={updateOnboardingData}
             onNext={handleNextStep}
-            onSkip={handleSkipStep}
             loading={loading}
           />
         );
