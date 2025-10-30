@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.8';
+const CURRENT_DB_VERSION = '1.9.9';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -210,6 +210,10 @@ export class DB {
           // Approvals
           if (!db.objectStoreNames.contains('approvals')) {
             db.createObjectStore('approvals', { keyPath: 'id' });
+          }
+          // Approval approvers
+          if (!db.objectStoreNames.contains('approval_approvers')) {
+            db.createObjectStore('approval_approvers', { keyPath: 'id' });
           }
 
           // Custom Fields & Values
@@ -451,6 +455,7 @@ export class DB {
       | 'messages'
       | 'job_positions'
       | 'status_transition_groups'
+      | 'approval_approvers'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -505,6 +510,7 @@ export class DB {
       | 'messages'
       | 'job_positions'
       | 'status_transition_groups'
+      | 'approval_approvers'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'

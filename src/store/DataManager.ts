@@ -17,6 +17,7 @@ const coreKeys = [
   'priorities',
   'slas',
   'approvals',
+  'approvalApprovers',
   'spots',
   'users',
   'jobPositions',

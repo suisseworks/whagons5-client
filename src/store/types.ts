@@ -154,6 +154,21 @@ export interface Approval {
     deleted_at?: string | Date | null;
 }
 
+export interface ApprovalApprover {
+    id: number;
+    approval_id: number;
+    approver_type: 'user' | 'role' | string;
+    approver_id: number;
+    scope?: 'global' | 'creator_department' | 'creator_manager' | 'specific_department' | string;
+    scope_id?: number | null;
+    required: boolean;
+    order_index: number;
+    created_by?: number | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+    deleted_at?: string | Date | null;
+}
+
 // High Priority - User Management & Authentication
 export interface User {
     id: number;

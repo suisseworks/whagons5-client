@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { faSquareCheck, faUsers } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { Approval, Status } from "@/store/types";
+import { Approval, Status, ApprovalApprover } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import type { AppDispatch } from "@/store/store";
 import { Button } from "@/components/ui/button";
@@ -23,13 +23,18 @@ import {
   CheckboxField,
 } from "../components";
 
-// Compact name/description cell similar to Teams
+// Compact name/description cell similar to Teams with type indicator (S/P)
 const NameCell = (props: ICellRendererParams) => {
   const name = props.value as string;
   const description = props.data?.description as string | null | undefined;
   const isActive = props.data?.is_active !== false;
+  const typeRaw = String((props.data?.approval_type || '') as string).toUpperCase();
+  const isParallel = typeRaw === 'PARALLEL';
+  const letter = isParallel ? 'P' : 'S';
+  const color = isParallel ? 'bg-emerald-500' : 'bg-blue-500';
   return (
     <div className="flex items-center space-x-3 h-full">
+      <div className={`h-6 w-6 rounded-full ${color} text-white text-xs font-semibold flex items-center justify-center shrink-0`}>{letter}</div>
       <div className="flex flex-col leading-tight">
         <span className={`truncate ${isActive ? '' : 'line-through opacity-60'}`}>{name}</span>
         {description ? (
@@ -84,11 +89,17 @@ function Approvals() {
 
   const [isApproversDialogOpen, setIsApproversDialogOpen] = useState(false);
   const [approversApproval, setApproversApproval] = useState<Approval | null>(null);
+  const { value: approvalApprovers } = useSelector((s: RootState) => s.approvalApprovers) as { value: ApprovalApprover[] };
 
   const approverCountByApproval = useMemo(() => {
-    // Placeholder: will be wired to approvalApprovers slice when available
-    return new Map<number, number>();
-  }, []);
+    const map = new Map<number, number>();
+    for (const a of (approvalApprovers || [])) {
+      const aid = Number((a as any)?.approval_id ?? (a as any)?.approvalId);
+      if (!Number.isFinite(aid)) continue;
+      map.set(aid, (map.get(aid) || 0) + 1);
+    }
+    return map;
+  }, [approvalApprovers]);
 
   const openManageApprovers = useCallback((approval: Approval) => {
     setApproversApproval(approval);
@@ -99,20 +110,16 @@ function Approvals() {
     {
       field: 'name',
       headerName: 'Approval',
-      flex: 1.5,
-      minWidth: 240,
+      flex: 1.2,
+      minWidth: 220,
       cellRenderer: NameCell,
     },
-    {
-      field: 'approval_type',
-      headerName: 'Type',
-      width: 140,
-    },
+  
     {
       field: 'require_all',
       headerName: 'Requirement',
       flex: 1,
-      minWidth: 170,
+      minWidth: 150,
       cellRenderer: (p: ICellRendererParams) => {
         const requireAll = !!p?.data?.require_all;
         const min = p?.data?.minimum_approvals as number | null | undefined;
@@ -122,47 +129,32 @@ function Approvals() {
     {
       field: 'trigger_type',
       headerName: 'Trigger',
-      width: 160,
+      width: 140,
     },
-    {
-      field: 'trigger_status_id',
-      headerName: 'Trigger Status',
-      flex: 1,
-      minWidth: 180,
-      cellRenderer: (p: ICellRendererParams) => {
-        const id = p?.data?.trigger_status_id as number | null | undefined;
-        return id ? (statusIdToName.get(id) || `#${id}`) : '-';
-      },
-    },
+    
     {
       field: 'require_rejection_comment',
       headerName: 'Require Comment',
-      width: 150,
+      width: 130,
       cellRenderer: (p: ICellRendererParams) => (p?.data?.require_rejection_comment ? 'Yes' : 'No'),
     },
     {
       field: 'block_editing_during_approval',
       headerName: 'Block Editing',
-      width: 140,
+      width: 120,
       cellRenderer: (p: ICellRendererParams) => (p?.data?.block_editing_during_approval ? 'Yes' : 'No'),
     },
     {
       field: 'deadline_type',
       headerName: 'Deadline',
       flex: 1,
-      minWidth: 160,
+      minWidth: 140,
       cellRenderer: (p: ICellRendererParams) => renderDeadline(p?.data?.deadline_type, p?.data?.deadline_value),
-    },
-    {
-      field: 'is_active',
-      headerName: 'Active',
-      width: 100,
-      cellRenderer: (p: ICellRendererParams) => (p?.data?.is_active ? 'Yes' : 'No'),
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 180,
+      width: 220,
       cellRenderer: createActionsCellRenderer({
         customActions: [{
           icon: faUsers,
@@ -304,6 +296,9 @@ function Approvals() {
   useEffect(() => {
     dispatch(genericActions.approvals.getFromIndexedDB());
     dispatch(genericActions.approvals.fetchFromAPI());
+    // Load approvers for counts and manager
+    dispatch(genericActions.approvalApprovers.getFromIndexedDB());
+    dispatch(genericActions.approvalApprovers.fetchFromAPI());
     // Ensure statuses available for name mapping
     dispatch(genericActions.statuses.getFromIndexedDB());
     dispatch(genericActions.statuses.fetchFromAPI());

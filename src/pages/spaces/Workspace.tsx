@@ -58,6 +58,22 @@ export const Workspace = () => {
   const [resizeStartX, setResizeStartX] = useState<number | null>(null);
   const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
 
+  // Display options
+  const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('wh_workspace_show_kpis');
+      return saved == null ? true : saved === 'true';
+    } catch { return true; }
+  });
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e?.detail?.showKpis;
+      if (typeof v === 'boolean') setShowHeaderKpis(v);
+    };
+    window.addEventListener('wh:displayOptionsChanged', handler as any);
+    return () => window.removeEventListener('wh:displayOptionsChanged', handler as any);
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem('wh_workspace_right_panel_w', String(rightPanelWidth));
@@ -400,15 +416,14 @@ export const Workspace = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
           <Input
             placeholder="Search…"
-            className="h-10 pl-9 pr-14 rounded-lg border-[#E5E7EB]"
+            className="h-10 pl-9 pr-9 rounded-xl border-border/40"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex items-center rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{navigator.platform?.toLowerCase().includes('mac') ? '⌘K' : 'Ctrl+K'}</span>
         </div>
         {/* Quick filter chips */}
         <div className="flex items-center gap-2 ml-2">
-          <Button variant="outline" size="sm" className="h-8 rounded-full"
+          <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80"
             title="All tasks"
             onClick={() => {
               tableRef.current?.setFilterModel(null);
@@ -438,7 +453,7 @@ export const Workspace = () => {
               className="inline-flex"
               title="Drag to reorder pinned preset"
             >
-              <Button variant="outline" size="sm" className="h-8 rounded-full"
+              <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80"
                 title={p.name}
                 onClick={() => {
                   tableRef.current?.setFilterModel(p.model);
@@ -448,13 +463,13 @@ export const Workspace = () => {
               >{p.name}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" className="h-8 rounded-full"
+          <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80"
             title="Custom filters"
             onClick={() => setFiltersOpen(true)}
           >Filters…</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9" title="More presets">More…</Button>
+              <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80" title="More presets">More…</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[240px]">
               <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
@@ -496,9 +511,9 @@ export const Workspace = () => {
         {/* Density moved to Settings screen */}
         {/* Group by control */}
         <div className="flex items-center gap-2 ml-2">
-          <Label className="text-sm text-muted-foreground">Group</Label>
+          <Label className="text-xs text-muted-foreground">Group</Label>
           <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-            <SelectTrigger size="sm" className="h-8 rounded-full px-3">
+            <SelectTrigger size="sm" className="h-8 rounded-full px-3 text-[12px] text-foreground/80">
               <SelectValue placeholder="Group" />
             </SelectTrigger>
             <SelectContent>
@@ -536,24 +551,26 @@ export const Workspace = () => {
           </Button>
         </div>
       </div>
-      {/* Stats summary (compact chips) */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-card px-2.5 py-1">
-          <ClipboardList className="h-3.5 w-3.5 text-cyan-600" />
-          <span className="text-[11px] text-muted-foreground">Total</span>
-          <span className="text-sm font-semibold">{stats.loading ? '—' : stats.total.toLocaleString()}</span>
+      {/* Stats summary (chips) */}
+      {showHeaderKpis && (
+        <div className="flex flex-wrap gap-2.5 mb-3">
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
+            <ClipboardList className="h-[18px] w-[18px] text-cyan-600" />
+            <span className="text-[12px] text-muted-foreground">Total</span>
+            <span className="text-base font-semibold">{stats.loading ? '—' : stats.total.toLocaleString()}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
+            <Clock className="h-[18px] w-[18px] text-amber-600" />
+            <span className="text-[12px] text-muted-foreground">In progress</span>
+            <span className="text-base font-semibold">{stats.loading ? '—' : stats.inProgress.toLocaleString()}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
+            <CheckCircle2 className="h-[18px] w-[18px] text-emerald-600" />
+            <span className="text-[12px] text-muted-foreground">Completed today</span>
+            <span className="text-base font-semibold">{stats.loading ? '—' : stats.completedToday.toLocaleString()}</span>
+          </div>
         </div>
-        <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-card px-2.5 py-1">
-          <Clock className="h-3.5 w-3.5 text-amber-600" />
-          <span className="text-[11px] text-muted-foreground">In progress</span>
-          <span className="text-sm font-semibold">{stats.loading ? '—' : stats.inProgress.toLocaleString()}</span>
-        </div>
-        <div className="inline-flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-card px-2.5 py-1">
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-          <span className="text-[11px] text-muted-foreground">Completed today</span>
-          <span className="text-sm font-semibold">{stats.loading ? '—' : stats.completedToday.toLocaleString()}</span>
-        </div>
-      </div>
+      )}
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
         <div className="flex items-center gap-2 mb-2 border rounded px-2 py-1 bg-background/60">

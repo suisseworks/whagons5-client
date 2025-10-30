@@ -211,7 +211,7 @@ function Header() {
 
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -225,7 +225,7 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -239,7 +239,7 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/40 shadow-sm">
+        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/20">
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
@@ -252,15 +252,15 @@ function Header() {
                             {workspaceIcon ? (
                                 <FontAwesomeIcon
                                     icon={workspaceIcon}
-                                    className="flex-shrink-0 text-lg sm:text-2xl lg:text-3xl leading-none"
+                                    className="flex-shrink-0 text-base sm:text-xl lg:text-2xl leading-none"
                                     style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
                                 />
                             ) : (
                                 currentWorkspaceName === 'Everything' ? (
-                                    <Layers className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7" style={{ color: '#27C1A7' }} />
+                                    <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" style={{ color: '#27C1A7' }} />
                                 ) : null
                             )}
-                            <h1 className="font-title tracking-tight text-lg sm:text-2xl lg:text-3xl font-extrabold truncate max-w-[32rem]">
+                            <h1 className="font-title tracking-tight text-base sm:text-xl lg:text-2xl font-extrabold truncate max-w-[32rem]">
                                 {currentWorkspaceName}
                             </h1>
                             {hydrationBadge}
