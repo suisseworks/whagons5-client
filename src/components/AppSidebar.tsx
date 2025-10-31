@@ -20,6 +20,7 @@ import {
   Layers,
   Plug,
   Users2,
+  Globe,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -491,6 +492,37 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                       <span className="sr-only">Settings</span>
                     ) : (
                       <span className="ml-3 text-sm font-medium">Settings</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem className="pt-1 pb-1">
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
+                  className={`rounded-md relative transition-colors ${isCollapsed && !isMobile
+                      ? `h-10 flex justify-center items-center ${pathname === '/settings/global'
+                            ? 'bg-primary/10 text-primary border-2 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                      : `h-10 ${pathname === '/settings/global'
+                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                        }`
+                  }`}
+                >
+                  <Link
+                    to="/settings/global"
+                    className={`${isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : 'flex items-center'
+                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
+                  >
+                    <Globe size={20} className="w-5! h-5! p-[1px]" />
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Global Settings</span>
+                    ) : (
+                      <span className="ml-3 text-sm font-medium">Global Settings</span>
                     )}
                   </Link>
                 </SidebarMenuButton>

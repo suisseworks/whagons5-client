@@ -312,7 +312,7 @@ export const Workspace = () => {
       label: (
         <div className="flex items-center gap-2">
           <ClipboardList />
-          Tasks
+          <span className="tab-label-text">Tasks</span>
         </div>
       ),
       forceMount: true,
@@ -343,7 +343,7 @@ export const Workspace = () => {
       label: (
         <div className="flex items-center gap-2">
           <Calendar />
-          Calendar
+          <span className="tab-label-text">Calendar</span>
         </div>
       ),
       content: (
@@ -357,7 +357,7 @@ export const Workspace = () => {
       label: (
         <div className="flex items-center gap-2">
           <Clock />
-          Scheduler
+          <span className="tab-label-text">Scheduler</span>
         </div>
       ),
       content: (
@@ -371,7 +371,7 @@ export const Workspace = () => {
       label: (
         <div className="flex items-center gap-2">
           <MapIcon />
-          Map
+          <span className="tab-label-text">Map</span>
         </div>
       ),
       content: (
@@ -385,7 +385,7 @@ export const Workspace = () => {
       label: (
         <div className="flex items-center gap-2">
           <LayoutDashboard />
-          Board
+          <span className="tab-label-text">Board</span>
         </div>
       ),
       content: (
@@ -416,14 +416,14 @@ export const Workspace = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
           <Input
             placeholder="Search…"
-            className="h-10 pl-9 pr-9 rounded-xl border-border/40"
+            className="h-10 pl-9 pr-9 rounded-lg border-border/40 placeholder:text-muted-foreground/50"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
         </div>
         {/* Quick filter chips */}
         <div className="flex items-center gap-2 ml-2">
-          <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80"
+          <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5"
             title="All tasks"
             onClick={() => {
               tableRef.current?.setFilterModel(null);
@@ -453,7 +453,7 @@ export const Workspace = () => {
               className="inline-flex"
               title="Drag to reorder pinned preset"
             >
-              <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80"
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5"
                 title={p.name}
                 onClick={() => {
                   tableRef.current?.setFilterModel(p.model);
@@ -463,13 +463,13 @@ export const Workspace = () => {
               >{p.name}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80"
+          <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5"
             title="Custom filters"
             onClick={() => setFiltersOpen(true)}
           >Filters…</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 rounded-full text-[12px] text-foreground/80" title="More presets">More…</Button>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5" title="More presets">More…</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[240px]">
               <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
@@ -513,7 +513,7 @@ export const Workspace = () => {
         <div className="flex items-center gap-2 ml-2">
           <Label className="text-xs text-muted-foreground">Group</Label>
           <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-            <SelectTrigger size="sm" className="h-8 rounded-full px-3 text-[12px] text-foreground/80">
+            <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5">
               <SelectValue placeholder="Group" />
             </SelectTrigger>
             <SelectContent>

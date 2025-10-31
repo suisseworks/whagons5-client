@@ -10,7 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { Category, Task, Team, StatusTransitionGroup, Sla } from "@/store/types";
+import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconService } from '@/database/iconService';
@@ -36,6 +36,7 @@ interface CategoryFormData {
   enabled: boolean;
   team_id: string;
   sla_id: string;
+  approval_id: string;
   status_transition_group_id: string;
 }
 
@@ -109,12 +110,17 @@ function Categories() {
   const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
   const slasState = useSelector((state: RootState) => (state as any).slas) as { value?: Sla[] } | undefined;
   const slas: Sla[] = slasState?.value ?? [];
+  const approvalsState = useSelector((state: RootState) => (state as any).approvals) as { value?: Approval[] } | undefined;
+  const approvals: Approval[] = approvalsState?.value ?? [];
 
   // Ensure local IndexedDB hydration on mount (no network requests)
   useEffect(() => {
     dispatch((genericActions as any).categories.getFromIndexedDB());
+    dispatch((genericActions as any).categories.fetchFromAPI());
     dispatch((genericActions as any).teams.getFromIndexedDB());
     dispatch((genericActions as any).slas.getFromIndexedDB());
+    dispatch((genericActions as any).approvals.getFromIndexedDB());
+    dispatch((genericActions as any).approvals.fetchFromAPI());
     dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
     dispatch((genericActions as any).categoryCustomFields.getFromIndexedDB());
   }, [dispatch]);
@@ -159,6 +165,7 @@ function Categories() {
     enabled: true,
     team_id: '',
     sla_id: '',
+    approval_id: '',
     status_transition_group_id: ''
   });
 
@@ -171,6 +178,7 @@ function Categories() {
     enabled: true,
     team_id: '',
     sla_id: '',
+    approval_id: '',
     status_transition_group_id: ''
   });
 
@@ -185,6 +193,7 @@ function Categories() {
         enabled: editingCategory.enabled ?? true,
         team_id: editingCategory.team_id?.toString() || '',
         sla_id: editingCategory.sla_id?.toString() || '',
+        approval_id: (editingCategory as any).approval_id?.toString?.() || '',
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
       });
     }
@@ -285,6 +294,22 @@ function Categories() {
       filter: true
     },
     {
+      field: 'approval_id',
+      headerName: 'Approval',
+      flex: 1.2,
+      minWidth: 180,
+      cellRenderer: (params: ICellRendererParams) => {
+        const approvalId = params.value as number | null | undefined;
+        if (!approvalId) {
+          return '' as any;
+        }
+        const approval = approvals.find((a: Approval) => a.id === Number(approvalId));
+        return <span>{approval?.name || `Approval ${approvalId}`}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
       field: 'status_transition_group_id',
       headerName: 'Status Transition Group',
       flex: 1.5,
@@ -333,7 +358,7 @@ function Categories() {
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, slas, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
+  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -355,6 +380,7 @@ function Categories() {
       team_id: parseInt(createFormData.team_id),
       workspace_id: 1,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
+      approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
       status_transition_group_id: parseInt(createFormData.status_transition_group_id),
       deleted_at: null
     };
@@ -369,6 +395,7 @@ function Categories() {
       enabled: true,
       team_id: '',
       sla_id: '',
+      approval_id: '',
       status_transition_group_id: ''
     });
   };
@@ -386,6 +413,7 @@ function Categories() {
       team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
       workspace_id: 1,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
+      approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
       status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined
     };
     await updateItem(editingCategory.id, updates);
@@ -594,6 +622,17 @@ function Categories() {
             }))]}
           />
           <SelectField
+            id="approval"
+            label="Approval"
+            value={createFormData.approval_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+            placeholder="Select approval…"
+            options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
+              value: a.id.toString(),
+              label: a.name
+            }))]}
+          />
+          <SelectField
             id="status-group"
             label="Status Transition Group"
             value={createFormData.status_transition_group_id}
@@ -676,6 +715,17 @@ function Categories() {
             options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
               value: s.id.toString(),
               label: s.name
+            }))]}
+          />
+          <SelectField
+            id="edit-approval"
+            label="Approval"
+            value={editFormData.approval_id}
+            onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+            placeholder="Select approval…"
+            options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
+              value: a.id.toString(),
+              label: a.name
             }))]}
           />
           <SelectField

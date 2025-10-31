@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboardList, faPlus, faFileAlt, faTags } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { Template, Task, Category } from "@/store/types";
+import { Template, Task, Category, Approval } from "@/store/types";
+import { genericActions } from "@/store/genericSlices";
 import { iconService } from '@/database/iconService';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,11 +73,13 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Templates() {
+  const dispatch = useDispatch();
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: priorities } = useSelector((state: RootState) => state.priorities);
   const { value: slas } = useSelector((state: RootState) => state.slas);
+  const { value: approvals } = useSelector((state: RootState) => (state as any).approvals || { value: [] });
   const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
   // State for default users (using string IDs for MultiSelect)
@@ -125,6 +128,7 @@ function Templates() {
     category_id: '',
     priority_id: '',
     sla_id: '',
+    approval_id: '',
     default_spot_id: '',
     expected_duration: '',
     enabled: true
@@ -134,6 +138,7 @@ function Templates() {
     category_id: '',
     priority_id: '',
     sla_id: '',
+    approval_id: '',
     default_spot_id: '',
     expected_duration: '',
     enabled: true
@@ -151,6 +156,7 @@ function Templates() {
         category_id: editingTemplate.category_id?.toString() || '',
         priority_id: (editingTemplate as any).priority_id?.toString() || '',
         sla_id: (editingTemplate as any).sla_id?.toString() || '',
+        approval_id: (editingTemplate as any).approval_id?.toString() || '',
         default_spot_id: (editingTemplate as any).default_spot_id?.toString() || '',
         expected_duration: (editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : '',
         enabled: (editingTemplate as any).enabled !== false // Default to true if not set
@@ -195,6 +201,12 @@ function Templates() {
     (slas as any[]).forEach((s: any) => map.set(Number(s.id), s));
     return map;
   }, [slas]);
+
+  const approvalById = useMemo(() => {
+    const map = new Map<number, any>();
+    (approvals as any[]).forEach((a: any) => map.set(Number(a.id), a));
+    return map;
+  }, [approvals]);
 
   const spotById = useMemo(() => {
     const map = new Map<number, any>();
@@ -285,6 +297,20 @@ function Templates() {
       filter: true
     },
     {
+      field: 'approval_id',
+      headerName: 'Approval',
+      flex: 1,
+      minWidth: 160,
+      cellRenderer: (params: ICellRendererParams) => {
+        const aid = Number(params.value);
+        const a = approvalById.get(aid);
+        if (!a) return <span className="text-muted-foreground">—</span>;
+        return <span>{a.name}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
       field: 'expected_duration',
       headerName: 'Expected Duration',
       flex: 0.8,
@@ -339,7 +365,7 @@ function Templates() {
       resizable: false,
       pinned: 'right'
     }
-  ], [categories, priorityById, slaById, spotById, handleEdit, handleDeleteTemplate]);
+  ], [categories, priorityById, slaById, approvalById, spotById, handleEdit, handleDeleteTemplate]);
 
   // Form handlers
   const handleCellValueChanged = useCallback(async (event: any) => {
@@ -380,6 +406,7 @@ function Templates() {
       category_id: parseInt(createFormData.category_id),
       priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
+      approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
       default_spot_id: createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null,
       default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
       instructions,
@@ -399,6 +426,7 @@ function Templates() {
       category_id: '',
       priority_id: '',
       sla_id: '',
+      approval_id: '',
       default_spot_id: '',
       expected_duration: '',
       enabled: true
@@ -435,6 +463,7 @@ function Templates() {
       category_id: parseInt(editFormData.category_id),
       priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
+      approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
       default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null,
       default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
       instructions,
@@ -466,6 +495,7 @@ function Templates() {
         category_id: editFormData.category_id ? parseInt(editFormData.category_id) : (editingTemplate as any).category_id,
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : ((editingTemplate as any).priority_id ?? null),
         sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : ((editingTemplate as any).sla_id ?? null),
+        approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : ((editingTemplate as any).approval_id ?? null),
         default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : ((editingTemplate as any).default_spot_id ?? null),
         default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
         instructions: (editingTemplate as any).instructions ?? null,
@@ -662,6 +692,22 @@ function Templates() {
               ))}
             </select>
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="approval" className="text-right">Approval</Label>
+            <select
+              id="approval"
+              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              value={createFormData.approval_id}
+              onChange={(e) => setCreateFormData(prev => ({ ...prev, approval_id: e.target.value }))}
+            >
+              <option value="">None</option>
+              {Array.from((approvals as any[])).map((a: any) => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
           </TabsContent>
           <TabsContent value="defaults">
@@ -800,6 +846,14 @@ function Templates() {
               onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
               placeholder="None"
               options={[{ value: 'none', label: 'None' }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
+            />
+            <SelectField
+              id="edit-approval"
+              label="Approval"
+              value={editFormData.approval_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+              placeholder="None"
+              options={[{ value: 'none', label: 'None' }, ...((approvals as Approval[]) || []).map((a: Approval) => ({ value: a.id.toString(), label: a.name }))]}
             />
           </div>
             </TabsContent>

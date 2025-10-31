@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+ 
 import { MultiStateBadge, AnimatedSpinner } from '@/animated/Status';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string };
@@ -84,25 +84,18 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
   }, [allowedNext, statusMap]);
 
   return (
-    <TooltipProvider>
-      <Popover open={open} onOpenChange={setOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <div className="flex items-center h-full py-1 gap-2">
-                <MultiStateBadge
-                  state={animationState}
-                  customStatus={customStatusConfig}
-                  customComponent={StatusPill}
-                  className="cursor-pointer"
-                />
-                {/* optional right-side animation removed by request */}
-              </div>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="top">Change status</TooltipContent>
-        </Tooltip>
-        <PopoverContent side="right" align="start" className="p-2 w-[220px]" sideOffset={6}>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center h-full py-1 gap-2">
+          <MultiStateBadge
+            state={animationState}
+            customStatus={customStatusConfig}
+            customComponent={StatusPill}
+            className="cursor-pointer"
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="p-2 w-[220px]" sideOffset={6}>
           <div className="flex flex-col gap-1">
             {items.length === 0 && (
               <div className="text-xs text-muted-foreground px-1 py-1">No allowed transitions</div>
@@ -146,8 +139,7 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
             ))}
           </div>
         </PopoverContent>
-      </Popover>
-    </TooltipProvider>
+    </Popover>
   );
 };
 

@@ -114,6 +114,59 @@ function Header() {
         return () => { cancelled = true; };
     }, [currentWorkspaceIcon]);
 
+    // Track theme changes (dark/light) so the gradient updates without hard refresh
+    const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => {
+        if (typeof document === 'undefined') return false;
+        return document.documentElement.classList.contains('dark');
+    });
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const updateThemeState = () => {
+            setIsDarkTheme(document.documentElement.classList.contains('dark'));
+        };
+
+        // Observe class changes on <html> to catch theme toggles
+        const observer = new MutationObserver(() => updateThemeState());
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        // Also react to system preference changes as a fallback
+        const mql = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleMqlChange = () => updateThemeState();
+        try {
+            mql.addEventListener('change', handleMqlChange);
+        } catch {
+            // Safari fallback
+            // @ts-ignore
+            mql.addListener(handleMqlChange);
+        }
+
+        return () => {
+            observer.disconnect();
+            try {
+                mql.removeEventListener('change', handleMqlChange);
+            } catch {
+                // @ts-ignore
+                mql.removeListener(handleMqlChange);
+            }
+        };
+    }, []);
+
+    // Subtle gradient background for workspace headers
+    const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
+        if (!currentWorkspaceName) return undefined;
+        if (isDarkTheme) {
+            const color = currentWorkspaceColor || 'var(--color-primary)';
+            // Dark mode: very soft tint
+            const topTint = `color-mix(in oklab, ${color} 4%, var(--color-background) 96%)`;
+            return { backgroundImage: `linear-gradient(180deg, ${topTint} 0%, var(--color-card) 60%)` } as React.CSSProperties;
+        }
+        // Light mode: very soft neutral gradient
+        const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
+        return { backgroundImage: `linear-gradient(180deg, ${grayTop} 0%, var(--color-card) 70%)` } as React.CSSProperties;
+    }, [currentWorkspaceName, currentWorkspaceColor, isDarkTheme]);
+
     // Hydration status badge: processing while hydrating, success briefly when done, hidden otherwise
     const [hydrationState, setHydrationState] = useState<"start" | "processing" | "success" | "error" | "custom">("custom");
     const prevHydrating = useRef(false);
@@ -239,7 +292,7 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/20">
+        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/20" style={headerBackgroundStyle}>
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}

@@ -35,6 +35,7 @@ export interface Category {
     icon: string;
     enabled: boolean;
     sla_id?: number | null;
+    approval_id?: number | null;
     team_id: number;
     workspace_id: number;
     status_transition_group_id: number;
@@ -50,6 +51,7 @@ export interface Template {
     category_id: number;
     priority_id: number | null;
     sla_id: number | null;
+    approval_id?: number | null;
     default_spot_id?: number | null;
     default_user_ids?: number[] | null;
     expected_duration?: number | null;
@@ -77,6 +79,7 @@ export interface Task {
     spot_id: number | null;
     status_id: number;
     priority_id: number;
+    approval_id: number | null;
     start_date: string | null;
     due_date: string | null;
     expected_duration: number;

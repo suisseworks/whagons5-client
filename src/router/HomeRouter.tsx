@@ -22,6 +22,7 @@ import Priorities from '@/pages/settings/sub_pages/Priorities';
 import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Approvals from '@/pages/settings/sub_pages/Approvals';
+import Global from '@/pages/settings/sub_pages/Global';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 // Messages removed
@@ -83,6 +84,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/slas" element={<Slas />} />
           <Route path="/settings/workflows" element={<Workflows />} />
           <Route path="/settings/approvals" element={<Approvals />} />
+          <Route path="/settings/global" element={<Global />} />
           <Route path="/settings/test" element={<TestPage />} />
         </Routes>
       </MainLayout>

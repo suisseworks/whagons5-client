@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { CalendarDays, CheckCircle2, Edit3, UserRound, MoreHorizontal, MapPin, Flag } from 'lucide-react';
+import { CalendarDays, MapPin, Flag } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function buildWorkspaceColumns(opts: any) {
@@ -23,7 +23,6 @@ export function buildWorkspaceColumns(opts: any) {
     spotMap,
     spotsLoaded,
     userMap,
-    getDoneStatusId,
     groupField,
   } = opts;
 
@@ -39,7 +38,7 @@ export function buildWorkspaceColumns(opts: any) {
     {
       field: 'name',
       headerName: 'Task',
-      flex: 1.2,
+      flex: 1.9,
       filter: false,
       wrapText: false,
       autoHeight: false,
@@ -50,17 +49,17 @@ export function buildWorkspaceColumns(opts: any) {
           <div className="flex flex-col gap-0.5 py-0.5">
             <div className="flex items-center gap-2">
               <HoverPopover content={(
-                <div className="max-w-[420px] text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                <div className="max-w-[520px] text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
                   {description || 'No description'}
                 </div>
               )}>
-                <div className="font-semibold text-base leading-tight text-foreground truncate cursor-default" title={name}>{name}</div>
+                <div className="font-semibold text-base leading-tight text-foreground truncate cursor-default">{name}</div>
               </HoverPopover>
             </div>
           </div>
         );
       },
-      minWidth: 150,
+      minWidth: 240,
     },
     {
       field: 'status_id',
@@ -154,14 +153,7 @@ export function buildWorkspaceColumns(opts: any) {
             </span>
           </div>
         );
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>{pill}</TooltipTrigger>
-              <TooltipContent side="top">{name}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
+        return pill;
       },
       width: 130,
       minWidth: 120,
@@ -288,85 +280,6 @@ export function buildWorkspaceColumns(opts: any) {
         );
       },
       minWidth: 100,
-    },
-    {
-      field: 'actions',
-      headerName: '',
-      sortable: false,
-      filter: false,
-      width: 140,
-      minWidth: 120,
-      maxWidth: 160,
-      pinned: 'right',
-      cellRenderer: (p: any) => {
-        const row = p.data;
-        if (!row) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
-        const doneId = typeof getDoneStatusId === 'function' ? getDoneStatusId() : undefined;
-        return (
-          <div className="flex items-center h-full py-1 gap-2 justify-end pr-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-                    aria-label="Mark complete"
-                    title="Mark complete"
-                    onClick={(e) => { e.stopPropagation(); if (doneId != null) handleChangeStatus(row, doneId); }}
-                  >
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Complete (C)</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-                    aria-label="Edit"
-                    title="Edit"
-                    onClick={(e) => { e.stopPropagation(); }}
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Edit (E)</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-                    aria-label="Reassign"
-                    title="Reassign"
-                    onClick={(e) => { e.stopPropagation(); }}
-                  >
-                    <UserRound className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Reassign (R)</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-accent"
-                    aria-label="More options"
-                    title="More options"
-                    onClick={(e) => { e.stopPropagation(); }}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">More (.)</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        );
-      },
     },
   ]);
 

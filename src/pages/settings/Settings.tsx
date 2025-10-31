@@ -21,7 +21,8 @@ import {
   faCalendar,
   faRocket,
   faTrophy,
-  faSquareCheck
+  faSquareCheck,
+  faLayerGroup
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useState } from "react";
@@ -70,6 +71,7 @@ function Settings() {
   const users = useSelector((s: RootState) => s.users?.value ?? []);
   const forms = useSelector((s: RootState) => s.forms?.value ?? []);
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
+  const tags = useSelector((s: RootState) => s.tags?.value ?? []);
   const didMoveRef = useRef(false);
   const pointerStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
   // const workflows = useSelector((s: RootState) => s.workflows.value);
@@ -81,22 +83,31 @@ function Settings() {
       teams: teams.length,
       spots: spots.length,
       statuses: statuses.length,
+      tags: tags.length,
       priorities: priorities.length,
       slas: slas.length,
       users: users.length,
       forms: forms.length,
       workflows: 0,
     };
-  }, [categories.length, templates.length, teams.length, spots.length, statuses.length, priorities.length, slas.length, users.length, forms.length]);
+  }, [categories.length, templates.length, teams.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length]);
 
   const basicSettings = useMemo(() => [
     {
       id: 'categories',
       title: 'Categories',
-      icon: faTags,
+      icon: faLayerGroup,
       count: counts.categories,
       description: 'Manage task categories and labels',
       color: 'text-red-500'
+    },
+    {
+      id: 'tags',
+      title: 'Tags',
+      icon: faTags,
+      count: counts.tags,
+      description: 'Manage task tags',
+      color: 'text-fuchsia-500'
     },
     {
       id: 'templates',
@@ -147,7 +158,7 @@ function Settings() {
       color: 'text-rose-500'
     },
 
-  ], [counts.categories, counts.templates, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities]);
+  ], [counts.categories, counts.tags, counts.templates, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities]);
   // Settings configuration data
   const advancedSettings = useMemo(() => [
 
@@ -298,6 +309,9 @@ function Settings() {
     switch (settingId) {
       case 'categories':
         navigate('/settings/categories');
+        break;
+      case 'tags':
+        navigate('/settings/tags');
         break;
       case 'templates':
         navigate('/settings/templates');

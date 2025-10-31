@@ -472,6 +472,7 @@ export class TasksCache {
             (task as any).spot_id || 0,
             (task as any).status_id,
             (task as any).priority_id,
+            (task as any).approval_id || 0,
             normalizedUserIds,
             // Timestamps normalized to UTC epoch ms (empty string when falsy)
             this.toUtcEpochMs((task as any).start_date),
