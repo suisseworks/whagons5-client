@@ -8,7 +8,7 @@ export const GRID_STYLES = {
 };
 
 export const GRID_CONSTANTS = {
-  ROW_HEIGHT: 44,
+  ROW_HEIGHT: 64,
   HEADER_HEIGHT: 44,
   ROW_BUFFER: 50,
   CLIENT_THRESHOLD: 1000,
@@ -23,10 +23,19 @@ export const createLoadingSpinner = () => (
   </div>
 );
 
-export const createGridContainer = (children: React.ReactNode) => (
-  <div style={GRID_STYLES.container} className="ag-theme-quartz wh-workspace-grid wh-modern-grid wh-density-compact h-full w-full">
-    <div style={GRID_STYLES.grid}>
-      {children}
+export const createGridContainer = (children: React.ReactNode) => {
+  let densityClass = 'wh-density-comfortable';
+  try {
+    const v = (localStorage.getItem('wh_workspace_density') as any) || 'comfortable';
+    if (v === 'compact') densityClass = 'wh-density-compact';
+    else if (v === 'spacious') densityClass = 'wh-density-comfortable'; // keep comfortable spacing for L; rowHeight handles height
+    else densityClass = 'wh-density-comfortable';
+  } catch {}
+  return (
+    <div style={GRID_STYLES.container} className={`ag-theme-quartz wh-workspace-grid wh-modern-grid ${densityClass} h-full w-full`}>
+      <div style={GRID_STYLES.grid}>
+        {children}
+      </div>
     </div>
-  </div>
-);
+  );
+};

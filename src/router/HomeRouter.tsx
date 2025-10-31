@@ -19,6 +19,7 @@ import Users from '@/pages/settings/sub_pages/Users';
 import JobPositions from '@/pages/settings/sub_pages/JobPositions';
 import Statuses from '@/pages/settings/sub_pages/Statuses';
 import Priorities from '@/pages/settings/sub_pages/Priorities';
+import Tags from '@/pages/settings/sub_pages/Tags';
 import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Approvals from '@/pages/settings/sub_pages/Approvals';
@@ -81,6 +82,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/users" element={<Users />} /> 
           <Route path="/settings/statuses" element={<Statuses />} />
           <Route path="/settings/priorities" element={<Priorities />} />
+          <Route path="/settings/tags" element={<Tags />} />
           <Route path="/settings/slas" element={<Slas />} />
           <Route path="/settings/workflows" element={<Workflows />} />
           <Route path="/settings/approvals" element={<Approvals />} />

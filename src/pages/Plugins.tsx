@@ -21,7 +21,7 @@ function Plugins() {
 							</div>
 						</div>
 						<div className="space-y-1.5">
-							<CardTitle className="text-xl">Cleaning</CardTitle>
+							<CardTitle className="text-2xl">Cleaning</CardTitle>
 							<CardDescription>Cleaning workflows, schedules and services</CardDescription>
 						</div>
 					</CardHeader>

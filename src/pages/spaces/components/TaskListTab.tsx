@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
@@ -25,6 +25,12 @@ function createSpotMap(spots: any[]) {
   return m;
 }
 
+function createCategoryMap(categories: any[]) {
+  const m: Record<number, any> = {};
+  for (const c of categories || []) m[Number(c.id)] = c;
+  return m;
+}
+
 export default function TaskListTab({
   workspaceId,
   searchText = "",
@@ -35,12 +41,14 @@ export default function TaskListTab({
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
+  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const statusMap = useMemo(() => createStatusMap(statuses || []), [statuses]);
   const priorityMap = useMemo(() => createPriorityMap(priorities || []), [priorities]);
   const spotMap = useMemo(() => createSpotMap(spots || []), [spots]);
+  const categoryMap = useMemo(() => createCategoryMap(categories || []), [categories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +112,7 @@ export default function TaskListTab({
           statusMap={statusMap}
           priorityMap={priorityMap}
           spotMap={spotMap}
+          categoryMap={categoryMap}
           getStatusIcon={getStatusIcon}
         />
       ))}

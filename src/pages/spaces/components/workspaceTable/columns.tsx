@@ -2,14 +2,17 @@ import dayjs from 'dayjs';
 // import { Badge } from "@/components/ui/badge";
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CalendarDays, MapPin, Flag } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTags } from "@fortawesome/free-solid-svg-icons";
+import { iconService } from "@/database/iconService";
+import { useEffect, useState } from "react";
 
 export function buildWorkspaceColumns(opts: any) {
   const {
     getUserDisplayName,
-    getUserInitials,
     getStatusIcon,
     getAllowedNextStatuses,
     handleChangeStatus,
@@ -24,11 +27,34 @@ export function buildWorkspaceColumns(opts: any) {
     spotsLoaded,
     userMap,
     groupField,
+    showDescriptions,
   } = opts;
 
-  const AvatarImg = ({ user }: { user: any }) => {
+  const CategoryIconSmall = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
+    const [iconEl, setIconEl] = useState<any>(faTags);
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const loaded = await iconService.getIcon(iconClass);
+          if (!cancelled) setIconEl(loaded || faTags);
+        } catch {
+          if (!cancelled) setIconEl(faTags);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [iconClass]);
+    return <FontAwesomeIcon icon={iconEl as any} className="mr-1" style={{ color: color || '#6b7280', width: 18, height: 18 }} />;
+  };
+
+  // Always render initials instead of profile pictures
+  const UserInitial = ({ user }: { user: any }) => {
+    const name: string = getUserDisplayName(user) || '';
+    const initial = (name.trim().charAt(0) || '?').toUpperCase();
     return (
-      <AvatarImage src={user?.url_picture || ''} alt={getUserDisplayName(user)} onError={() => {}} />
+      <AvatarFallback className="text-[11px] font-semibold">
+        {initial}
+      </AvatarFallback>
     );
   };
 
@@ -38,28 +64,48 @@ export function buildWorkspaceColumns(opts: any) {
     {
       field: 'name',
       headerName: 'Task',
-      flex: 1.9,
+      flex: 3,
       filter: false,
-      wrapText: false,
-      autoHeight: false,
+      wrapText: true,
+      autoHeight: true,
       cellRenderer: (p: any) => {
         const name = p.data?.name || '';
         const description = p.data?.description || '';
+        const cat = (opts as any)?.categoryMap?.[Number(p.data?.category_id)];
         return (
           <div className="flex flex-col gap-0.5 py-0.5">
             <div className="flex items-center gap-2">
-              <HoverPopover content={(
-                <div className="max-w-[520px] text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                  {description || 'No description'}
-                </div>
-              )}>
-                <div className="font-semibold text-base leading-tight text-foreground truncate cursor-default">{name}</div>
-              </HoverPopover>
+              <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
+              <div className="font-semibold text-[18px] leading-[1.6] tracking-[-0.01em] cursor-default text-[#0f172a] dark:text-white">{name}</div>
             </div>
+            {showDescriptions && description && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="wh-task-desc mt-1 pl-6 text-[13px] leading-relaxed text-[#6b7280] dark:text-muted-foreground"
+                      style={{
+                        whiteSpace: 'normal',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical' as any,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {description}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[520px] whitespace-pre-wrap text-[14px] leading-relaxed">
+                    {description}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         );
       },
-      minWidth: 240,
+      minWidth: 280,
     },
     {
       field: 'status_id',
@@ -99,9 +145,9 @@ export function buildWorkspaceColumns(opts: any) {
           />
         );
       },
-      width: 160,
-      minWidth: 120,
-      maxWidth: 200,
+      width: 170,
+      minWidth: 160,
+      maxWidth: 220,
     },
     {
       field: 'priority_id',
@@ -128,41 +174,35 @@ export function buildWorkspaceColumns(opts: any) {
         const meta: any = priorityMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
-        const color = meta?.color || '#6B7280';
-        const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-        const gradient = color ? (isDark
-          ? `linear-gradient(135deg, color-mix(in oklab, ${color} 28%, #101014 72%), color-mix(in oklab, ${color} 18%, #101014 82%))`
-          : `linear-gradient(135deg, color-mix(in oklab, ${color} 22%, #ffffff 78%), color-mix(in oklab, ${color} 12%, #ffffff 88%))`
-        ) : undefined;
-        const borderClr = color ? (isDark
-          ? `color-mix(in oklab, ${color} 60%, var(--color-card) 40%)`
-          : color
-        ) : undefined;
-        const textClr = color ? (isDark
-          ? `color-mix(in oklab, ${color} 78%, white 22%)`
-          : color
-        ) : undefined;
+        const lower = (name || '').toLowerCase();
+        const palette = lower.includes('high')
+          ? { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444' }
+          : lower.includes('medium')
+            ? { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B' }
+            : lower.includes('low')
+              ? { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981' }
+              : { bg: `color-mix(in oklab, ${(meta?.color || '#6B7280')} 12%, #ffffff 88%)`, text: (meta?.color || '#6B7280') };
         const pill = (
-          <div className="inline-flex items-center h-full py-2">
+          <div className="inline-flex items-center h-full py-1.5">
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none border truncate max-w-[120px]"
-              style={{ background: gradient, borderColor: borderClr, color: textClr }}
+              className="inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none truncate max-w-[160px]"
+              style={{ background: palette.bg, color: palette.text }}
             >
-              <Flag className="h-3 w-3" />
+              <Flag className="h-3.5 w-3.5" style={{ color: palette.text, opacity: 0.9 }} />
               {name}
             </span>
           </div>
         );
         return pill;
       },
-      width: 130,
-      minWidth: 120,
-      maxWidth: 180,
+      width: 110,
+      minWidth: 110,
+      maxWidth: 140,
     },
     {
       field: 'user_ids',
       headerName: 'Responsible',
-      flex: 0.85,
+      width: 140,
       filter: false,
       cellRenderer: (p: any) => {
         if (!usersLoaded) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
@@ -173,26 +213,24 @@ export function buildWorkspaceColumns(opts: any) {
         const displayUsers = users.slice(0, 3);
         const remainingCount = users.length - displayUsers.length;
         return (
-            <div className="flex items-center h-full py-0.5 gap-2">
+          <div className="flex items-center h-full py-0.5 gap-2">
             <div className="flex items-center -space-x-2">
               {displayUsers.map((user: any) => (
                 <HoverPopover key={user.id} content={(
                   <div className="flex flex-col items-center gap-3">
-                    <Avatar className="h-16 w-16 border-2 border-background">
-                      <AvatarImg user={user} />
-                      <AvatarFallback className="text-base font-medium">{getUserInitials(user)}</AvatarFallback>
+                    <Avatar className="h-16 w-16 border-2 border-background bg-muted text-foreground">
+                      <UserInitial user={user} />
                     </Avatar>
                     <span className="text-base font-medium text-popover-foreground text-center">{getUserDisplayName(user)}</span>
                   </div>
                 )}>
-                  <Avatar className="h-7 w-7 border border-background hover:border-primary transition-colors cursor-pointer" title={getUserDisplayName(user)}>
-                    <AvatarImg user={user} />
-                    <AvatarFallback className="text-[10px]">{getUserInitials(user)}</AvatarFallback>
+                  <Avatar className="h-7 w-7 border-2 transition-colors cursor-pointer bg-muted text-foreground" title={getUserDisplayName(user)} style={{ borderColor: '#e5e7eb' }}>
+                    <UserInitial user={user} />
                   </Avatar>
                 </HoverPopover>
               ))}
               {remainingCount > 0 && (
-                <div className="h-7 w-7 rounded-full bg-muted border border-background flex items-center justify-center">
+                <div className="h-7 w-7 rounded-full bg-muted border-2 flex items-center justify-center" style={{ borderColor: '#e5e7eb' }}>
                   <span className="text-[10px] text-muted-foreground font-medium">+{remainingCount}</span>
                 </div>
               )}
@@ -200,7 +238,8 @@ export function buildWorkspaceColumns(opts: any) {
           </div>
         );
       },
-      minWidth: 120,
+      minWidth: 140,
+      maxWidth: 200,
     },
     {
       field: 'due_date',
@@ -211,7 +250,7 @@ export function buildWorkspaceColumns(opts: any) {
         if (!dueDate) {
           return (
             <div className="flex items-center h-full py-2">
-              <span className="text-sm text-muted-foreground">No due date</span>
+              <span className="text-[13px] text-muted-foreground">No due date</span>
             </div>
           );
         }
@@ -222,11 +261,11 @@ export function buildWorkspaceColumns(opts: any) {
         const urgent = !isOverdue && daysDiff <= 2;
         const colorCls = isOverdue ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-muted-foreground';
         const inner = (
-          <div className="flex items-center h-full py-2 gap-1.5">
+          <div className="flex items-center h-full py-2 gap-2">
             <span className={`inline-flex items-center ${colorCls}`}>
-              <span className="inline-block h-1.5 w-1.5 rounded-full mr-1" aria-hidden style={{ backgroundColor: isOverdue ? '#dc2626' : urgent ? '#d97706' : '#9ca3af' }} />
-              <CalendarDays className="h-4 w-4 mr-1" aria-hidden={true} />
-              <span className="text-sm font-medium">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
+              <span className="inline-block h-2 w-2 rounded-full mr-2" aria-hidden style={{ backgroundColor: isOverdue ? '#dc2626' : urgent ? '#d97706' : '#9ca3af' }} />
+              <CalendarDays className="h-4 w-4 mr-2" aria-hidden={true} style={{ color: '#8B5CF6' }} />
+              <span className="text-[13px] font-medium">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
             </span>
           </div>
         );
@@ -239,7 +278,9 @@ export function buildWorkspaceColumns(opts: any) {
           </TooltipProvider>
         );
       },
-      minWidth: 160,
+      width: 140,
+      minWidth: 140,
+      maxWidth: 180,
     },
     {
       field: 'spot_id',
@@ -270,16 +311,17 @@ export function buildWorkspaceColumns(opts: any) {
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
         const tag = (
-          <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-muted text-muted-foreground text-xs">
-            <MapPin className="h-3.5 w-3.5" />
-            <span className="truncate max-w-[140px]">{name}</span>
+          <div className="inline-flex items-center gap-2 text-[13px] text-muted-foreground">
+            <MapPin className="h-4 w-4 mr-2" style={{ color: '#6366F1' }} />
+            <span className="truncate max-w-[160px]">{name}</span>
           </div>
         );
         return (
           <div className="flex items-center h-full py-1">{tag}</div>
         );
       },
-      minWidth: 100,
+      flex: 2,
+      minWidth: 220,
     },
   ]);
 

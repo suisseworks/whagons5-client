@@ -64,24 +64,25 @@
 }
 
 .dark {
-  --background: oklch(0.16 0.02 255); /* Neutral deep dark */
-  --foreground: oklch(0.98 0 0); /* Neutral white text */
-  --card: oklch(0.19 0.02 255); /* Slightly raised card */
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.19 0.02 255);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.78 0.2 280); /* Distinct violet for dark mode */
+  /* Map core vars to dark tokens for consistent palette */
+  --background: var(--bg-primary);
+  --foreground: #ffffff;
+  --card: var(--bg-secondary);
+  --card-foreground: #ffffff;
+  --popover: var(--bg-secondary);
+  --popover-foreground: #ffffff;
+  --primary: oklch(0.78 0.2 280);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.23 0.03 255); /* Neutral subtle surface */
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.22 0.02 255);
-  --muted-foreground: oklch(0.88 0.02 255);
+  --secondary: var(--bg-hover);
+  --secondary-foreground: #e5e7eb;
+  --muted: #1f1f1f;
+  --muted-foreground: var(--text-secondary);
   --accent: oklch(0.76 0.16 210);
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.65 0.22 25);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.36 0.03 255);
-  --input: oklch(0.24 0.03 255);
+  --border: var(--border-subtle);
+  --input: var(--bg-secondary);
   --ring: oklch(0.8 0.17 205 / 0.5);
   --chart-1: oklch(0.8 0.17 205);
   --chart-2: oklch(0.76 0.16 210);
@@ -90,21 +91,58 @@
   --chart-5: oklch(0.78 0.15 260);
 
   /* Dark sidebar palette */
-  --sidebar: oklch(0.18 0.02 255); /* Match neutral dark background */
+  --sidebar: #1a1f28;
   --sidebar-foreground: #e5e7eb;
   --sidebar-primary: oklch(0.78 0.2 280);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: oklch(0.26 0.03 255);
+  --sidebar-accent: #252b36;
   --sidebar-accent-foreground: #e5e7eb;
-  --sidebar-border: oklch(0.34 0.03 255);
+  --sidebar-border: rgba(255,255,255,0.08);
   --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
-  /* Dark variant: slightly more teal to read against dark */
   --sidebar-header: color-mix(in oklab, var(--sidebar) 75%, var(--primary) 25%);
 
   /* Dark mode gradients */
   --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.22 0.02 255) 0%, oklch(0.26 0.03 255) 100%);
+  --gradient-secondary: linear-gradient(135deg, #1f2530 0%, #1a1f28 100%);
   --gradient-accent: linear-gradient(135deg, oklch(0.76 0.16 210) 0%, oklch(0.72 0.14 230) 100%);
+
+  /* Dark mode design tokens (for incremental adoption) */
+  --bg-primary: #0F0F0F;
+  --bg-secondary: #1A1A1A;
+  --bg-hover: #222222;
+  --bg-elevated: #1E1E1E;
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --text-tertiary: #6B7280;
+
+  --border-subtle: #2A2A2A;
+  --border-medium: #374151;
+
+  --accent-primary: #4F46E5;
+  --accent-danger: #EF4444;
+  --accent-success: #10B981;
+  --accent-warning: #F59E0B;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 15px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
 }
 
 @theme inline {
@@ -157,22 +195,40 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Smooth transitions for interactive elements */
+  button, [role="button"], a, input, select, textarea, .ag-row, .ag-cell {
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Focus styles */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #6366F1;
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    border-color: #6366F1;
+  }
   /* Sidebar font utility */
   .font-montserrat {
     font-family: 'Montserrat', sans-serif;
   }
   
-  /* Workspace header: solid white for clean, modern look */
+  /* Workspace header */
   .wh-header { background: #ffffff; }
-
-  /* Dark theme: slightly stronger blend for visibility */
   .dark .wh-header {
-    background: linear-gradient(
-      to right,
-      color-mix(in oklab, var(--color-background) 88%, var(--color-primary) 12%) 0%,
-      var(--color-background) 50%,
-      color-mix(in oklab, var(--color-background) 88%, var(--color-primary) 12%) 100%
-    );
+    background: #0A0A0A;
+    border-bottom: 1px solid #1F1F1F;
   }
   
   /* Gradient button helpers */
@@ -277,6 +333,13 @@
 }
 .dark .wh-workspace-grid .ag-center-cols-container .ag-row:not(.ag-row-selected) {
   border-bottom: 1px solid oklch(from var(--color-border) l calc(l + 0.08) c h / 0.25);
+}
+/* Smoother row hover for dark mode */
+.wh-workspace-grid .ag-center-cols-container .ag-row {
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dark .wh-workspace-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+  background-color: var(--bg-hover) !important;
 }
 
 /* Subtle underline for workspace grid header */
@@ -481,47 +544,49 @@
 /* Row as card: rounded, subtle elevation, divider-less */
 .wh-modern-grid .ag-center-cols-container .ag-row {
   /* Use horizontal margins only to avoid AG Grid row stacking issues */
-  margin: 0 8px;
-  border-radius: var(--radius-md);
-  background-color: oklch(from var(--color-card) l c h / 0.6);
-  box-shadow: 0 1px 0 oklch(from var(--color-background) l calc(l - 0.06) c h / 0.6);
-  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  margin: 0 8px 8px 8px;
+  border-radius: 8px;
+  background-color: var(--color-card);
+  border: 1px solid rgba(255,255,255,0.08);
+  /* Remove all inset/left shadows to avoid glow on selection */
+  box-shadow: none !important;
+  transition: all 0.2s ease;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row {
-  background-color: oklch(from var(--color-card) l calc(l - 0.02) c h / 0.75);
-  box-shadow: 0 1px 0 oklch(from var(--color-background) l calc(l + 0.06) c h / 0.25);
+  background-color: #252b36;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: none !important;
 }
 
 /* Hover and selection polish */
 .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  /* Very light neutral hover */
-  background-color: hsl(0 0% 97%) !important;
-  box-shadow: 0 4px 14px oklch(from var(--color-background) l calc(l - 0.1) c h / 0.18);
-  transform: translateY(-1px);
+  background-color: rgba(255,255,255,0.04) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  transform: none;
 }
 
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: hsl(0 0% 95%) !important; /* force pure light gray */
-  border-color: hsl(0 0% 85%);
-  box-shadow: 0 6px 16px oklch(from var(--color-background) l calc(l - 0.12) c h / 0.22);
+  background-color: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: none !important;
 }
 
 /* Ensure cells inherit the same gray without theme mixing */
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell {
-  background-color: hsl(0 0% 95%) !important;
+  background-color: transparent !important;
 }
 
 /* Dark mode: use darker, higher-contrast selection and hover */
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  background-color: oklch(0.26 0.03 255) !important; /* subtle dark hover */
-  box-shadow: 0 4px 14px oklch(from var(--color-background) l calc(l + 0.06) c h / 0.22);
+  background-color: rgba(255,255,255,0.04) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: oklch(0.28 0.03 255) !important; /* selected slightly brighter than hover */
-  border-color: oklch(0.38 0.04 255);
-  box-shadow: 0 6px 18px oklch(from var(--color-background) l calc(l + 0.1) c h / 0.28);
+  background-color: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: none !important;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell {
@@ -532,6 +597,9 @@
 .wh-modern-grid .ag-header {
   background: transparent;
   border-bottom: none;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .wh-modern-grid .ag-header .ag-header-cell,
@@ -541,12 +609,20 @@
 
 /* Compact, friendly cell paddings */
 .wh-modern-grid .ag-cell {
-  padding-block: 8px;
+  padding-block: 12px;
 }
 
 /* Make status cells stand out slightly */
 .wh-modern-grid .ag-center-cols-container .ag-row .ag-cell[col-id="status_id"] {
   font-weight: 600;
+}
+
+/* Column header typography for workspace grid */
+.wh-modern-grid .ag-header-cell-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9CA3AF;
+  letter-spacing: 0.5px;
 }
 
 /* Make drag handles and resize lines subtle */
@@ -572,15 +648,20 @@
 
 /* Better keyboard focus ring on cells */
 .wh-modern-grid .ag-cell:focus-within {
-  outline: 2px solid var(--color-ring);
-  outline-offset: -2px;
+  outline: 1px solid var(--color-border);
+  outline-offset: -1px;
   border-radius: calc(var(--radius-md) - 2px);
+}
+
+/* When a row is selected, remove the teal focus outline to avoid left glow */
+.wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell:focus-within {
+  outline: none;
 }
 
 /* Density controls */
 .wh-modern-grid.wh-density-compact .ag-center-cols-container .ag-row { margin: 0 6px; }
 .wh-modern-grid.wh-density-compact .ag-cell { padding-block: 4px; }
 
-.wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 10px; }
-.wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 12px; }
+.wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 12px; }
+.wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 10px; }
 

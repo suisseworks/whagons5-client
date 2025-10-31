@@ -134,6 +134,8 @@ export interface Tag {
     id: number;
     name: string;
     color?: string | null;
+    icon?: string | null;
+    category_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
 }

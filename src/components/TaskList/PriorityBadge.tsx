@@ -1,6 +1,4 @@
 "use client";
-
-import React from "react";
 import { Flag } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -19,25 +17,23 @@ export function PriorityBadge({
   if (!meta) {
     return <span className={"text-xs text-muted-foreground" + (className ? ` ${className}` : "")}>No priority</span>;
   }
-  const color = meta.color || "#6B7280";
-  const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
-  const gradient = isDark
-    ? `linear-gradient(135deg, color-mix(in oklab, ${color} 16%, #101014 84%), color-mix(in oklab, ${color} 10%, #101014 90%))`
-    : `linear-gradient(135deg, color-mix(in oklab, ${color} 12%, #ffffff 88%), color-mix(in oklab, ${color} 6%, #ffffff 94%))`;
-  // Make border neutral/subtle instead of priority-colored
-  const border = `oklch(from var(--color-border) l c h / 0.45)`;
-  const text = isDark
-    ? `color-mix(in oklab, ${color} 78%, white 22%)`
-    : color;
+  const name = (meta.name || '').toLowerCase();
+  const palette = name.includes('high')
+    ? { bg: 'rgba(239, 68, 68, 0.15)', text: '#EF4444' }
+    : name.includes('medium')
+      ? { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B' }
+      : name.includes('low')
+        ? { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981' }
+        : { bg: `color-mix(in oklab, ${(meta.color || '#6B7280')} 12%, #ffffff 88%)`, text: (meta.color || '#6B7280') };
 
   const inner = (
     <span
-      className={"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none border " + (className || "")}
-      style={{ background: gradient, borderColor: border, color: text }}
+      className={"inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none " + (className || "")}
+      style={{ background: palette.bg, color: palette.text }}
       aria-label={`Priority: ${meta.name}`}
     >
-      <Flag className="h-3 w-3" style={{ color: text }} />
-      <span className="truncate max-w-[100px]">{meta.name}</span>
+      <Flag className="h-3.5 w-3.5" style={{ color: palette.text, opacity: 0.9 }} />
+      <span className="truncate max-w-[120px]">{meta.name}</span>
     </span>
   );
 

@@ -1,6 +1,4 @@
 "use client";
-
-import React from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -24,31 +22,24 @@ export function StatusBadge({
     );
   }
   const color = meta.color || "#6B7280";
-  const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
-  const bg = isDark
-    ? `color-mix(in oklab, ${color} 10%, var(--color-card) 90%)`
-    : `color-mix(in oklab, ${color} 15%, var(--color-card) 85%)`;
-  const border = isDark
-    ? `color-mix(in oklab, ${color} 55%, var(--color-card) 45%)`
-    : color;
-  const text = isDark
-    ? `color-mix(in oklab, ${color} 75%, white 25%)`
-    : color;
-
   const icon = meta.icon && typeof getStatusIcon === "function" ? getStatusIcon(meta.icon) : null;
 
   const inner = (
     <span
-      className={"inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none border " + (className || "")}
-      style={{ background: bg, borderColor: border, color: text }}
+      className={"inline-flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-[12px] font-medium leading-none border " + (className || "")}
+      style={{
+        background: `color-mix(in oklab, ${color} 12%, #101014 88%)`,
+        borderColor: 'oklch(from var(--color-border) l c h / 0.45)',
+        color: '#F3F4F6'
+      }}
       aria-label={`Status: ${meta.name}`}
     >
       {icon ? (
-        <FontAwesomeIcon icon={icon} className="text-[10px]" style={{ color: text }} />
+        <FontAwesomeIcon icon={icon} className="text-[10px]" style={{ color: '#F3F4F6' }} />
       ) : (
-        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: text }} />
+        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
       )}
-      <span className="truncate max-w-[120px]">{meta.name}</span>
+      <span className="truncate max-w-[140px] lowercase">{meta.name}</span>
     </span>
   );
 

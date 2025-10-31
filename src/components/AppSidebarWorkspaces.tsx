@@ -309,7 +309,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                         className={`rounded-md relative ${
                           collapsed
                             ? 'flex items-center justify-center h-8 w-8 mx-0'
-                            : 'flex items-center space-x-2 overflow-hidden h-10 px-4 mx-2'
+                            : 'flex items-center space-x-3 overflow-hidden h-10 px-4 mx-2'
                         }`}
                         data-swapy-item={itemId}
                         key={itemId}
@@ -318,16 +318,16 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                           to={`/workspace/${itemId}`}
                           data-workspace-id={String(itemId)}
                           onDragStart={(event) => event.preventDefault()}
-                          className={`group flex items-center  rounded-md ${
+                          className={`group flex items-center rounded-md ${
                             collapsed
                               ? `justify-center w-full h-full text-xs font-medium ${
                                   pathname === `/workspace/${itemId}`
                                     ? 'bg-primary/20 text-primary border border-primary/40'
                                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                                 }`
-                              : `flex-1 space-x-2 h-10 -mx-4 px-4 ${
+                              : `flex-1 space-x-3 h-10 -mx-4 px-4 ${
                                   pathname === `/workspace/${itemId}`
-                                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
+                                    ? 'bg-primary/10 text-primary border-l-[3px] border-primary'
                                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
                                 } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 `
                           }`}
@@ -339,7 +339,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                               className="w-4 h-4"
                             />
                           </span>
-                          <span className={collapsed ? 'sr-only' : 'truncate font-medium'}>{item.name}</span>
+                          <span className={collapsed ? 'sr-only' : 'truncate font-medium text-[14px]'}>{item.name}</span>
                         </Link>
                       </div>
                     )}

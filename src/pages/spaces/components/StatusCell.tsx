@@ -43,37 +43,23 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     color: color
   };
 
-  // Build a compact pill with theme-aware contrast.
-  // In dark mode, use a softer mix for bg and slightly softened border/text to reduce harshness.
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  const tintedBackground = "transparent";
-  const pillBorderColor = "transparent";
-  const pillTextColor = color
-    ? (isDark
-      ? `color-mix(in oklab, ${color} 72%, white 28%)`
-      : color)
-    : undefined;
+  // Status tag: solid colored pill with white text
+  const pillTextColor = '#ffffff';
   const StatusPill = (
     <div
-      className="inline-flex items-center gap-2 rounded-md px-2 py-0"
-      style={{ background: tintedBackground, color: pillTextColor, borderColor: pillBorderColor }}
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.02em]"
+      style={{ background: color, color: pillTextColor }}
     >
       {isWorkingStatus ? (
-        <span className="relative inline-flex items-center justify-center h-4 w-4" aria-busy="true">
-          <span
-            className="absolute inline-block rounded-full animate-ping"
-            style={{ backgroundColor: pillBorderColor, opacity: isDark ? 0.35 : 0.45, height: '16px', width: '16px' }}
-          />
-          <span className="absolute inline-flex items-center justify-center" style={{ height: '16px', width: '16px', color: pillTextColor }}>
-            <AnimatedSpinner />
-          </span>
+        <span className="relative inline-flex items-center justify-center h-3 w-3 mr-0.5" aria-busy="true" style={{ color: '#ffffff' }}>
+          <AnimatedSpinner />
         </span>
       ) : meta?.icon ? (
-        <FontAwesomeIcon icon={icon} className="text-[11px]" style={{ color: pillTextColor }} />
+        <FontAwesomeIcon icon={icon} className="text-[10px]" style={{ color: pillTextColor }} />
       ) : (
-        <span className="text-[10px] leading-none" style={{ color: pillTextColor }}>●</span>
+        <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
       )}
-      <span className="text-xs font-semibold tracking-wide uppercase leading-none">{name}</span>
+      <span className="text-[12px] font-semibold tracking-wide leading-none">{name}</span>
     </div>
   );
 

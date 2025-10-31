@@ -207,6 +207,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const spotMap = useMemo(() => createSpotMap(spots), [spots]);
   const userMap = useMemo(() => createUserMap(users), [users]);
   const filteredPriorities = useMemo(() => createFilteredPriorities(priorities, defaultCategoryId), [priorities, defaultCategoryId]);
+  const categoryMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const c of categories || []) {
+      const id = Number((c as any).id);
+      if (Number.isFinite(id)) m[id] = { id, name: (c as any).name, color: (c as any).color, icon: (c as any).icon };
+    }
+    return m;
+  }, [categories]);
 
   // Refs for data access in callbacks
   const statusMapRef = useRef(statusMap);
@@ -331,6 +339,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
   }, [spotMap]);
 
+  // Determine current density to decide whether to show row descriptions
+  const density = (() => {
+    try { return (localStorage.getItem('wh_workspace_density') as any) || 'comfortable'; } catch { return 'comfortable'; }
+  })();
+
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
     getUserInitials,
@@ -350,12 +363,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     userMap,
     getDoneStatusId,
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
+    categoryMap,
+    showDescriptions: density !== 'compact',
   } as any), [
     statusMap, priorityMap, spotMap, userMap,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 

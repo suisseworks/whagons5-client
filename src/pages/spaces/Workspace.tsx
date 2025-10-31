@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search } from 'lucide-react';
+import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search, SlidersHorizontal, ChevronUp } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -57,6 +57,13 @@ export const Workspace = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStartX, setResizeStartX] = useState<number | null>(null);
   const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
+  // Toggle visibility of search/filters header
+  const [controlsVisible, setControlsVisible] = useState<boolean>(() => {
+    try { return (localStorage.getItem('wh_workspace_controls_visible') ?? 'true') !== 'false'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('wh_workspace_controls_visible', String(controlsVisible)); } catch {}
+  }, [controlsVisible]);
 
   // Display options
   const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
@@ -106,10 +113,10 @@ export const Workspace = () => {
   // Row density (affects grid row height)
   const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
     try {
-      return (localStorage.getItem('wh_workspace_density') as any) || 'compact';
+      return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
     } catch { return 'compact'; }
   });
-  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 52 : 64;
+  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 46 : 64;
   useEffect(() => {
     try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
   }, [rowDensity]);
@@ -411,19 +418,33 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-center gap-6 mb-2">
+      {/* Toggle controls button */}
+      <div className="flex items-center justify-end mb-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Toggle controls"
+          title={controlsVisible ? 'Hide controls' : 'Show controls'}
+          onClick={() => setControlsVisible(v => !v)}
+        >
+          {controlsVisible ? <ChevronUp className="w-5 h-5" /> : <SlidersHorizontal className="w-5 h-5" />}
+        </Button>
+      </div>
+
+      {controlsVisible && (
+      <div className="flex items-center gap-6 mb-2 mt-[-24px]">
         <div className="relative max-w-sm w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
           <Input
             placeholder="Search…"
-            className="h-10 pl-9 pr-9 rounded-lg border-border/40 placeholder:text-muted-foreground/50"
+            className="h-10 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
         </div>
         {/* Quick filter chips */}
         <div className="flex items-center gap-2 ml-2">
-          <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5"
+          <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
             title="All tasks"
             onClick={() => {
               tableRef.current?.setFilterModel(null);
@@ -453,7 +474,7 @@ export const Workspace = () => {
               className="inline-flex"
               title="Drag to reorder pinned preset"
             >
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5"
+              <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
                 title={p.name}
                 onClick={() => {
                   tableRef.current?.setFilterModel(p.model);
@@ -463,13 +484,13 @@ export const Workspace = () => {
               >{p.name}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5"
+          <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
             title="Custom filters"
             onClick={() => setFiltersOpen(true)}
           >Filters…</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5" title="More presets">More…</Button>
+              <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" title="More presets">More…</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[240px]">
               <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
@@ -551,9 +572,10 @@ export const Workspace = () => {
           </Button>
         </div>
       </div>
+      )}
       {/* Stats summary (chips) */}
       {showHeaderKpis && (
-        <div className="flex flex-wrap gap-2.5 mb-3">
+        <div className="flex flex-wrap gap-2.5 mb-0">
           <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
             <ClipboardList className="h-[18px] w-[18px] text-cyan-600" />
             <span className="text-[12px] text-muted-foreground">Total</span>

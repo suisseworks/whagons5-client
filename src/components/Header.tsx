@@ -157,15 +157,13 @@ function Header() {
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
         if (isDarkTheme) {
-            const color = currentWorkspaceColor || 'var(--color-primary)';
-            // Dark mode: very soft tint
-            const topTint = `color-mix(in oklab, ${color} 4%, var(--color-background) 96%)`;
-            return { backgroundImage: `linear-gradient(180deg, ${topTint} 0%, var(--color-card) 60%)` } as React.CSSProperties;
+            // Solid dark per spec with subtle bottom border
+            return { backgroundColor: '#0A0A0A', borderBottom: '1px solid #1F1F1F' } as React.CSSProperties;
         }
         // Light mode: very soft neutral gradient
         const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
         return { backgroundImage: `linear-gradient(180deg, ${grayTop} 0%, var(--color-card) 70%)` } as React.CSSProperties;
-    }, [currentWorkspaceName, currentWorkspaceColor, isDarkTheme]);
+    }, [currentWorkspaceName, isDarkTheme]);
 
     // Hydration status badge: processing while hydrating, success briefly when done, hidden otherwise
     const [hydrationState, setHydrationState] = useState<"start" | "processing" | "success" | "error" | "custom">("custom");

@@ -5,6 +5,10 @@ import PriorityBadge from "./PriorityBadge";
 import DueDateCell from "./DueDateCell";
 import TaskRowActions from "./TaskRowActions";
 import { MapPin } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTags } from "@fortawesome/free-solid-svg-icons";
+import { iconService } from "@/database/iconService";
+import { useEffect, useState } from "react";
 
 type StatusMeta = { id: number; name: string; color?: string; icon?: string };
 type PriorityMeta = { id: number; name: string; color?: string };
@@ -24,6 +28,7 @@ export function TaskRow({
   statusMap,
   priorityMap,
   spotMap,
+  categoryMap,
   getStatusIcon,
   onClick,
   onEdit,
@@ -35,6 +40,7 @@ export function TaskRow({
   statusMap: Record<number, StatusMeta>;
   priorityMap: Record<number, PriorityMeta>;
   spotMap: Record<number, SpotMeta>;
+  categoryMap?: Record<number, { id: number; name: string; color?: string; icon?: string }>;
   getStatusIcon?: (iconName?: string) => any;
   onClick?: () => void;
   onEdit?: () => void;
@@ -43,6 +49,22 @@ export function TaskRow({
   onMarkComplete?: () => void;
 }) {
   // Priority color indicator removed per design feedback
+  const CategoryIcon = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
+    const [iconEl, setIconEl] = useState<any>(faTags);
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const loaded = await iconService.getIcon(iconClass);
+          if (!cancelled) setIconEl(loaded || faTags);
+        } catch {
+          if (!cancelled) setIconEl(faTags);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [iconClass]);
+    return <FontAwesomeIcon icon={iconEl as any} className="mr-1" style={{ color: color || '#6b7280', width: 18, height: 18 }} />;
+  };
 
   return (
     <motion.div
@@ -58,27 +80,33 @@ export function TaskRow({
 
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1">
             {(() => {
-              const statusColor = statusMap?.[Number(task?.status_id)]?.color as string | undefined;
-              const priorityName = priorityMap?.[Number(task?.priority_id)]?.name as string | undefined;
-              const initial = ((priorityName || task?.name || "").trim().charAt(0) || "").toUpperCase();
-              const baseCls = "w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-[11px] font-semibold";
-              const cls = statusColor ? `${baseCls} text-white` : `${baseCls} bg-muted text-foreground/80 border`;
-              const style = statusColor ? { backgroundColor: statusColor } : undefined;
-              return (
-                <span className={cls} style={style} aria-hidden>
-                  {initial}
-                </span>
-              );
+              const cat = categoryMap?.[Number(task?.category_id)];
+              return <CategoryIcon iconClass={cat?.icon} color={cat?.color} />;
             })()}
             <h3
-              className="text-[15px] font-medium text-foreground tracking-[-0.02em] leading-5 truncate"
+              className="text-[18px] font-semibold text-[#0f172a] tracking-[-0.02em] leading-6 truncate"
               title={task?.name || "Untitled task"}
             >
               {task?.name || "Untitled task"}
             </h3>
           </div>
+
+          {task?.description ? (
+            <div
+              className="text-[13px] text-muted-foreground mb-2"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as any,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {task.description}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <StatusBadge statusId={task?.status_id} statusMap={statusMap} getStatusIcon={getStatusIcon} />
