@@ -419,13 +419,14 @@ export const Workspace = () => {
   return (
     <div className="w-full h-full flex flex-col">
       {/* Toggle controls button */}
-      <div className="flex items-center justify-end mb-0">
+      <div className="flex items-center justify-end mb-2 pr-8">
         <Button
           variant="ghost"
           size="icon"
           aria-label="Toggle controls"
           title={controlsVisible ? 'Hide controls' : 'Show controls'}
           onClick={() => setControlsVisible(v => !v)}
+          className="mr-12 mt-[-10px]"
         >
           {controlsVisible ? <ChevronUp className="w-5 h-5" /> : <SlidersHorizontal className="w-5 h-5" />}
         </Button>
@@ -444,7 +445,7 @@ export const Workspace = () => {
         </div>
         {/* Quick filter chips */}
         <div className="flex items-center gap-2 ml-2">
-          <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+          <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
             title="All tasks"
             onClick={() => {
               tableRef.current?.setFilterModel(null);
@@ -474,7 +475,7 @@ export const Workspace = () => {
               className="inline-flex"
               title="Drag to reorder pinned preset"
             >
-              <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+              <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
                 title={p.name}
                 onClick={() => {
                   tableRef.current?.setFilterModel(p.model);
@@ -484,13 +485,13 @@ export const Workspace = () => {
               >{p.name}</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+          <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
             title="Custom filters"
             onClick={() => setFiltersOpen(true)}
           >Filters…</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" title="More presets">More…</Button>
+              <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" title="More presets">More…</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[240px]">
               <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
@@ -551,7 +552,7 @@ export const Workspace = () => {
             </div>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-4 pr-2">
           <Button
             variant="ghost"
             size="icon"

@@ -87,7 +87,7 @@ export function buildWorkspaceColumns(opts: any) {
                       style={{
                         whiteSpace: 'normal',
                         display: '-webkit-box',
-                        WebkitLineClamp: 2,
+                        WebkitLineClamp: 1,
                         WebkitBoxOrient: 'vertical' as any,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',

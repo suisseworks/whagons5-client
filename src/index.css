@@ -631,8 +631,21 @@
 }
 
 /* Zebra hover nuance: faint divider on alternating rows only when not selected */
+/* Zebra striping: very subtle alternate row background */
 .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
-  box-shadow: inset 0 -1px 0 oklch(from var(--color-border) l calc(l - 0.06) c h / 0.25);
+  /* Lighter, subtle striping for light mode */
+  background-color: oklch(from var(--color-muted) l c h / 0.22);
+}
+.dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
+  background-color: oklch(from var(--color-muted) l calc(l - 0.10) c h / 0.25);
+}
+
+/* Ensure striping is visible even if cells paint their own backgrounds */
+.wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n):not(:hover) .ag-cell {
+  background-color: oklch(from var(--color-muted) l c h / 0.22);
+}
+.dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n):not(:hover) .ag-cell {
+  background-color: oklch(from var(--color-muted) l calc(l - 0.10) c h / 0.25);
 }
 
 /* Soft blurred header strip to separate from content without hard border */

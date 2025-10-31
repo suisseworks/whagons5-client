@@ -98,7 +98,7 @@ export function TaskRow({
               className="text-[13px] text-muted-foreground mb-2"
               style={{
                 display: '-webkit-box',
-                WebkitLineClamp: 2,
+                WebkitLineClamp: 1,
                 WebkitBoxOrient: 'vertical' as any,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
