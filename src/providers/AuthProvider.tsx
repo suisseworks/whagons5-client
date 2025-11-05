@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.warn('Manifest fetch/verify failed (continuing):', e);
             }
 
-            // Category-field-assignments are fetched per category on demand and cached via GenericCache
+            // Category custom fields will be hydrated by DataManager + on-demand fetches
             const rtl = new RealTimeListener(
               // {
               //   debug: true,

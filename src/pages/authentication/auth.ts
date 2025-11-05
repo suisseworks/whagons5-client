@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { clearAuth } from '../../api/whagonsApi';
 import { DB } from '@/store/indexedDB/DB';
+import { getEnvVariables } from '@/lib/getEnvVariables';
 
 
 // Google Sign-In
@@ -32,7 +33,28 @@ export const signInWithEmail = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    if (!user.emailVerified) {
+    const env = getEnvVariables();
+    const allowUnverifiedLogin = ['true', '1', 'yes'].includes(
+      String((env as any).VITE_ALLOW_UNVERIFIED_LOGIN ?? 'false').toLowerCase()
+    );
+    const emailLower = (user.email || email || '').toLowerCase();
+    let enforceVerification = true; // default: require verification
+
+    if (allowUnverifiedLogin) {
+      const regexSource = (env as any).VITE_ALLOW_UNVERIFIED_EMAIL_REGEX as string | undefined;
+      if (!regexSource) {
+        enforceVerification = false; // allow everyone unverified
+      } else {
+        try {
+          const regex = new RegExp(regexSource);
+          enforceVerification = !regex.test(emailLower); // allow only if matches
+        } catch {
+          enforceVerification = false; // invalid regex → allow (dev convenience)
+        }
+      }
+    }
+
+    if (enforceVerification && !user.emailVerified) {
       throw new Error('Please verify your email before logging in.');
     }
     return userCredential;

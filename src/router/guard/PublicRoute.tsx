@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 // import { useAuthStore } from "../../features/auth/hooks/useAuthStore";
 import { useAuth } from '../../providers/AuthProvider';
@@ -21,8 +21,31 @@ const LoadingScreen = ({ message = "Loading..." }: { message?: string }) => (
 export const PublicRoute = ({ children }: PublicRouteProps) => {
   const { firebaseUser, user, loading, userLoading } = useAuth();
   const location = useLocation();
+  const isAuthPage = location.pathname === '/auth/signin' || location.pathname === '/auth/signup';
 
-  // While loading auth state or user data, show loading
+  // For auth pages, show form immediately - don't wait for loading states
+  // This prevents hanging if Firebase auth state check or API calls hang
+  if (isAuthPage) {
+    // If no Firebase user, show sign-in form immediately
+    if (!firebaseUser) {
+      return <>{children}</>;
+    }
+    
+    // If Firebase user exists but no backend user, still show form (user needs to re-auth)
+    if (!user) {
+      return <>{children}</>;
+    }
+    
+    // User is authenticated - redirect based on onboarding status
+    if (user.initialization_stage !== InitializationStage.COMPLETED) {
+      return <Navigate to="/onboarding" replace />;
+    }
+    
+    // User completed onboarding - redirect to home
+    return <Navigate to="/" replace />;
+  }
+
+  // For non-auth pages, wait for loading to complete
   if (loading || userLoading) {
     return <LoadingScreen message={loading ? "Authenticating..." : "Loading user data..."} />;
   }
