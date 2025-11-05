@@ -1,11 +1,11 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboardList, faPlus, faFileAlt, faTags } from "@fortawesome/free-solid-svg-icons";
-import { RootState, AppDispatch } from "@/store/store";
+import { RootState } from "@/store/store";
+import { Template, Task, Category, Approval } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
-import { Template, Task, Category } from "@/store/types";
 import { iconService } from '@/database/iconService';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,22 +73,18 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Templates() {
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useDispatch();
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: priorities } = useSelector((state: RootState) => state.priorities);
   const { value: slas } = useSelector((state: RootState) => state.slas);
+  const { value: approvals } = useSelector((state: RootState) => (state as any).approvals || { value: [] });
   const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
-  const approvalTemplates = useSelector((state: RootState) => (state as any).approvalTemplates?.value ?? []) as any[];
   // State for default users (using string IDs for MultiSelect)
   const [createDefaultUserValues, setCreateDefaultUserValues] = useState<string[]>([]);
   const [editDefaultUserValues, setEditDefaultUserValues] = useState<string[]>([]);
-
-  // State for approver users (using string IDs for MultiSelect)
-  const [createApproverValues, setCreateApproverValues] = useState<string[]>([]);
-  const [editApproverValues, setEditApproverValues] = useState<string[]>([]);
 
   // Convert users to MultiSelectOption format
   const userOptions = useMemo(() => {
@@ -127,15 +123,12 @@ function Templates() {
     searchFields: ['name']
   });
 
-  // Approvals (template-level) state
-  const [createRequiresApproval, setCreateRequiresApproval] = useState<boolean>(false);
-  const [editRequiresApproval, setEditRequiresApproval] = useState<boolean>(false);
-
   // Local state for form values
   const [createFormData, setCreateFormData] = useState({
     category_id: '',
     priority_id: '',
     sla_id: '',
+    approval_id: '',
     default_spot_id: '',
     expected_duration: '',
     enabled: true
@@ -145,15 +138,11 @@ function Templates() {
     category_id: '',
     priority_id: '',
     sla_id: '',
+    approval_id: '',
     default_spot_id: '',
     expected_duration: '',
     enabled: true
   });
-
-  const findCategoryApprovalTemplate = useCallback((categoryId: number | null | undefined) => {
-    if (!categoryId) return null;
-    return approvalTemplates.find((t: any) => Number(t.category_id) === Number(categoryId) && t.is_default);
-  }, [approvalTemplates]);
 
   useEffect(() => {
     if (isEditDialogOpen && editingTemplate) {
@@ -167,21 +156,13 @@ function Templates() {
         category_id: editingTemplate.category_id?.toString() || '',
         priority_id: (editingTemplate as any).priority_id?.toString() || '',
         sla_id: (editingTemplate as any).sla_id?.toString() || '',
+        approval_id: (editingTemplate as any).approval_id?.toString() || '',
         default_spot_id: (editingTemplate as any).default_spot_id?.toString() || '',
         expected_duration: (editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : '',
         enabled: (editingTemplate as any).enabled !== false // Default to true if not set
       });
-
-      // Prefill approvals controls from category default approval template
-      const currentCatId = editingTemplate.category_id as number | null | undefined;
-      const catTpl = findCategoryApprovalTemplate(currentCatId || undefined);
-      const approvers = ((catTpl?.template_config?.approvers as any[]) || [])
-        .filter((a: any) => (a?.type === 'user' && typeof a?.value === 'number'))
-        .map((a: any) => String(a.value));
-      setEditRequiresApproval(!!catTpl?.is_active);
-      setEditApproverValues(approvers);
     }
-  }, [isEditDialogOpen, editingTemplate, findCategoryApprovalTemplate]);
+  }, [isEditDialogOpen, editingTemplate]);
 
   // Helper functions
   const minutesToHHMM = (totalMinutes: number | null | undefined) => {
@@ -220,6 +201,12 @@ function Templates() {
     (slas as any[]).forEach((s: any) => map.set(Number(s.id), s));
     return map;
   }, [slas]);
+
+  const approvalById = useMemo(() => {
+    const map = new Map<number, any>();
+    (approvals as any[]).forEach((a: any) => map.set(Number(a.id), a));
+    return map;
+  }, [approvals]);
 
   const spotById = useMemo(() => {
     const map = new Map<number, any>();
@@ -310,6 +297,20 @@ function Templates() {
       filter: true
     },
     {
+      field: 'approval_id',
+      headerName: 'Approval',
+      flex: 1,
+      minWidth: 160,
+      cellRenderer: (params: ICellRendererParams) => {
+        const aid = Number(params.value);
+        const a = approvalById.get(aid);
+        if (!a) return <span className="text-muted-foreground">—</span>;
+        return <span>{a.name}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
       field: 'expected_duration',
       headerName: 'Expected Duration',
       flex: 0.8,
@@ -352,34 +353,6 @@ function Templates() {
       filter: false
     },
     {
-      field: 'requires_approval',
-      headerName: 'Requires Approval',
-      flex: 0.8,
-      minWidth: 140,
-      cellRenderer: (params: ICellRendererParams) => {
-        const categoryId = Number(params.data?.category_id);
-        if (!categoryId) return <span className="text-muted-foreground">—</span>;
-
-        const approvalTemplate = findCategoryApprovalTemplate(categoryId);
-        const requiresApproval = approvalTemplate?.is_active || false;
-
-        return (
-          <Badge variant={requiresApproval ? "default" : "secondary"}>
-            {requiresApproval ? 'Yes' : 'No'}
-          </Badge>
-        );
-      },
-      sortable: true,
-      filter: true,
-      valueGetter: (params: any) => {
-        const categoryId = Number(params.data?.category_id);
-        if (!categoryId) return false;
-
-        const approvalTemplate = findCategoryApprovalTemplate(categoryId);
-        return approvalTemplate?.is_active || false;
-      }
-    },
-    {
       field: 'actions',
       headerName: 'Actions',
       width: 100,
@@ -392,7 +365,7 @@ function Templates() {
       resizable: false,
       pinned: 'right'
     }
-  ], [categories, priorityById, slaById, spotById, handleEdit, handleDeleteTemplate]);
+  ], [categories, priorityById, slaById, approvalById, spotById, handleEdit, handleDeleteTemplate]);
 
   // Form handlers
   const handleCellValueChanged = useCallback(async (event: any) => {
@@ -433,6 +406,7 @@ function Templates() {
       category_id: parseInt(createFormData.category_id),
       priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
+      approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
       default_spot_id: createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null,
       default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
       instructions,
@@ -445,44 +419,20 @@ function Templates() {
     // Clear any previous error messages after successful creation
     (window as any).__settings_error = null;
 
-    // Upsert category default approval template if requested
-    try {
-      const categoryId = parseInt(createFormData.category_id);
-      if (Number.isFinite(categoryId)) {
-        const existing = findCategoryApprovalTemplate(categoryId);
-        if (createRequiresApproval) {
-          const payload: any = {
-            name: `Default approval for category ${categoryId}`,
-            category_id: categoryId,
-            template_config: {
-              approvers: (createApproverValues || []).map((id) => ({ type: 'user', value: Number(id) }))
-            },
-            is_active: true,
-            is_default: true
-          };
-          if (existing) {
-            await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: payload }));
-          } else {
-            await dispatch((genericActions as any).approvalTemplates.addAsync(payload));
-          }
-        } else if (existing && existing.is_active) {
-          await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: { is_active: false } }));
-        }
-      }
-    } catch {}
+    // approvals logic removed
 
     // Reset form after successful creation
     setCreateFormData({
       category_id: '',
       priority_id: '',
       sla_id: '',
+      approval_id: '',
       default_spot_id: '',
       expected_duration: '',
       enabled: true
     });
     setCreateDefaultUserValues([]);
-    setCreateApproverValues([]);
-    setCreateRequiresApproval(false);
+    // approvals state removed
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -513,6 +463,7 @@ function Templates() {
       category_id: parseInt(editFormData.category_id),
       priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
+      approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
       default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null,
       default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
       instructions,
@@ -525,31 +476,7 @@ function Templates() {
     // Clear any previous error messages after successful update
     (window as any).__settings_error = null;
 
-    // Upsert category default approval template if requested
-    try {
-      const categoryId = parseInt(editFormData.category_id);
-      if (Number.isFinite(categoryId)) {
-        const existing = findCategoryApprovalTemplate(categoryId);
-        if (editRequiresApproval) {
-          const payload: any = {
-            name: `Default approval for category ${categoryId}`,
-            category_id: categoryId,
-            template_config: {
-              approvers: (editApproverValues || []).map((id) => ({ type: 'user', value: Number(id) }))
-            },
-            is_active: true,
-            is_default: true
-          };
-          if (existing) {
-            await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: payload }));
-          } else {
-            await dispatch((genericActions as any).approvalTemplates.addAsync(payload));
-          }
-        } else if (existing && existing.is_active) {
-          await dispatch((genericActions as any).approvalTemplates.updateAsync({ id: existing.id, updates: { is_active: false } }));
-        }
-      }
-    } catch {}
+    // approvals logic removed
     } catch (err: any) {
       console.error('Edit template submit failed:', err);
       // Surface a simple error into the dialog footer
@@ -568,6 +495,7 @@ function Templates() {
         category_id: editFormData.category_id ? parseInt(editFormData.category_id) : (editingTemplate as any).category_id,
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : ((editingTemplate as any).priority_id ?? null),
         sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : ((editingTemplate as any).sla_id ?? null),
+        approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : ((editingTemplate as any).approval_id ?? null),
         default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : ((editingTemplate as any).default_spot_id ?? null),
         default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
         instructions: (editingTemplate as any).instructions ?? null,
@@ -665,13 +593,17 @@ function Templates() {
         </Button>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={colDefs}
-        noRowsMessage="No templates found"
-        onRowDoubleClicked={handleEdit}
-        onCellValueChanged={handleCellValueChanged}
-      />
+      <div className="flex h-full flex-col">
+        <div className="flex-1 min-h-0">
+          <SettingsGrid
+            rowData={filteredItems}
+            columnDefs={colDefs}
+            noRowsMessage="No templates found"
+            onRowDoubleClicked={handleEdit}
+            onCellValueChanged={handleCellValueChanged}
+          />
+        </div>
+      </div>
 
       {/* Create Template Dialog */}
       <SettingsDialog
@@ -692,7 +624,6 @@ function Templates() {
               enabled: true
             });
             setCreateDefaultUserValues([]);
-            setCreateApproverValues([]);
           }
         }}
         type="create"
@@ -707,7 +638,6 @@ function Templates() {
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="defaults">Defaults</TabsTrigger>
-            <TabsTrigger value="approvals">Approvals</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
         <div className="grid gap-4 min-h-[480px]">
@@ -762,6 +692,22 @@ function Templates() {
               ))}
             </select>
           </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="approval" className="text-right">Approval</Label>
+            <select
+              id="approval"
+              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              value={createFormData.approval_id}
+              onChange={(e) => setCreateFormData(prev => ({ ...prev, approval_id: e.target.value }))}
+            >
+              <option value="">None</option>
+              {Array.from((approvals as any[])).map((a: any) => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
           </TabsContent>
           <TabsContent value="defaults">
@@ -798,34 +744,7 @@ function Templates() {
               <CheckboxField id="enabled" name="enabled" label="Status" defaultChecked={true} description="Enabled" />
             </div>
           </TabsContent>
-          <TabsContent value="approvals">
-            <div className="grid gap-4 min-h-[480px]">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Requires approval</Label>
-                <div className="col-span-3">
-                  <div className="flex items-center gap-3">
-                    <input id="create-requires-approval" type="checkbox" checked={createRequiresApproval} onChange={(e) => setCreateRequiresApproval(e.target.checked)} />
-                    <span className="text-sm text-muted-foreground">Select approvers for tasks that require approval</span>
-                  </div>
-                </div>
-              </div>
-              {createRequiresApproval && (
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">Approvers</Label>
-                  <div className="col-span-3">
-                    <MultiSelect
-                      options={userOptions}
-                      onValueChange={setCreateApproverValues}
-                      defaultValue={createApproverValues}
-                      placeholder="Select approvers..."
-                      maxCount={5}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </TabsContent>
+          
         </Tabs>
       </SettingsDialog>
 
@@ -848,7 +767,6 @@ function Templates() {
               enabled: true
             });
             setEditDefaultUserValues([]);
-            setEditApproverValues([]);
           }
         }}
         type="edit"
@@ -861,11 +779,10 @@ function Templates() {
       >
         {editingTemplate && (
           <Tabs defaultValue="general" className="w-full">
-            <TabsList>
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="defaults">Defaults</TabsTrigger>
-              <TabsTrigger value="approvals">Approvals</TabsTrigger>
-            </TabsList>
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="defaults">Defaults</TabsTrigger>
+          </TabsList>
             <TabsContent value="general">
           <div className="grid gap-4 min-h-[480px]">
             <div className="grid grid-cols-4 items-center gap-4">
@@ -926,9 +843,17 @@ function Templates() {
               id="edit-sla"
               label="SLA"
               value={editFormData.sla_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value }))}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
               placeholder="None"
-              options={Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))}
+              options={[{ value: 'none', label: 'None' }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
+            />
+            <SelectField
+              id="edit-approval"
+              label="Approval"
+              value={editFormData.approval_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+              placeholder="None"
+              options={[{ value: 'none', label: 'None' }, ...((approvals as Approval[]) || []).map((a: Approval) => ({ value: a.id.toString(), label: a.name }))]}
             />
           </div>
             </TabsContent>
@@ -959,34 +884,7 @@ function Templates() {
                 <CheckboxField id="edit-enabled" label="Enabled" checked={editFormData.enabled} onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))} description="Enable this template" />
               </div>
             </TabsContent>
-            <TabsContent value="approvals">
-              <div className="grid gap-4 min-h-[480px]">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Requires approval</Label>
-                  <div className="col-span-3">
-                    <div className="flex items-center gap-3">
-                      <input id="edit-requires-approval" type="checkbox" checked={editRequiresApproval} onChange={(e) => setEditRequiresApproval(e.target.checked)} />
-                      <span className="text-sm text-muted-foreground">Select approvers for tasks that require approval</span>
-                    </div>
-                  </div>
-                </div>
-                {editRequiresApproval && (
-                  <div className="grid grid-cols-4 items-start gap-4">
-                    <Label className="text-right pt-2">Approvers</Label>
-                    <div className="col-span-3">
-                      <MultiSelect
-                        options={userOptions}
-                        onValueChange={setEditApproverValues}
-                        defaultValue={editApproverValues}
-                        placeholder="Select approvers..."
-                        maxCount={5}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+            
           </Tabs>
         )}
       </SettingsDialog>

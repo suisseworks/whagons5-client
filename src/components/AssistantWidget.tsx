@@ -88,7 +88,12 @@ const FloatingButton: React.FC<{ onClick: () => void }>= ({ onClick }) => {
   );
 };
 
-export const AssistantWidget: React.FC = () => {
+interface AssistantWidgetProps {
+  floating?: boolean;
+  renderTrigger?: (open: () => void) => React.ReactNode;
+}
+
+export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = true, renderTrigger }) => {
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState('');
   const [messages, setMessages] = React.useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
@@ -150,7 +155,11 @@ export const AssistantWidget: React.FC = () => {
 
   return (
     <>
-      <FloatingButton onClick={() => setOpen(true)} />
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : (
+        floating && <FloatingButton onClick={() => setOpen(true)} />
+      )}
       <Dialog modal open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-xl p-0">
           <div className="p-6 pb-3">

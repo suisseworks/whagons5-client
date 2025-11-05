@@ -167,7 +167,7 @@ export function TextAreaField({
         placeholder={placeholder}
         required={required}
         rows={rows}
-        className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
+        className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
       />
     </FormField>
   );
@@ -248,11 +248,14 @@ export function SelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
-              {option.label}
-            </SelectItem>
-          ))}
+          {options.map((option) => {
+            const val = String(option.value);
+            return (
+              <SelectItem key={`${id}-${val}`} value={val} disabled={option.disabled}>
+                {option.label}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </FormField>

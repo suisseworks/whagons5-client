@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.1';
+const CURRENT_DB_VERSION = '1.9.10';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -132,12 +132,12 @@ export class DB {
           if (!db.objectStoreNames.contains('tags')) {
             db.createObjectStore('tags', { keyPath: 'id' });
           }
-          // Custom fields and category-field-assignments (GenericCache-backed)
+          // Custom fields and category custom fields (GenericCache-backed)
           if (!db.objectStoreNames.contains('custom_fields')) {
             db.createObjectStore('custom_fields', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('category_field_assignments')) {
-            db.createObjectStore('category_field_assignments', {
+          if (!db.objectStoreNames.contains('category_custom_fields')) {
+            db.createObjectStore('category_custom_fields', {
               keyPath: 'id',
             });
           }
@@ -177,6 +177,9 @@ export class DB {
           if (!db.objectStoreNames.contains('slas')) {
             db.createObjectStore('slas', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('sla_policies')) {
+            db.createObjectStore('sla_policies', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('sla_alerts')) {
             db.createObjectStore('sla_alerts', { keyPath: 'id' });
           }
@@ -198,13 +201,19 @@ export class DB {
           if (!db.objectStoreNames.contains('messages')) {
             db.createObjectStore('messages', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('job_positions')) {
+            db.createObjectStore('job_positions', { keyPath: 'id' });
+          }
+
+          
 
           // Approvals
-          if (!db.objectStoreNames.contains('status_approval_config')) {
-            db.createObjectStore('status_approval_config', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('approvals')) {
+            db.createObjectStore('approvals', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('approval_templates')) {
-            db.createObjectStore('approval_templates', { keyPath: 'id' });
+          // Approval approvers
+          if (!db.objectStoreNames.contains('approval_approvers')) {
+            db.createObjectStore('approval_approvers', { keyPath: 'id' });
           }
 
           // Custom Fields & Values
@@ -424,7 +433,7 @@ export class DB {
       | 'spots'
       | 'tags'
       | 'custom_fields'
-      | 'category_field_assignments'
+      | 'category_custom_fields'
       | 'users'
       | 'roles'
       | 'permissions'
@@ -436,12 +445,17 @@ export class DB {
       | 'task_tags'
       | 'spot_types'
       | 'slas'
+      | 'sla_policies'
       | 'sla_alerts'
       | 'category_priorities'
       | 'forms'
       | 'invitations'
       | 'task_logs'
       | 'templates'
+      | 'messages'
+      | 'job_positions'
+      | 'status_transition_groups'
+      | 'approval_approvers'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -474,7 +488,7 @@ export class DB {
       | 'spots'
       | 'tags'
       | 'custom_fields'
-      | 'category_field_assignments'
+      | 'category_custom_fields'
       | 'users'
       | 'roles'
       | 'permissions'
@@ -486,12 +500,17 @@ export class DB {
       | 'task_tags'
       | 'spot_types'
       | 'slas'
+      | 'sla_policies'
       | 'sla_alerts'
       | 'category_priorities'
       | 'forms'
       | 'invitations'
       | 'task_logs'
       | 'templates'
+      | 'messages'
+      | 'job_positions'
+      | 'status_transition_groups'
+      | 'approval_approvers'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -554,9 +573,13 @@ export class DB {
         tx.onerror = () => reject(tx.error as any);
         tx.onabort = () => reject(tx.error as any);
       });
-      if (!DB.isEncryptionEnabledForStore(storeName)) return rows.filter((r) => r != null);
-      // If encrypted rows exist, make sure KEK/CEK are ready before attempting decrypt
+      // If any encrypted rows exist (even if encryption is currently disabled),
+      // attempt to decrypt for backward compatibility with previously-encrypted caches
       const hasEncrypted = rows.some((r) => r && r.enc && r.enc.ct);
+      if (!hasEncrypted) {
+        return rows.filter((r) => r != null);
+      }
+      // For encrypted rows, ensure crypto is initialized and CEK ready
       if (hasEncrypted) {
         if (!CryptoHandler.inited) await CryptoHandler.init();
         try {

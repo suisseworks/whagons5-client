@@ -5,11 +5,10 @@ interface OptionalStepProps {
   data: OnboardingData;
   onUpdate: (data: Partial<OnboardingData>) => void;
   onNext: (data?: Partial<OnboardingData>) => void;
-  onSkip: () => void;
   loading: boolean;
 }
 
-const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, onSkip, loading }) => {
+const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loading }) => {
   const [photoUrl, setPhotoUrl] = useState(data.url_picture || '');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -171,14 +170,6 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, onS
             ) : (
               'Complete Setup'
             )}
-          </button>
-
-          <button
-            onClick={onSkip}
-            disabled={loading}
-            className="w-full py-3 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-50"
-          >
-            Skip for now
           </button>
         </div>
 

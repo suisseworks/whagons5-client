@@ -16,13 +16,18 @@ import Teams from '@/pages/settings/sub_pages/Teams';
 import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';
 import Users from '@/pages/settings/sub_pages/Users';
+import JobPositions from '@/pages/settings/sub_pages/JobPositions';
 import Statuses from '@/pages/settings/sub_pages/Statuses';
 import Priorities from '@/pages/settings/sub_pages/Priorities';
+import Tags from '@/pages/settings/sub_pages/Tags';
 import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
+import Approvals from '@/pages/settings/sub_pages/Approvals';
+import Global from '@/pages/settings/sub_pages/Global';
 import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
-import Messages from '@/pages/messages/Messages';
+// Messages removed
+import TeamConnect from '@/pages/teamconnect/TeamConnect';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
 
@@ -65,8 +70,7 @@ export const HomeRoutes = () => {
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/plugins" element={<Plugins />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/messages/board/:id" element={<Messages />} />
+          <Route path="/teamconnect" element={<TeamConnect />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
@@ -74,11 +78,15 @@ export const HomeRoutes = () => {
           <Route path="/settings/teams" element={<Teams />} />
           <Route path="/settings/spots" element={<Spots />} />
           <Route path="/settings/spots/types" element={<SpotTypes />} />
+          <Route path="/settings/job-positions" element={<JobPositions />} />
           <Route path="/settings/users" element={<Users />} /> 
           <Route path="/settings/statuses" element={<Statuses />} />
           <Route path="/settings/priorities" element={<Priorities />} />
+          <Route path="/settings/tags" element={<Tags />} />
           <Route path="/settings/slas" element={<Slas />} />
           <Route path="/settings/workflows" element={<Workflows />} />
+          <Route path="/settings/approvals" element={<Approvals />} />
+          <Route path="/settings/global" element={<Global />} />
           <Route path="/settings/test" element={<TestPage />} />
         </Routes>
       </MainLayout>

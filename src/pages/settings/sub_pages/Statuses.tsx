@@ -32,9 +32,7 @@ function Statuses() {
   const statuses = useSelector((s: RootState) => s.statuses.value) as any[];
   const statusTransitions = useSelector((s: RootState) => s.statusTransitions.value) as any[];
   const statusTransitionGroups = useSelector((s: RootState) => s.statusTransitionGroups.value) as any[];
-  const statusApprovalConfigs = useSelector((s: RootState) => (s as any).statusApprovalConfig?.value ?? []) as any[];
-  const approvalTemplates = useSelector((s: RootState) => (s as any).approvalTemplates?.value ?? []) as any[];
-
+  
   // Local UI state
   const [activeTab, setActiveTab] = useState<string>("statuses");
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -107,6 +105,7 @@ function Statuses() {
   // Form state
   const [formName, setFormName] = useState("");
   const [formAction, setFormAction] = useState("");
+  const [formSemanticType, setFormSemanticType] = useState<string | null>(null);
   const [formColor, setFormColor] = useState("#888888");
   const [formIcon, setFormIcon] = useState("fas fa-circle");
   const [formInitial, setFormInitial] = useState(false);
@@ -118,23 +117,7 @@ function Statuses() {
   // Toast removed
   // Backend enum values for status.action
   const allowedActions = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
-
-  // Approvals form state
-  const [apHasContext, setApHasContext] = useState(false);
-  const [apAutoAdvance, setApAutoAdvance] = useState(true);
-  const [apNextOnApprove, setApNextOnApprove] = useState<number | null>(null);
-  const [apNextOnReject, setApNextOnReject] = useState<number | null>(null);
-  const [apNextOnTimeout, setApNextOnTimeout] = useState<number | null>(null);
-  const [apBlocksEditing, setApBlocksEditing] = useState(false);
-  const [apBlocksDeletion, setApBlocksDeletion] = useState(false);
-  const [apBlocksReassign, setApBlocksReassign] = useState(false);
-  const [apDefaultType, setApDefaultType] = useState<'all' | 'single' | 'majority' | 'sequential'>('all');
-  const [apMinApprovers, setApMinApprovers] = useState<number | ''>('');
-  const [apTimeoutHours, setApTimeoutHours] = useState<number | ''>('');
-  const [apSaving, setApSaving] = useState(false);
-  const [apError, setApError] = useState<string | null>(null);
-
-  // Toast removed
+  const allowedSemantics = ['pending_review','in_approval','approved','rejected','canceled','expired'] as const;
 
   
   // Load persisted view and group, and save changes
@@ -175,81 +158,13 @@ function Statuses() {
 
   // back navigation removed from header; using SettingsLayout's backPath
 
-  // Sync approvals form when status selection changes or configs load
-  useEffect(() => {
-    if (!selectedStatus) return;
-    const cfg = statusApprovalConfigs.find((c: any) => Number(c.status_id) === Number(selectedStatus.id));
-    if (!cfg) {
-      setApHasContext(false);
-      setApAutoAdvance(true);
-      setApNextOnApprove(null);
-      setApNextOnReject(null);
-      setApNextOnTimeout(null);
-      setApBlocksEditing(false);
-      setApBlocksDeletion(false);
-      setApBlocksReassign(false);
-      setApDefaultType('all');
-      setApMinApprovers('');
-      setApTimeoutHours('');
-      setApError(null);
-      return;
-    }
-    setApHasContext(!!cfg.has_approval_context);
-    setApAutoAdvance(!!cfg.auto_advance);
-    setApNextOnApprove(cfg.next_status_on_approve ?? null);
-    setApNextOnReject(cfg.next_status_on_reject ?? null);
-    setApNextOnTimeout(cfg.next_status_on_timeout ?? null);
-    setApBlocksEditing(!!cfg.blocks_editing);
-    setApBlocksDeletion(!!cfg.blocks_deletion);
-    setApBlocksReassign(!!cfg.blocks_reassignment);
-    const ac = cfg.approval_config || {};
-    setApDefaultType((ac.default_type as any) || 'all');
-    setApMinApprovers(typeof ac.min_approvers === 'number' ? ac.min_approvers : '');
-    setApTimeoutHours(typeof ac.timeout_hours === 'number' ? ac.timeout_hours : '');
-    setApError(null);
-  }, [selectedStatus, statusApprovalConfigs]);
-
-  const handleSaveApproval = async () => {
-    if (!selectedStatus) return;
-    setApSaving(true);
-    setApError(null);
-    try {
-      const existing = statusApprovalConfigs.find((c: any) => Number(c.status_id) === Number(selectedStatus.id));
-      const updates: any = {
-        status_id: selectedStatus.id,
-        has_approval_context: apHasContext,
-        auto_advance: apAutoAdvance,
-        next_status_on_approve: apNextOnApprove || null,
-        next_status_on_reject: apNextOnReject || null,
-        next_status_on_timeout: apNextOnTimeout || null,
-        blocks_editing: apBlocksEditing,
-        blocks_deletion: apBlocksDeletion,
-        blocks_reassignment: apBlocksReassign,
-        approval_config: {
-          default_type: apDefaultType,
-          ...(apMinApprovers !== '' ? { min_approvers: Number(apMinApprovers) } : {}),
-          ...(apTimeoutHours !== '' ? { timeout_hours: Number(apTimeoutHours) } : {}),
-        }
-      };
-      let res: any;
-      if (existing) {
-        res = await dispatch((genericActions as any).statusApprovalConfig.updateAsync({ id: existing.id, updates }));
-      } else {
-        res = await dispatch((genericActions as any).statusApprovalConfig.addAsync(updates));
-      }
-      if (res?.meta?.requestStatus === 'rejected') {
-        setApError(res?.payload || res?.error?.message || 'Failed to save');
-      }
-    } finally {
-      setApSaving(false);
-    }
-  };
-
   // Action handlers for kebab menu
   const handleEditClick = (row: any) => {
     setSelectedStatus(row);
     setFormName(row.name || "");
     setFormAction(row.action || "");
+    setFormSemanticType(row.semantic_type || null);
+    setFormSemanticType(row.semantic_type || null);
     setFormColor(row.color || "#888888");
     setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
     setFormInitial(!!row.initial);
@@ -283,6 +198,7 @@ function Statuses() {
       );
     } },
     { headerName: "Action", field: "action", flex: 1, minWidth: 140 },
+    { headerName: "Semantic", field: "semantic_type", flex: 1, minWidth: 160 },
     // Icon column removed; icon shown with color inside Name
     { headerName: "System", field: "system", width: 110 },
     {
@@ -370,8 +286,9 @@ function Statuses() {
     return statuses.filter((s: any) => {
       const name = String(s?.name || '').toLowerCase();
       const action = String(s?.action || '').toLowerCase();
+      const semantic = String(s?.semantic_type || '').toLowerCase();
       const icon = String(s?.icon || '').toLowerCase();
-      return name.includes(q) || action.includes(q) || icon.includes(q);
+      return name.includes(q) || action.includes(q) || semantic.includes(q) || icon.includes(q);
     });
   }, [statuses, searchQuery]);
 
@@ -417,26 +334,28 @@ function Statuses() {
       value: 'statuses',
       label: 'Statuses',
       content: (
-        <div className="space-y-4">
-          <SettingsGrid
-            rowData={filteredStatuses}
-            columnDefs={columns}
-            height="520px"
-            noRowsMessage="No statuses found"
-            rowSelection="single"
-            onSelectionChanged={(rows) => setSelectedStatus(rows?.[0] || null)}
-            onRowDoubleClicked={(row) => {
-              setSelectedStatus(row);
-              setFormName(row.name || "");
-              setFormAction(row.action || "");
-              setFormColor(row.color || "#888888");
-              setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
-              setFormInitial(!!row.initial);
-              setFormSystem(!!row.system);
-              setFormError(null);
-              setEditOpen(true);
-            }}
-          />
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0">
+            <SettingsGrid
+              rowData={filteredStatuses}
+              columnDefs={columns}
+              noRowsMessage="No statuses found"
+              rowSelection="single"
+              onSelectionChanged={(rows) => setSelectedStatus(rows?.[0] || null)}
+              onRowDoubleClicked={(row) => {
+                setSelectedStatus(row);
+                setFormName(row.name || "");
+                setFormAction(row.action || "");
+                setFormSemanticType(row.semantic_type || null);
+                setFormColor(row.color || "#888888");
+                setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
+                setFormInitial(!!row.initial);
+                setFormSystem(!!row.system);
+                setFormError(null);
+                setEditOpen(true);
+              }}
+            />
+          </div>
         </div>
       )
     },
@@ -581,134 +500,6 @@ function Statuses() {
           )}
         </div>
       )
-    },
-    {
-      value: 'approvals',
-      label: 'Approvals',
-      content: (
-        <div className="space-y-4">
-          <div className="border rounded-lg p-4 bg-card">
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-xl font-semibold">Status Approvals</h2>
-              <div className="flex items-center gap-2">
-                <Select value={selectedStatus ? String(selectedStatus.id) : ''} onValueChange={(v) => setSelectedStatus(statuses.find(s => String(s.id) === v) || null)}>
-                  <SelectTrigger className="w-[240px]"><SelectValue placeholder="Select status" /></SelectTrigger>
-                  <SelectContent position="popper">
-                    {statuses.map((s: any) => (
-                      <SelectItem key={`ap-sel-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedStatus && (
-                  <div className="flex items-center gap-2 px-2 py-1 rounded border" style={{ borderColor: selectedStatus.color || '#6B7280' }}>
-                    <StatusIcon icon={selectedStatus.icon || 'fas fa-circle'} color={selectedStatus.color || '#6B7280'} />
-                    <span className="font-medium">{selectedStatus.name}</span>
-                  </div>
-                )}
-              </div>
-              <div className="ml-auto">
-                <Button size="sm" disabled={!selectedStatus || apSaving} onClick={handleSaveApproval}>
-                  {apSaving ? 'Saving…' : 'Save'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={apHasContext} onCheckedChange={(v: any) => setApHasContext(!!v)} disabled={!selectedStatus} />
-                  <div>
-                    <div className="font-medium">Enable approvals on this status</div>
-                    <div className="text-sm text-muted-foreground">When tasks enter this status, an approval flow will be started.</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Checkbox checked={apAutoAdvance} onCheckedChange={(v: any) => setApAutoAdvance(!!v)} disabled={!apHasContext || !selectedStatus} />
-                  <div>
-                    <div className="font-medium">Auto-advance after approval</div>
-                    <div className="text-sm text-muted-foreground">Automatically move to the configured next status when approved.</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <div className="text-sm font-medium mb-1">Next on approve</div>
-                    <Select value={apNextOnApprove ? String(apNextOnApprove) : ''} onValueChange={(v) => setApNextOnApprove(v ? Number(v) : null)} disabled={!apHasContext || !selectedStatus}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
-                      <SelectContent position="popper">
-                        {statuses.map((s: any) => (
-                          <SelectItem key={`appr-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Next on reject</div>
-                    <Select value={apNextOnReject ? String(apNextOnReject) : ''} onValueChange={(v) => setApNextOnReject(v ? Number(v) : null)} disabled={!apHasContext || !selectedStatus}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
-                      <SelectContent position="popper">
-                        {statuses.map((s: any) => (
-                          <SelectItem key={`rej-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Next on timeout</div>
-                    <Select value={apNextOnTimeout ? String(apNextOnTimeout) : ''} onValueChange={(v) => setApNextOnTimeout(v ? Number(v) : null)} disabled={!apHasContext || !selectedStatus}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select status" /></SelectTrigger>
-                      <SelectContent position="popper">
-                        {statuses.map((s: any) => (
-                          <SelectItem key={`tout-${s.id}`} value={String(s.id)}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <div className="text-sm font-medium mb-1">Default type</div>
-                    <Select value={apDefaultType} onValueChange={(v: any) => setApDefaultType(v)} disabled={!apHasContext || !selectedStatus}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent position="popper">
-                        {['all','single','majority','sequential'].map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Min approvers</div>
-                    <Input type="number" value={apMinApprovers} onChange={(e) => setApMinApprovers(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext || !selectedStatus} />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium mb-1">Timeout (hours)</div>
-                    <Input type="number" value={apTimeoutHours} onChange={(e) => setApTimeoutHours(e.target.value === '' ? '' : Number(e.target.value))} placeholder="optional" disabled={!apHasContext || !selectedStatus} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={apBlocksEditing} onCheckedChange={(v: any) => setApBlocksEditing(!!v)} disabled={!apHasContext || !selectedStatus} />
-                    <span className="text-sm">Block editing</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={apBlocksDeletion} onCheckedChange={(v: any) => setApBlocksDeletion(!!v)} disabled={!apHasContext || !selectedStatus} />
-                    <span className="text-sm">Block deletion</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={apBlocksReassign} onCheckedChange={(v: any) => setApBlocksReassign(!!v)} disabled={!apHasContext || !selectedStatus} />
-                    <span className="text-sm">Block reassignment</span>
-                  </div>
-                </div>
-              {apError && <div className="text-sm text-red-600">{apError}</div>}
-            </div>
-            </div>
-          </div>
-        </div>
-      )
     }
   ];
 
@@ -719,7 +510,7 @@ function Statuses() {
       icon={faSitemap}
       iconColor="#f59e0b"
       backPath="/settings"
-      wrapChildrenFullHeight={activeTab === 'transitions'}
+      wrapChildrenFullHeight={true}
       search={{
         placeholder: "Search statuses...",
         value: searchQuery,
@@ -740,6 +531,7 @@ function Statuses() {
           <Button size="sm" onClick={() => {
             setFormName("");
             setFormAction("");
+            setFormSemanticType(null);
             setFormColor("#888888");
             setFormIcon("fas fa-circle");
             setFormInitial(false);
@@ -788,6 +580,7 @@ function Statuses() {
               const payload: any = {
                 name: formName.trim(),
                 action: normalizedAction,
+                semantic_type: formSemanticType || null,
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
@@ -808,6 +601,7 @@ function Statuses() {
       >
         <TextField label="Name" value={formName} onChange={setFormName} required />
         <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+        <SelectField label="Semantic" value={formSemanticType ?? 'none'} onChange={(v) => setFormSemanticType(v === 'none' ? null : v)} options={[{ value: 'none', label: 'None' }, ...allowedSemantics.map(s => ({ value: s, label: s }))]} />
         <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
         <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
@@ -841,6 +635,7 @@ function Statuses() {
               const updates: any = {
                 name: formName.trim(),
                 action: normalizedAction,
+                semantic_type: formSemanticType || null,
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
@@ -861,6 +656,7 @@ function Statuses() {
       >
         <TextField label="Name" value={formName} onChange={setFormName} required />
         <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+      <SelectField label="Semantic" value={formSemanticType ?? 'none'} onChange={(v) => setFormSemanticType(v === 'none' ? null : v)} options={[{ value: 'none', label: 'None' }, ...allowedSemantics.map(s => ({ value: s, label: s }))]} />
         <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
         <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />

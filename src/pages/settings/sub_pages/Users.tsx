@@ -16,6 +16,8 @@ interface UserData {
   email: string;
   team_id?: number | null;
   role_id?: number | null;
+  job_position_id?: number | null;
+  job_position?: { id: number; title: string } | null;
   organization_name?: string | null;
   is_admin?: boolean;
   has_active_subscription?: boolean;
@@ -42,6 +44,7 @@ function Users() {
   const navigate = useNavigate();
   // Redux state for related data
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+  const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
   
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
@@ -74,11 +77,24 @@ function Users() {
     searchFields: ['name', 'email']
   });
 
+  // Ensure users, teams, and job positions are loaded when users page mounts
+  useEffect(() => {
+    // Load users data
+    dispatch((genericActions as any).users.getFromIndexedDB());
+    
+    // Load teams (needed for team column and dropdown)
+    dispatch((genericActions as any).teams.getFromIndexedDB());
+    
+    // Load job positions (needed for dropdown/labels)
+    dispatch((genericActions as any).jobPositions.getFromIndexedDB());
+  }, [dispatch]);
+
   // Form state for controlled components
   const [editFormData, setEditFormData] = useState<{
     name: string;
     email: string;
     team_id: string;
+    job_position_id: string;
     organization_name: string;
     is_admin: boolean;
     has_active_subscription: boolean;
@@ -86,6 +102,7 @@ function Users() {
     name: '',
     email: '',
     team_id: '',
+    job_position_id: '',
     organization_name: '',
     is_admin: false,
     has_active_subscription: false
@@ -98,6 +115,7 @@ function Users() {
         name: editingUser.name || '',
         email: editingUser.email || '',
         team_id: editingUser.team_id?.toString() || '',
+        job_position_id: editingUser.job_position_id != null ? editingUser.job_position_id.toString() : '',
         organization_name: editingUser.organization_name || '',
         is_admin: !!editingUser.is_admin,
         has_active_subscription: !!editingUser.has_active_subscription
@@ -172,6 +190,19 @@ function Users() {
       }
     },
     {
+      field: 'job_position_id',
+      headerName: 'Job Position',
+      flex: 2,
+      minWidth: 220,
+      cellRenderer: (params: ICellRendererParams) => {
+        const idVal = params.value as number | string | undefined;
+        if (idVal == null || idVal === '') return <span className="text-muted-foreground">No Job Position</span>;
+        const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
+        const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
+        return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
+      }
+    },
+    {
       field: 'is_admin',
       headerName: 'Role',
       flex: 0.8,
@@ -200,7 +231,7 @@ function Users() {
       resizable: false,
       pinned: 'right'
     }
-  ]), [teams, handleEdit, handleDelete]);
+  ]), [teams, jobPositions, handleEdit, handleDelete]);
 
   // Render entity preview for delete dialog
   const renderUserPreview = (user: UserData) => (
@@ -236,6 +267,7 @@ function Users() {
     name: string;
     email: string;
     team_id: string;
+    job_position_id: string;
     organization_name: string;
     is_admin: boolean;
     has_active_subscription: boolean;
@@ -243,6 +275,7 @@ function Users() {
     name: '',
     email: '',
     team_id: '',
+    job_position_id: '',
     organization_name: '',
     is_admin: false,
     has_active_subscription: false
@@ -256,6 +289,7 @@ function Users() {
       name: createFormData.name,
       email: createFormData.email,
       team_id: createFormData.team_id ? Number(createFormData.team_id) : null,
+      job_position_id: createFormData.job_position_id ? Number(createFormData.job_position_id) : null,
       role_id: null, // Not used in this form
       organization_name: createFormData.organization_name || null,
       is_admin: createFormData.is_admin,
@@ -269,6 +303,7 @@ function Users() {
       name: '',
       email: '',
       team_id: '',
+      job_position_id: '',
       organization_name: '',
       is_admin: false,
       has_active_subscription: false
@@ -284,6 +319,7 @@ function Users() {
       name: editFormData.name,
       email: editFormData.email,
       team_id: editFormData.team_id ? Number(editFormData.team_id) : null,
+      job_position_id: editFormData.job_position_id ? Number(editFormData.job_position_id) : null,
       role_id: null, // Not used in this form
       organization_name: editFormData.organization_name || null,
       is_admin: editFormData.is_admin,
@@ -333,6 +369,9 @@ function Users() {
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/teams')}>
             Manage Teams
           </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
+            Manage Job Positions
+          </Button>
           <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
             <span className="mr-2 inline-flex items-center"><svg width="0" height="0" className="hidden" aria-hidden="true"></svg></span>
             Add User
@@ -340,13 +379,16 @@ function Users() {
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={columnDefs}
-        noRowsMessage="No users found"
-        height="500px"
-        onRowDoubleClicked={(row: UserData) => handleEdit(row)}
-      />
+      <div className="flex h-full flex-col">
+        <div className="flex-1 min-h-0">
+          <SettingsGrid
+            rowData={filteredItems}
+            columnDefs={columnDefs}
+            noRowsMessage="No users found"
+            onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+          />
+        </div>
+      </div>
 
       {/* Create User Dialog */}
       <SettingsDialog
@@ -385,6 +427,17 @@ function Users() {
             options={teams.map((team: Team) => ({
               value: team.id.toString(),
               label: team.name
+            }))}
+          />
+          <SelectField
+            id="job_position_id"
+            label="Job Position"
+            value={createFormData.job_position_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
+            placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+            options={jobPositions.map((jp: any) => ({
+              value: jp.id?.toString?.() ?? String(jp.id),
+              label: jp.title
             }))}
           />
           <TextField
@@ -448,6 +501,17 @@ function Users() {
               options={teams.map((team: Team) => ({
                 value: team.id.toString(),
                 label: team.name
+              }))}
+            />
+            <SelectField
+              id="edit-job_position_id"
+              label="Job Position"
+              value={editFormData.job_position_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
+              placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+              options={jobPositions.map((jp: any) => ({
+                value: jp.id?.toString?.() ?? String(jp.id),
+                label: jp.title
               }))}
             />
             <TextField

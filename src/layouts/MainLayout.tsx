@@ -50,7 +50,6 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
             {!isWelcome && <Header />}
             <div className={`${isWelcome ? 'flex-1 p-0 overflow-hidden' : 'flex-1 p-4 md:p-6 overflow-auto'}`}>
               {children}
-              <AssistantWidget />
             </div>
           </SidebarInset>
         </div>

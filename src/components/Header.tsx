@@ -10,7 +10,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus } from "lucide-react";
+import { User, LogOut, Bell, Plus, Layers } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
@@ -19,6 +19,10 @@ import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
+import AssistantWidget from '@/components/AssistantWidget';
+import { Bot } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { iconService } from '@/database/iconService';
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -80,17 +84,86 @@ function Header() {
     }, [location.pathname]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
-    const { currentWorkspaceName, currentWorkspaceId } = useMemo(() => {
+    const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
         // Supports /workspace/:id and /workspace/all
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
         const allMatch = /\/workspace\/all$/.test(location.pathname);
-        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null };
-        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null };
+        if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
+        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
         const wid = parseInt(numMatch![1], 10);
         const ws = workspaces.find((w: any) => w.id === wid);
-        return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid };
+        return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
     }, [location.pathname, workspaces]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
+
+    const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                if (currentWorkspaceIcon) {
+                    const icon = await iconService.getIcon(currentWorkspaceIcon);
+                    if (!cancelled) setWorkspaceIcon(icon);
+                } else {
+                    if (!cancelled) setWorkspaceIcon(null);
+                }
+            } catch {
+                if (!cancelled) setWorkspaceIcon(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [currentWorkspaceIcon]);
+
+    // Track theme changes (dark/light) so the gradient updates without hard refresh
+    const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => {
+        if (typeof document === 'undefined') return false;
+        return document.documentElement.classList.contains('dark');
+    });
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const updateThemeState = () => {
+            setIsDarkTheme(document.documentElement.classList.contains('dark'));
+        };
+
+        // Observe class changes on <html> to catch theme toggles
+        const observer = new MutationObserver(() => updateThemeState());
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        // Also react to system preference changes as a fallback
+        const mql = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleMqlChange = () => updateThemeState();
+        try {
+            mql.addEventListener('change', handleMqlChange);
+        } catch {
+            // Safari fallback
+            // @ts-ignore
+            mql.addListener(handleMqlChange);
+        }
+
+        return () => {
+            observer.disconnect();
+            try {
+                mql.removeEventListener('change', handleMqlChange);
+            } catch {
+                // @ts-ignore
+                mql.removeListener(handleMqlChange);
+            }
+        };
+    }, []);
+
+    // Subtle gradient background for workspace headers
+    const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
+        if (!currentWorkspaceName) return undefined;
+        if (isDarkTheme) {
+            // Solid dark per spec with subtle bottom border
+            return { backgroundColor: '#0A0A0A', borderBottom: '1px solid #1F1F1F' } as React.CSSProperties;
+        }
+        // Light mode: very soft neutral gradient
+        const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
+        return { backgroundImage: `linear-gradient(180deg, ${grayTop} 0%, var(--color-card) 70%)` } as React.CSSProperties;
+    }, [currentWorkspaceName, isDarkTheme]);
 
     // Hydration status badge: processing while hydrating, success briefly when done, hidden otherwise
     const [hydrationState, setHydrationState] = useState<"start" | "processing" | "success" | "error" | "custom">("custom");
@@ -189,7 +262,7 @@ function Header() {
 
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -203,7 +276,7 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center space-x-3 p-2">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -217,17 +290,28 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/50 shadow-sm">
+        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/20" style={headerBackgroundStyle}>
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center justify-between px-5 h-16">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
                         <div className="flex items-center space-x-2">
-                            <h1 className="text-lg sm:text-xl font-semibold truncate max-w-[20rem]">
+                            {workspaceIcon ? (
+                                <FontAwesomeIcon
+                                    icon={workspaceIcon}
+                                    className="flex-shrink-0 text-base sm:text-xl lg:text-2xl leading-none"
+                                    style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
+                                />
+                            ) : (
+                                currentWorkspaceName === 'Everything' ? (
+                                    <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" style={{ color: '#27C1A7' }} />
+                                ) : null
+                            )}
+                            <h1 className="font-title tracking-tight text-base sm:text-xl lg:text-2xl font-extrabold truncate max-w-[32rem]">
                                 {currentWorkspaceName}
                             </h1>
                             {hydrationBadge}
@@ -303,6 +387,18 @@ function Header() {
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9" />
+                    <AssistantWidget
+                        floating={false}
+                        renderTrigger={(open) => (
+                            <button
+                                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent text-foreground"
+                                title="AI Assistant"
+                                onClick={open}
+                            >
+                                <Bot className="h-5 w-5" />
+                            </button>
+                        )}
+                    />
 
                     {/* Notifications */}
                     <DropdownMenu>

@@ -1,6 +1,9 @@
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Users, Eye, Filter } from "lucide-react";
+import { Users, Eye, Filter, SlidersHorizontal } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
@@ -411,6 +414,59 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
           />
         </motion.div>
       )
+    },
+    {
+      value: 'display',
+      label: (
+        <div className="flex items-center space-x-2">
+          <SlidersHorizontal className="w-4 h-4" />
+          <span>Display</span>
+        </div>
+      ),
+      content: (
+        <motion.div
+          className="mt-4 flex-1 h-full"
+          key="display"
+          exit={{ x: "-80vw" }}
+          initial={{ x: "80vw" }}
+          animate={{ x: 0 }}
+        >
+          {/* Display options */}
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Show header KPIs</div>
+                <div className="text-xs text-muted-foreground">Toggle the Total / In progress / Completed today pills</div>
+              </div>
+              <Switch
+                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_show_kpis') ?? 'true') !== 'false')}
+                onCheckedChange={(checked) => {
+                  try { localStorage.setItem('wh_workspace_show_kpis', String(checked)); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showKpis: checked } })); } catch {}
+                }}
+              />
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center gap-3">
+              <Label>Table density</Label>
+              <ToggleGroup
+                type="single"
+                defaultValue={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_density') as any)) || 'compact'}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  try { localStorage.setItem('wh_workspace_density', v); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
+                }}
+              >
+                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-2 text-xs">C</ToggleGroupItem>
+                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
+                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </div>
+        </motion.div>
+      )
     }
   ];
 
@@ -470,11 +526,13 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
         <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
       </div>
 
+      {/* Table density control moved into Overview tab */}
+
       <UrlTabs
         tabs={settingsTabs}
         defaultValue="overview"
         basePath={`/workspace/${workspaceId}/settings`}
-        pathMap={{ overview: '', users: '/users', filters: '/creation' }}
+        pathMap={{ overview: '', users: '/users', filters: '/creation', display: '/display' }}
         className="w-full h-full flex flex-col"
         onValueChange={(value) => {
           setPrevActiveTab(activeTab);

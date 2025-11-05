@@ -18,6 +18,10 @@ export interface Team {
     name: string;
     description: string | null;
     color: string | null;
+    icon?: string | null;
+    is_active?: boolean;
+    parent_team_id?: number | null;
+    team_lead_id?: number | null;
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
@@ -30,7 +34,8 @@ export interface Category {
     color: string;
     icon: string;
     enabled: boolean;
-    sla_id: number;
+    sla_id?: number | null;
+    approval_id?: number | null;
     team_id: number;
     workspace_id: number;
     status_transition_group_id: number;
@@ -46,6 +51,7 @@ export interface Template {
     category_id: number;
     priority_id: number | null;
     sla_id: number | null;
+    approval_id?: number | null;
     default_spot_id?: number | null;
     default_user_ids?: number[] | null;
     expected_duration?: number | null;
@@ -73,6 +79,7 @@ export interface Task {
     spot_id: number | null;
     status_id: number;
     priority_id: number;
+    approval_id: number | null;
     start_date: string | null;
     due_date: string | null;
     expected_duration: number;
@@ -83,9 +90,7 @@ export interface Task {
     // Store responsible user IDs as JSON array for efficient storage
     // Most tasks have few responsible users, so this avoids a large junction table
     user_ids: number[] | null;
-    // Approval workflow fields
-    approval_metadata?: any | null; // JSON metadata for approval workflows
-    approval_metadata_updated_at?: string | null; // Timestamp for approval metadata updates
+    
     created_at: string;
     updated_at: string;
 }
@@ -94,6 +99,7 @@ export interface Status {
     id: number;
     name: string;
     action: 'NONE' | 'WORKING' | 'PAUSED' | 'FINISHED';
+    semantic_type?: string | null;
     color?: string | null;
     icon?: string | null;
     system: boolean;
@@ -109,7 +115,6 @@ export interface Priority {
     color?: string | null;
     level?: number | null;
     category_id?: number | null;
-    sla_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
 }
@@ -129,8 +134,44 @@ export interface Tag {
     id: number;
     name: string;
     color?: string | null;
+    icon?: string | null;
+    category_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
+}
+
+export interface Approval {
+    id: number;
+    name: string;
+    description?: string | null;
+    approval_type: 'SEQUENTIAL' | 'PARALLEL' | string;
+    require_all: boolean;
+    minimum_approvals?: number | null;
+    trigger_type: 'ON_CREATE' | 'ON_STATUS_CHANGE' | 'MANUAL' | 'CONDITIONAL' | string;
+    trigger_status_id?: number | null;
+    require_rejection_comment: boolean;
+    block_editing_during_approval: boolean;
+    deadline_type: 'hours' | 'date' | string;
+    deadline_value?: string | null;
+    is_active: boolean;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+    deleted_at?: string | Date | null;
+}
+
+export interface ApprovalApprover {
+    id: number;
+    approval_id: number;
+    approver_type: 'user' | 'role' | string;
+    approver_id: number;
+    scope?: 'global' | 'creator_department' | 'creator_manager' | 'specific_department' | string;
+    scope_id?: number | null;
+    required: boolean;
+    order_index: number;
+    created_by?: number | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+    deleted_at?: string | Date | null;
 }
 
 // High Priority - User Management & Authentication

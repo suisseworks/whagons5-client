@@ -9,6 +9,7 @@ interface TabItem {
   label: string | React.ReactNode;
   content: React.ReactNode;
   disabled?: boolean;
+  forceMount?: boolean; // keep mounted even when inactive
 }
 
 interface UrlTabsProps {
@@ -87,13 +88,13 @@ export function UrlTabs({
       if (pathMap) {
         const normalizedBase = basePath.replace(/\/+$/, '');
         const seg = pathMap[value] || '';
-        const newUrl = `${normalizedBase}${seg}`;
+        const newUrl = `${normalizedBase}${seg}${location.search || ''}`;
         navigate(newUrl, { replace: true });
       } else {
         // Query mode
         const urlParams = new URLSearchParams(location.search);
         urlParams.set(tabParam, value);
-        const search = `?${tabParam}=${encodeURIComponent(value)}`;
+        const search = `?${urlParams.toString()}`;
         const newUrl = `${basePath}${search}`;
         navigate(newUrl, { replace: true });
       }
@@ -111,13 +112,14 @@ export function UrlTabs({
     }
   }, [location.search, location.pathname]);
 
-  // Update active tab when tabs prop changes (e.g., tabs become available)
+  // Update active tab when tabs prop changes (ensure current value is still valid)
   useEffect(() => {
-    if (!activeTab && tabs.length > 0) {
+    const values = new Set(tabs.map(t => t.value));
+    if (!values.has(activeTab)) {
       const currentTabFromUrl = getCurrentTabFromUrl();
-      setActiveTab(currentTabFromUrl || defaultValue || tabs[0].value);
+      setActiveTab(currentTabFromUrl || defaultValue || tabs[0]?.value || '');
     }
-  }, [tabs]);
+  }, [tabs, activeTab]);
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>
@@ -149,7 +151,11 @@ export function UrlTabs({
         )}
 
         {tabs.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value}>
+          <TabsContent
+            key={tab.value}
+            value={tab.value}
+            forceMount={tab.forceMount ? true : undefined}
+          >
             {tab.content}
           </TabsContent>
         ))}

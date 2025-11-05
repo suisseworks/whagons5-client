@@ -11,6 +11,7 @@ import { genericActions } from '@/store/genericSlices';
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { SettingsLayout } from "../components";
 import { createSwapy } from 'swapy';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type DraftField = {
   id?: number;
@@ -392,13 +393,14 @@ export default function CustomFieldsTab() {
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <label className="text-right text-sm">Type</label>
-              <select 
-                className="col-span-3 px-3 py-2 border rounded-md" 
-                value={draft.field_type} 
-                onChange={(e) => setDraft({ ...draft, field_type: e.target.value })}
-              >
-                {TYPES.map(t => (<option key={t.id} value={t.id}>{t.label}</option>))}
-              </select>
+              <Select value={draft.field_type} onValueChange={(v) => setDraft({ ...draft, field_type: v })}>
+                <SelectTrigger className="col-span-3"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectContent>
+                  {TYPES.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <label className="text-right text-sm">Options</label>

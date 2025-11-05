@@ -26,7 +26,7 @@ const TabsList = React.forwardRef<
     left: 0,
     top: 0,
     width: 0,
-    height: 0,
+    height: 2,
   });
   const tabsListRef = useRef<HTMLDivElement | null>(null);
 
@@ -42,12 +42,10 @@ const TabsList = React.forwardRef<
     const tabsRect = tabsListRef.current.getBoundingClientRect();
 
     requestAnimationFrame(() => {
-      setIndicatorStyle({
-        left: activeRect.left - tabsRect.left,
-        top: activeRect.top - tabsRect.top,
-        width: activeRect.width,
-        height: activeRect.height,
-      });
+      const left = activeRect.left - tabsRect.left;
+      const width = activeRect.width;
+      const top = activeRect.bottom - tabsRect.top - 2; // underline position
+      setIndicatorStyle({ left, top, width, height: 2 });
     });
   }, []);
 
@@ -80,13 +78,13 @@ const TabsList = React.forwardRef<
         ref={ref}
         data-slot="tabs-list"
         className={cn(
-          "bg-muted text-muted-foreground relative inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]",
+          "text-muted-foreground relative inline-flex h-10 w-fit items-center gap-1 border-b border-border/60",
           className
         )}
         {...props}
       />
       <div
-        className="absolute rounded-md border border-transparent bg-background shadow-sm dark:border-input dark:bg-input/30 transition-all duration-300 ease-in-out"
+        className="absolute h-[2px] rounded-full bg-foreground/80 transition-all duration-300 ease-in-out pointer-events-none"
         style={indicatorStyle}
       />
     </div>
@@ -102,7 +100,7 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     data-slot="tabs-trigger"
     className={cn(
-      "data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 z-10",
+      "text-foreground/55 data-[state=active]:text-foreground data-[state=active]:font-semibold inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-ring focus-visible:outline-1 focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[state=inactive]:[&_.tab-label-text]:hidden",
       className
     )}
     {...props}
@@ -117,7 +115,11 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     data-slot="tabs-content"
-    className={cn("flex-1 min-h-0 flex flex-col outline-none mt-2", className)}
+    className={cn(
+      // Keep layout sizing, but hide when not active
+      "flex-1 min-h-0 flex flex-col outline-none mt-2 data-[state=inactive]:hidden",
+      className
+    )}
     {...props}
   />
 ));

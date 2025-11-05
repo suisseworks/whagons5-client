@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -6,8 +6,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUsers, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Team, Category, Task } from "@/store/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusIcon } from "@/pages/settings/components/StatusIcon";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -15,23 +15,42 @@ import {
   useSettingsState,
   createActionsCellRenderer,
   ColorIndicatorCellRenderer,
-  TextField
+  TextField,
+  SelectField,
+  CheckboxField,
+  IconPicker
 } from "../components";
 
-// Custom cell renderer for team name with color indicator
-const TeamNameCellRenderer = (props: ICellRendererParams) => (
-  <ColorIndicatorCellRenderer 
-    value={props.value} 
-    name={props.value}
-    color={props.data?.color || '#6B7280'}
-  />
-);
+// Custom cell renderer: show color avatar, name, and description stacked
+const TeamNameCellRenderer = (props: ICellRendererParams) => {
+  const name = props.value as string;
+  const description = props.data?.description as string | null | undefined;
+  const color = props.data?.color || '#6B7280';
+  const isActive = props.data?.is_active !== false;
+  return (
+    <div className="flex items-center space-x-3 h-full">
+      <div 
+        className="w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0"
+        style={{ backgroundColor: color }}
+      >
+        {name ? name.charAt(0).toUpperCase() : '?'}
+      </div>
+      <div className="flex flex-col leading-tight">
+        <span className={`truncate ${isActive ? '' : 'line-through opacity-60'}`}>{name}</span>
+        {description ? (
+          <span className={`text-xs text-muted-foreground truncate ${isActive ? '' : 'line-through opacity-60'}`}>{description}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+};
 
 function Teams() {
   const navigate = useNavigate();
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
+  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
   
   // Use shared state management
   const {
@@ -52,6 +71,8 @@ function Teams() {
     isEditDialogOpen,
     setIsEditDialogOpen,
     isDeleteDialogOpen,
+    setFormError,
+    setEditingItem,
     editingItem: editingTeam,
     deletingItem: deletingTeam,
     handleEdit,
@@ -66,13 +87,21 @@ function Teams() {
   const [createFormData, setCreateFormData] = useState({
     name: '',
     description: '',
-    color: '#4ECDC4'
+    color: '#4ECDC4',
+    icon: '',
+    is_active: true,
+    parent_team_id: null as number | null,
+    team_lead_id: null as number | null
   });
 
   const [editFormData, setEditFormData] = useState({
     name: '',
     description: '',
-    color: '#4ECDC4'
+    color: '#4ECDC4',
+    icon: '',
+    is_active: true,
+    parent_team_id: null as number | null,
+    team_lead_id: null as number | null
   });
 
   // Update edit form data when editing team changes
@@ -81,7 +110,11 @@ function Teams() {
       setEditFormData({
         name: editingTeam.name || '',
         description: editingTeam.description || '',
-        color: editingTeam.color || '#4ECDC4'
+        color: editingTeam.color || '#4ECDC4',
+        icon: editingTeam.icon ?? '',
+        is_active: editingTeam.is_active ?? true,
+        parent_team_id: editingTeam.parent_team_id ?? null,
+        team_lead_id: editingTeam.team_lead_id ?? null
       });
     }
   }, [editingTeam]);
@@ -110,45 +143,99 @@ function Teams() {
     }
   };
 
+  // Quick lookup maps
+  const teamIdToName = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const t of teams) map.set(t.id, t.name);
+    return map;
+  }, [teams]);
+
+  const userIdToName = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const u of (users || [])) map.set(u.id, u.name);
+    return map;
+  }, [users]);
+
+  // Open edit with immediate form population to avoid flicker
+  const handleQuickEdit = useCallback((item: Team) => {
+    if (!item) return;
+    setEditFormData({
+      name: item.name || '',
+      description: item.description || '',
+      color: item.color || '#4ECDC4',
+      icon: (item as any).icon ?? '',
+      is_active: (item as any).is_active ?? true,
+      parent_team_id: (item as any).parent_team_id ?? null,
+      team_lead_id: (item as any).team_lead_id ?? null
+    });
+    setFormError(null);
+    setEditingItem(item);
+    setIsEditDialogOpen(true);
+  }, [setEditFormData, setFormError, setEditingItem, setIsEditDialogOpen]);
+
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
     { 
       field: 'name', 
       headerName: 'Team Name',
-      flex: 2,
-      minWidth: 200,
+      flex: 1.5,
+      minWidth: 220,
+      maxWidth: 420,
       cellRenderer: TeamNameCellRenderer
     },
-    { 
-      field: 'description', 
-      headerName: 'Description',
-      flex: 3,
-      minWidth: 250
+    {
+      field: 'parent_team_id',
+      headerName: 'Parent Team',
+      flex: 1,
+      minWidth: 160,
+      valueGetter: (p) => p.data?.parent_team_id ?? null,
+      cellRenderer: (p: ICellRendererParams) => {
+        const id = p?.data?.parent_team_id as number | null | undefined;
+        return id ? (teamIdToName.get(id) || `#${id}`) : '-';
+      }
     },
-    { 
-      field: 'categories', 
-      headerName: 'Categories',
-      width: 120,
-      cellRenderer: (params: ICellRendererParams) => {
-        const categoryCount = getTeamCategoryCount(params.data.id);
+    {
+      field: 'icon',
+      headerName: 'Icon',
+      width: 90,
+      cellRenderer: (p: ICellRendererParams) => {
+        const iconStr: string = p?.data?.icon || 'fas fa-circle';
+        const color = p?.data?.color || '#6B7280';
         return (
           <div className="flex items-center h-full">
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              {categoryCount}
-            </Badge>
+            <StatusIcon icon={iconStr} color={color} />
           </div>
         );
       },
       sortable: false,
       filter: false
     },
+    {
+      field: 'team_lead_id',
+      headerName: 'Team Lead',
+      flex: 1,
+      minWidth: 180,
+      valueGetter: (p) => p.data?.team_lead_id ?? null,
+      cellRenderer: (p: ICellRendererParams) => {
+        const id = p?.data?.team_lead_id as number | null | undefined;
+        if (!id) return '-';
+        return userIdToName.get(id) || `User #${id}`;
+      }
+    },
+    {
+      field: 'is_active',
+      headerName: 'Active',
+      width: 100,
+      valueGetter: (p) => !!p.data?.is_active,
+      cellRenderer: (p: ICellRendererParams) => (p?.data?.is_active ? 'Yes' : 'No')
+    },
     // Tasks column removed per request; task counts still used in delete validation and stats
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 110,
       cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
+        onEdit: handleQuickEdit,
         onDelete: handleDeleteTeam
       }),
       sortable: false,
@@ -156,7 +243,7 @@ function Teams() {
       resizable: false,
       pinned: 'right'
     }
-  ], [handleEdit, handleDeleteTeam]);
+  ], [handleEdit, handleDeleteTeam, teamIdToName, userIdToName]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -171,6 +258,10 @@ function Teams() {
       name: createFormData.name.trim(),
       description: createFormData.description.trim(),
       color: createFormData.color,
+      icon: createFormData.icon || null,
+      is_active: !!createFormData.is_active,
+      parent_team_id: createFormData.parent_team_id,
+      team_lead_id: createFormData.team_lead_id,
       deleted_at: null
     };
 
@@ -180,7 +271,11 @@ function Teams() {
     setCreateFormData({
       name: '',
       description: '',
-      color: '#4ECDC4'
+      color: '#4ECDC4',
+      icon: '',
+      is_active: true,
+      parent_team_id: null,
+      team_lead_id: null
     });
   };
 
@@ -196,7 +291,11 @@ function Teams() {
     const updates = {
       name: editFormData.name.trim(),
       description: editFormData.description.trim(),
-      color: editFormData.color
+      color: editFormData.color,
+      icon: editFormData.icon || null,
+      is_active: !!editFormData.is_active,
+      parent_team_id: editFormData.parent_team_id,
+      team_lead_id: editFormData.team_lead_id
     };
 
     await updateItem(editingTeam.id, updates);
@@ -267,13 +366,17 @@ function Teams() {
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={colDefs}
-        noRowsMessage="No teams found"
-        rowSelection="single"
-        onRowDoubleClicked={(row: any) => handleEdit(row)}
-      />
+      <div className="flex h-full flex-col">
+        <div className="flex-1 min-h-0">
+          <SettingsGrid
+            rowData={filteredItems}
+            columnDefs={colDefs}
+            noRowsMessage="No teams found"
+            rowSelection="single"
+            onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
+          />
+        </div>
+      </div>
 
       {/* Create Team Dialog */}
       <SettingsDialog
@@ -285,7 +388,11 @@ function Teams() {
             setCreateFormData({
               name: '',
               description: '',
-              color: '#4ECDC4'
+              color: '#4ECDC4',
+              icon: '',
+              is_active: true,
+              parent_team_id: null,
+              team_lead_id: null
             });
           }
         }}
@@ -318,6 +425,33 @@ function Teams() {
             value={createFormData.color}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
+          <IconPicker
+            id="icon"
+            label="Icon"
+            value={createFormData.icon}
+            onChange={(icon) => setCreateFormData(prev => ({ ...prev, icon }))}
+            color={createFormData.color}
+          />
+          <SelectField
+            id="parent-team"
+            label="Parent Team"
+            value={createFormData.parent_team_id ?? 'none'}
+            onChange={(val) => setCreateFormData(prev => ({ ...prev, parent_team_id: val === 'none' ? null : Number(val) }))}
+            options={[{ value: 'none', label: 'None' }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
+          />
+          <SelectField
+            id="team-lead"
+            label="Team Lead"
+            value={createFormData.team_lead_id ?? 'none'}
+            onChange={(val) => setCreateFormData(prev => ({ ...prev, team_lead_id: val === 'none' ? null : Number(val) }))}
+            options={[{ value: 'none', label: 'Unassigned' }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
+          />
+          <CheckboxField
+            id="is-active"
+            label="Active"
+            checked={!!createFormData.is_active}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_active: checked }))}
+          />
         </div>
       </SettingsDialog>
 
@@ -331,7 +465,11 @@ function Teams() {
             setEditFormData({
               name: '',
               description: '',
-              color: '#4ECDC4'
+              color: '#4ECDC4',
+              icon: '',
+              is_active: true,
+              parent_team_id: null,
+              team_lead_id: null
             });
           }
         }}
@@ -364,6 +502,33 @@ function Teams() {
               type="color"
               value={editFormData.color}
               onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
+            />
+            <IconPicker
+              id="edit-icon"
+              label="Icon"
+              value={editFormData.icon}
+              onChange={(icon) => setEditFormData(prev => ({ ...prev, icon }))}
+              color={editFormData.color}
+            />
+            <SelectField
+              id="edit-parent-team"
+              label="Parent Team"
+              value={editFormData.parent_team_id ?? 'none'}
+              onChange={(val) => setEditFormData(prev => ({ ...prev, parent_team_id: val === 'none' ? null : Number(val) }))}
+              options={[{ value: 'none', label: 'None' }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
+            />
+            <SelectField
+              id="edit-team-lead"
+              label="Team Lead"
+              value={editFormData.team_lead_id ?? 'none'}
+              onChange={(val) => setEditFormData(prev => ({ ...prev, team_lead_id: val === 'none' ? null : Number(val) }))}
+              options={[{ value: 'none', label: 'Unassigned' }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
+            />
+            <CheckboxField
+              id="edit-is-active"
+              label="Active"
+              checked={!!editFormData.is_active}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_active: checked }))}
             />
           </div>
         )}

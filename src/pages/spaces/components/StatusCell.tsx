@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import blockShuffle from '@/assets/block-3-shuffle.svg';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { MultiStateBadge } from '@/animated/Status';
+ 
+import { MultiStateBadge, AnimatedSpinner } from '@/animated/Status';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string };
 
@@ -44,6 +43,26 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     color: color
   };
 
+  // Status tag: solid colored pill with white text
+  const pillTextColor = '#ffffff';
+  const StatusPill = (
+    <div
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.02em]"
+      style={{ background: color, color: pillTextColor }}
+    >
+      {isWorkingStatus ? (
+        <span className="relative inline-flex items-center justify-center h-3 w-3 mr-0.5" aria-busy="true" style={{ color: '#ffffff' }}>
+          <AnimatedSpinner />
+        </span>
+      ) : meta?.icon ? (
+        <FontAwesomeIcon icon={icon} className="text-[10px]" style={{ color: pillTextColor }} />
+      ) : (
+        <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
+      )}
+      <span className="text-[12px] font-semibold tracking-wide leading-none">{name}</span>
+    </div>
+  );
+
   const items = useMemo(() => {
     return allowedNext
       .map((id) => ({ id, meta: statusMap[id] }))
@@ -51,31 +70,18 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
   }, [allowedNext, statusMap]);
 
   return (
-    <TooltipProvider>
-      <Popover open={open} onOpenChange={setOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <div className="flex items-center h-full py-2 gap-2">
-                <MultiStateBadge
-                  state={animationState}
-                  customStatus={customStatusConfig}
-                  className="cursor-pointer"
-                />
-                {/* {isWorkingStatus && (
-                  <img
-                    src={blockShuffle}
-                    alt=""
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                  />
-                )} */}
-              </div>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="top">Change status</TooltipContent>
-        </Tooltip>
-        <PopoverContent side="right" align="start" className="p-2 w-[220px]" sideOffset={6}>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="flex items-center h-full py-1 gap-2">
+          <MultiStateBadge
+            state={animationState}
+            customStatus={customStatusConfig}
+            customComponent={StatusPill}
+            className="cursor-pointer"
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="p-2 w-[220px]" sideOffset={6}>
           <div className="flex flex-col gap-1">
             {items.length === 0 && (
               <div className="text-xs text-muted-foreground px-1 py-1">No allowed transitions</div>
@@ -112,22 +118,14 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
                   )}
                   <span className="inline-flex items-center gap-1">
                     <span>{meta?.name || `#${id}`}</span>
-                    {meta?.action?.toUpperCase?.() === 'WORKING' && (
-                      <img
-                        src={blockShuffle}
-                        alt=""
-                        aria-hidden="true"
-                        className="h-3 w-3"
-                      />
-                    )}
+                    {/* removed moving image for WORKING status */}
                   </span>
                 </span>
               </Button>
             ))}
           </div>
         </PopoverContent>
-      </Popover>
-    </TooltipProvider>
+    </Popover>
   );
 };
 
