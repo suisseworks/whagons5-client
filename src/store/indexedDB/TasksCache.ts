@@ -473,6 +473,9 @@ export class TasksCache {
             (task as any).status_id,
             (task as any).priority_id,
             (task as any).approval_id || 0,
+            (task as any).approval_status || '',
+            this.toUtcEpochMs((task as any).approval_triggered_at),
+            this.toUtcEpochMs((task as any).approval_completed_at),
             normalizedUserIds,
             // Timestamps normalized to UTC epoch ms (empty string when falsy)
             this.toUtcEpochMs((task as any).start_date),
