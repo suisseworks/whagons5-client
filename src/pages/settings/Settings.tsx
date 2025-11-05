@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,8 +25,16 @@ import {
   faLayerGroup
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { useState } from "react";
-import { createSwapy, SlotItemMapArray, Swapy, utils } from 'swapy';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { UrlTabs } from "@/components/ui/url-tabs";
 
 
@@ -50,10 +58,87 @@ const saveOrder = (key: string, ids: string[]) => {
   try { localStorage.setItem(key, JSON.stringify(ids)); } catch { }
 };
 
+interface SettingCard {
+  id: string;
+  title: string;
+  icon: any;
+  count: number;
+  description: string;
+  color: string;
+}
+
+interface SortableSettingCardProps {
+  setting: SettingCard;
+  onSettingClick: (id: string) => void;
+}
+
+function SortableSettingCard({ setting, onSettingClick }: SortableSettingCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: setting.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="h-full cursor-grab active:cursor-grabbing"
+    >
+      <Card
+        className={`transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden ${isDragging ? 'shadow-lg scale-[1.02]' : ''}`}
+        onClick={(e) => {
+          // Prevent navigation if dragging
+          if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          onSettingClick(setting.id);
+        }}
+      >
+        <CardHeader className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
+              <FontAwesomeIcon icon={setting.icon || faCog} />
+            </div>
+            <div className="flex items-center gap-2">
+              {typeof setting.count !== 'undefined' && (
+                <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
+                  {setting.count}
+                </Badge>
+              )}
+              <div
+                className={`transition flex items-center text-muted-foreground opacity-60`}
+                title="Drag to reorder"
+              >
+                <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <CardTitle className="text-xl">{setting.title}</CardTitle>
+            <CardDescription>{setting.description}</CardDescription>
+          </div>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+}
+
 
 function Settings() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<string>('basics');
 
 
 
@@ -72,8 +157,6 @@ function Settings() {
   const forms = useSelector((s: RootState) => s.forms?.value ?? []);
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const tags = useSelector((s: RootState) => s.tags?.value ?? []);
-  const didMoveRef = useRef(false);
-  const pointerStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
   // const workflows = useSelector((s: RootState) => s.workflows.value);
 
   const counts = useMemo(() => {
@@ -159,6 +242,7 @@ function Settings() {
     },
 
   ], [counts.categories, counts.tags, counts.templates, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities]);
+
   // Settings configuration data
   const advancedSettings = useMemo(() => [
 
@@ -223,77 +307,86 @@ function Settings() {
     },
   ], [counts.slas, counts.forms]);
 
-  //set up maps for swapy
-  const [advancedSettingsMap, setAdvancedSettingsMap] = useState<SlotItemMapArray>(() => {
+  // Order state management
+  const [basicOrder, setBasicOrder] = useState<string[]>(() => {
+    const currentIds = basicSettings.map(s => s.id);
+    const saved = loadOrder(STORAGE_KEYS.basic);
+    return [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
+  });
+
+  const [advancedOrder, setAdvancedOrder] = useState<string[]>(() => {
     const currentIds = advancedSettings.map(s => s.id);
     const saved = loadOrder(STORAGE_KEYS.advanced);
-    const merged = [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
-    return merged.map(id => ({ slot: id, item: id })) as SlotItemMapArray;
+    return [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
   });
-  const [basicSlotItemMap, setBasicSlotItemMap] = useState<SlotItemMapArray>(() => {
+
+  // Update order when settings change
+  useEffect(() => {
     const currentIds = basicSettings.map(s => s.id);
     const saved = loadOrder(STORAGE_KEYS.basic);
     const merged = [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
-    return merged.map(id => ({ slot: id, item: id })) as SlotItemMapArray;
-  });
+    setBasicOrder(merged);
+  }, [basicSettings.map(s => s.id).join(',')]);
 
-  //set up items for swapy
-  const advancedSettingsItems = useMemo(() => utils.toSlottedItems(advancedSettings, 'id', advancedSettingsMap), [advancedSettingsMap, advancedSettings]);
-  const basicSettingsItems = useMemo(() => utils.toSlottedItems(basicSettings, 'id', basicSlotItemMap), [basicSlotItemMap, basicSettings  ]);
+  useEffect(() => {
+    const currentIds = advancedSettings.map(s => s.id);
+    const saved = loadOrder(STORAGE_KEYS.advanced);
+    const merged = [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
+    setAdvancedOrder(merged);
+  }, [advancedSettings.map(s => s.id).join(',')]);
 
-  //set up refs for swapy
-  const advancedRef = useRef<Swapy | null>(null);
-  const basicRef = useRef<Swapy | null>(null);
-  const advancedContainerRef = useRef<HTMLDivElement | null>(null);
-  const basicContainerRef = useRef<HTMLDivElement | null>(null);
+  // Ordered settings based on saved order
+  const orderedBasicSettings = useMemo(() => {
+    const settingMap = new Map(basicSettings.map(s => [s.id, s]));
+    return basicOrder.map(id => settingMap.get(id)).filter(Boolean) as SettingCard[];
+  }, [basicSettings, basicOrder]);
 
-  // //use effect to update the maps
-  useEffect(() => { utils.dynamicSwapy(advancedRef.current, advancedSettings, 'id', advancedSettingsMap, setAdvancedSettingsMap); }, [advancedSettings]);
-  useEffect(() => { utils.dynamicSwapy(basicRef.current,    basicSettings,    'id', basicSlotItemMap,    setBasicSlotItemMap); },    [basicSettings]);
+  const orderedAdvancedSettings = useMemo(() => {
+    const settingMap = new Map(advancedSettings.map(s => [s.id, s]));
+    return advancedOrder.map(id => settingMap.get(id)).filter(Boolean) as SettingCard[];
+  }, [advancedSettings, advancedOrder]);
 
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    })
+  );
 
-  const initSwapy = (el: HTMLDivElement | null, ref: React.MutableRefObject<Swapy|null>, setMap: (m: SlotItemMapArray) => void, key: string) => {
-    if (!el || !el.isConnected) return;
-    console.log('el', el);
-    ref.current?.destroy?.();
-    const inst = createSwapy(el, { manualSwap: true });
-    ref.current = inst;
-    inst.onSwap?.(e => setMap(e.newSlotItemMap.asArray));
-    inst.onSwapEnd?.(({ hasChanged, slotItemMap }) => {
-      if (!hasChanged || !slotItemMap) return;
-      const ids = slotItemMap.asArray.map(({ item }) => item);
-      saveOrder(key, ids);
-    });
+  // Drag handlers
+  const handleBasicDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = basicOrder.indexOf(String(active.id));
+    const newIndex = basicOrder.indexOf(String(over.id));
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newOrder = arrayMove(basicOrder, oldIndex, newIndex);
+      setBasicOrder(newOrder);
+      saveOrder(STORAGE_KEYS.basic, newOrder);
+    }
   };
 
+  const handleAdvancedDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
+    const oldIndex = advancedOrder.indexOf(String(active.id));
+    const newIndex = advancedOrder.indexOf(String(over.id));
 
-  useEffect(() => {
-    if (tab !== 'advanced') { basicRef.current?.destroy?.(); basicRef.current = null; return; }
-    const raf = requestAnimationFrame(() =>{
-      //must grab ref manually because basicRef ref gets destroyed by tab change
-      const advancedContainer = document.querySelector('[data-swapy-container="advanced"]');
-      console.log('advancedContainer', advancedContainer);
-      //create react ref
-      advancedContainerRef.current = advancedContainer as HTMLDivElement;
-      initSwapy(advancedContainerRef.current, advancedRef, setAdvancedSettingsMap, STORAGE_KEYS.advanced)
-    });
-    return () => { cancelAnimationFrame(raf); basicRef.current?.destroy?.(); basicRef.current = null; };
-  }, [tab, advancedSettingsItems.length]);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newOrder = arrayMove(advancedOrder, oldIndex, newIndex);
+      setAdvancedOrder(newOrder);
+      saveOrder(STORAGE_KEYS.advanced, newOrder);
+    }
+  };
 
-
-  useEffect(() => {
-    if (tab !== 'basics') { basicRef.current?.destroy?.(); basicRef.current = null; return; }
-    const raf = requestAnimationFrame(() =>{
-      //must grab ref manually because basicRef ref gets destroyed by tab change
-      const basicContainer = document.querySelector('[data-swapy-container="basic"]');
-      console.log('basicContainer', basicContainer);
-      //create react ref
-      basicContainerRef.current = basicContainer as HTMLDivElement;
-      initSwapy(basicContainerRef.current, basicRef, setBasicSlotItemMap, STORAGE_KEYS.basic)
-    });
-    return () => { cancelAnimationFrame(raf); basicRef.current?.destroy?.(); basicRef.current = null; };
-  }, [tab, basicSettingsItems.length]);
+  // IDs for SortableContext
+  const basicIds = useMemo(() => orderedBasicSettings.map(s => s.id), [orderedBasicSettings]);
+  const advancedIds = useMemo(() => orderedAdvancedSettings.map(s => s.id), [orderedAdvancedSettings]);
 
 
 
@@ -366,63 +459,23 @@ function Settings() {
       content: (
         <div className="space-y-4">
           <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
-          <div
-            data-swapy-container="basic"
-            ref={basicContainerRef}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleBasicDragEnd}
           >
-            {basicSettingsItems.map(({ slotId, itemId, item }) => (
-              <div key={slotId} data-swapy-slot={slotId} className="h-full">
-                {item && (
-                  <div data-swapy-item={itemId} key={itemId} className="h-full">
-                    <Card
-                      className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                      onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                      onPointerMove={(e) => {
-                        const s = pointerStartRef.current;
-                        if (!s) return;
-                        const dx = Math.abs(e.clientX - s.x);
-                        const dy = Math.abs(e.clientY - s.y);
-                        if (dx > 3 || dy > 3) {
-                          didMoveRef.current = true;
-                        }
-                      }}
-                      onPointerUp={(e) => {
-                        const s = pointerStartRef.current; pointerStartRef.current = null;
-                        if (!s) return;
-                        const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                        if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                          handleSettingClick(item.id);
-                        }
-                      }}
-                    >
-                      <CardHeader className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className={`text-4xl ${item.color} group-hover:scale-110 transition-transform duration-200`}>
-                            <FontAwesomeIcon icon={item.icon || faCog} />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {typeof item.count !== 'undefined' && (
-                              <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
-                                {item.count}
-                              </Badge>
-                            )}
-                            <div className={`transition flex items-center text-muted-foreground opacity-60 hover:opacity-100 cursor-grab active:cursor-grabbing`} title="Drag to reorder">
-                              <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <CardTitle className="text-xl">{item.title}</CardTitle>
-                          <CardDescription>{item.description}</CardDescription>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </div>
-                )}
+            <SortableContext items={basicIds} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {orderedBasicSettings.map((setting) => (
+                  <SortableSettingCard
+                    key={setting.id}
+                    setting={setting}
+                    onSettingClick={handleSettingClick}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )
     },
@@ -432,63 +485,23 @@ function Settings() {
       content: (
         <div className="space-y-4">
           <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
-          <div
-            data-swapy-container="advanced"
-            ref={advancedContainerRef}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleAdvancedDragEnd}
           >
-            {advancedSettingsItems.map(({ slotId, itemId, item }) => (
-              <div key={slotId} data-swapy-slot={slotId} className="h-full">
-                {item && (
-                  <div data-swapy-item={itemId} key={itemId} className="h-full">
-                    <Card
-                      className={`cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden`}
-                      onPointerDown={(e) => { didMoveRef.current = false; pointerStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }; }}
-                      onPointerMove={(e) => {
-                        const s = pointerStartRef.current;
-                        if (!s) return;
-                        const dx = Math.abs(e.clientX - s.x);
-                        const dy = Math.abs(e.clientY - s.y);
-                        if (dx > 3 || dy > 3) {
-                          didMoveRef.current = true;
-                        }
-                      }}
-                      onPointerUp={(e) => {
-                        const s = pointerStartRef.current; pointerStartRef.current = null;
-                        if (!s) return;
-                        const dt = Date.now() - s.t; const dx = Math.abs(e.clientX - s.x); const dy = Math.abs(e.clientY - s.y);
-                        if (dt < 300 && dx < 5 && dy < 5 && !didMoveRef.current) {
-                          handleSettingClick(item.id);
-                        }
-                      }}
-                    >
-                      <CardHeader className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className={`text-4xl ${item.color} group-hover:scale-110 transition-transform duration-200`}>
-                            <FontAwesomeIcon icon={item.icon || faCog} />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {typeof item.count !== 'undefined' && (
-                              <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
-                                {item.count}
-                              </Badge>
-                            )}
-                            <div className={`transition flex items-center text-muted-foreground opacity-60 hover:opacity-100 cursor-grab active:cursor-grabbing`} title="Drag to reorder">
-                              <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <CardTitle className="text-xl">{item.title}</CardTitle>
-                          <CardDescription>{item.description}</CardDescription>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </div>
-                )}
+            <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {orderedAdvancedSettings.map((setting) => (
+                  <SortableSettingCard
+                    key={setting.id}
+                    setting={setting}
+                    onSettingClick={handleSettingClick}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )
     }
@@ -504,7 +517,6 @@ function Settings() {
         tabs={mainSettingsTabs}
         defaultValue="basics"
         basePath="/settings"
-        onValueChange={setTab}
       />
 
 

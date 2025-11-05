@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -30,7 +30,16 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Workspace } from '@/store/types';
-import { createSwapy, SlotItemMapArray, Swapy, utils } from 'swapy';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const WS_ORDER_STORAGE = 'wh-workspace-order';
 
@@ -68,6 +77,105 @@ export interface AppSidebarWorkspacesProps {
   getWorkspaceIcon: (iconName?: string) => any;
 }
 
+interface SortableWorkspaceItemProps {
+  workspace: Workspace;
+  pathname: string;
+  collapsed: boolean;
+  getWorkspaceIcon: (iconName?: string) => any;
+}
+
+function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon }: SortableWorkspaceItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: String(workspace.id) });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  if (collapsed) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="flex items-center justify-center h-8 w-8 mx-0 rounded-md"
+      >
+        <div
+          {...listeners}
+          {...attributes}
+          className="w-full h-full cursor-grab active:cursor-grabbing"
+        >
+          <Link
+            to={`/workspace/${workspace.id}`}
+            data-workspace-id={String(workspace.id)}
+            onClick={(e) => {
+              if (isDragging) {
+                e.preventDefault();
+              }
+            }}
+            className={`group flex items-center justify-center w-full h-full text-xs font-medium rounded-md ${
+              pathname === `/workspace/${workspace.id}`
+                ? 'bg-primary/20 text-primary border border-primary/40'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            }`}
+          >
+            <FontAwesomeIcon
+              icon={getWorkspaceIcon(workspace.icon)}
+              style={{ color: workspace.color }}
+              className="w-4 h-4"
+            />
+            <span className="sr-only">{workspace.name}</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="flex items-center h-10 rounded-md relative cursor-grab active:cursor-grabbing"
+    >
+      <Link
+        to={`/workspace/${workspace.id}`}
+        data-workspace-id={String(workspace.id)}
+        onClick={(e) => {
+          // Prevent navigation if dragging
+          if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }}
+        className={`group flex items-center rounded-md flex-1 space-x-3 h-10 px-3 pointer-events-auto ${
+          pathname === `/workspace/${workspace.id}`
+            ? 'bg-primary/10 text-primary border-l-[3px] border-primary rounded-l-md'
+            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+        } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:rounded-l-md`}
+        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+      >
+        <span className="flex items-center justify-center">
+          <FontAwesomeIcon
+            icon={getWorkspaceIcon(workspace.icon)}
+            style={{ color: workspace.color }}
+            className="w-4 h-4"
+          />
+        </span>
+        <span className="truncate font-medium text-[14px]">{workspace.name}</span>
+      </Link>
+    </div>
+  );
+}
+
 export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }: AppSidebarWorkspacesProps) {
   const { isMobile, state } = useSidebar();
   const isCollapsedState = state === 'collapsed';
@@ -77,7 +185,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
 
-
+  const [orderKey, setOrderKey] = useState(0);
 
   const localWorkspaces = useMemo(() => {
     const normalized = workspaces.map((w) => ({ ...w, id: String(w.id) }));
@@ -92,31 +200,9 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
       if (workspace) ordered.push(workspace as unknown as Workspace);
     });
     return ordered;
-  }, [workspaces]);
-  const [workspaceSlotItemMap, setWorkspaceSlotItemMap] = useState<SlotItemMapArray>(utils.initSlotItemMap(localWorkspaces, 'id'));
-  const workspaceSlottedItems = useMemo(() => utils.toSlottedItems(localWorkspaces, 'id', workspaceSlotItemMap), [localWorkspaces, workspaceSlotItemMap]);
-  const pendingSlotItemMapRef = useRef<SlotItemMapArray | null>(null);
+  }, [workspaces, orderKey]);
 
-  const displaySlottedItems = useMemo(() => {
-    if (!workspaceSlottedItems.length) {
-      return localWorkspaces.map((workspace) => ({
-        slotId: String(workspace.id),
-        itemId: String(workspace.id),
-        item: workspace,
-      }));
-    }
-
-    const hasRenderableItem = workspaceSlottedItems.some(({ item }) => Boolean(item));
-    if (!hasRenderableItem) {
-      return localWorkspaces.map((workspace) => ({
-        slotId: String(workspace.id),
-        itemId: String(workspace.id),
-        item: workspace,
-      }));
-    }
-
-    return workspaceSlottedItems;
-  }, [workspaceSlottedItems, localWorkspaces]);
+  const workspaceIds = useMemo(() => localWorkspaces.map((w) => String(w.id)), [localWorkspaces]);
 
   useEffect(() => {
     // Avoid wiping saved order before data loads
@@ -128,67 +214,33 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
     if (!arraysEqual(merged, saved)) {
       saveWorkspaceOrder(merged);
     }
-
-    const mergedMap = merged.map((id) => ({ slot: id, item: id })) as SlotItemMapArray;
-    setWorkspaceSlotItemMap((previous) => {
-      const previousIds = previous.map(({ item }) => item);
-      return arraysEqual(previousIds, merged) ? previous : mergedMap;
-    });
   }, [localWorkspaces]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    })
+  );
 
-  const swapyRef = useRef<Swapy | null>(null);
-  const workspaceContainerRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {utils.dynamicSwapy(swapyRef.current, localWorkspaces, 'id', workspaceSlotItemMap, setWorkspaceSlotItemMap);}, [localWorkspaces]);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-
-
-
-
-
-  useEffect(() => {
-    const container = workspaceContainerRef.current;
-    if (!container) {
+    if (!over || active.id === over.id) {
       return;
     }
 
-    swapyRef.current?.destroy?.();
+    const oldIndex = workspaceIds.indexOf(String(active.id));
+    const newIndex = workspaceIds.indexOf(String(over.id));
 
-    if (localWorkspaces.length === 0) {
-      swapyRef.current = null;
-      return;
-    }
-
-    const instance = createSwapy(container, {
-      manualSwap: true,
-    });
-
-    swapyRef.current = instance;
-
-    instance.onSwap?.((event) => {
-
-
-      setWorkspaceSlotItemMap(event.newSlotItemMap.asArray);
-    });
-
-    instance.onSwapEnd?.((event) => {
-      if (!event.hasChanged) return;
-      // Prefer the new map from the event; fall back to instance/state if absent
-      const slotArray = event.newSlotItemMap?.asArray
-        ?? (swapyRef.current as any)?.slotItemMap?.asArray
-        ?? pendingSlotItemMapRef.current
-        ?? workspaceSlotItemMap;
-      if (!slotArray) return;
-      pendingSlotItemMapRef.current = slotArray as SlotItemMapArray;
-      const orderedIds = (slotArray as SlotItemMapArray).map(({ item }) => item as string);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reorderedWorkspaces = arrayMove(localWorkspaces, oldIndex, newIndex);
+      const orderedIds = reorderedWorkspaces.map((w) => String(w.id));
       saveWorkspaceOrder(orderedIds);
-    });
-
-    return () => {
-
-      swapyRef.current?.destroy?.();
-    };
-  }, [localWorkspaces, workspaceSlottedItems.length, collapsed]);
+      setOrderKey((prev) => prev + 1); // Force re-render to update order
+    }
+  };
 
 
 
@@ -299,54 +351,29 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
         </SidebarGroupLabel>
 
         <CollapsibleContent keepRendered>
-          <SidebarGroupContent className={collapsed ? 'pt-2' : 'pt-2 pl-1'}>
-            <div ref={workspaceContainerRef}>
-              <div className={collapsed ? 'flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent z-300' : 'workspace-items'}>
-                {displaySlottedItems.map(({ slotId, itemId, item }) => (
-                  <div data-swapy-slot={slotId} key={slotId}>
-                    {item && (
-                      <div
-                        className={`rounded-md relative ${
-                          collapsed
-                            ? 'flex items-center justify-center h-8 w-8 mx-0'
-                            : 'flex items-center space-x-3 overflow-hidden h-10 px-4 mx-2'
-                        }`}
-                        data-swapy-item={itemId}
-                        key={itemId}
-                      >
-                        <Link
-                          to={`/workspace/${itemId}`}
-                          data-workspace-id={String(itemId)}
-                          onDragStart={(event) => event.preventDefault()}
-                          className={`group flex items-center rounded-md ${
-                            collapsed
-                              ? `justify-center w-full h-full text-xs font-medium ${
-                                  pathname === `/workspace/${itemId}`
-                                    ? 'bg-primary/20 text-primary border border-primary/40'
-                                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                                }`
-                              : `flex-1 space-x-3 h-10 -mx-4 px-4 ${
-                                  pathname === `/workspace/${itemId}`
-                                    ? 'bg-primary/10 text-primary border-l-[3px] border-primary'
-                                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
-                                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 `
-                          }`}
-                        >
-                          <span className="flex items-center justify-center">
-                            <FontAwesomeIcon
-                              icon={getWorkspaceIcon(item.icon)}
-                              style={{ color: item.color }}
-                              className="w-4 h-4"
-                            />
-                          </span>
-                          <span className={collapsed ? 'sr-only' : 'truncate font-medium text-[14px]'}>{item.name}</span>
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+          <SidebarGroupContent className={collapsed ? 'pt-2' : 'pt-2'}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={workspaceIds}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className={collapsed ? 'flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent z-300' : 'space-y-1'}>
+                  {localWorkspaces.map((workspace) => (
+                    <SortableWorkspaceItem
+                      key={workspace.id}
+                      workspace={workspace}
+                      pathname={pathname}
+                      collapsed={collapsed}
+                      getWorkspaceIcon={getWorkspaceIcon}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </SidebarGroupContent>
         </CollapsibleContent>
       </SidebarGroup>

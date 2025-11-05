@@ -188,12 +188,12 @@ const refreshToken = async () => {
     return storedToken;
   }
 
-  // If there is no Firebase user, do not loop indefinitely
-  if (!auth.currentUser) {
-    throw new Error('No Firebase user available to refresh token');
+  let token = await auth.currentUser?.getIdToken();
+  // console.log('Refreshing token', token);
+  if (!token) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return refreshToken();
   }
-
-  const token = await auth.currentUser.getIdToken();
 
   try {
     const response = await api.post(`/login`, {
@@ -320,13 +320,8 @@ api.interceptors.response.use(
     ) {
       originalRequest._retry = true;
 
-      // If no Firebase user exists, don't attempt a refresh loop
-      if (!auth.currentUser) {
-        clearAuth();
-        return Promise.reject(error);
-      }
-
       try {
+        // console.log('originalRequest.url', originalRequest.url);
         // Clear stored token on 401 and get a fresh one
         deleteCookie('auth_token');
         // Single-flight refresh so concurrent 401s share the same /login
