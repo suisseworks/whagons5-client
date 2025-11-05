@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,6 +32,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -90,7 +91,7 @@ function SortableSettingCard({ setting, onSettingClick }: SortableSettingCardPro
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, touchAction: 'none' }}
       {...listeners}
       {...attributes}
       className="h-full cursor-grab active:cursor-grabbing"
@@ -355,33 +356,165 @@ function Settings() {
     })
   );
 
+  // Refs to track drag state and prevent scroll
+  const isDraggingRef = useRef(false);
+  const originalOverflowRef = useRef<string>('');
+  const originalTouchActionRef = useRef<string>('');
+  const originalPositionRef = useRef<string>('');
+  const scrollPositionRef = useRef({ x: 0, y: 0 });
+  const scrollLockAnimationFrameRef = useRef<number | null>(null);
+
+  // Prevent scrolling during drag
+  const handleDragStart = (_event: DragStartEvent) => {
+    isDraggingRef.current = true;
+    
+    // Store original values
+    originalOverflowRef.current = document.body.style.overflow || '';
+    originalTouchActionRef.current = document.body.style.touchAction || '';
+    originalPositionRef.current = document.body.style.position || '';
+    
+    // Store current scroll position
+    scrollPositionRef.current = {
+      x: window.scrollX || document.documentElement.scrollLeft,
+      y: window.scrollY || document.documentElement.scrollTop
+    };
+    
+    // Prevent scrolling using position: fixed trick (most reliable)
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollPositionRef.current.y}px`;
+    document.body.style.left = `-${scrollPositionRef.current.x}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.touchAction = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    
+    // Prevent scroll events with separate handlers for each type
+    const preventTouchMove = (e: TouchEvent) => {
+      if (isDraggingRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    const preventWheel = (e: WheelEvent) => {
+      if (isDraggingRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    const preventScroll = (e: Event) => {
+      if (isDraggingRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    // Lock scroll position using requestAnimationFrame (smoother and faster)
+    const lockScrollPosition = () => {
+      if (isDraggingRef.current) {
+        // Lock window scroll
+        window.scrollTo(scrollPositionRef.current.x, scrollPositionRef.current.y);
+        // Lock document scroll
+        document.documentElement.scrollTop = scrollPositionRef.current.y;
+        document.documentElement.scrollLeft = scrollPositionRef.current.x;
+        document.body.scrollTop = scrollPositionRef.current.y;
+        document.body.scrollLeft = scrollPositionRef.current.x;
+        
+        // Continue locking
+        scrollLockAnimationFrameRef.current = requestAnimationFrame(lockScrollPosition);
+      }
+    };
+    
+    // Start the scroll lock loop
+    scrollLockAnimationFrameRef.current = requestAnimationFrame(lockScrollPosition);
+    
+    window.addEventListener('touchmove', preventTouchMove, { passive: false, capture: true });
+    window.addEventListener('wheel', preventWheel, { passive: false, capture: true });
+    window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    document.addEventListener('touchmove', preventTouchMove, { passive: false, capture: true });
+    document.addEventListener('wheel', preventWheel, { passive: false, capture: true });
+    document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    
+    // Store cleanup function
+    (window as any).__dragScrollPreventCleanup = () => {
+      if (scrollLockAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(scrollLockAnimationFrameRef.current);
+        scrollLockAnimationFrameRef.current = null;
+      }
+      window.removeEventListener('touchmove', preventTouchMove, { capture: true } as any);
+      window.removeEventListener('wheel', preventWheel, { capture: true } as any);
+      window.removeEventListener('scroll', preventScroll, { capture: true } as any);
+      document.removeEventListener('touchmove', preventTouchMove, { capture: true } as any);
+      document.removeEventListener('wheel', preventWheel, { capture: true } as any);
+      document.removeEventListener('scroll', preventScroll, { capture: true } as any);
+    };
+  };
+
+  const handleDragEnd = (_event: DragEndEvent, callback: () => void) => {
+    isDraggingRef.current = false;
+    
+    // Clean up event listeners
+    if ((window as any).__dragScrollPreventCleanup) {
+      (window as any).__dragScrollPreventCleanup();
+      delete (window as any).__dragScrollPreventCleanup;
+    }
+    
+    // Restore scroll behavior
+    const scrollY = scrollPositionRef.current.y;
+    const scrollX = scrollPositionRef.current.x;
+    
+    document.body.style.position = originalPositionRef.current;
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.width = '';
+    document.body.style.overflow = originalOverflowRef.current;
+    document.body.style.touchAction = originalTouchActionRef.current;
+    document.body.style.overscrollBehavior = '';
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.touchAction = '';
+    document.documentElement.style.overscrollBehavior = '';
+    
+    // Restore scroll position
+    window.scrollTo(scrollX, scrollY);
+    
+    callback();
+  };
+
   // Drag handlers
   const handleBasicDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    handleDragEnd(event, () => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
 
-    const oldIndex = basicOrder.indexOf(String(active.id));
-    const newIndex = basicOrder.indexOf(String(over.id));
+      const oldIndex = basicOrder.indexOf(String(active.id));
+      const newIndex = basicOrder.indexOf(String(over.id));
 
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(basicOrder, oldIndex, newIndex);
-      setBasicOrder(newOrder);
-      saveOrder(STORAGE_KEYS.basic, newOrder);
-    }
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(basicOrder, oldIndex, newIndex);
+        setBasicOrder(newOrder);
+        saveOrder(STORAGE_KEYS.basic, newOrder);
+      }
+    });
   };
 
   const handleAdvancedDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    handleDragEnd(event, () => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
 
-    const oldIndex = advancedOrder.indexOf(String(active.id));
-    const newIndex = advancedOrder.indexOf(String(over.id));
+      const oldIndex = advancedOrder.indexOf(String(active.id));
+      const newIndex = advancedOrder.indexOf(String(over.id));
 
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(advancedOrder, oldIndex, newIndex);
-      setAdvancedOrder(newOrder);
-      saveOrder(STORAGE_KEYS.advanced, newOrder);
-    }
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(advancedOrder, oldIndex, newIndex);
+        setAdvancedOrder(newOrder);
+        saveOrder(STORAGE_KEYS.advanced, newOrder);
+      }
+    });
   };
 
   // IDs for SortableContext
@@ -462,6 +595,7 @@ function Settings() {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleBasicDragEnd}
           >
             <SortableContext items={basicIds} strategy={rectSortingStrategy}>
@@ -488,6 +622,7 @@ function Settings() {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleAdvancedDragEnd}
           >
             <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
