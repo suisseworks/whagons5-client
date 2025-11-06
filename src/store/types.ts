@@ -469,13 +469,11 @@ export interface TaskRecurrence {
 // Invitations & Onboarding
 export interface Invitation {
     id: number;
-    email: string;
+    invitation_token: string;
+    user_email?: string | null;
+    team_id?: number | null;
     role_id?: number | null;
-    workspace_id?: number | null;
-    invited_by: number;
-    token: string;
-    expires_at: string;
-    accepted_at?: string | null;
+    job_position_id?: number | null;
     created_at: string;
     updated_at: string;
 }

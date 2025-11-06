@@ -1,7 +1,9 @@
-export type TabKey = 'grid' | 'calendar' | 'scheduler' | 'map' | 'board' | 'settings';
+export type WorkspaceTabKey = 'grid' | 'calendar' | 'scheduler' | 'map' | 'board' | 'settings';
+export type SettingsTabKey = 'basics' | 'advanced';
+export type WorkspaceSettingsTabKey = 'overview' | 'users' | 'filters' | 'display';
 
-export interface TabAnimationConfig {
-  order: TabKey[];
+export interface TabAnimationConfig<T extends string = string> {
+  order: T[];
   distance: string | number;
   transition: {
     duration: number;
@@ -11,8 +13,30 @@ export interface TabAnimationConfig {
   };
 }
 
-export const TAB_ANIMATION: TabAnimationConfig = {
+export const TAB_ANIMATION: TabAnimationConfig<WorkspaceTabKey> = {
   order: ['grid', 'calendar', 'scheduler', 'map', 'board', 'settings'],
+  distance: '80vw',
+  transition: {
+    duration: 0.05,
+    type: 'spring',
+    stiffness: 400,
+    damping: 32,
+  },
+};
+
+export const SETTINGS_TAB_ANIMATION: TabAnimationConfig<SettingsTabKey> = {
+  order: ['basics', 'advanced'],
+  distance: '80vw',
+  transition: {
+    duration: 0.05,
+    type: 'spring',
+    stiffness: 400,
+    damping: 32,
+  },
+};
+
+export const WORKSPACE_SETTINGS_TAB_ANIMATION: TabAnimationConfig<WorkspaceSettingsTabKey> = {
+  order: ['overview', 'users', 'filters', 'display'],
   distance: '80vw',
   transition: {
     duration: 0.05,
@@ -27,16 +51,51 @@ function negativeDistance(distance: string | number): string | number {
   return distance.startsWith('-') ? distance : `-${distance}`;
 }
 
-export function getTabInitialX(
-  prev: TabKey | string | null | undefined,
-  next: TabKey | string
+/**
+ * Generic function to calculate the initial X position for tab animations based on direction.
+ * Uses the provided config to determine tab order and animation distance.
+ */
+export function getTabInitialX<T extends string>(
+  prev: T | string | null | undefined,
+  next: T | string,
+  config: TabAnimationConfig<T>
 ): string | number {
   if (!prev || prev === next) return 0;
-  const order = TAB_ANIMATION.order;
-  const from = order.indexOf(prev as TabKey);
-  const to = order.indexOf(next as TabKey);
+  const from = config.order.indexOf(prev as T);
+  const to = config.order.indexOf(next as T);
   if (from === -1 || to === -1) return 0;
-  return to > from ? TAB_ANIMATION.distance : negativeDistance(TAB_ANIMATION.distance);
+  return to > from ? config.distance : negativeDistance(config.distance);
+}
+
+/**
+ * Legacy function for workspace tabs - uses TAB_ANIMATION config by default.
+ * @deprecated Use getTabInitialX with explicit config instead for better type safety.
+ */
+export function getWorkspaceTabInitialX(
+  prev: WorkspaceTabKey | string | null | undefined,
+  next: WorkspaceTabKey | string
+): string | number {
+  return getTabInitialX(prev, next, TAB_ANIMATION);
+}
+
+/**
+ * Convenience function for settings tabs.
+ */
+export function getSettingsTabInitialX(
+  prev: SettingsTabKey | string | null | undefined,
+  next: SettingsTabKey | string
+): string | number {
+  return getTabInitialX(prev, next, SETTINGS_TAB_ANIMATION);
+}
+
+/**
+ * Convenience function for workspace settings tabs.
+ */
+export function getWorkspaceSettingsTabInitialX(
+  prev: WorkspaceSettingsTabKey | string | null | undefined,
+  next: WorkspaceSettingsTabKey | string
+): string | number {
+  return getTabInitialX(prev, next, WORKSPACE_SETTINGS_TAB_ANIMATION);
 }
 
 

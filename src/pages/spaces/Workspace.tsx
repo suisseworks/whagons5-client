@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import { motion } from 'motion/react';
-import { TAB_ANIMATION, getTabInitialX } from '@/config/tabAnimation';
+import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
 import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
@@ -328,7 +328,7 @@ export const Workspace = () => {
           className='flex-1 h-full'
           key='grid'
           initial={false}
-          animate={{ x: activeTab === 'grid' ? 0 : getTabInitialX(activeTab, 'grid') }}
+          animate={{ x: activeTab === 'grid' ? 0 : getWorkspaceTabInitialX(activeTab, 'grid') }}
           transition={activeTab === 'grid' ? TAB_ANIMATION.transition : { duration: 0 }}
         >
           <WorkspaceTable 
@@ -354,7 +354,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='calendar' initial={{ x: getTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='calendar' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <CalendarViewTab workspaceId={id} />
         </motion.div>
       )
@@ -368,7 +368,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='scheduler' initial={{ x: getTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='scheduler' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SchedulerViewTab workspaceId={id} />
         </motion.div>
       )
@@ -382,7 +382,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='map' initial={{ x: getTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='map' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <MapViewTab workspaceId={id} />
         </motion.div>
       )
@@ -396,7 +396,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='board' initial={{ x: getTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='board' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <TaskBoardTab workspaceId={id} />
         </motion.div>
       )
@@ -409,7 +409,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div key='settings' initial={{ x: getTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SettingsComponent workspaceId={id} />
         </motion.div>
       )

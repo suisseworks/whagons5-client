@@ -259,8 +259,18 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
     setIsModalOpen(false);
   };
 
+  // When sidebar is collapsed, always keep workspace section open so icons are visible
+  const [collapsibleOpen, setCollapsibleOpen] = useState(true);
+
+  const handleCollapsibleChange = (open: boolean) => {
+    // Don't allow closing when sidebar is collapsed - icons need to remain visible
+    if (!collapsed) {
+      setCollapsibleOpen(open);
+    }
+  };
+
   return (
-    <Collapsible defaultOpen className="group/collapsible">
+    <Collapsible open={collapsed ? true : collapsibleOpen} onOpenChange={handleCollapsibleChange} className="group/collapsible">
       <SidebarGroup>
         <SidebarGroupLabel asChild className="text-sm font-normal">
           <div

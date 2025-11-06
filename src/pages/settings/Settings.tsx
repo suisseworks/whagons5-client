@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { motion } from 'motion/react';
+import { SETTINGS_TAB_ANIMATION, getSettingsTabInitialX } from '@/config/tabAnimation';
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -140,6 +142,18 @@ function SortableSettingCard({ setting, onSettingClick }: SortableSettingCardPro
 
 function Settings() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'basics' | 'advanced'>('basics');
+  const [prevActiveTab, setPrevActiveTab] = useState<'basics' | 'advanced'>('basics');
+
+  // Sync activeTab with URL on initial load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabFromUrl = urlParams.get('tab');
+    if (tabFromUrl === 'advanced' || tabFromUrl === 'basics') {
+      setActiveTab(tabFromUrl);
+      setPrevActiveTab(tabFromUrl);
+    }
+  }, []);
 
 
 
@@ -590,54 +604,70 @@ function Settings() {
       value: 'basics',
       label: 'Basics',
       content: (
-        <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleBasicDragEnd}
-          >
-            <SortableContext items={basicIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {orderedBasicSettings.map((setting) => (
-                  <SortableSettingCard
-                    key={setting.id}
-                    setting={setting}
-                    onSettingClick={handleSettingClick}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
+        <motion.div
+          className="space-y-4 flex-1 h-full"
+          key="basics"
+          initial={{ x: getSettingsTabInitialX(prevActiveTab, 'basics') }}
+          animate={{ x: 0 }}
+          transition={SETTINGS_TAB_ANIMATION.transition}
+        >
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleBasicDragEnd}
+            >
+              <SortableContext items={basicIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {orderedBasicSettings.map((setting) => (
+                    <SortableSettingCard
+                      key={setting.id}
+                      setting={setting}
+                      onSettingClick={handleSettingClick}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        </motion.div>
       )
     },
     {
       value: 'advanced',
       label: 'Advanced',
       content: (
-        <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleAdvancedDragEnd}
-          >
-            <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {orderedAdvancedSettings.map((setting) => (
-                  <SortableSettingCard
-                    key={setting.id}
-                    setting={setting}
-                    onSettingClick={handleSettingClick}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
+        <motion.div
+          className="space-y-4 flex-1 h-full"
+          key="advanced"
+          initial={{ x: getSettingsTabInitialX(prevActiveTab, 'advanced') }}
+          animate={{ x: 0 }}
+          transition={SETTINGS_TAB_ANIMATION.transition}
+        >
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleAdvancedDragEnd}
+            >
+              <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {orderedAdvancedSettings.map((setting) => (
+                    <SortableSettingCard
+                      key={setting.id}
+                      setting={setting}
+                      onSettingClick={handleSettingClick}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        </motion.div>
       )
     }
   ];
@@ -652,6 +682,10 @@ function Settings() {
         tabs={mainSettingsTabs}
         defaultValue="basics"
         basePath="/settings"
+        onValueChange={(value) => {
+          setPrevActiveTab(activeTab);
+          setActiveTab(value as 'basics' | 'advanced');
+        }}
       />
 
 

@@ -7,6 +7,7 @@ import { faUser } from "@fortawesome/free-solid-svg-icons";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
 import { Team } from "@/store/types";
+import { Role } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 
 // Extended User type based on actual API data structure
@@ -45,6 +46,7 @@ function Users() {
   // Redux state for related data
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
+  const { value: roles, loading: rolesLoading } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
@@ -57,13 +59,10 @@ function Users() {
     searchQuery,
     setSearchQuery,
     handleSearch,
-    createItem,
     updateItem,
     deleteItem,
     isSubmitting,
     formError,
-    isCreateDialogOpen,
-    setIsCreateDialogOpen,
     isEditDialogOpen,
     setIsEditDialogOpen,
     isDeleteDialogOpen,
@@ -87,6 +86,9 @@ function Users() {
     
     // Load job positions (needed for dropdown/labels)
     dispatch((genericActions as any).jobPositions.getFromIndexedDB());
+    
+    // Load roles (needed for invitation form)
+    dispatch((genericActions as any).roles.getFromIndexedDB());
   }, [dispatch]);
 
   // Form state for controlled components
@@ -262,52 +264,28 @@ function Users() {
     </div>
   );
 
-  // Create form state
-  const [createFormData, setCreateFormData] = useState<{
-    name: string;
-    email: string;
+  // Invitation dialog state
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [inviteFormData, setInviteFormData] = useState<{
     team_id: string;
+    role_id: string;
     job_position_id: string;
-    organization_name: string;
-    is_admin: boolean;
-    has_active_subscription: boolean;
   }>({
-    name: '',
-    email: '',
     team_id: '',
-    job_position_id: '',
-    organization_name: '',
-    is_admin: false,
-    has_active_subscription: false
+    role_id: '',
+    job_position_id: ''
   });
 
-  // Create submit handler
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const payload: Omit<UserData, 'id' | 'created_at' | 'updated_at' | 'deleted_at'> = {
-      name: createFormData.name,
-      email: createFormData.email,
-      team_id: createFormData.team_id ? Number(createFormData.team_id) : null,
-      job_position_id: createFormData.job_position_id ? Number(createFormData.job_position_id) : null,
-      role_id: null, // Not used in this form
-      organization_name: createFormData.organization_name || null,
-      is_admin: createFormData.is_admin,
-      has_active_subscription: createFormData.has_active_subscription,
-      url_picture: null
+    const payload: any = {
+      team_id: inviteFormData.team_id ? Number(inviteFormData.team_id) : null,
+      role_id: inviteFormData.role_id ? Number(inviteFormData.role_id) : null,
+      job_position_id: inviteFormData.job_position_id ? Number(inviteFormData.job_position_id) : null,
     };
-    await createItem(payload as any);
-
-    // Reset form after successful creation
-    setCreateFormData({
-      name: '',
-      email: '',
-      team_id: '',
-      job_position_id: '',
-      organization_name: '',
-      is_admin: false,
-      has_active_subscription: false
-    });
+    await dispatch((genericActions as any).invitations.addAsync(payload));
+    setIsInviteDialogOpen(false);
+    setInviteFormData({ team_id: '', role_id: '', job_position_id: '' });
   };
 
   // Edit submit handler
@@ -372,9 +350,9 @@ function Users() {
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
             Manage Job Positions
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+          <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
             <span className="mr-2 inline-flex items-center"><svg width="0" height="0" className="hidden" aria-hidden="true"></svg></span>
-            Add User
+            Create Invitation
           </Button>
         </div>
       }
@@ -390,75 +368,42 @@ function Users() {
         </div>
       </div>
 
-      {/* Create User Dialog */}
+      {/* Create Invitation Dialog */}
       <SettingsDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        open={isInviteDialogOpen}
+        onOpenChange={setIsInviteDialogOpen}
         type="create"
-        title="Add New User"
-        description="Create a new user account."
-        onSubmit={handleCreateSubmit}
+        title="Create Invitation"
+        description="Send an invitation with predefined team, role, and job position."
+        onSubmit={handleInviteSubmit}
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting}
       >
         <div className="grid gap-4">
-          <TextField
-            id="name"
-            label="Name"
-            value={createFormData.name}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
-            required
-          />
-          <TextField
-            id="email"
-            label="Email"
-            type="email"
-            value={createFormData.email}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
-            required
-          />
           <SelectField
-            id="team_id"
+            id="invite-team_id"
             label="Team"
-            value={createFormData.team_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, team_id: value }))}
+            value={inviteFormData.team_id}
+            onChange={(value) => setInviteFormData(prev => ({ ...prev, team_id: value }))}
             placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
-            options={teams.map((team: Team) => ({
-              value: team.id.toString(),
-              label: team.name
-            }))}
+            options={teams.map((team: Team) => ({ value: team.id.toString(), label: team.name }))}
           />
           <SelectField
-            id="job_position_id"
+            id="invite-role_id"
+            label="Role"
+            value={inviteFormData.role_id}
+            onChange={(value) => setInviteFormData(prev => ({ ...prev, role_id: value }))}
+            placeholder={rolesLoading && roles.length === 0 ? "Loading…" : "No Role"}
+            options={roles.map((r: Role) => ({ value: r.id.toString(), label: r.name }))}
+          />
+          <SelectField
+            id="invite-job_position_id"
             label="Job Position"
-            value={createFormData.job_position_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
+            value={inviteFormData.job_position_id}
+            onChange={(value) => setInviteFormData(prev => ({ ...prev, job_position_id: value }))}
             placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
-            options={jobPositions.map((jp: any) => ({
-              value: jp.id?.toString?.() ?? String(jp.id),
-              label: jp.title
-            }))}
-          />
-          <TextField
-            id="organization_name"
-            label="Organization"
-            value={createFormData.organization_name}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
-          />
-          <CheckboxField
-            id="is_admin"
-            label="Admin"
-            checked={createFormData.is_admin}
-            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
-            description="Grant admin role"
-          />
-          <CheckboxField
-            id="has_active_subscription"
-            label="Subscription"
-            checked={createFormData.has_active_subscription}
-            onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-            description="Active subscription"
+            options={jobPositions.map((jp: any) => ({ value: jp.id?.toString?.() ?? String(jp.id), label: jp.title }))}
           />
         </div>
       </SettingsDialog>

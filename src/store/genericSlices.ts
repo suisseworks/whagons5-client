@@ -52,7 +52,7 @@ const genericSliceConfigs = [
     { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','approval_type','require_all','minimum_approvals','trigger_type','trigger_status_id','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','is_active','updated_at'] },
     { name: 'approvalApprovers', table: 'wh_approval_approvers', endpoint: '/approval-approvers', store: 'approval_approvers', hashFields: ['id','approval_id','approver_type','approver_id','scope','scope_id','required','order_index','created_by','updated_at'] },
     { name: 'categoryPriorities', table: 'wh_category_priority', endpoint: '/category-priorities', store: 'category_priorities', hashFields: ['id','priority_id','category_id','sla_id','updated_at'] },
-    { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','updated_at'] },
+    { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','team_id','role_id','job_position_id','updated_at'] },
 
     // Activity & Logging
     { name: 'sessionLogs', table: 'wh_session_logs', endpoint: '/session-logs', store: 'session_logs', hashFields: ['id','user_id','action_type','ip_address','user_agent','description','device_data','updated_at'] },

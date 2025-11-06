@@ -11,7 +11,8 @@ import { genericActions } from '@/store/genericSlices';
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";
-import { AnimatePresence, motion, useAnimation } from "motion/react";
+import { motion } from "motion/react";
+import { WORKSPACE_SETTINGS_TAB_ANIMATION, getWorkspaceSettingsTabInitialX } from "@/config/tabAnimation";
 
 // Simplified module loading
 const loadRequiredModules = async () => {
@@ -65,8 +66,8 @@ interface WorkspaceInfo {
 }
 
 function Settings({ workspaceId }: { workspaceId?: string }) {
-  const [prevActiveTab, setPrevActiveTab] = useState('overview');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [prevActiveTab, setPrevActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('overview');
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const [workspaceOverview, setWorkspaceOverview] = useState<WorkspaceOverview | null>(null);
   const [workspaceFilters, setWorkspaceFilters] = useState<WorkspaceFilters | null>(null);
@@ -77,8 +78,6 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   // Using async actions for workspace operations
-
-  const overViewControls = useAnimation();
 
   // Get current workspace from Redux store (slice only; no fetching)
   const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
@@ -133,30 +132,23 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       .catch(console.error);
   }, []);
 
+  // Sync activeTab with URL on initial load
   useEffect(() => {
-    console.log('activeTab', activeTab);
-    console.log('prevActiveTab', prevActiveTab);
-
-    if (activeTab === 'overview' && prevActiveTab != 'overview') {
-      overViewControls.start({
-        x: ["-80vw", 0],
-        transition: {
-          duration: 0.25,
-          type: 'spring',
-          stiffness: 350,
-          damping: 18
-        }
-
-      }
-
-      );
-    } else if (activeTab === 'overview' && prevActiveTab === 'overview') {
-      overViewControls.start({ //set initial state
-        x: "0",
-      });
+    const path = location.pathname;
+    if (path.includes('/users')) {
+      setActiveTab('users');
+      setPrevActiveTab('users');
+    } else if (path.includes('/creation')) {
+      setActiveTab('filters');
+      setPrevActiveTab('filters');
+    } else if (path.includes('/display')) {
+      setActiveTab('display');
+      setPrevActiveTab('display');
+    } else {
+      setActiveTab('overview');
+      setPrevActiveTab('overview');
     }
-
-  }, [activeTab]);
+  }, [location.pathname]);
 
 
   // Fetch workspace overview data
@@ -349,9 +341,11 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       ),
       content: (
         <motion.div
-          className="mt-4 flex-1"
+          className="mt-4 flex-1 h-full"
           key="overview"
-          animate={overViewControls}
+          initial={{ x: getWorkspaceSettingsTabInitialX(prevActiveTab, 'overview') }}
+          animate={{ x: 0 }}
+          transition={WORKSPACE_SETTINGS_TAB_ANIMATION.transition}
         >
           <OverviewTab
             workspaceOverview={workspaceOverview}
@@ -378,9 +372,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
         <motion.div
           className="mt-4 flex-1 h-full"
           key="users"
-          exit={{ x: prevActiveTab === 'overview' ? "-80vw" : "80vw" }}
-          initial={{ x: prevActiveTab === 'overview' ? "80vw" : "-80vw" }}
+          initial={{ x: getWorkspaceSettingsTabInitialX(prevActiveTab, 'users') }}
           animate={{ x: 0 }}
+          transition={WORKSPACE_SETTINGS_TAB_ANIMATION.transition}
         >
           <UsersTab
             modulesLoaded={modulesLoaded}
@@ -402,9 +396,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
         <motion.div
           className="mt-4 flex-1 h-full"
           key="filters"
-          exit={{ x: "-80vw" }}
-          initial={{ x: "80vw" }}
+          initial={{ x: getWorkspaceSettingsTabInitialX(prevActiveTab, 'filters') }}
           animate={{ x: 0 }}
+          transition={WORKSPACE_SETTINGS_TAB_ANIMATION.transition}
         >
           <CreationTab
             modulesLoaded={modulesLoaded}
@@ -427,9 +421,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
         <motion.div
           className="mt-4 flex-1 h-full"
           key="display"
-          exit={{ x: "-80vw" }}
-          initial={{ x: "80vw" }}
+          initial={{ x: getWorkspaceSettingsTabInitialX(prevActiveTab, 'display') }}
           animate={{ x: 0 }}
+          transition={WORKSPACE_SETTINGS_TAB_ANIMATION.transition}
         >
           {/* Display options */}
           <div className="mb-4 p-3 border rounded-md bg-background">
