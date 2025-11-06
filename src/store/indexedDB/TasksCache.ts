@@ -829,6 +829,10 @@ export class TasksCache {
      * Apply sorting to tasks array
      */
     private static applySorting(tasks: Task[], sortModel: Array<{ colId: string; sort: string }>): Task[] {
+        if (!sortModel || sortModel.length === 0) {
+            return tasks;
+        }
+        
         return tasks.sort((a, b) => {
             for (const sort of sortModel) {
                 const { colId, sort: direction } = sort;
@@ -842,17 +846,39 @@ export class TasksCache {
                     comparison = bValue === null || bValue === undefined ? 0 : -1;
                 } else if (bValue === null || bValue === undefined) {
                     comparison = 1;
-                } else if (typeof aValue === 'string' && typeof bValue === 'string') {
-                    comparison = aValue.localeCompare(bValue);
-                } else if (aValue instanceof Date || bValue instanceof Date) {
-                    const aDate = new Date(aValue);
-                    const bDate = new Date(bValue);
-                    comparison = aDate.getTime() - bDate.getTime();
                 } else {
-                    comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                    // Check if this is a date field (ends with _at or _date) or is a date string
+                    const isDateField = colId.endsWith('_at') || colId.endsWith('_date') || 
+                                       (typeof aValue === 'string' && !isNaN(Date.parse(aValue)) && !isNaN(Date.parse(bValue)));
+                    
+                    if (isDateField) {
+                        // Convert to Date objects for proper comparison
+                        const aDate = new Date(aValue);
+                        const bDate = new Date(bValue);
+                        const aTime = aDate.getTime();
+                        const bTime = bDate.getTime();
+                        
+                        // Check for invalid dates
+                        if (isNaN(aTime) || isNaN(bTime)) {
+                            // Fallback to string comparison if dates are invalid
+                            comparison = String(aValue).localeCompare(String(bValue));
+                        } else {
+                            comparison = aTime - bTime;
+                        }
+                    } else if (typeof aValue === 'string' && typeof bValue === 'string') {
+                        comparison = aValue.localeCompare(bValue);
+                    } else if (aValue instanceof Date || bValue instanceof Date) {
+                        const aDate = new Date(aValue);
+                        const bDate = new Date(bValue);
+                        comparison = aDate.getTime() - bDate.getTime();
+                    } else {
+                        comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                    }
                 }
                 
                 if (comparison !== 0) {
+                    // For desc: newer dates (larger timestamps) should come first
+                    // If comparison > 0, a is newer than b, so for desc we want a first (return negative)
                     return direction === 'desc' ? -comparison : comparison;
                 }
             }

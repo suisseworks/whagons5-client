@@ -83,6 +83,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   searchText?: string;
   onFiltersChanged?: (active: boolean) => void;
   onSelectionChanged?: (selectedIds: number[]) => void;
+  onRowClicked?: (task: any) => void;
   rowHeight?: number;
   groupBy?: 'none' | 'spot_id' | 'status_id' | 'priority_id';
   collapseGroups?: boolean;
@@ -94,6 +95,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   searchText = '',
   onFiltersChanged,
   onSelectionChanged,
+  onRowClicked,
   rowHeight,
   groupBy = 'none',
   collapseGroups = true,
@@ -273,6 +275,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           if (!TasksCache.initialized) await TasksCache.init();
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          // Default sort by created_at desc
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
           const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
           const totalFiltered = countResp?.rowCount ?? 0;
           const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
@@ -295,6 +299,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           // Build minimal params equivalent to the grid query
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          // Default sort by created_at desc
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
 
           const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: result.totalFiltered });
           setClientRows(rowsResp?.rows || []);
@@ -475,6 +481,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         const mergedFm = { ...(activeFm || {}), ...(externalFilterModelRef.current || {}) };
         const normalizedFm = normalizeFilterModelForQuery(mergedFm);
         baseParams.filterModel = normalizedFm;
+        // Get sort model from grid and pass to query
+        const sortModel = gridRef.current.api.getSortModel?.() || [];
+        if (sortModel.length > 0) {
+          baseParams.sortModel = sortModel;
+        } else {
+          // Default to created_at desc if no sort is set
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
+        }
         console.log('[WT Filters] refreshGrid client-side baseParams.filterModel:', normalizedFm);
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
@@ -522,13 +536,37 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
     suppressPersistRef.current = true;
 
+    // Set default sort by created_at descending if no sort is already applied
+    // This must be done BEFORE setting datasource for infinite mode to ensure it's included in the first query
+    try {
+      const currentSort = params.api.getSortModel?.() || [];
+      if (currentSort.length === 0) {
+        params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+      }
+    } catch {}
+
     if (!useClientSide) {
+      // Set sort again to ensure it's applied (in case the first call didn't work)
+      try {
+        const sortModel = params.api.getSortModel?.() || [];
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
+          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        }
+      } catch {}
+      
       const ds = { rowCount: undefined, getRows };
       params.api.setGridOption('datasource', ds);
       console.log('[WT Filters] onGridReady refreshing infinite cache');
       params.api.refreshInfiniteCache();
     } else {
       console.log('[WT Filters] onGridReady client-side refresh');
+      // Ensure sort is set before refreshing
+      try {
+        const sortModel = params.api.getSortModel?.() || [];
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
+          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        }
+      } catch {}
       refreshGrid();
     }
 
@@ -640,6 +678,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             const ids = rows.map((r: any) => Number(r.id)).filter((n: any) => Number.isFinite(n));
             onSelectionChanged(ids);
           } catch { onSelectionChanged([] as number[]); }
+        }}
+        onRowClicked={(e: any) => {
+          if (onRowClicked && e?.data) {
+            onRowClicked(e.data);
+          }
         }}
         animateRows={true}
         suppressColumnVirtualisation={true}

@@ -295,31 +295,45 @@
 }
 
 .ag-theme-quartz {
-  --ag-background-color: var(--color-background);
+  --ag-background-color: #fafafa;
   --ag-foreground-color: var(--color-foreground);
   /* Modern header styling */
-  --ag-header-background-color: oklch(from var(--color-muted) l calc(l - 0.03) c h); /* subtle tinted bg */
+  --ag-header-background-color: #fafafa; /* subtle tinted bg */
   --ag-header-foreground-color: var(--color-foreground);
   --ag-header-column-resize-handle-color: var(--color-border);
-  --ag-odd-row-background-color: var(--color-muted);
-  --ag-row-border-color: var(--color-border);
+  --ag-odd-row-background-color: #fafafa;
+  --ag-row-border-color: transparent;
   /* Light gray selection (pure neutral, no tint) */
-  --ag-selected-row-background-color: hsl(0 0% 95%);
+  --ag-selected-row-background-color: #f0f0f0;
   --ag-range-selection-border-color: var(--color-accent);
   --ag-input-focus-border-color: var(--color-ring);
-  --ag-border-color: var(--color-border);
-  --ag-secondary-border-color: var(--color-border);
+  --ag-border-color: rgba(0,0,0,0.06);
+  --ag-secondary-border-color: rgba(0,0,0,0.06);
   --ag-accent-color: var(--color-primary);
-  --ag-icon-color: var(--color-foreground);
-  --ag-header-cell-hover-background-color: var(--color-secondary);
-  --ag-row-hover-color: var(--color-secondary);
-  --ag-column-hover-color: var(--color-secondary);
-  --ag-header-column-hover-color: var(--color-secondary);
+  --ag-icon-color: #6b7280;
+  --ag-header-cell-hover-background-color: #f5f5f5;
+  --ag-row-hover-color: #f5f5f5;
+  --ag-column-hover-color: #f5f5f5;
+  --ag-header-column-hover-color: #f5f5f5;
   --ag-input-disabled-background-color: oklch(from var(--color-background) l calc(l + 0.02) c h); /* Slightly lighter background */
   --ag-font-family: inherit; /* Use app's font */
   --ag-font-size: inherit; /* Use app's font size */
   --ag-grid-size: var(--radius-sm); /* Controls spacing/padding, link to radius */
   --ag-border-radius: var(--radius-md);
+}
+
+.dark .ag-theme-quartz {
+  --ag-background-color: #1a1a1a;
+  --ag-header-background-color: #1a1a1a;
+  --ag-odd-row-background-color: #1a1a1a;
+  --ag-selected-row-background-color: #2a2a2a;
+  --ag-border-color: rgba(255,255,255,0.08);
+  --ag-secondary-border-color: rgba(255,255,255,0.08);
+  --ag-icon-color: #9ca3af;
+  --ag-header-cell-hover-background-color: #222222;
+  --ag-row-hover-color: #222222;
+  --ag-column-hover-color: #222222;
+  --ag-header-column-hover-color: #222222;
 }
 
 /* Cleaner workspace grid: remove heavy borders/lines */
@@ -544,31 +558,33 @@
 /* Row as card: rounded, subtle elevation, divider-less */
 .wh-modern-grid .ag-center-cols-container .ag-row {
   /* Use horizontal margins only to avoid AG Grid row stacking issues */
-  margin: 0 8px 8px 8px;
-  border-radius: 8px;
-  background-color: var(--color-card);
-  border: 1px solid rgba(255,255,255,0.08);
+  margin: 0 8px 2px 8px;
+  border-radius: 0;
+  background-color: #fafafa;
+  border: none;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
   /* Remove all inset/left shadows to avoid glow on selection */
   box-shadow: none !important;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row {
-  background-color: #252b36;
-  border: 1px solid rgba(255,255,255,0.08);
+  background-color: #1a1a1a;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   box-shadow: none !important;
 }
 
 /* Hover and selection polish */
 .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  background-color: rgba(255,255,255,0.04) !important;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  background-color: #f5f5f5 !important;
+  box-shadow: none;
   transform: none;
 }
 
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: rgba(255,255,255,0.06) !important;
-  border-color: rgba(255,255,255,0.12);
+  background-color: #f0f0f0 !important;
+  border-color: transparent;
   box-shadow: none !important;
 }
 
@@ -579,13 +595,13 @@
 
 /* Dark mode: use darker, higher-contrast selection and hover */
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  background-color: rgba(255,255,255,0.04) !important;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+  background-color: #222222 !important;
+  box-shadow: none;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: rgba(255,255,255,0.06) !important;
-  border-color: rgba(255,255,255,0.12);
+  background-color: #2a2a2a !important;
+  border-color: transparent;
   box-shadow: none !important;
 }
 
@@ -595,11 +611,16 @@
 
 /* Reduce gridlines and header chrome */
 .wh-modern-grid .ag-header {
-  background: transparent;
-  border-bottom: none;
+  background: #fafafa;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.dark .wh-modern-grid .ag-header {
+  background: #1a1a1a;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .wh-modern-grid .ag-header .ag-header-cell,
@@ -609,7 +630,8 @@
 
 /* Compact, friendly cell paddings */
 .wh-modern-grid .ag-cell {
-  padding-block: 12px;
+  padding-block: 10px;
+  padding-inline: 12px;
 }
 
 /* Make status cells stand out slightly */
@@ -619,10 +641,15 @@
 
 /* Column header typography for workspace grid */
 .wh-modern-grid .ag-header-cell-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: #9CA3AF;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  letter-spacing: 0.3px;
+  text-transform: none;
+}
+
+.dark .wh-modern-grid .ag-header-cell-text {
+  color: #9ca3af;
 }
 
 /* Make drag handles and resize lines subtle */
@@ -634,29 +661,30 @@
 /* Zebra striping: very subtle alternate row background */
 .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
   /* Lighter, subtle striping for light mode */
-  background-color: oklch(from var(--color-muted) l c h / 0.22);
+  background-color: #fafafa;
 }
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
-  background-color: oklch(from var(--color-muted) l calc(l - 0.10) c h / 0.25);
+  background-color: #1a1a1a;
 }
 
 /* Ensure striping is visible even if cells paint their own backgrounds */
 .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n):not(:hover) .ag-cell {
-  background-color: oklch(from var(--color-muted) l c h / 0.22);
+  background-color: transparent;
 }
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n):not(:hover) .ag-cell {
-  background-color: oklch(from var(--color-muted) l calc(l - 0.10) c h / 0.25);
+  background-color: transparent;
 }
 
 /* Soft blurred header strip to separate from content without hard border */
 .wh-modern-grid .ag-header-viewport {
-  backdrop-filter: saturate(1.1) blur(4px);
-  background: linear-gradient(
-    to bottom,
-    oklch(from var(--color-background) l calc(l + 0.02) c h / 0.75),
-    oklch(from var(--color-background) l c h / 0.55)
-  );
-  border-bottom: 1px solid oklch(from var(--color-border) l calc(l - 0.02) c h / 0.6);
+  backdrop-filter: none;
+  background: #fafafa;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.dark .wh-modern-grid .ag-header-viewport {
+  background: #1a1a1a;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 /* Better keyboard focus ring on cells */

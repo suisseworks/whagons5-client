@@ -71,6 +71,8 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     maxBlocksInCache: 10,
     getRowId: (params: any) => String(params.data.id),
   }),
+  // Default sort by created_at descending (newest first)
+  sortModel: [{ colId: 'created_at', sort: 'desc' }],
   animateRows: true,
   suppressColumnVirtualisation: true,
   suppressNoRowsOverlay: false,

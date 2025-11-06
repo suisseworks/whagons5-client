@@ -5,23 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addTaskAsync } from '@/store/reducers/tasksSlice';
+import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 
-interface CreateTaskDialogProps {
+interface EditTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workspaceId: number;
+  task: any | null;
 }
 
-export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: CreateTaskDialogProps) {
+export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDialogProps) {
   const dispatch = useDispatch<AppDispatch>();
 
   const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
@@ -29,23 +28,26 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
   const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
   const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
-  const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
   const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
   const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
   const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
   const { value: approvals = [] } = useSelector((s: RootState) => (s as any).approvals || { value: [] });
 
+  const workspaceId = task?.workspace_id ? Number(task.workspace_id) : null;
   const currentWorkspace = workspaces.find((w: any) => w.id === workspaceId);
 
-  const workspaceCategories = useMemo(() => categories.filter((c: any) => c.workspace_id === workspaceId), [categories, workspaceId]);
+  const workspaceCategories = useMemo(() => {
+    if (!workspaceId) return [];
+    return categories.filter((c: any) => c.workspace_id === workspaceId);
+  }, [categories, workspaceId]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [priorityId, setPriorityId] = useState<number | null>(null);
   const [spotId, setSpotId] = useState<number | null>(null);
-  const [templateId, setTemplateId] = useState<number | null>(null);
+  const [statusId, setStatusId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState<string>('');
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,12 +55,6 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const [slaId, setSlaId] = useState<number | null>(null);
   const [approvalId, setApprovalId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
-
-  const categoryInitialStatusId = useMemo(() => {
-    // Statuses are global; pick the one marked initial, otherwise first available
-    const initial = (statuses || []).find((s: any) => s.initial === true);
-    return (initial || statuses[0])?.id || null;
-  }, [statuses]);
 
   const derivedTeamId = useMemo(() => {
     if (!categoryId) return null;
@@ -92,29 +88,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     return priorities.filter((p: any) => p.category_id === categoryId);
   }, [priorities, categoryId]);
 
-  // Keep selectedPriority derivation available for future inline display needs
-  // const selectedPriority = useMemo(() => {
-  //   return categoryPriorities.find((p: any) => p.id === priorityId) || null;
-  // }, [categoryPriorities, priorityId]);
-
-  const workspaceTemplates = useMemo(() => {
-    // Only show templates for workspaces of type "DEFAULT"
-    if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
-      return [];
-    }
-
-    // Templates are matched to workspace by category_id
-    return templates.filter((template: any) => {
-      if (template?.enabled === false) return false;
-      return template.category_id === currentWorkspace.category_id;
-    });
-  }, [templates, currentWorkspace]);
-
   const workspaceUsers = useMemo(() => {
+    if (!workspaceId) return [];
     return users.filter((u: any) => !u.workspace_id || u.workspace_id === workspaceId);
   }, [users, workspaceId]);
 
   const workspaceSpots = useMemo(() => {
+    if (!workspaceId) return [];
     // Filter spots by spotType.workspace_id when available
     const typeById = new Map(spotTypes.map((st: any) => [st.id, st]));
     return spots.filter((s: any) => {
@@ -123,63 +103,31 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     });
   }, [spots, spotTypes, workspaceId]);
 
+  const availableStatuses = useMemo(() => {
+    if (!categoryId) return [];
+    return statuses.filter((s: any) => {
+      // Filter statuses that belong to the same category or are global
+      return !s.category_id || s.category_id === categoryId;
+    });
+  }, [statuses, categoryId]);
+
+  // Load task data when dialog opens or task changes
   useEffect(() => {
-    // Prefill defaults when panel opens
-    if (open) {
-      setDescription('');
-      setSpotId(null);
-      setSelectedUserIds([]);
-      setDueDate('');
+    if (open && task) {
+      setName(task.name || '');
+      setDescription(task.description || '');
+      setCategoryId(task.category_id ? Number(task.category_id) : null);
+      setPriorityId(task.priority_id ? Number(task.priority_id) : null);
+      setSpotId(task.spot_id ? Number(task.spot_id) : null);
+      setStatusId(task.status_id ? Number(task.status_id) : null);
+      setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
+      setSelectedUserIds(Array.isArray(task.user_ids) ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n)) : []);
+      setSlaId(task.sla_id ? Number(task.sla_id) : null);
+      setApprovalId(task.approval_id ? Number(task.approval_id) : null);
       setIsSubmitting(false);
-      setSlaId(null);
-      setApprovalId(null);
       setActiveTab('basic');
-
-      // Choose first template and derive defaults
-      const firstTemplate = workspaceTemplates[0];
-      if (firstTemplate) {
-        setTemplateId(firstTemplate.id);
-        setCategoryId(firstTemplate.category_id || null);
-        setPriorityId(firstTemplate.default_priority || null);
-        // Set name automatically from template
-        setName(firstTemplate.name || '');
-        setSlaId(firstTemplate.sla_id || null);
-        setApprovalId(firstTemplate.approval_id || null);
-      } else {
-        setTemplateId(null);
-        setName('');
-        // fall back to first category in workspace if no templates
-        const defaultCategory = workspaceCategories[0];
-        setCategoryId(defaultCategory ? defaultCategory.id : null);
-        setPriorityId(null);
-      }
     }
-  }, [open, workspaceCategories, workspaceTemplates]);
-
-  useEffect(() => {
-    // When template changes, derive category/priority defaults and set name automatically
-    if (templateId) {
-      const t = workspaceTemplates.find((x: any) => x.id === templateId);
-      if (t) {
-        setCategoryId(t.category_id || null);
-        setPriorityId(t.default_priority || null);
-        setName(t.name || ''); // Always set name from template
-        setSlaId(t.sla_id || null);
-        setApprovalId(t.approval_id || null);
-      }
-    }
-  }, [templateId, workspaceTemplates]);
-
-  useEffect(() => {
-    // When category changes without template default, set a reasonable default priority
-    if (categoryId && !priorityId) {
-      const firstPriority = categoryPriorities[0]?.id ?? null;
-      setPriorityId(firstPriority);
-    }
-    if (!categoryId) {
-      setPriorityId(null);
-    }
-  }, [categoryId]);
+  }, [open, task]);
 
   const canSubmit = useMemo(() => {
     return Boolean(
@@ -187,44 +135,33 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
       workspaceId &&
       categoryId &&
       derivedTeamId &&
-      categoryInitialStatusId &&
-      (priorityId || categoryPriorities.length === 0)
+      statusId &&
+      (priorityId || categoryPriorities.length === 0) &&
+      task?.id
     );
-  }, [name, workspaceId, categoryId, derivedTeamId, categoryInitialStatusId, priorityId, categoryPriorities.length]);
+  }, [name, workspaceId, categoryId, derivedTeamId, statusId, priorityId, categoryPriorities.length, task?.id]);
 
   const handleSubmit = async () => {
-    if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId) return;
+    if (!canSubmit || !categoryId || !derivedTeamId || !statusId || !task?.id) return;
     try {
       setIsSubmitting(true);
-      const payload: any = {
+      const updates: any = {
         name: name.trim(),
         description: description.trim() || null,
-        workspace_id: workspaceId,
         category_id: categoryId,
         team_id: derivedTeamId,
-        template_id: templateId,
         spot_id: spotId,
-        status_id: categoryInitialStatusId,
+        status_id: statusId,
         priority_id: priorityId ?? 0,
         sla_id: slaId,
         approval_id: approvalId,
-        start_date: null,
         due_date: dueDate || null,
-        expected_duration: (() => {
-          const t = workspaceTemplates.find((x: any) => x.id === templateId);
-          const v = t?.expected_duration ?? t?.default_duration ?? 0;
-          return Number.isFinite(v) ? v : 0;
-        })(),
-        response_date: null,
-        resolution_date: null,
-        work_duration: 0,
-        pause_duration: 0,
         user_ids: (Array.isArray(selectedUserIds) && selectedUserIds.length > 0)
           ? selectedUserIds.map((id) => parseInt(String(id), 10)).filter((n) => Number.isFinite(n))
           : [],
       };
 
-      await dispatch(addTaskAsync(payload)).unwrap();
+      await dispatch(updateTaskAsync({ id: Number(task.id), updates })).unwrap();
       onOpenChange(false);
     } catch (e) {
       // Error is handled by slice; keep dialog open for correction
@@ -233,42 +170,23 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     }
   };
 
+  if (!task) return null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[1000px] sm:w-[1200px] overflow-auto">
         <SheetHeader className="pb-6 mb-6 border-b px-6">
-          <SheetTitle className="text-xl font-semibold mb-2">Create New Task</SheetTitle>
-          <SheetDescription className="text-sm">Create a task from a template with all necessary details.</SheetDescription>
+          <SheetTitle className="text-xl font-semibold mb-2">Edit Task</SheetTitle>
+          <SheetDescription className="text-sm">Update task details and configuration.</SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 px-6">
-          {/* Template Selection */}
+          {/* Task Name */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Template *</Label>
-            <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder={
-                  !currentWorkspace || currentWorkspace.type !== "DEFAULT"
-                    ? 'Templates only available for default workspaces'
-                    : workspaceTemplates.length
-                      ? 'Select template'
-                      : 'No templates available'
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {workspaceTemplates.map((t: any) => (
-                  <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!workspaceTemplates.length && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {!currentWorkspace || currentWorkspace.type !== "DEFAULT"
-                  ? 'Templates are only available for default workspaces.'
-                  : 'No templates available in this workspace. Enable or create templates first.'
-                }
-              </p>
-            )}
+            <Label className="text-sm font-medium">Task Name</Label>
+            <div className="text-sm py-2.5 px-3 border rounded-md bg-muted/50">
+              {name || 'N/A'}
+            </div>
           </div>
 
           {/* Additional Details Tabs */}
@@ -367,6 +285,23 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                   </div>
                 )}
 
+                {/* Status */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Status *</Label>
+                  <Select value={statusId ? String(statusId) : undefined} onValueChange={(v) => setStatusId(parseInt(v, 10))}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStatuses.map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Due Date */}
                 <div className="space-y-3">
                   <Label htmlFor="due" className="text-sm font-medium">Due Date</Label>
@@ -429,7 +364,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                 Cancel
               </Button>
               <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="h-9 px-5">
-                {isSubmitting ? 'Creating...' : 'Create Task'}
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </div>
@@ -438,5 +373,4 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     </Sheet>
   );
 }
-
 

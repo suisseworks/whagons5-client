@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CalendarDays, MapPin, Flag } from 'lucide-react';
+import { MapPin, Flag } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
@@ -63,7 +63,7 @@ export function buildWorkspaceColumns(opts: any) {
   const cols = ([
     {
       field: 'name',
-      headerName: 'Task',
+      headerName: 'Name',
       flex: 3,
       filter: false,
       wrapText: true,
@@ -73,17 +73,17 @@ export function buildWorkspaceColumns(opts: any) {
         const description = p.data?.description || '';
         const cat = (opts as any)?.categoryMap?.[Number(p.data?.category_id)];
         return (
-          <div className="flex flex-col gap-0.5 py-0.5">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-1 py-1.5">
+            <div className="flex items-center gap-2.5">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
-              <div className="font-semibold text-[18px] leading-[1.6] tracking-[-0.01em] cursor-default text-[#0f172a] dark:text-white">{name}</div>
+              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white">{name}</div>
             </div>
             {showDescriptions && description && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="wh-task-desc mt-1 pl-6 text-[13px] leading-relaxed text-[#6b7280] dark:text-muted-foreground"
+                      className="wh-task-desc mt-0.5 pl-7 text-[12px] leading-relaxed text-[#6b7280] dark:text-muted-foreground"
                       style={{
                         whiteSpace: 'normal',
                         display: '-webkit-box',
@@ -201,7 +201,7 @@ export function buildWorkspaceColumns(opts: any) {
     },
     {
       field: 'user_ids',
-      headerName: 'Responsible',
+      headerName: 'Owner',
       width: 140,
       filter: false,
       cellRenderer: (p: any) => {
@@ -209,12 +209,12 @@ export function buildWorkspaceColumns(opts: any) {
         const userIds = p.data?.user_ids;
         if (userIds == null) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const users = getUsersFromIds(userIds, userMap) || [];
-        if (users.length === 0) return (<div className="flex items-center h-full py-2"><div className="text-sm text-muted-foreground">No users assigned</div></div>);
+        if (users.length === 0) return (<div className="flex items-center h-full py-2"><div className="text-[12px] text-muted-foreground">—</div></div>);
         const displayUsers = users.slice(0, 3);
         const remainingCount = users.length - displayUsers.length;
         return (
-          <div className="flex items-center h-full py-0.5 gap-2">
-            <div className="flex items-center -space-x-2">
+          <div className="flex items-center h-full py-1 gap-2">
+            <div className="flex items-center -space-x-1.5">
               {displayUsers.map((user: any) => (
                 <HoverPopover key={user.id} content={(
                   <div className="flex flex-col items-center gap-3">
@@ -224,14 +224,14 @@ export function buildWorkspaceColumns(opts: any) {
                     <span className="text-base font-medium text-popover-foreground text-center">{getUserDisplayName(user)}</span>
                   </div>
                 )}>
-                  <Avatar className="h-7 w-7 border-2 transition-colors cursor-pointer bg-muted text-foreground" title={getUserDisplayName(user)} style={{ borderColor: '#e5e7eb' }}>
+                  <Avatar className="h-6 w-6 border transition-colors cursor-pointer bg-muted text-foreground" title={getUserDisplayName(user)} style={{ borderColor: '#e5e7eb' }}>
                     <UserInitial user={user} />
                   </Avatar>
                 </HoverPopover>
               ))}
               {remainingCount > 0 && (
-                <div className="h-7 w-7 rounded-full bg-muted border-2 flex items-center justify-center" style={{ borderColor: '#e5e7eb' }}>
-                  <span className="text-[10px] text-muted-foreground font-medium">+{remainingCount}</span>
+                <div className="h-6 w-6 rounded-full bg-muted border flex items-center justify-center" style={{ borderColor: '#e5e7eb' }}>
+                  <span className="text-[9px] text-muted-foreground font-medium">+{remainingCount}</span>
                 </div>
               )}
             </div>
@@ -250,7 +250,7 @@ export function buildWorkspaceColumns(opts: any) {
         if (!dueDate) {
           return (
             <div className="flex items-center h-full py-2">
-              <span className="text-[13px] text-muted-foreground">No due date</span>
+              <span className="text-[12px] text-muted-foreground">—</span>
             </div>
           );
         }
@@ -261,11 +261,9 @@ export function buildWorkspaceColumns(opts: any) {
         const urgent = !isOverdue && daysDiff <= 2;
         const colorCls = isOverdue ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-muted-foreground';
         const inner = (
-          <div className="flex items-center h-full py-2 gap-2">
+          <div className="flex items-center h-full py-2">
             <span className={`inline-flex items-center ${colorCls}`}>
-              <span className="inline-block h-2 w-2 rounded-full mr-2" aria-hidden style={{ backgroundColor: isOverdue ? '#dc2626' : urgent ? '#d97706' : '#9ca3af' }} />
-              <CalendarDays className="h-4 w-4 mr-2" aria-hidden={true} style={{ color: '#8B5CF6' }} />
-              <span className="text-[13px] font-medium">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
+              <span className="text-[12px]">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
             </span>
           </div>
         );
@@ -278,9 +276,9 @@ export function buildWorkspaceColumns(opts: any) {
           </TooltipProvider>
         );
       },
-      width: 140,
-      minWidth: 140,
-      maxWidth: 180,
+      width: 120,
+      minWidth: 100,
+      maxWidth: 160,
     },
     {
       field: 'spot_id',
@@ -306,13 +304,13 @@ export function buildWorkspaceColumns(opts: any) {
       },
       cellRenderer: (p: any) => {
         if (!spotsLoaded) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
-        if (p.value == null) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
+        if (p.value == null) return (<div className="flex items-center h-full py-2"><span className="text-[12px] text-muted-foreground">—</span></div>);
         const meta: any = spotMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
         const tag = (
-          <div className="inline-flex items-center gap-2 text-[13px] text-muted-foreground">
-            <MapPin className="h-4 w-4 mr-2" style={{ color: '#6366F1' }} />
+          <div className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" style={{ color: '#9ca3af' }} />
             <span className="truncate max-w-[160px]">{name}</span>
           </div>
         );
@@ -321,7 +319,51 @@ export function buildWorkspaceColumns(opts: any) {
         );
       },
       flex: 2,
-      minWidth: 220,
+      minWidth: 180,
+    },
+    {
+      field: 'created_at',
+      colId: 'created_at',
+      headerName: 'Last modified',
+      sortable: true,
+      filter: false,
+      comparator: (valueA: any, valueB: any) => {
+        // Proper date comparison for AG Grid client-side sorting
+        if (!valueA && !valueB) return 0;
+        if (!valueA) return -1;
+        if (!valueB) return 1;
+        const dateA = new Date(valueA).getTime();
+        const dateB = new Date(valueB).getTime();
+        // Return negative if dateA is newer (for descending sort, newer should come first)
+        return dateA - dateB;
+      },
+      cellRenderer: (p: any) => {
+        const createdAt = p.data?.created_at;
+        if (!createdAt) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="text-[12px] text-muted-foreground">—</span>
+            </div>
+          );
+        }
+        const d = dayjs(createdAt);
+        const inner = (
+          <div className="flex items-center h-full py-2">
+            <span className="text-[12px] text-muted-foreground">{d.fromNow()}</span>
+          </div>
+        );
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>{inner}</TooltipTrigger>
+              <TooltipContent side="top">{d.format('MMM D, YYYY [at] h:mm A')}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+      width: 120,
+      minWidth: 100,
+      maxWidth: 160,
     },
   ]);
 
