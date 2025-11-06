@@ -73,8 +73,10 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   }),
   // Default sort by created_at descending (newest first)
   sortModel: [{ colId: 'created_at', sort: 'desc' }],
-  animateRows: true,
+  animateRows: false, // Disabled for scroll performance
   suppressColumnVirtualisation: true,
   suppressNoRowsOverlay: false,
   loading: false,
+  suppressScrollOnNewData: true, // Prevent scroll jumps
+  debounceVerticalScrollbar: true, // Debounce scrollbar updates
 });

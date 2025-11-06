@@ -684,10 +684,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             onRowClicked(e.data);
           }
         }}
-        animateRows={true}
+        animateRows={false}
         suppressColumnVirtualisation={true}
         suppressNoRowsOverlay={false}
         loading={false}
+        suppressScrollOnNewData={true}
+        suppressAnimationFrame={false}
       />
     </Suspense>
   );

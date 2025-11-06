@@ -195,8 +195,8 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* Smooth transitions for interactive elements */
-  button, [role="button"], a, input, select, textarea, .ag-row, .ag-cell {
+  /* Smooth transitions for interactive elements - exclude grid cells for scroll performance */
+  button, [role="button"], a, input, select, textarea {
     transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
                 color 150ms cubic-bezier(0.4, 0, 0.2, 1),
                 border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -553,6 +553,24 @@
   --ag-row-border-color: transparent;
   --ag-border-color: transparent;
   --ag-secondary-border-color: transparent;
+  /* Optimize scrolling performance */
+  --ag-scroll-bar-size: 8px;
+}
+
+/* Optimize grid container for smooth scrolling */
+.wh-modern-grid .ag-body-viewport {
+  will-change: scroll-position;
+  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
+  /* Prevent border rendering issues during scroll */
+  contain: layout style paint;
+}
+
+.wh-modern-grid .ag-center-cols-container {
+  will-change: transform;
+  transform: translateZ(0);
+  /* Optimize rendering */
+  contain: layout style;
 }
 
 /* Row as card: rounded, subtle elevation, divider-less */
@@ -565,7 +583,14 @@
   border-bottom: 1px solid rgba(0,0,0,0.06);
   /* Remove all inset/left shadows to avoid glow on selection */
   box-shadow: none !important;
-  transition: background-color 0.15s ease;
+  /* GPU acceleration for smooth scrolling */
+  will-change: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Only transition on hover, not during scroll */
+  transition: none;
+  /* Optimize row rendering - use contain for better performance */
+  contain: layout style paint;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row {
@@ -573,13 +598,18 @@
   border: none;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   box-shadow: none !important;
+  /* GPU acceleration for smooth scrolling */
+  will-change: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-/* Hover and selection polish */
+/* Hover and selection polish - only transition on hover */
 .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
   background-color: #f5f5f5 !important;
   box-shadow: none;
-  transform: none;
+  transform: translateZ(0);
+  transition: background-color 0.1s ease;
 }
 
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
@@ -597,6 +627,7 @@
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
   background-color: #222222 !important;
   box-shadow: none;
+  transition: background-color 0.1s ease;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
@@ -632,6 +663,12 @@
 .wh-modern-grid .ag-cell {
   padding-block: 10px;
   padding-inline: 12px;
+  /* GPU acceleration for smooth scrolling */
+  will-change: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* No transitions during scroll */
+  transition: none;
 }
 
 /* Make status cells stand out slightly */
@@ -692,6 +729,8 @@
   outline: 1px solid var(--color-border);
   outline-offset: -1px;
   border-radius: calc(var(--radius-md) - 2px);
+  /* Only transition focus, not during scroll */
+  transition: outline 0.1s ease;
 }
 
 /* When a row is selected, remove the teal focus outline to avoid left glow */
