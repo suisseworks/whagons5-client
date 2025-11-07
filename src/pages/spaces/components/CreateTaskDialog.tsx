@@ -7,13 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addTaskAsync } from '@/store/reducers/tasksSlice';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
+import { ChevronUp, Plus } from 'lucide-react';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -30,7 +29,6 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
   const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
   const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
-  const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
   const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
   const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
@@ -53,6 +51,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const [slaId, setSlaId] = useState<number | null>(null);
   const [approvalId, setApprovalId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
+  const [showDescription, setShowDescription] = useState(false);
 
   const categoryInitialStatusId = useMemo(() => {
     // Statuses are global; pick the one marked initial, otherwise first available
@@ -134,12 +133,14 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
       setSlaId(null);
       setApprovalId(null);
       setActiveTab('basic');
+      setShowDescription(false);
 
       // Choose first template and derive defaults
       const firstTemplate = workspaceTemplates[0];
       if (firstTemplate) {
         setTemplateId(firstTemplate.id);
         setCategoryId(firstTemplate.category_id || null);
+        // If template doesn't define priority, it will be set to "low" by the category change effect
         setPriorityId(firstTemplate.default_priority || null);
         // Set name automatically from template
         setName(firstTemplate.name || '');
@@ -162,24 +163,42 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
       const t = workspaceTemplates.find((x: any) => x.id === templateId);
       if (t) {
         setCategoryId(t.category_id || null);
-        setPriorityId(t.default_priority || null);
+        // If template doesn't define priority, default to "low"
+        if (t.default_priority) {
+          setPriorityId(t.default_priority);
+        } else {
+          // Find "low" priority in category priorities
+          const lowPriority = categoryPriorities.find((p: any) => 
+            p.name?.toLowerCase() === 'low'
+          );
+          setPriorityId(lowPriority?.id || null);
+        }
         setName(t.name || ''); // Always set name from template
         setSlaId(t.sla_id || null);
         setApprovalId(t.approval_id || null);
       }
     }
-  }, [templateId, workspaceTemplates]);
+  }, [templateId, workspaceTemplates, categoryPriorities]);
 
   useEffect(() => {
-    // When category changes without template default, set a reasonable default priority
+    // When category changes without template default, set priority to "low"
     if (categoryId && !priorityId) {
-      const firstPriority = categoryPriorities[0]?.id ?? null;
-      setPriorityId(firstPriority);
+      // Try to find "low" priority first
+      const lowPriority = categoryPriorities.find((p: any) => 
+        p.name?.toLowerCase() === 'low'
+      );
+      if (lowPriority) {
+        setPriorityId(lowPriority.id);
+      } else {
+        // Fallback to first priority if "low" doesn't exist
+        const firstPriority = categoryPriorities[0]?.id ?? null;
+        setPriorityId(firstPriority);
+      }
     }
     if (!categoryId) {
       setPriorityId(null);
     }
-  }, [categoryId]);
+  }, [categoryId, categoryPriorities, priorityId]);
 
   const canSubmit = useMemo(() => {
     return Boolean(
@@ -235,75 +254,188 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[1000px] sm:w-[1200px] overflow-auto">
-        <SheetHeader className="pb-6 mb-6 border-b px-6">
-          <SheetTitle className="text-xl font-semibold mb-2">Create New Task</SheetTitle>
-          <SheetDescription className="text-sm">Create a task from a template with all necessary details.</SheetDescription>
-        </SheetHeader>
-
-        <div className="space-y-6 px-6">
-          {/* Template Selection */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Template *</Label>
-            <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder={
-                  !currentWorkspace || currentWorkspace.type !== "DEFAULT"
-                    ? 'Templates only available for default workspaces'
-                    : workspaceTemplates.length
-                      ? 'Select template'
-                      : 'No templates available'
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {workspaceTemplates.map((t: any) => (
-                  <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!workspaceTemplates.length && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {!currentWorkspace || currentWorkspace.type !== "DEFAULT"
-                  ? 'Templates are only available for default workspaces.'
-                  : 'No templates available in this workspace. Enable or create templates first.'
-                }
-              </p>
+      <SheetContent 
+        side="right" 
+        className="w-full sm:w-[600px] max-w-[600px] p-0 m-0 sm:m-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
+      >
+        {/* Header Section - Fixed */}
+        <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
+          <div className="flex items-center gap-3 mb-2">
+            <SheetTitle className="text-xl sm:text-2xl font-semibold font-[600] text-foreground">Create New Task</SheetTitle>
+            {categoryId && categoryIcon && (
+              <FontAwesomeIcon
+                icon={categoryIcon}
+                style={{ color: currentCategory?.color }}
+                className="w-5 h-5 flex-shrink-0"
+              />
+            )}
+            {categoryId && currentCategory && (
+              <span className="text-sm text-[#6B7280] font-medium">
+                {currentCategory.name}
+              </span>
             )}
           </div>
+          <SheetDescription className="text-sm text-[#6B7280] mt-1">
+            Create a task from a template with all necessary details.
+          </SheetDescription>
+        </SheetHeader>
 
-          {/* Additional Details Tabs */}
-          <div className="border rounded-lg overflow-hidden">
+        {/* Content Area - Scrollable */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-auto">
+          {/* Tabs Navigation */}
+          <div className="px-4 sm:px-6 pt-4 sm:pt-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-11 rounded-none border-b bg-muted/30">
-                <TabsTrigger value="basic" className="text-sm data-[state=active]:bg-background">Basic Details</TabsTrigger>
-                <TabsTrigger value="additional" className="text-sm data-[state=active]:bg-background">Additional Info</TabsTrigger>
+              <TabsList className="inline-flex h-auto p-0 bg-transparent border-b border-border/40 rounded-none gap-0 w-full">
+                <TabsTrigger 
+                  value="basic" 
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                >
+                  Basic Details
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="additional" 
+                  className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                >
+                  Additional Info
+                </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="basic" className="space-y-5 p-6 m-0">
-                {/* Description */}
-                <div className="space-y-3">
-                  <Label htmlFor="task-desc" className="text-sm font-medium">Description</Label>
-                  <textarea 
-                    id="task-desc" 
-                    value={description} 
-                    onChange={(e) => setDescription(e.target.value)} 
-                    placeholder="Add a description for this task..." 
-                    className="w-full min-h-[100px] px-3 py-2.5 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none" 
-                  />
+              {/* Basic Details Tab */}
+              <TabsContent value="basic" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
+                {/* Template Selection */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="template" className="text-sm font-medium font-[500] text-foreground">
+                    Template
+                  </Label>
+                  <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
+                    <SelectTrigger 
+                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                    >
+                      <SelectValue placeholder={
+                        !currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                          ? 'Templates only available for default workspaces'
+                          : workspaceTemplates.length
+                            ? 'Select template'
+                            : 'No templates available'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workspaceTemplates.map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!workspaceTemplates.length && (
+                    <p className="text-xs text-[#6B7280] mt-1">
+                      {!currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                        ? 'Templates are only available for default workspaces.'
+                        : 'No templates available in this workspace. Enable or create templates first.'
+                      }
+                    </p>
+                  )}
+                </div>
+
+                {/* Description - Collapsible */}
+                {!showDescription && !description.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDescription(true)}
+                    className="flex items-center gap-2 text-sm text-[#6B7280] hover:text-foreground transition-colors duration-150 py-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add description</span>
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="task-desc" className="text-sm font-medium font-[500] text-foreground">
+                        Description
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDescription(false);
+                          if (!description.trim()) {
+                            setDescription('');
+                          }
+                        }}
+                        className="text-[#6B7280] hover:text-foreground transition-colors duration-150 p-1"
+                        aria-label="Hide description"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <textarea 
+                      id="task-desc" 
+                      value={description} 
+                      onChange={(e) => {
+                        setDescription(e.target.value);
+                        if (e.target.value.trim() && !showDescription) {
+                          setShowDescription(true);
+                        }
+                      }}
+                      placeholder="Add a description for this task..." 
+                      className="w-full min-h-[120px] px-4 py-4 border border-black/8 bg-[#F8F9FA] rounded-[12px] text-sm text-foreground placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#00BFA5] focus:ring-[3px] focus:ring-[#00BFA5]/10 focus:bg-background resize-y transition-all duration-150" 
+                    />
+                  </div>
+                )}
+
+                {/* Location */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Location
+                  </Label>
+                  <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                    <Combobox
+                      options={workspaceSpots.map((s: any) => ({
+                        value: String(s.id),
+                        label: s.name,
+                      }))}
+                      value={spotId ? String(spotId) : undefined}
+                      onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
+                      placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
+                      searchPlaceholder="Search locations..."
+                      emptyText="No locations found."
+                      className="w-full"
+                    />
+                  </div>
                 </div>
 
                 {/* Priority */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Priority</Label>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Priority
+                  </Label>
                   <Select value={priorityId ? String(priorityId) : undefined} onValueChange={(v) => setPriorityId(parseInt(v, 10))}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
+                    <SelectTrigger 
+                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        {priorityId && (() => {
+                          const selectedPriority = categoryPriorities.find((p: any) => p.id === priorityId);
+                          if (selectedPriority) {
+                            return (
+                              <>
+                                <span 
+                                  className="w-2 h-2 rounded-full flex-shrink-0" 
+                                  style={{ backgroundColor: selectedPriority.color }}
+                                />
+                                <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
+                              </>
+                            );
+                          }
+                          return <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />;
+                        })()}
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
                       {categoryPriorities.map((p: any) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                           <div className="flex items-center gap-2">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                            <span 
+                              className="w-2 h-2 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: p.color }}
+                            />
                             <span>{p.name}</span>
                           </div>
                         </SelectItem>
@@ -312,126 +444,114 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                   </Select>
                 </div>
 
-                {/* Location */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Location</Label>
-                  <Combobox
-                    options={workspaceSpots.map((s: any) => ({
-                      value: String(s.id),
-                      label: s.name,
-                    }))}
-                    value={spotId ? String(spotId) : undefined}
-                    onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
-                    placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
-                    searchPlaceholder="Search locations..."
-                    emptyText="No locations found."
-                    className="h-10"
-                  />
-                </div>
-
                 {/* Responsible */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Responsible</Label>
-                  <MultiSelectCombobox
-                    options={workspaceUsers.map((u: any) => ({
-                      value: String(u.id),
-                      label: u.name || u.email || `User ${u.id}`,
-                    }))}
-                    value={selectedUserIds.map((id) => String(id))}
-                    onValueChange={(values) => {
-                      setSelectedUserIds(values.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n)));
-                    }}
-                    placeholder="Select users..."
-                    searchPlaceholder="Search users..."
-                    emptyText="No users found."
-                    className="h-10"
-                  />
-                </div>
-
-                {/* Category Display */}
-                {categoryId && (
-                  <div className="flex items-center gap-3 p-4 rounded-md bg-muted/50 border">
-                    {categoryIcon && (
-                      <FontAwesomeIcon
-                        icon={categoryIcon}
-                        style={{ color: currentCategory?.color }}
-                        className="w-4 h-4"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground mb-1 block">Category</Label>
-                      <div className="text-sm font-medium">
-                        {currentCategory?.name || `Category ${categoryId}`}
-                      </div>
-                    </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Responsible
+                  </Label>
+                  <div className="[&_button]:h-auto [&_button]:min-h-[48px] [&_button]:px-4 [&_button]:py-2.5 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                    <MultiSelectCombobox
+                      options={workspaceUsers.map((u: any) => ({
+                        value: String(u.id),
+                        label: u.name || u.email || `User ${u.id}`,
+                      }))}
+                      value={selectedUserIds.map((id) => String(id))}
+                      onValueChange={(values) => {
+                        setSelectedUserIds(values.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n)));
+                      }}
+                      placeholder="Select users..."
+                      searchPlaceholder="Search users..."
+                      emptyText="No users found."
+                      className="w-full"
+                    />
                   </div>
-                )}
+                </div>
+              </TabsContent>
 
+              {/* Additional Info Tab */}
+              <TabsContent value="additional" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
                 {/* Due Date */}
-                <div className="space-y-3">
-                  <Label htmlFor="due" className="text-sm font-medium">Due Date</Label>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="due" className="text-sm font-medium font-[500] text-foreground">
+                    Due Date
+                  </Label>
                   <Input 
                     id="due" 
                     type="date" 
                     value={dueDate} 
                     onChange={(e) => setDueDate(e.target.value)} 
-                    className="h-10"
+                    className="h-12 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
                   />
                 </div>
-              </TabsContent>
 
-              <TabsContent value="additional" className="space-y-5 p-6 m-0">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">SLA</Label>
-                    <Select value={slaId ? String(slaId) : undefined} onValueChange={(v) => setSlaId(v ? parseInt(v, 10) : null)}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select SLA (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.isArray(slas) && slas.length > 0 ? (
-                          slas.filter((s: any) => s.enabled !== false).map((s: any) => (
-                            <SelectItem key={s.id} value={String(s.id)}>{s.name || `SLA ${s.id}`}</SelectItem>
-                          ))
-                        ) : (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">No SLAs available</div>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* SLA */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    SLA
+                  </Label>
+                  <Select value={slaId ? String(slaId) : undefined} onValueChange={(v) => setSlaId(v ? parseInt(v, 10) : null)}>
+                    <SelectTrigger 
+                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                    >
+                      <SelectValue placeholder="Select SLA (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.isArray(slas) && slas.length > 0 ? (
+                        slas.filter((s: any) => s.enabled !== false).map((s: any) => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.name || `SLA ${s.id}`}</SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-[#6B7280]">No SLAs available</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Approval</Label>
-                    <Select value={approvalId ? String(approvalId) : undefined} onValueChange={(v) => setApprovalId(v ? parseInt(v, 10) : null)}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select approval (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.isArray(approvals) && approvals.length > 0 ? (
-                          approvals.filter((a: any) => a.is_active !== false).map((a: any) => (
-                            <SelectItem key={a.id} value={String(a.id)}>{a.name || `Approval ${a.id}`}</SelectItem>
-                          ))
-                        ) : (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">No approvals available</div>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* Approval */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Approval
+                  </Label>
+                  <Select value={approvalId ? String(approvalId) : undefined} onValueChange={(v) => setApprovalId(v ? parseInt(v, 10) : null)}>
+                    <SelectTrigger 
+                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                    >
+                      <SelectValue placeholder="Select approval (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.isArray(approvals) && approvals.length > 0 ? (
+                        approvals.filter((a: any) => a.is_active !== false).map((a: any) => (
+                          <SelectItem key={a.id} value={String(a.id)}>{a.name || `Approval ${a.id}`}</SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-[#6B7280]">No approvals available</div>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
               </TabsContent>
             </Tabs>
           </div>
+        </div>
 
-          {/* Footer Actions */}
-          <div className="sticky bottom-0 bg-background border-t pt-6 mt-6 -mx-6 px-6 pb-6 -mb-6">
-            <div className="flex items-center justify-end gap-3">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="h-9 px-5">
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className="h-9 px-5">
-                {isSubmitting ? 'Creating...' : 'Create Task'}
-              </Button>
-            </div>
+        {/* Footer Actions - Fixed */}
+        <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-6 border-t border-border/40 bg-background">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => onOpenChange(false)} 
+              disabled={isSubmitting} 
+              className="h-12 px-6 text-[#6B7280] border border-black/20 bg-transparent hover:bg-[#F3F4F6] rounded-[10px] transition-all duration-200 font-medium order-2 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={!canSubmit || isSubmitting} 
+              className="h-12 px-8 bg-[#00BFA5] hover:bg-[#00AA92] text-white rounded-[10px] transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
+            >
+              {isSubmitting ? 'Creating...' : 'Create Task'}
+            </Button>
           </div>
         </div>
       </SheetContent>

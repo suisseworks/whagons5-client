@@ -3,7 +3,7 @@
 export function buildGetRows(TasksCache: any, refs: any) {
   const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
   return async (params: any) => {
-    // Default sortModel to created_at desc if not provided
+   // Default sortModel to created_at desc if not provided
     const sortModel = params.sortModel && params.sortModel.length > 0 
       ? params.sortModel 
       : [{ colId: 'created_at', sort: 'desc' }];

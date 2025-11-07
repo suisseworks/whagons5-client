@@ -134,7 +134,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
 
   // Extract state from abstracted hooks
-  const { statuses, priorities, spots, users, categories, statusTransitions } = reduxState;
+  const { statuses, priorities, spots, users, categories, statusTransitions, approvals, taskApprovalInstances } = reduxState;
   const { defaultCategoryId } = derivedState;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
 
@@ -217,6 +217,18 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
     return m;
   }, [categories]);
+
+  const approvalMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const a of approvals || []) {
+      const id = Number((a as any).id);
+      if (Number.isFinite(id)) m[id] = a;
+    }
+    return m;
+  }, [approvals]);
+
+  // Memoize taskApprovalInstances to prevent unnecessary column rebuilds
+  const stableTaskApprovalInstances = useMemo(() => taskApprovalInstances, [taskApprovalInstances]);
 
   // Refs for data access in callbacks
   const statusMapRef = useRef(statusMap);
@@ -371,12 +383,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
     categoryMap,
     showDescriptions: density !== 'compact',
+    approvalMap,
+    taskApprovalInstances: stableTaskApprovalInstances,
   } as any), [
     statusMap, priorityMap, spotMap, userMap,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density,
+    approvalMap, stableTaskApprovalInstances
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 

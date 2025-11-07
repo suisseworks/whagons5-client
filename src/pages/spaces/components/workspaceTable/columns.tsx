@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MapPin, Flag } from 'lucide-react';
+import { MapPin, Flag, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
@@ -72,11 +72,224 @@ export function buildWorkspaceColumns(opts: any) {
         const name = p.data?.name || '';
         const description = p.data?.description || '';
         const cat = (opts as any)?.categoryMap?.[Number(p.data?.category_id)];
+        const approvalId = p.data?.approval_id;
+        const approvalStatus = p.data?.approval_status;
+        const approvalTriggeredAt = p.data?.approval_triggered_at;
+        const approvalMap = (opts as any)?.approvalMap || {};
+        const taskApprovalInstances = (opts as any)?.taskApprovalInstances || [];
+        const approval = approvalId ? approvalMap[approvalId] : null;
+        
+        // Calculate approval progress (only if approval exists)
+        let totalApprovers = 0;
+        let approvedCount = 0;
+        let rejectedCount = 0;
+        let pendingCount = 0;
+        let progressPercent = 0;
+        
+        if (approvalId && taskApprovalInstances.length > 0) {
+          const instances = taskApprovalInstances.filter((inst: any) => inst.task_id === p.data?.id);
+          totalApprovers = instances.length;
+          approvedCount = instances.filter((inst: any) => inst.status === 'approved').length;
+          rejectedCount = instances.filter((inst: any) => inst.status === 'rejected').length;
+          pendingCount = instances.filter((inst: any) => inst.status === 'pending').length;
+          progressPercent = totalApprovers > 0 ? Math.round((approvedCount / totalApprovers) * 100) : 0;
+        }
+        
+        // Check if approval is active
+        // For ON_CREATE triggers, approval is active if task exists (was created) and status is pending/null
+        // For other triggers, approval is active if it has been triggered and status is pending/null
+        const isApprovalActive = approval 
+          ? (approval.trigger_type === 'ON_CREATE' 
+              ? (approvalStatus === 'pending' || approvalStatus === null)
+              : !!approvalTriggeredAt && (approvalStatus === 'pending' || approvalStatus === null))
+          : false;
+        const hasApproval = !!approvalId;
+        const isApprovalAssigned = !!approvalId && !approvalTriggeredAt && approval?.trigger_type !== 'ON_CREATE';
+        
+        // Calculate deadline and time remaining (skip time remaining calculation to avoid constant re-renders)
+        let deadline: Date | null = null;
+        let deadlineDisplay: string | null = null;
+        
+        if (approval && approval.deadline_value) {
+          if (approval.deadline_type === 'hours') {
+            // For ON_CREATE triggers, use task created_at if approvalTriggeredAt is not set
+            const triggerTime = approvalTriggeredAt 
+              ? approvalTriggeredAt 
+              : (approval.trigger_type === 'ON_CREATE' && p.data?.created_at ? p.data.created_at : null);
+            
+            if (triggerTime) {
+              const triggered = new Date(triggerTime);
+              const deadlineHours = Number(approval.deadline_value);
+              if (Number.isFinite(deadlineHours)) {
+                deadline = new Date(triggered.getTime() + deadlineHours * 60 * 60 * 1000);
+              }
+            } else {
+              deadlineDisplay = `${approval.deadline_value} hours`;
+            }
+          } else if (approval.deadline_type === 'date') {
+            deadline = new Date(approval.deadline_value);
+            deadlineDisplay = deadline.toLocaleDateString();
+          }
+        }
+        
+        // Get trigger type display
+        const triggerTypeDisplay = approval?.trigger_type 
+          ? approval.trigger_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+          : null;
+        
         return (
           <div className="flex flex-col gap-1 py-1.5">
             <div className="flex items-center gap-2.5">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
               <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white">{name}</div>
+              {hasApproval && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10" style={{
+                        backgroundColor: isApprovalActive ? 'rgba(59, 130, 246, 0.1)' :
+                                        approvalStatus === 'approved' ? 'rgba(34, 197, 94, 0.1)' :
+                                        approvalStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' :
+                                        'rgba(156, 163, 175, 0.1)'
+                      }}>
+                        {isApprovalActive ? (
+                          <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        ) : approvalStatus === 'approved' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                        ) : approvalStatus === 'rejected' ? (
+                          <XCircle className="w-3.5 h-3.5 text-red-600" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 text-gray-500 opacity-50" />
+                        )}
+                        {isApprovalActive && totalApprovers > 0 && (
+                          <span className="text-[11px] font-medium" style={{
+                            color: approvalStatus === 'approved' ? '#22c55e' :
+                                   approvalStatus === 'rejected' ? '#ef4444' :
+                                   '#3b82f6'
+                          }}>
+                            {progressPercent}%
+                          </span>
+                        )}
+                        {!isApprovalActive && approval?.deadline_value && (
+                          <span className="text-[10px] text-gray-500">
+                            {approval.deadline_type === 'hours' ? `${approval.deadline_value}h` : 'Due'}
+                          </span>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-[320px] p-3">
+                      <div className="space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-semibold text-sm">
+                            {approval?.name || 'Approval Required'}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {isApprovalAssigned && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                                Assigned
+                              </span>
+                            )}
+                            {approvalTriggeredAt && approvalStatus !== 'pending' && approvalStatus !== null && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                                {approvalStatus === 'approved' ? 'Completed' : approvalStatus === 'rejected' ? 'Rejected' : 'Cancelled'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {triggerTypeDisplay && (
+                          <div className="text-xs text-muted-foreground">
+                            Trigger: <span className="font-medium">{triggerTypeDisplay}</span>
+                          </div>
+                        )}
+                        
+                        {isApprovalActive && (
+                          <div className="text-xs text-muted-foreground">
+                            {approvalTriggeredAt ? (
+                              <>Triggered: <span className="font-medium">
+                                {new Date(approvalTriggeredAt).toLocaleString()}
+                              </span></>
+                            ) : approval?.trigger_type === 'ON_CREATE' && p.data?.created_at ? (
+                              <>Created: <span className="font-medium">
+                                {new Date(p.data.created_at).toLocaleString()}
+                              </span></>
+                            ) : null}
+                          </div>
+                        )}
+                        
+                        {isApprovalActive && totalApprovers > 0 && (
+                          <>
+                            <div className="text-xs text-muted-foreground">
+                              Progress: {approvedCount} of {totalApprovers} approved
+                              {rejectedCount > 0 && `, ${rejectedCount} rejected`}
+                              {pendingCount > 0 && `, ${pendingCount} pending`}
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className="h-1.5 rounded-full transition-all"
+                                style={{
+                                  width: `${progressPercent}%`,
+                                  backgroundColor: approvalStatus === 'rejected' ? '#ef4444' :
+                                                 approvalStatus === 'approved' ? '#22c55e' : '#3b82f6'
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
+                        
+                        {approval?.deadline_value && (
+                          <div className="text-xs text-muted-foreground border-t pt-2">
+                            {isApprovalActive && deadline ? (
+                              (() => {
+                                // Calculate time remaining only when tooltip is shown (on hover)
+                                const now = new Date();
+                                const remaining = deadline.getTime() - now.getTime();
+                                if (remaining > 0) {
+                                  const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+                                  const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                  const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                                  const timeRemaining = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                                  return (
+                                    <div>
+                                      Time remaining: <span className="font-medium text-blue-600">{timeRemaining}</span>
+                                      <div className="mt-0.5">Deadline: <span className="font-medium">{deadline.toLocaleString()}</span></div>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div>
+                                      <span className="text-red-600 font-medium">⚠️ Time limit exceeded</span>
+                                      <div className="mt-0.5">Deadline: <span className="font-medium">{deadline.toLocaleString()}</span></div>
+                                    </div>
+                                  );
+                                }
+                              })()
+                            ) : isApprovalActive ? (
+                              deadlineDisplay ? (
+                                <div>Deadline: <span className="font-medium">{deadlineDisplay}</span></div>
+                              ) : null
+                            ) : (
+                              <div>
+                                Deadline: <span className="font-medium">
+                                  {approval.deadline_type === 'hours' 
+                                    ? `${approval.deadline_value} hours after ${approval.trigger_type === 'ON_CREATE' ? 'creation' : 'trigger'}`
+                                    : deadlineDisplay || approval.deadline_value}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {approvalStatus && (
+                          <div className="text-xs border-t pt-2">
+                            Status: <span className="font-medium capitalize">{approvalStatus}</span>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
             {showDescriptions && description && (
               <TooltipProvider>
