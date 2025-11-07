@@ -44,7 +44,7 @@ function Users() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   // Redux state for related data
-  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+  const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
   const { value: roles, loading: rolesLoading } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   
