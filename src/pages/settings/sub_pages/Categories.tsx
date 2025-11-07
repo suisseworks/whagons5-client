@@ -267,7 +267,10 @@ function Categories() {
 
         return (
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 min-w-[1.5rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+            <div 
+              className="w-6 h-6 min-w-[1.5rem] text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+              style={{ backgroundColor: team?.color ?? '#6B7280' }}
+            >
               {team?.name ? team.name.charAt(0).toUpperCase() : 'T'}
             </div>
             <span>{team?.name || `Team ${teamId}`}</span>
@@ -458,16 +461,22 @@ function Categories() {
           <div className="font-medium">{category.name}</div>
           <div className="text-sm text-muted-foreground">{category.description}</div>
           <div className="flex items-center space-x-2 mt-1">
-            {category.team_id && (
-              <div className="flex items-center space-x-1">
-                <div className="w-4 h-4 min-w-[1rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                  {teams.find((t: Team) => t.id === category.team_id)?.name?.charAt(0).toUpperCase() || 'T'}
+            {category.team_id && (() => {
+              const team = teams.find((t: Team) => t.id === category.team_id);
+              return (
+                <div className="flex items-center space-x-1">
+                  <div 
+                    className="w-4 h-4 min-w-[1rem] text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                    style={{ backgroundColor: team?.color ?? '#6B7280' }}
+                  >
+                    {team?.name?.charAt(0).toUpperCase() || 'T'}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {team?.name || `Team ${category.team_id}`}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {teams.find((t: Team) => t.id === category.team_id)?.name || `Team ${category.team_id}`}
-                </span>
-              </div>
-            )}
+              );
+            })()}
             <Badge
               variant={category.enabled ? "default" : "secondary"}
               className={`text-xs ${category.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
