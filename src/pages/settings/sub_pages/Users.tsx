@@ -15,7 +15,7 @@ interface UserData {
   id: number;
   name: string;
   email: string;
-  team_id?: number | null;
+  teams?: Array<{ id: number; name: string; description?: string; color?: string; role_id?: number }> | null;
   role_id?: number | null;
   job_position_id?: number | null;
   job_position?: { id: number; title: string } | null;
@@ -44,7 +44,7 @@ function Users() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   // Redux state for related data
-  const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
   const { value: roles, loading: rolesLoading } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   
@@ -95,7 +95,6 @@ function Users() {
   const [editFormData, setEditFormData] = useState<{
     name: string;
     email: string;
-    team_id: string;
     job_position_id: string;
     organization_name: string;
     is_admin: boolean;
@@ -103,7 +102,6 @@ function Users() {
   }>({
     name: '',
     email: '',
-    team_id: '',
     job_position_id: '',
     organization_name: '',
     is_admin: false,
@@ -116,7 +114,6 @@ function Users() {
       setEditFormData({
         name: editingUser.name || '',
         email: editingUser.email || '',
-        team_id: editingUser.team_id?.toString() || '',
         job_position_id: editingUser.job_position_id != null ? editingUser.job_position_id.toString() : '',
         organization_name: editingUser.organization_name || '',
         is_admin: !!editingUser.is_admin,
@@ -147,46 +144,49 @@ function Users() {
       minWidth: 220
     },
     {
-      field: 'team_id',
-      headerName: 'Team',
+      field: 'teams',
+      headerName: 'Teams',
       flex: 2,
       minWidth: 240,
       cellRenderer: (params: ICellRendererParams) => {
-        const teamId = params.value;
-        if (!teamId) return <span className="text-muted-foreground">No Team</span>;
+        const userTeams = params.data?.teams || [];
+        if (!userTeams || userTeams.length === 0) return <span className="text-muted-foreground">No Teams</span>;
 
-        const team = teams.find((t: Team) => t.id === teamId);
-        if (!team) return <span className="text-muted-foreground">Team {teamId}</span>;
-        const initial = (team.name || '').charAt(0).toUpperCase();
-        const hex = String((team as any).color || '').trim();
-        let bg = hex;
-        let fg = '#fff';
-        try {
-          if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
-            const h = hex.length === 4
-              ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-              : hex;
-            const r = parseInt(h.slice(1, 3), 16);
-            const g = parseInt(h.slice(3, 5), 16);
-            const b = parseInt(h.slice(5, 7), 16);
-            const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-            fg = brightness > 180 ? '#111827' : '#ffffff';
-          } else if (!hex) {
-            bg = '';
-          }
-        } catch { /* ignore */ }
         return (
-          <div className="flex items-center gap-2 h-full">
-            <div
-              className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 self-center ${bg ? '' : 'bg-muted text-foreground/80'}`}
-              style={bg ? { backgroundColor: bg, color: fg } : undefined}
-              title={team.name}
-            >
-              {initial || 'T'}
-            </div>
-            <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">
-              {team.name}
-            </Badge>
+          <div className="flex flex-wrap gap-1">
+            {userTeams.map((team: { id: number; name: string; color?: string }) => {
+              const teamData = teams.find((t: Team) => t.id === team.id);
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || teamData?.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
+                  <div
+                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                  {team.name}
+                </Badge>
+              );
+            })}
           </div>
         );
       }
@@ -244,12 +244,12 @@ function Users() {
       <div>
         <div className="font-medium">{user.name}</div>
         <div className="text-sm text-muted-foreground">{user.email}</div>
-        <div className="flex items-center space-x-2 mt-1">
-          {user.team_id && (
-            <Badge variant="secondary" className="text-xs">
-              {teams.find(t => t.id === user.team_id)?.name || `Team ${user.team_id}`}
+        <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
+          {user.teams && user.teams.length > 0 && user.teams.map((team: { id: number; name: string; color?: string }) => (
+            <Badge key={team.id} variant="secondary" className="text-xs">
+              {team.name}
             </Badge>
-          )}
+          ))}
           <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
             {user.is_admin ? "Admin" : "User"}
           </Badge>
@@ -296,7 +296,6 @@ function Users() {
     const updates: Partial<UserData> = {
       name: editFormData.name,
       email: editFormData.email,
-      team_id: editFormData.team_id ? Number(editFormData.team_id) : null,
       job_position_id: editFormData.job_position_id ? Number(editFormData.job_position_id) : null,
       role_id: null, // Not used in this form
       organization_name: editFormData.organization_name || null,
@@ -435,17 +434,6 @@ function Users() {
               value={editFormData.email}
               onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
               required
-            />
-            <SelectField
-              id="edit-team_id"
-              label="Team"
-              value={editFormData.team_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, team_id: value }))}
-              placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
-              options={teams.map((team: Team) => ({
-                value: team.id.toString(),
-                label: team.name
-              }))}
             />
             <SelectField
               id="edit-job_position_id"

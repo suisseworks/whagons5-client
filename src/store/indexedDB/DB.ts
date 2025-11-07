@@ -215,6 +215,10 @@ export class DB {
           if (!db.objectStoreNames.contains('approval_approvers')) {
             db.createObjectStore('approval_approvers', { keyPath: 'id' });
           }
+          // Task approval instances
+          if (!db.objectStoreNames.contains('task_approval_instances')) {
+            db.createObjectStore('task_approval_instances', { keyPath: 'id' });
+          }
 
           // Custom Fields & Values
           if (!db.objectStoreNames.contains('spot_custom_fields')) {
@@ -456,6 +460,7 @@ export class DB {
       | 'job_positions'
       | 'status_transition_groups'
       | 'approval_approvers'
+      | 'task_approval_instances'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -511,6 +516,7 @@ export class DB {
       | 'job_positions'
       | 'status_transition_groups'
       | 'approval_approvers'
+      | 'task_approval_instances'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'

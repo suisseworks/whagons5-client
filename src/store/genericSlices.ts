@@ -23,7 +23,7 @@ const genericSliceConfigs = [
     { name: 'fieldOptions', table: 'wh_field_options', endpoint: '/field-options', store: 'field_options', hashFields: ['id','name','version','data','enabled','created_by','updated_at'] },
 
     // User Management
-    { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','team_id','role_id','job_position_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
+    { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','role_id','job_position_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
     { name: 'roles', table: 'wh_roles', endpoint: '/roles', store: 'roles', hashFields: ['id','name','description','updated_at'] },
     { name: 'permissions', table: 'wh_permissions', endpoint: '/permissions', store: 'permissions', hashFields: ['id','name','key','group','type','updated_at'] },
     { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','role_id','updated_at'] },
@@ -51,6 +51,7 @@ const genericSliceConfigs = [
     { name: 'slaAlerts', table: 'wh_sla_alerts', endpoint: '/sla-alerts', store: 'sla_alerts', hashFields: ['id','sla_id','time','type','notify_to','updated_at'] },
     { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','approval_type','require_all','minimum_approvals','trigger_type','trigger_status_id','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','is_active','updated_at'] },
     { name: 'approvalApprovers', table: 'wh_approval_approvers', endpoint: '/approval-approvers', store: 'approval_approvers', hashFields: ['id','approval_id','approver_type','approver_id','scope','scope_id','required','order_index','created_by','updated_at'] },
+    { name: 'taskApprovalInstances', table: 'wh_task_approval_instances', endpoint: '/task-approval-instances', store: 'task_approval_instances', hashFields: ['id','task_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
     { name: 'categoryPriorities', table: 'wh_category_priority', endpoint: '/category-priorities', store: 'category_priorities', hashFields: ['id','priority_id','category_id','sla_id','updated_at'] },
     { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','team_id','role_id','job_position_id','updated_at'] },
 
@@ -114,6 +115,7 @@ export const {
     slaAlerts,
     approvals,
     approvalApprovers,
+    taskApprovalInstances,
     categoryPriorities,
     invitations,
     sessionLogs,
@@ -174,6 +176,7 @@ export const genericEventNames = {
     slaAlerts: genericSlices.slices.slaAlerts.eventNames,
     approvals: genericSlices.slices.approvals.eventNames,
     approvalApprovers: genericSlices.slices.approvalApprovers.eventNames,
+    taskApprovalInstances: genericSlices.slices.taskApprovalInstances.eventNames,
     categoryPriorities: genericSlices.slices.categoryPriorities.eventNames,
     invitations: genericSlices.slices.invitations.eventNames,
     sessionLogs: genericSlices.slices.sessionLogs.eventNames,
@@ -225,6 +228,7 @@ export const genericActions = {
     slaAlerts: genericSlices.slices.slaAlerts.actions,
     approvals: genericSlices.slices.approvals.actions,
     approvalApprovers: genericSlices.slices.approvalApprovers.actions,
+    taskApprovalInstances: genericSlices.slices.taskApprovalInstances.actions,
     categoryPriorities: genericSlices.slices.categoryPriorities.actions,
     invitations: genericSlices.slices.invitations.actions,
     sessionLogs: genericSlices.slices.sessionLogs.actions,

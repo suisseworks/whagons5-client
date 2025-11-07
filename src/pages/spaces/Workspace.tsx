@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import EditTaskDialog from '@/pages/spaces/components/EditTaskDialog';
 import { motion } from 'motion/react';
 import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
@@ -45,6 +46,8 @@ export const Workspace = () => {
   const tableRef = useRef<WorkspaceTableHandle | null>(null);
   const [showClearFilters, setShowClearFilters] = useState(false);
   const [openCreateTask, setOpenCreateTask] = useState(false);
+  const [openEditTask, setOpenEditTask] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [rightPanel, setRightPanel] = useState<'chat' | 'resources' | null>(null);
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
     try {
@@ -338,6 +341,10 @@ export const Workspace = () => {
             searchText={searchText}
             onFiltersChanged={(active) => setShowClearFilters(!!active)}
             onSelectionChanged={setSelectedIds}
+            onRowClicked={(task) => {
+              setSelectedTask(task);
+              setOpenEditTask(true);
+            }}
             rowHeight={computedRowHeight}
             groupBy={groupBy}
             collapseGroups={collapseGroups}
@@ -685,6 +692,7 @@ export const Workspace = () => {
             <Plus className="h-6 w-6" />
           </button>
           <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
+          <EditTaskDialog open={openEditTask} onOpenChange={setOpenEditTask} task={selectedTask} />
         </>
       )}
     </div>

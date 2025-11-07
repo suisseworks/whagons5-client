@@ -21,6 +21,8 @@ export const useGridReduxState = () => {
   const users = useSelector((s: RootState) => (s as any).users.value as User[]);
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
   const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
+  const approvals = useSelector((s: RootState) => (s as any).approvals?.value as any[] || []);
+  const taskApprovalInstances = useSelector((s: RootState) => (s as any).taskApprovalInstances?.value as any[] || []);
 
   return {
     statuses,
@@ -30,6 +32,8 @@ export const useGridReduxState = () => {
     users,
     categories,
     statusTransitions,
+    approvals,
+    taskApprovalInstances,
   };
 };
 

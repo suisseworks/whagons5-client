@@ -83,6 +83,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   searchText?: string;
   onFiltersChanged?: (active: boolean) => void;
   onSelectionChanged?: (selectedIds: number[]) => void;
+  onRowClicked?: (task: any) => void;
   rowHeight?: number;
   groupBy?: 'none' | 'spot_id' | 'status_id' | 'priority_id';
   collapseGroups?: boolean;
@@ -94,6 +95,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   searchText = '',
   onFiltersChanged,
   onSelectionChanged,
+  onRowClicked,
   rowHeight,
   groupBy = 'none',
   collapseGroups = true,
@@ -132,7 +134,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
 
   // Extract state from abstracted hooks
-  const { statuses, priorities, spots, users, categories, statusTransitions } = reduxState;
+  const { statuses, priorities, spots, users, categories, statusTransitions, approvals, taskApprovalInstances } = reduxState;
   const { defaultCategoryId } = derivedState;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
 
@@ -216,6 +218,18 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return m;
   }, [categories]);
 
+  const approvalMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const a of approvals || []) {
+      const id = Number((a as any).id);
+      if (Number.isFinite(id)) m[id] = a;
+    }
+    return m;
+  }, [approvals]);
+
+  // Memoize taskApprovalInstances to prevent unnecessary column rebuilds
+  const stableTaskApprovalInstances = useMemo(() => taskApprovalInstances, [taskApprovalInstances]);
+
   // Refs for data access in callbacks
   const statusMapRef = useRef(statusMap);
   useEffect(() => { statusMapRef.current = statusMap; }, [statusMap]);
@@ -273,6 +287,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           if (!TasksCache.initialized) await TasksCache.init();
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          // Default sort by created_at desc
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
           const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
           const totalFiltered = countResp?.rowCount ?? 0;
           const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
@@ -295,6 +311,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           // Build minimal params equivalent to the grid query
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          // Default sort by created_at desc
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
 
           const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: result.totalFiltered });
           setClientRows(rowsResp?.rows || []);
@@ -365,12 +383,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
     categoryMap,
     showDescriptions: density !== 'compact',
+    approvalMap,
+    taskApprovalInstances: stableTaskApprovalInstances,
   } as any), [
     statusMap, priorityMap, spotMap, userMap,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density,
+    approvalMap, stableTaskApprovalInstances
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 
@@ -475,6 +496,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         const mergedFm = { ...(activeFm || {}), ...(externalFilterModelRef.current || {}) };
         const normalizedFm = normalizeFilterModelForQuery(mergedFm);
         baseParams.filterModel = normalizedFm;
+        // Get sort model from grid and pass to query
+        const sortModel = gridRef.current.api.getSortModel?.() || [];
+        if (sortModel.length > 0) {
+          baseParams.sortModel = sortModel;
+        } else {
+          // Default to created_at desc if no sort is set
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
+        }
         console.log('[WT Filters] refreshGrid client-side baseParams.filterModel:', normalizedFm);
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
@@ -522,13 +551,37 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
     suppressPersistRef.current = true;
 
+    // Set default sort by created_at descending if no sort is already applied
+    // This must be done BEFORE setting datasource for infinite mode to ensure it's included in the first query
+    try {
+      const currentSort = params.api.getSortModel?.() || [];
+      if (currentSort.length === 0) {
+        params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+      }
+    } catch {}
+
     if (!useClientSide) {
+      // Set sort again to ensure it's applied (in case the first call didn't work)
+      try {
+        const sortModel = params.api.getSortModel?.() || [];
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
+          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        }
+      } catch {}
+      
       const ds = { rowCount: undefined, getRows };
       params.api.setGridOption('datasource', ds);
       console.log('[WT Filters] onGridReady refreshing infinite cache');
       params.api.refreshInfiniteCache();
     } else {
       console.log('[WT Filters] onGridReady client-side refresh');
+      // Ensure sort is set before refreshing
+      try {
+        const sortModel = params.api.getSortModel?.() || [];
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
+          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        }
+      } catch {}
       refreshGrid();
     }
 
@@ -641,10 +694,17 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             onSelectionChanged(ids);
           } catch { onSelectionChanged([] as number[]); }
         }}
-        animateRows={true}
+        onRowClicked={(e: any) => {
+          if (onRowClicked && e?.data) {
+            onRowClicked(e.data);
+          }
+        }}
+        animateRows={false}
         suppressColumnVirtualisation={true}
         suppressNoRowsOverlay={false}
         loading={false}
+        suppressScrollOnNewData={true}
+        suppressAnimationFrame={false}
       />
     </Suspense>
   );

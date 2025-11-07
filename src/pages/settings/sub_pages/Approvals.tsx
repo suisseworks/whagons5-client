@@ -127,6 +127,15 @@ function Approvals() {
       },
     },
     {
+      field: 'approval_type',
+      headerName: 'Approval Type',
+      width: 130,
+      cellRenderer: (p: ICellRendererParams) => {
+        const type = String(p?.data?.approval_type || '').toUpperCase();
+        return type === 'PARALLEL' ? 'Parallel' : 'Sequential';
+      },
+    },
+    {
       field: 'trigger_type',
       headerName: 'Trigger',
       width: 140,

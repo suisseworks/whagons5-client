@@ -236,16 +236,19 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
           ) : (
             <div className="border rounded-md">
               <div className="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-t-md">
-                <div className="col-span-7">Approver</div>
+                <div className="col-span-5">Approver</div>
+                <div className="col-span-2">Approval Type</div>
                 <div className="col-span-3">Required</div>
                 <div className="col-span-2 text-right">Actions</div>
               </div>
               <div className="divide-y">
                 {items.map(i => (
                   <div key={i.id} className="grid grid-cols-12 gap-2 items-center px-3 py-2.5">
-                    <div className="col-span-7 truncate">
+                    <div className="col-span-5 truncate">
                       <div className="font-medium leading-tight">{nameOf(i)}</div>
-                      <div className="text-[11px] text-muted-foreground">{i.approver_type === 'user' ? 'User' : 'Role'}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-sm capitalize">{i.approver_type === 'user' ? 'User' : 'Role'}</div>
                     </div>
                     <div className="col-span-3">
                       <input type="checkbox" className="rounded" checked={i.required} onChange={() => toggleRequired(i.id)} />

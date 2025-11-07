@@ -3,7 +3,12 @@
 export function buildGetRows(TasksCache: any, refs: any) {
   const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
   return async (params: any) => {
-    const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(params.sortModel || [])}-${searchRef.current}`;
+   // Default sortModel to created_at desc if not provided
+    const sortModel = params.sortModel && params.sortModel.length > 0 
+      ? params.sortModel 
+      : [{ colId: 'created_at', sort: 'desc' }];
+    
+    const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(sortModel)}-${searchRef.current}`;
     if (rowCache.current.has(cacheKey)) {
       const cachedData = rowCache.current.get(cacheKey)!;
       params.successCallback(cachedData.rows, cachedData.rowCount);
@@ -32,6 +37,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
       const queryParams: any = {
         ...normalized,
         search: searchRef.current,
+        sortModel: sortModel, // Always include sortModel, defaulting to created_at desc
       };
       if (workspaceRef.current !== 'all') {
         queryParams.workspace_id = workspaceRef.current;
