@@ -351,7 +351,6 @@ function Users() {
             Manage Job Positions
           </Button>
           <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
-            <span className="mr-2 inline-flex items-center"><svg width="0" height="0" className="hidden" aria-hidden="true"></svg></span>
             Create Invitation
           </Button>
         </div>
