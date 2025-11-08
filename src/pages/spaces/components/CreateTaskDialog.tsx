@@ -176,6 +176,12 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         setName(t.name || ''); // Always set name from template
         setSlaId(t.sla_id || null);
         setApprovalId(t.approval_id || null);
+        // Clear spot if spots are not applicable for this template
+        if (t.spots_not_applicable) {
+          setSpotId(null);
+        } else if (t.default_spot_id) {
+          setSpotId(t.default_spot_id);
+        }
       }
     }
   }, [templateId, workspaceTemplates, categoryPriorities]);
@@ -215,6 +221,9 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId) return;
     try {
       setIsSubmitting(true);
+      const selectedTemplate = workspaceTemplates.find((t: any) => t.id === templateId);
+      const spotsApplicable = !selectedTemplate?.spots_not_applicable;
+      
       const payload: any = {
         name: name.trim(),
         description: description.trim() || null,
@@ -222,7 +231,6 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         category_id: categoryId,
         team_id: derivedTeamId,
         template_id: templateId,
-        spot_id: spotId,
         status_id: categoryInitialStatusId,
         priority_id: priorityId ?? 0,
         sla_id: slaId,
@@ -242,6 +250,11 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
           ? selectedUserIds.map((id) => parseInt(String(id), 10)).filter((n) => Number.isFinite(n))
           : [],
       };
+      
+      // Only include spot_id if spots are applicable for this template
+      if (spotsApplicable) {
+        payload.spot_id = spotId;
+      }
 
       await dispatch(addTaskAsync(payload)).unwrap();
       onOpenChange(false);
@@ -378,25 +391,36 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                 )}
 
                 {/* Location */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-medium font-[500] text-foreground">
-                    Location
-                  </Label>
-                  <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
-                    <Combobox
-                      options={workspaceSpots.map((s: any) => ({
-                        value: String(s.id),
-                        label: s.name,
-                      }))}
-                      value={spotId ? String(spotId) : undefined}
-                      onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
-                      placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
-                      searchPlaceholder="Search locations..."
-                      emptyText="No locations found."
-                      className="w-full"
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const selectedTemplate = workspaceTemplates.find((t: any) => t.id === templateId);
+                  const spotsApplicable = !selectedTemplate?.spots_not_applicable;
+                  
+                  if (!spotsApplicable) {
+                    return null; // Hide the Location field when spots are not applicable
+                  }
+                  
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm font-medium font-[500] text-foreground">
+                        Location
+                      </Label>
+                      <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                        <Combobox
+                          options={workspaceSpots.map((s: any) => ({
+                            value: String(s.id),
+                            label: s.name,
+                          }))}
+                          value={spotId ? String(spotId) : undefined}
+                          onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
+                          placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
+                          searchPlaceholder="Search locations..."
+                          emptyText="No locations found."
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Priority */}
                 <div className="flex flex-col gap-2">

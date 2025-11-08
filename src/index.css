@@ -527,23 +527,11 @@
 }
 
 
-/* Subtle background pattern for sidebar surfaces */
+/* Clean sidebar background - no patterns */
 @layer utilities {
   .bg-sidebar-header { background-color: var(--sidebar-header); }
   .bg-sidebar {
-    /* Very subtle dot grid; tuned for light theme */
-    background-image:
-      radial-gradient(hsl(0 0% 0% / 0.045) 1px, transparent 1px),
-      radial-gradient(hsl(0 0% 0% / 0.03) 1px, transparent 1px);
-    background-position: 0 0, 6px 6px;
-    background-size: 12px 12px;
-  }
-
-  .dark .bg-sidebar {
-    /* Slightly brighter dots on dark to ensure visibility */
-    background-image:
-      radial-gradient(hsl(0 0% 100% / 0.075) 1px, transparent 1px),
-      radial-gradient(hsl(0 0% 100% / 0.05) 1px, transparent 1px);
+    background-color: var(--sidebar);
   }
 }
 

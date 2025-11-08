@@ -180,7 +180,7 @@ export interface SelectFieldProps {
   value?: string | number;
   defaultValue?: string | number;
   onChange?: (value: string) => void;
-  options: Array<{ value: string | number; label: string; disabled?: boolean }>;
+  options: Array<{ value: string | number; label: string; disabled?: boolean; color?: string }>;
   placeholder?: string;
   required?: boolean;
   className?: string;
@@ -228,7 +228,15 @@ export function SelectField({
           <SelectContent>
             {options.map((option) => (
               <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
-                {option.label}
+                <div className="flex items-center gap-2">
+                  {option.color && (
+                    <div 
+                      className="w-2 h-2 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: option.color }}
+                    />
+                  )}
+                  <span>{option.label}</span>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>
@@ -252,7 +260,15 @@ export function SelectField({
             const val = String(option.value);
             return (
               <SelectItem key={`${id}-${val}`} value={val} disabled={option.disabled}>
-                {option.label}
+                <div className="flex items-center gap-2">
+                  {option.color && (
+                    <div 
+                      className="w-2 h-2 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: option.color }}
+                    />
+                  )}
+                  <span>{option.label}</span>
+                </div>
               </SelectItem>
             );
           })}
@@ -369,16 +385,41 @@ export function ColorIndicatorCellRenderer({ value, name, color }: { value: stri
   );
 }
 
-export function AvatarCellRenderer({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+export function AvatarCellRenderer({ name, color, size = "md" }: { name: string; color?: string | null; size?: "sm" | "md" | "lg" }) {
   const sizeClasses = {
     sm: "w-6 h-6 min-w-[1.5rem] text-xs",
     md: "w-8 h-8 min-w-[2rem] text-sm", 
     lg: "w-10 h-10 min-w-[2.5rem] text-base"
   };
   
+  // Calculate text color based on background brightness
+  const getTextColor = (bgColor: string): string => {
+    if (!bgColor) return '#ffffff';
+    try {
+      // Handle both #RGB and #RRGGBB formats
+      const hex = bgColor.length === 4
+        ? `#${bgColor[1]}${bgColor[1]}${bgColor[2]}${bgColor[2]}${bgColor[3]}${bgColor[3]}`
+        : bgColor;
+      
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+      return brightness > 180 ? '#111827' : '#ffffff';
+    } catch {
+      return '#ffffff';
+    }
+  };
+
+  const backgroundColor = color || undefined;
+  const textColor = color ? getTextColor(color) : undefined;
+  
   return (
     <div className="flex items-center space-x-2">
-      <div className={`${sizeClasses[size]} bg-primary text-primary-foreground rounded-full flex items-center justify-center font-medium flex-shrink-0`}>
+      <div 
+        className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-medium flex-shrink-0 ${!backgroundColor ? 'bg-primary text-primary-foreground' : ''}`}
+        style={backgroundColor ? { backgroundColor, color: textColor } : undefined}
+      >
         {name?.charAt(0)?.toUpperCase() || '?'}
       </div>
       <span className="truncate">{name}</span>

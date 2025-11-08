@@ -165,6 +165,7 @@ function Settings() {
   const categories = useSelector((s: RootState) => s.categories?.value ?? []);
   const templates = useSelector((s: RootState) => s.templates?.value ?? []);
   const teams = useSelector((s: RootState) => s.teams?.value ?? []);
+  const workspaces = useSelector((s: RootState) => (s as any).workspaces?.value ?? []);
   const statuses = useSelector((s: RootState) => s.statuses?.value ?? []);
   const priorities = useSelector((s: RootState) => s.priorities?.value ?? []);
   const slas = useSelector((s: RootState) => s.slas?.value ?? []);
@@ -179,6 +180,7 @@ function Settings() {
       categories: categories.length,
       templates: templates.length,
       teams: teams.length,
+      workspaces: workspaces.length,
       spots: spots.length,
       statuses: statuses.length,
       tags: tags.length,
@@ -188,7 +190,7 @@ function Settings() {
       forms: forms.length,
       workflows: 0,
     };
-  }, [categories.length, templates.length, teams.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length]);
+  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length]);
 
   const basicSettings = useMemo(() => [
     {
@@ -214,6 +216,14 @@ function Settings() {
       count: counts.templates,
       description: 'Manage task templates',
       color: 'text-blue-500'
+    },
+    {
+      id: 'workspaces',
+      title: 'Workspaces',
+      icon: faDiagramProject,
+      count: counts.workspaces,
+      description: 'Manage workspaces and projects',
+      color: 'text-cyan-500'
     },
     {
       id: 'spots',
@@ -256,7 +266,7 @@ function Settings() {
       color: 'text-rose-500'
     },
 
-  ], [counts.categories, counts.tags, counts.templates, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities]);
+  ], [counts.categories, counts.tags, counts.templates, counts.workspaces, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities]);
 
   // Settings configuration data
   const advancedSettings = useMemo(() => [
@@ -555,6 +565,9 @@ function Settings() {
         break;
       case 'templates':
         navigate('/settings/templates');
+        break;
+      case 'workspaces':
+        navigate('/settings/workspaces');
         break;
       case 'forms':
         navigate('/settings/forms');

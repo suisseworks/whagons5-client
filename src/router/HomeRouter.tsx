@@ -13,6 +13,7 @@ import CustomFieldsTab from '@/pages/settings/sub_pages/CustomFieldsTab';
 import Templates from '@/pages/settings/sub_pages/Templates';
 import Forms from '@/pages/settings/sub_pages/forms';
 import Teams from '@/pages/settings/sub_pages/Teams';
+import Workspaces from '@/pages/settings/sub_pages/Workspaces';
 import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';
 import Users from '@/pages/settings/sub_pages/Users';
@@ -75,6 +76,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
           <Route path="/settings/forms" element={<Forms />} />
+          <Route path="/settings/workspaces" element={<Workspaces />} />
           <Route path="/settings/teams" element={<Teams />} />
           <Route path="/settings/spots" element={<Spots />} />
           <Route path="/settings/spots/types" element={<SpotTypes />} />

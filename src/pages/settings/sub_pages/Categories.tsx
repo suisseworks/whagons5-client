@@ -82,9 +82,9 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
         style={{ color: categoryColor }}
       />
       <div className="flex flex-col leading-tight">
-        <span className={props.data?.enabled === false ? "line-through text-muted-foreground" : undefined}>{categoryName}</span>
+        <span className={!props.data?.enabled ? "line-through text-muted-foreground" : undefined}>{categoryName}</span>
         {props.data?.description ? (
-          <span className="text-xs text-muted-foreground truncate">{props.data.description}</span>
+          <span className={`text-xs truncate ${!props.data?.enabled ? "line-through text-muted-foreground" : "text-muted-foreground"}`}>{props.data.description}</span>
         ) : null}
       </div>
     </div>
@@ -248,8 +248,8 @@ function Categories() {
     { 
       field: 'name', 
       headerName: 'Category Name',
-      flex: 2,
-      minWidth: 150,
+      flex: 4,
+      minWidth: 350,
       cellRenderer: CategoryNameCellRenderer
     },
     // Description column removed; description now shown under name

@@ -183,6 +183,7 @@ export interface User {
     name: string;
     email: string;
     url_picture?: string | null;
+    color?: string | null;
     role_id?: number | null;
     workspace_id?: number | null;
     is_active: boolean;

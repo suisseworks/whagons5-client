@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search, SlidersHorizontal, ChevronUp } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search, SlidersHorizontal, ChevronUp, BarChart3 } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -10,6 +10,7 @@ import CalendarViewTab from '@/pages/spaces/components/CalendarViewTab';
 import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
+import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
 import { Input } from '@/components/ui/input';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -435,6 +436,19 @@ export const Workspace = () => {
           <SettingsComponent workspaceId={id} />
         </motion.div>
       )
+    },
+    {
+      value: 'statistics',
+      label: (
+        <div className="flex items-center gap-2" aria-label="Statistics">
+          <BarChart3 />
+        </div>
+      ),
+      content: (
+        <motion.div key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <WorkspaceStatistics workspaceId={id} />
+        </motion.div>
+      )
     }
   ];
 
@@ -642,7 +656,7 @@ export const Workspace = () => {
           tabs={workspaceTabs}
           defaultValue="grid"
           basePath={`/workspace/${id}`}
-          pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings' }}
+          pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' }}
           className="w-full h-full flex flex-col"
           onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v); }}
           showClearFilters={showClearFilters}

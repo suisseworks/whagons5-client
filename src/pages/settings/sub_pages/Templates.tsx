@@ -1,8 +1,8 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Template, Task, Category, Approval } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -24,6 +24,8 @@ import {
 } from "../components";
   import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { MultiSelect } from "@/components/ui/multi-select";
+import ReactECharts from 'echarts-for-react';
+import dayjs from 'dayjs';
 
 // Custom component for async icon loading in Templates
 const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
@@ -88,6 +90,21 @@ function Templates() {
   const [createDefaultUserValues, setCreateDefaultUserValues] = useState<string[]>([]);
   const [editDefaultUserValues, setEditDefaultUserValues] = useState<string[]>([]);
 
+  // Statistics state
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statistics, setStatistics] = useState<{
+    totalTemplates: number;
+    withDefaultSpot: number;
+    withDefaultUsers: number;
+    withExpectedDuration: number;
+    mostUsedTemplates: Array<{ template: Template; count: number }>;
+    urgentTasksCount: number;
+    tasksWithApprovalsCount: number;
+    latestTasks: Task[];
+    templatesByCategory: Array<{ category: Category; count: number }>;
+    tasksOverTime: Array<{ date: string; count: number }>;
+  } | null>(null);
+
   // Convert users to MultiSelectOption format
   const userOptions = useMemo(() => {
     return (users as any[]).map((user: any) => ({
@@ -132,6 +149,7 @@ function Templates() {
     sla_id: '',
     approval_id: '',
     default_spot_id: '',
+    spots_not_applicable: false,
     expected_duration: '',
     enabled: true
   });
@@ -142,6 +160,7 @@ function Templates() {
     sla_id: '',
     approval_id: '',
     default_spot_id: '',
+    spots_not_applicable: false,
     expected_duration: '',
     enabled: true
   });
@@ -153,18 +172,33 @@ function Templates() {
         : [];
       setEditDefaultUserValues(ids);
 
+      // Validate that priority belongs to category (safety check)
+      const categoryId = editingTemplate.category_id;
+      const priorityId = (editingTemplate as any).priority_id;
+      let validPriorityId = priorityId?.toString() || '';
+      
+      if (categoryId && priorityId) {
+        const categoryPriorities = (priorities as any[]).filter((p: any) => p.category_id === categoryId);
+        const isValidPriority = categoryPriorities.find((p: any) => p.id === priorityId);
+        if (!isValidPriority) {
+          // Priority doesn't belong to category, reset it
+          validPriorityId = '';
+        }
+      }
+
       // Set form data values
       setEditFormData({
-        category_id: editingTemplate.category_id?.toString() || '',
-        priority_id: (editingTemplate as any).priority_id?.toString() || '',
+        category_id: categoryId?.toString() || '',
+        priority_id: validPriorityId,
         sla_id: (editingTemplate as any).sla_id?.toString() || '',
         approval_id: (editingTemplate as any).approval_id?.toString() || '',
         default_spot_id: (editingTemplate as any).default_spot_id?.toString() || '',
+        spots_not_applicable: (editingTemplate as any).spots_not_applicable === true,
         expected_duration: (editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : '',
         enabled: (editingTemplate as any).enabled !== false // Default to true if not set
       });
     }
-  }, [isEditDialogOpen, editingTemplate]);
+  }, [isEditDialogOpen, editingTemplate, priorities]);
 
   // Helper functions
   const minutesToHHMM = (totalMinutes: number | null | undefined) => {
@@ -183,6 +217,125 @@ function Templates() {
     return getTemplateTaskCount(template.id) === 0;
   };
 
+  // Track active tab to calculate stats when statistics tab is selected
+  const [activeTab, setActiveTab] = useState<string>('templates');
+  const isCalculatingRef = useRef(false);
+
+  // Calculate statistics
+  const calculateStatistics = useCallback(async () => {
+    // Prevent concurrent calculations
+    if (isCalculatingRef.current) return;
+    
+    isCalculatingRef.current = true;
+    setStatsLoading(true);
+    
+    // Simulate async calculation (in case of large datasets)
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    try {
+      const templateTasks = (tasks as Task[]).filter((task: Task) => task.template_id !== null);
+      
+      // Most used templates
+      const templateUsage = new Map<number, number>();
+      templateTasks.forEach((task: Task) => {
+        if (task.template_id) {
+          templateUsage.set(task.template_id, (templateUsage.get(task.template_id) || 0) + 1);
+        }
+      });
+      
+      const mostUsedTemplates = Array.from(templateUsage.entries())
+        .map(([templateId, count]) => ({
+          template: templates.find((t: Template) => t.id === templateId)!,
+          count
+        }))
+        .filter(item => item.template)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+      // Urgent tasks (high priority level - assuming level 4+ is urgent, or check priority name)
+      const urgentTasksCount = templateTasks.filter((task: Task) => {
+        const priority = (priorities as any[]).find((p: any) => p.id === task.priority_id);
+        if (priority?.level && priority.level >= 4) return true;
+        if (priority?.name) {
+          const nameLower = priority.name.toLowerCase();
+          return nameLower.includes('urgent') || nameLower.includes('critical') || nameLower.includes('high');
+        }
+        return false;
+      }).length;
+
+      // Tasks with approvals
+      const tasksWithApprovalsCount = templateTasks.filter((task: Task) => 
+        task.approval_id !== null && task.approval_id !== undefined
+      ).length;
+
+      // Latest tasks (last 10)
+      const latestTasks = [...templateTasks]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10);
+
+      // Templates by category
+      const categoryCounts = new Map<number, number>();
+      templates.forEach((template: Template) => {
+        const catId = template.category_id;
+        categoryCounts.set(catId, (categoryCounts.get(catId) || 0) + 1);
+      });
+
+      const templatesByCategory = Array.from(categoryCounts.entries())
+        .map(([categoryId, count]) => ({
+          category: (categories as Category[]).find((c: Category) => c.id === categoryId)!,
+          count
+        }))
+        .filter(item => item.category)
+        .sort((a, b) => b.count - a.count);
+
+      // Tasks over time (last 30 days)
+      const now = dayjs();
+      const tasksOverTimeMap = new Map<string, number>();
+      
+      templateTasks.forEach((task: Task) => {
+        const date = dayjs(task.created_at).format('YYYY-MM-DD');
+        tasksOverTimeMap.set(date, (tasksOverTimeMap.get(date) || 0) + 1);
+      });
+
+      const tasksOverTime = Array.from(tasksOverTimeMap.entries())
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-30); // Last 30 days
+
+      setStatistics({
+        totalTemplates: templates.length,
+        withDefaultSpot: templates.filter((t: any) => t.default_spot_id).length,
+        withDefaultUsers: templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length,
+        withExpectedDuration: templates.filter((t: any) => (t.expected_duration ?? 0) > 0).length,
+        mostUsedTemplates,
+        urgentTasksCount,
+        tasksWithApprovalsCount,
+        latestTasks,
+        templatesByCategory,
+        tasksOverTime
+      });
+    } catch (error) {
+      console.error('Error calculating statistics:', error);
+    } finally {
+      setStatsLoading(false);
+      isCalculatingRef.current = false;
+    }
+  }, [templates, tasks, priorities, categories]);
+
+  useEffect(() => {
+    // Reset statistics when switching away from statistics tab
+    if (activeTab !== 'statistics') {
+      setStatistics(null);
+      return;
+    }
+    
+    // Calculate statistics when switching to statistics tab
+    if (activeTab === 'statistics' && !isCalculatingRef.current) {
+      setStatistics(null); // Clear old stats first
+      calculateStatistics();
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleDeleteTemplate = (template: Template) => {
     if (canDeleteTemplate(template)) {
       deleteItem(template.id);
@@ -197,6 +350,32 @@ function Templates() {
     (priorities as any[]).forEach((p: any) => map.set(Number(p.id), { name: p.name, color: p.color }));
     return map;
   }, [priorities]);
+
+  // Filter priorities by selected category (for create form)
+  // Show category priorities first, fall back to global priorities if none exist
+  const createCategoryPriorities = useMemo(() => {
+    if (!createFormData.category_id) return [];
+    const categoryId = parseInt(createFormData.category_id);
+    const categoryPriorities = (priorities as any[]).filter((p: any) => p.category_id === categoryId);
+    // If no category priorities exist, show global priorities (category_id is null)
+    if (categoryPriorities.length === 0) {
+      return (priorities as any[]).filter((p: any) => p.category_id === null || p.category_id === undefined);
+    }
+    return categoryPriorities;
+  }, [priorities, createFormData.category_id]);
+
+  // Filter priorities by selected category (for edit form)
+  // Show category priorities first, fall back to global priorities if none exist
+  const editCategoryPriorities = useMemo(() => {
+    if (!editFormData.category_id) return [];
+    const categoryId = parseInt(editFormData.category_id);
+    const categoryPriorities = (priorities as any[]).filter((p: any) => p.category_id === categoryId);
+    // If no category priorities exist, show global priorities (category_id is null)
+    if (categoryPriorities.length === 0) {
+      return (priorities as any[]).filter((p: any) => p.category_id === null || p.category_id === undefined);
+    }
+    return categoryPriorities;
+  }, [priorities, editFormData.category_id]);
 
   const slaById = useMemo(() => {
     const map = new Map<number, any>();
@@ -409,7 +588,8 @@ function Templates() {
       priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
       approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
-      default_spot_id: createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null,
+      default_spot_id: createFormData.spots_not_applicable ? null : (createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null),
+      spots_not_applicable: createFormData.spots_not_applicable,
       default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
       instructions,
       expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
@@ -430,6 +610,7 @@ function Templates() {
       sla_id: '',
       approval_id: '',
       default_spot_id: '',
+      spots_not_applicable: false,
       expected_duration: '',
       enabled: true
     });
@@ -466,7 +647,8 @@ function Templates() {
       priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
       approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
-      default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null,
+      default_spot_id: editFormData.spots_not_applicable ? null : (editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null),
+      spots_not_applicable: editFormData.spots_not_applicable,
       default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
       instructions,
       expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
@@ -498,7 +680,8 @@ function Templates() {
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : ((editingTemplate as any).priority_id ?? null),
         sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : ((editingTemplate as any).sla_id ?? null),
         approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : ((editingTemplate as any).approval_id ?? null),
-        default_spot_id: editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : ((editingTemplate as any).default_spot_id ?? null),
+        default_spot_id: editFormData.spots_not_applicable ? null : (editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : ((editingTemplate as any).default_spot_id ?? null)),
+        spots_not_applicable: editFormData.spots_not_applicable,
         default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
         instructions: (editingTemplate as any).instructions ?? null,
         expected_duration: (() => { const raw: any = (document.getElementById('edit-expected_duration') as HTMLInputElement | null)?.value; const n = parseInt(raw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
@@ -618,35 +801,289 @@ function Templates() {
               </div>
             ),
             content: (
-              <div className="flex-1 min-h-0 overflow-auto">
-                <Card>
-                  <CardHeader className="py-1">
-                    <CardTitle className="text-sm">Template Statistics</CardTitle>
-                    <CardDescription className="text-[11px] text-muted-foreground/70">
-                      Overview of your template management
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{templates.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Total Templates</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{templates.filter((t: any) => t.default_spot_id).length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">With Default Spot</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">With Default Users</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{templates.filter((t: any) => (t.expected_duration ?? 0) > 0).length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">With Expected Duration</div>
-                      </div>
+              <div className="flex-1 min-h-0 overflow-auto p-4">
+                {statsLoading ? (
+                  <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                    <FontAwesomeIcon icon={faSpinner} className="w-8 h-8 text-muted-foreground animate-spin mb-4" />
+                    <p className="text-sm text-muted-foreground">Calculating statistics...</p>
+                  </div>
+                ) : statistics ? (
+                  <div className="space-y-4">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold">{statistics.totalTemplates}</div>
+                            <div className="text-xs text-muted-foreground mt-1">Total Templates</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-orange-600">{statistics.urgentTasksCount}</div>
+                            <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                              <FontAwesomeIcon icon={faExclamationTriangle} className="w-3 h-3" />
+                              Urgent Tasks
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">{statistics.tasksWithApprovalsCount}</div>
+                            <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                              <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3" />
+                              With Approvals
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">{statistics.latestTasks.length}</div>
+                            <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                              <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
+                              Recent Tasks
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                  </CardContent>
-                </Card>
+
+                    {/* Charts Row */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Most Used Templates Chart */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">Most Used Templates</CardTitle>
+                          <CardDescription className="text-xs">Top templates by task count</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {statistics.mostUsedTemplates.length > 0 ? (
+                            <ReactECharts
+                              option={{
+                                tooltip: {
+                                  trigger: 'axis',
+                                  axisPointer: { type: 'shadow' }
+                                },
+                                grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                                xAxis: {
+                                  type: 'value',
+                                  name: 'Tasks'
+                                },
+                                yAxis: {
+                                  type: 'category',
+                                  data: statistics.mostUsedTemplates.map(item => item.template.name).reverse(),
+                                  axisLabel: {
+                                    formatter: (value: string) => value.length > 20 ? value.substring(0, 20) + '...' : value
+                                  }
+                                },
+                                series: [{
+                                  name: 'Tasks Created',
+                                  type: 'bar',
+                                  data: statistics.mostUsedTemplates.map(item => item.count).reverse(),
+                                  itemStyle: {
+                                    color: '#3b82f6'
+                                  }
+                                }]
+                              }}
+                              style={{ height: '300px' }}
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                              No template usage data available
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Templates by Category Chart */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">Templates by Category</CardTitle>
+                          <CardDescription className="text-xs">Distribution across categories</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {statistics.templatesByCategory.length > 0 ? (
+                            <ReactECharts
+                              option={{
+                                tooltip: {
+                                  trigger: 'item',
+                                  formatter: '{b}: {c} ({d}%)'
+                                },
+                                legend: {
+                                  orient: 'vertical',
+                                  left: 'left',
+                                  textStyle: { fontSize: 11 }
+                                },
+                                series: [{
+                                  name: 'Templates',
+                                  type: 'pie',
+                                  radius: ['40%', '70%'],
+                                  avoidLabelOverlap: false,
+                                  itemStyle: {
+                                    borderRadius: 8,
+                                    borderColor: '#fff',
+                                    borderWidth: 2
+                                  },
+                                  label: {
+                                    show: true,
+                                    formatter: '{b}: {c}'
+                                  },
+                                  emphasis: {
+                                    label: {
+                                      show: true,
+                                      fontSize: 14,
+                                      fontWeight: 'bold'
+                                    }
+                                  },
+                                  data: statistics.templatesByCategory.map(item => ({
+                                    value: item.count,
+                                    name: item.category.name
+                                  }))
+                                }]
+                              }}
+                              style={{ height: '300px' }}
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                              No category data available
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Tasks Over Time Chart */}
+                    {statistics.tasksOverTime.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">Tasks Created Over Time</CardTitle>
+                          <CardDescription className="text-xs">Last 30 days of template-based task creation</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <ReactECharts
+                            option={{
+                              tooltip: {
+                                trigger: 'axis',
+                                formatter: (params: any) => {
+                                  const param = params[0];
+                                  return `${param.axisValue}<br/>${param.marker}${param.seriesName}: ${param.value}`;
+                                }
+                              },
+                              grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                              xAxis: {
+                                type: 'category',
+                                data: statistics.tasksOverTime.map(item => dayjs(item.date).format('MMM DD')),
+                                axisLabel: {
+                                  rotate: 45,
+                                  fontSize: 10
+                                }
+                              },
+                              yAxis: {
+                                type: 'value',
+                                name: 'Tasks'
+                              },
+                              series: [{
+                                name: 'Tasks Created',
+                                type: 'line',
+                                smooth: true,
+                                data: statistics.tasksOverTime.map(item => item.count),
+                                areaStyle: {
+                                  color: {
+                                    type: 'linear',
+                                    x: 0,
+                                    y: 0,
+                                    x2: 0,
+                                    y2: 1,
+                                    colorStops: [
+                                      { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                                      { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                                    ]
+                                  }
+                                },
+                                itemStyle: {
+                                  color: '#3b82f6'
+                                },
+                                lineStyle: {
+                                  color: '#3b82f6',
+                                  width: 2
+                                }
+                              }]
+                            }}
+                            style={{ height: '300px' }}
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Latest Tasks List */}
+                    {statistics.latestTasks.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">Latest Tasks from Templates</CardTitle>
+                          <CardDescription className="text-xs">Most recently created tasks using templates</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            {statistics.latestTasks.map((task: Task) => {
+                              const template = templates.find((t: Template) => t.id === task.template_id);
+                              return (
+                                <div key={task.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-accent/50">
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium">{task.name}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Template: {template?.name || 'Unknown'} • {dayjs(task.created_at).format('MMM DD, YYYY HH:mm')}
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline" className="ml-2">
+                                    {getTemplateTaskCount(task.template_id || 0)} total
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Additional Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-xl font-semibold">{statistics.withDefaultSpot}</div>
+                            <div className="text-xs text-muted-foreground mt-1">With Default Spot</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-xl font-semibold">{statistics.withDefaultUsers}</div>
+                            <div className="text-xs text-muted-foreground mt-1">With Default Users</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-xl font-semibold">{statistics.withExpectedDuration}</div>
+                            <div className="text-xs text-muted-foreground mt-1">With Expected Duration</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                    <p className="text-sm text-muted-foreground">Click the Statistics tab to load statistics</p>
+                  </div>
+                )}
               </div>
             )
           }
@@ -654,6 +1091,7 @@ function Templates() {
         defaultValue="templates"
         basePath="/settings/templates"
         className="h-full flex flex-col"
+        onValueChange={setActiveTab}
       />
 
       {/* Create Template Dialog */}
@@ -671,6 +1109,7 @@ function Templates() {
               priority_id: '',
               sla_id: '',
               default_spot_id: '',
+              spots_not_applicable: false,
               expected_duration: '',
               enabled: true
             });
@@ -704,29 +1143,56 @@ function Templates() {
             id="category"
             label="Category"
             value={createFormData.category_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, category_id: value }))}
+            onChange={(value) => {
+              setCreateFormData(prev => {
+                const newCategoryId = value;
+                const newCategoryPriorities = newCategoryId 
+                  ? (priorities as any[]).filter((p: any) => p.category_id === parseInt(newCategoryId))
+                  : [];
+                const currentPriority = prev.priority_id ? (priorities as any[]).find((p: any) => p.id === parseInt(prev.priority_id)) : null;
+                const isCurrentPriorityGlobal = currentPriority && (currentPriority.category_id === null || currentPriority.category_id === undefined);
+                
+                // If category has priorities, reset if current priority doesn't belong to category
+                // If category has no priorities, keep global priority if current is global
+                let shouldResetPriority = false;
+                if (prev.priority_id) {
+                  if (newCategoryPriorities.length > 0) {
+                    // Category has priorities - reset if current priority is not in category
+                    shouldResetPriority = !newCategoryPriorities.find((p: any) => p.id === parseInt(prev.priority_id));
+                  } else {
+                    // Category has no priorities - reset if current priority is not global
+                    shouldResetPriority = !isCurrentPriorityGlobal;
+                  }
+                }
+                
+                return {
+                  ...prev,
+                  category_id: value,
+                  priority_id: shouldResetPriority ? '' : prev.priority_id
+                };
+              });
+            }}
             placeholder="Select Category"
             options={categories.map((category: Category) => ({
               value: category.id.toString(),
               label: category.name
             }))}
           />
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="priority" className="text-right">Priority</Label>
-            <select
-              id="priority"
-              name="priority_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              defaultValue=""
-            >
-              <option value="">None</option>
-              {Array.from(priorityById.entries()).map(([id, priority]) => (
-                <option key={id} value={String(id)}>
-                  {priority.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            id="priority"
+            label="Priority"
+            value={createFormData.priority_id || 'none'}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, priority_id: value === 'none' ? '' : value }))}
+            placeholder="None"
+            options={[
+              { value: 'none', label: 'None' },
+              ...createCategoryPriorities.map((priority: any) => ({
+                value: priority.id.toString(),
+                label: priority.name,
+                color: priority.color || '#6b7280'
+              }))
+            ]}
+          />
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="sla" className="text-right">SLA</Label>
             <select
@@ -763,14 +1229,29 @@ function Templates() {
           </TabsContent>
           <TabsContent value="defaults">
             <div className="grid gap-4 min-h-[480px]">
-              <SelectField
-                id="default_spot_id"
-                label="Default Spot"
-                value={createFormData.default_spot_id}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, default_spot_id: value }))}
-                placeholder="None"
-                options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))}
+              <CheckboxField 
+                id="spots_not_applicable" 
+                label="Spots Not Applicable" 
+                checked={createFormData.spots_not_applicable}
+                onChange={(checked) => {
+                  setCreateFormData(prev => ({ 
+                    ...prev, 
+                    spots_not_applicable: checked,
+                    default_spot_id: checked ? '' : prev.default_spot_id // Clear spot if spots not applicable
+                  }));
+                }}
+                description="When enabled, tasks created from this template will not require a location/spot"
               />
+              {!createFormData.spots_not_applicable && (
+                <SelectField
+                  id="default_spot_id"
+                  label="Default Spot"
+                  value={createFormData.default_spot_id}
+                  onChange={(value) => setCreateFormData(prev => ({ ...prev, default_spot_id: value }))}
+                  placeholder="None"
+                  options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))}
+                />
+              )}
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">Default Users</Label>
                 <div className="col-span-3">
@@ -814,6 +1295,7 @@ function Templates() {
               priority_id: '',
               sla_id: '',
               default_spot_id: '',
+              spots_not_applicable: false,
               expected_duration: '',
               enabled: true
             });
@@ -871,7 +1353,35 @@ function Templates() {
               id="edit-category"
               label="Category"
               value={editFormData.category_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, category_id: value }))}
+              onChange={(value) => {
+                setEditFormData(prev => {
+                  const newCategoryId = value;
+                  const newCategoryPriorities = newCategoryId 
+                    ? (priorities as any[]).filter((p: any) => p.category_id === parseInt(newCategoryId))
+                    : [];
+                  const currentPriority = prev.priority_id ? (priorities as any[]).find((p: any) => p.id === parseInt(prev.priority_id)) : null;
+                  const isCurrentPriorityGlobal = currentPriority && (currentPriority.category_id === null || currentPriority.category_id === undefined);
+                  
+                  // If category has priorities, reset if current priority doesn't belong to category
+                  // If category has no priorities, keep global priority if current is global
+                  let shouldResetPriority = false;
+                  if (prev.priority_id) {
+                    if (newCategoryPriorities.length > 0) {
+                      // Category has priorities - reset if current priority is not in category
+                      shouldResetPriority = !newCategoryPriorities.find((p: any) => p.id === parseInt(prev.priority_id));
+                    } else {
+                      // Category has no priorities - reset if current priority is not global
+                      shouldResetPriority = !isCurrentPriorityGlobal;
+                    }
+                  }
+                  
+                  return {
+                    ...prev,
+                    category_id: value,
+                    priority_id: shouldResetPriority ? '' : prev.priority_id
+                  };
+                });
+              }}
               placeholder="Select Category"
               options={categories.map((category: Category) => ({
                 value: category.id.toString(),
@@ -882,13 +1392,17 @@ function Templates() {
             <SelectField
               id="edit-priority"
               label="Priority"
-              value={editFormData.priority_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, priority_id: value }))}
+              value={editFormData.priority_id || 'none'}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, priority_id: value === 'none' ? '' : value }))}
               placeholder="None"
-              options={Array.from(priorityById.entries()).map(([id, priority]) => ({
-                value: id.toString(),
-                label: priority.name
-              }))}
+              options={[
+                { value: 'none', label: 'None' },
+                ...editCategoryPriorities.map((priority: any) => ({
+                  value: priority.id.toString(),
+                  label: priority.name,
+                  color: priority.color || '#6b7280'
+                }))
+              ]}
             />
             <SelectField
               id="edit-sla"
@@ -910,7 +1424,29 @@ function Templates() {
             </TabsContent>
             <TabsContent value="defaults">
               <div className="grid gap-4 min-h-[480px]">
-                <SelectField id="edit-default-spot" label="Default Spot" value={editFormData.default_spot_id} onChange={(value) => setEditFormData(prev => ({ ...prev, default_spot_id: value }))} placeholder="None" options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))} />
+                <CheckboxField 
+                  id="edit-spots_not_applicable" 
+                  label="Spots Not Applicable" 
+                  checked={editFormData.spots_not_applicable}
+                  onChange={(checked) => {
+                    setEditFormData(prev => ({ 
+                      ...prev, 
+                      spots_not_applicable: checked,
+                      default_spot_id: checked ? '' : prev.default_spot_id // Clear spot if spots not applicable
+                    }));
+                  }}
+                  description="When enabled, tasks created from this template will not require a location/spot"
+                />
+                {!editFormData.spots_not_applicable && (
+                  <SelectField 
+                    id="edit-default-spot" 
+                    label="Default Spot" 
+                    value={editFormData.default_spot_id} 
+                    onChange={(value) => setEditFormData(prev => ({ ...prev, default_spot_id: value }))} 
+                    placeholder="None" 
+                    options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))} 
+                  />
+                )}
                 <div className="grid grid-cols-4 items-start gap-4">
                   <Label className="text-right pt-2">Default Users</Label>
                   <div className="col-span-3">

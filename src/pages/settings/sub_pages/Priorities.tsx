@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpWideShort, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUpWideShort, faPlus, faChartBar, faGlobe, faTags } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
@@ -79,18 +79,62 @@ function Priorities() {
     category_id: ''
   });
 
+  // Reset create form when dialog opens
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      setCreateFormData({
+        name: '',
+        color: '#ef4444',
+        category_id: ''
+      });
+    }
+  }, [isCreateDialogOpen]);
+
   // Update edit form data when editing item changes
   useEffect(() => {
     if (editingItem) {
       setEditFormData({
         name: editingItem.name || '',
         color: editingItem.color || '#ef4444',
-        category_id: editingItem.category_id?.toString() || ''
+        category_id: editingItem.category_id?.toString() || 'none'
       });
     }
   }, [editingItem]);
 
-  const columns = useMemo<ColDef[]>(() => [
+  // Separate global and category priorities
+  const globalPriorities = useMemo(() => {
+    return (priorities as any[]).filter((p: any) => p.category_id === null || p.category_id === undefined);
+  }, [priorities]);
+
+  const categoryPriorities = useMemo(() => {
+    return (priorities as any[]).filter((p: any) => p.category_id !== null && p.category_id !== undefined);
+  }, [priorities]);
+
+  const globalColumns = useMemo<ColDef[]>(() => [
+    {
+      field: "name",
+      headerName: "Priority",
+      flex: 2,
+      minWidth: 200,
+      cellRenderer: PriorityNameCellRenderer
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 100, // Fixed compact width for icons only
+      suppressSizeToFit: true, // Lock size, no auto-expansion
+      cellRenderer: createActionsCellRenderer({
+        onEdit: handleEdit,
+        onDelete: handleDelete
+      }),
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: "right"
+    }
+  ], [handleEdit, handleDelete]);
+
+  const categoryColumns = useMemo<ColDef[]>(() => [
     {
       field: "name",
       headerName: "Priority",
@@ -210,25 +254,51 @@ function Priorities() {
       <UrlTabs
         tabs={[
           {
-            value: "priorities",
+            value: "global",
             label: (
               <div className="flex items-center gap-2">
-                <FontAwesomeIcon icon={faArrowUpWideShort} className="w-4 h-4" />
-                <span>Priorities</span>
+                <FontAwesomeIcon icon={faGlobe} className="w-4 h-4" />
+                <span>Global Priorities</span>
               </div>
             ),
             content: (
               <div className="flex h-full flex-col">
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
-                    rowData={filteredItems}
-                    columnDefs={columns}
+                    rowData={globalPriorities.filter((item: Priority) => 
+                      !searchQuery || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )}
+                    columnDefs={globalColumns}
+                    onRowClicked={handleEdit}
+                    gridOptions={{}}
+                    noRowsMessage="No global priorities found"
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "category",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faTags} className="w-4 h-4" />
+                <span>Category Priorities</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={categoryPriorities.filter((item: Priority) => 
+                      !searchQuery || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )}
+                    columnDefs={categoryColumns}
                     onRowClicked={handleEdit}
                     gridOptions={{
                       groupDisplayType: 'groupRows',
                       groupDefaultExpanded: -1
                     }}
-                    noRowsMessage="No priorities found"
+                    noRowsMessage="No category priorities found"
                   />
                 </div>
               </div>
@@ -249,8 +319,16 @@ function Priorities() {
                     <CardTitle className="text-sm">Priority Statistics</CardTitle>
                   </CardHeader>
                   <CardContent className="py-2">
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-2">
                       <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{globalPriorities.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Global Priorities</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{categoryPriorities.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Category Priorities</div>
+                      </div>
+                      <div className="text-center col-span-2">
                         <div className="text-base font-semibold leading-none">{priorities.length}</div>
                         <div className="text-[11px] text-muted-foreground mt-1">Total Priorities</div>
                       </div>
@@ -261,7 +339,7 @@ function Priorities() {
             )
           }
         ]}
-        defaultValue="priorities"
+        defaultValue="global"
         basePath="/settings/priorities"
         className="h-full flex flex-col"
       />
@@ -295,11 +373,19 @@ function Priorities() {
           />
           <SelectField
             id="category"
-            label="Category"
-            value={createFormData.category_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, category_id: value }))}
-            placeholder="Unassigned"
-            options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
+            label="Category (optional - leave empty for global priority)"
+            value={createFormData.category_id || 'none'}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, category_id: value === 'none' ? '' : value }))}
+            placeholder="Global Priority (no category)"
+            options={(() => {
+              const categoryOptions = Array.isArray(categories) && categories.length > 0
+                ? categories.map((c: any) => ({ value: String(c.id), label: String(c.name || 'Unnamed') }))
+                : [];
+              return [
+                { value: 'none', label: 'Global Priority (no category)' },
+                ...categoryOptions
+              ];
+            })()}
           />
         </div>
       </SettingsDialog>
@@ -334,11 +420,19 @@ function Priorities() {
             />
             <SelectField
               id="edit-category"
-              label="Category"
-              value={editFormData.category_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, category_id: value }))}
-              placeholder="Unassigned"
-              options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
+              label="Category (optional - leave empty for global priority)"
+              value={editFormData.category_id || 'none'}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, category_id: value === 'none' ? '' : value }))}
+              placeholder="Global Priority (no category)"
+              options={(() => {
+                const categoryOptions = Array.isArray(categories) && categories.length > 0
+                  ? categories.map((c: any) => ({ value: String(c.id), label: String(c.name || 'Unnamed') }))
+                  : [];
+                return [
+                  { value: 'none', label: 'Global Priority (no category)' },
+                  ...categoryOptions
+                ];
+              })()}
             />
           </div>
         )}

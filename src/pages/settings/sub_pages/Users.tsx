@@ -26,6 +26,7 @@ interface UserData {
   is_admin?: boolean;
   has_active_subscription?: boolean;
   url_picture?: string | null;
+  color?: string | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -100,6 +101,7 @@ function Users() {
     email: string;
     job_position_id: string;
     organization_name: string;
+    color: string;
     is_admin: boolean;
     has_active_subscription: boolean;
   }>({
@@ -107,6 +109,7 @@ function Users() {
     email: '',
     job_position_id: '',
     organization_name: '',
+    color: '',
     is_admin: false,
     has_active_subscription: false
   });
@@ -119,6 +122,7 @@ function Users() {
         email: editingUser.email || '',
         job_position_id: editingUser.job_position_id != null ? editingUser.job_position_id.toString() : '',
         organization_name: editingUser.organization_name || '',
+        color: editingUser.color || '',
         is_admin: !!editingUser.is_admin,
         has_active_subscription: !!editingUser.has_active_subscription
       });
@@ -129,7 +133,8 @@ function Users() {
     {
       field: 'id',
       headerName: 'ID',
-      width: 90
+      width: 90,
+      hide: true
     },
     {
       field: 'name',
@@ -137,7 +142,7 @@ function Users() {
       flex: 2,
       minWidth: 180,
       cellRenderer: (params: ICellRendererParams) => (
-        <AvatarCellRenderer name={params.data?.name || ''} />
+        <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
       )
     },
     {
@@ -302,6 +307,7 @@ function Users() {
       job_position_id: editFormData.job_position_id ? Number(editFormData.job_position_id) : null,
       role_id: null, // Not used in this form
       organization_name: editFormData.organization_name || null,
+      color: editFormData.color || null,
       is_admin: editFormData.is_admin,
       has_active_subscription: editFormData.has_active_subscription
     };
@@ -478,6 +484,13 @@ function Users() {
               value={editFormData.email}
               onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
               required
+            />
+            <TextField
+              id="edit-color"
+              label="Color"
+              type="color"
+              value={editFormData.color}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
             />
             <SelectField
               id="edit-job_position_id"
