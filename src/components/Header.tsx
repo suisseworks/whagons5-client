@@ -260,9 +260,17 @@ function Header() {
         return user?.name || user?.email || 'User';
     };
 
+    // Loading/error header gradient style
+    const loadingHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
+        if (isDarkTheme) {
+            return { background: 'linear-gradient(90deg, #000000 0%, #1a5d52 100%)' };
+        }
+        return { background: 'linear-gradient(90deg, #ffffff 0%, #27C1A7 100%)' };
+    }, [isDarkTheme]);
+
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] bg-[#E8EAED] dark:bg-[#050505] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]">
+            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
                 <div className="flex items-center space-x-3 px-6 h-16">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -276,7 +284,7 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] bg-[#E8EAED] dark:bg-[#050505] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]">
+            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
                 <div className="flex items-center space-x-3 px-6 h-16">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -288,9 +296,19 @@ function Header() {
         );
     }
 
+    // Main header gradient style - soft gradient for settings pages
+    const mainHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
+        if (isDarkTheme) {
+            // Very soft dark gradient: black to subtle dark teal
+            return { background: 'linear-gradient(90deg, #000000 0%, #0a1f1c 100%)' };
+        }
+        // Very soft light gradient: white to very light teal tint
+        return { background: 'linear-gradient(90deg, #ffffff 0%, #f0fdfa 100%)' };
+    }, [isDarkTheme]);
+
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-[#E8EAED] dark:bg-[#050505] backdrop-blur-xl wh-header border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={headerBackgroundStyle}>
+        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}

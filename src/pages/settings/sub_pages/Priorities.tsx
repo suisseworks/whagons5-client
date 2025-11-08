@@ -2,10 +2,12 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpWideShort, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUpWideShort, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -198,12 +200,6 @@ function Priorities() {
       backPath="/settings"
       loading={{ isLoading: loading, message: "Loading priorities..." }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
-      statistics={{
-        title: "Priority Statistics",
-        items: [
-          { label: "Total Priorities", value: priorities.length },
-        ]
-      }}
       headerActions={
         <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
@@ -211,20 +207,64 @@ function Priorities() {
         </Button>
       }
     >
-      <div className="flex h-full flex-col">
-        <div className="flex-1 min-h-0">
-          <SettingsGrid
-            rowData={filteredItems}
-            columnDefs={columns}
-            onRowClicked={handleEdit}
-            gridOptions={{
-              groupDisplayType: 'groupRows',
-              groupDefaultExpanded: -1
-            }}
-            noRowsMessage="No priorities found"
-          />
-        </div>
-      </div>
+      <UrlTabs
+        tabs={[
+          {
+            value: "priorities",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faArrowUpWideShort} className="w-4 h-4" />
+                <span>Priorities</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={filteredItems}
+                    columnDefs={columns}
+                    onRowClicked={handleEdit}
+                    gridOptions={{
+                      groupDisplayType: 'groupRows',
+                      groupDefaultExpanded: -1
+                    }}
+                    noRowsMessage="No priorities found"
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "statistics",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+                <span>Statistics</span>
+              </div>
+            ),
+            content: (
+              <div className="flex-1 min-h-0 overflow-auto">
+                <Card>
+                  <CardHeader className="py-1">
+                    <CardTitle className="text-sm">Priority Statistics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{priorities.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Priorities</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          }
+        ]}
+        defaultValue="priorities"
+        basePath="/settings/priorities"
+        className="h-full flex flex-col"
+      />
 
       {/* Create Dialog */}
       <SettingsDialog

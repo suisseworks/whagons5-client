@@ -2,12 +2,14 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTags, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faTags, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Tag, Category } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { iconService } from "@/database/iconService";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import {
 	SettingsLayout,
 	SettingsGrid,
@@ -205,12 +207,6 @@ function Tags() {
 			backPath="/settings"
 			loading={{ isLoading: loading, message: "Loading tags..." }}
 			error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
-			statistics={{
-				title: "Tag Statistics",
-				items: [
-					{ label: "Total Tags", value: tags.length },
-				]
-			}}
 			headerActions={
 				<Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
 					<FontAwesomeIcon icon={faPlus} className="mr-2" />
@@ -218,16 +214,60 @@ function Tags() {
 				</Button>
 			}
 		>
-			<div className="flex h-full flex-col">
-				<div className="flex-1 min-h-0">
-					<SettingsGrid
-						rowData={filteredItems}
-						columnDefs={columns}
-						onRowClicked={handleEdit}
-						noRowsMessage="No tags found"
-					/>
-				</div>
-			</div>
+			<UrlTabs
+				tabs={[
+					{
+						value: "tags",
+						label: (
+							<div className="flex items-center gap-2">
+								<FontAwesomeIcon icon={faTags} className="w-4 h-4" />
+								<span>Tags</span>
+							</div>
+						),
+						content: (
+							<div className="flex h-full flex-col">
+								<div className="flex-1 min-h-0">
+									<SettingsGrid
+										rowData={filteredItems}
+										columnDefs={columns}
+										onRowClicked={handleEdit}
+										noRowsMessage="No tags found"
+									/>
+								</div>
+							</div>
+						)
+					},
+					{
+						value: "statistics",
+						label: (
+							<div className="flex items-center gap-2">
+								<FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+								<span>Statistics</span>
+							</div>
+						),
+						content: (
+							<div className="flex-1 min-h-0 overflow-auto">
+								<Card>
+									<CardHeader className="py-1">
+										<CardTitle className="text-sm">Tag Statistics</CardTitle>
+									</CardHeader>
+									<CardContent className="py-2">
+										<div className="grid grid-cols-1 gap-2 md:grid-cols-1">
+											<div className="text-center">
+												<div className="text-base font-semibold leading-none">{tags.length}</div>
+												<div className="text-[11px] text-muted-foreground mt-1">Total Tags</div>
+											</div>
+										</div>
+									</CardContent>
+								</Card>
+							</div>
+						)
+					}
+				]}
+				defaultValue="tags"
+				basePath="/settings/tags"
+				className="h-full flex flex-col"
+			/>
 
 			{/* Search */}
 			<div className="mb-4">

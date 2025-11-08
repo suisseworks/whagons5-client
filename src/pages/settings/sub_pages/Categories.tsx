@@ -6,14 +6,17 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTags,
   faPlus,
-  faCubes
+  faCubes,
+  faChartBar
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
 import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { iconService } from '@/database/iconService';
+import { UrlTabs } from "@/components/ui/url-tabs";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -506,15 +509,6 @@ function Categories() {
         message: error,
         onRetry: () => window.location.reload()
       } : undefined}
-      statistics={{
-        title: "Category Statistics",
-        description: "Overview of your category usage",
-        items: [
-          { label: "Total Categories", value: categories.length },
-          { label: "Enabled Categories", value: categories.filter((cat: Category) => cat.enabled).length },
-          { label: "Disabled Categories", value: categories.filter((cat: Category) => !cat.enabled).length }
-        ]
-      }}
       headerActions={
         <div className="flex items-center space-x-2">
           <Link to="/settings/categories/custom-fields">
@@ -531,26 +525,81 @@ function Categories() {
         </div>
       }
     >
-      <div className="flex h-full flex-col">
-        <div className="flex-1 min-h-0">
-          <SettingsGrid
-            rowData={filteredItems}
-            columnDefs={colDefs}
-            noRowsMessage="No categories found"
-            rowSelection="single"
-            onRowDoubleClicked={(row: any) => handleEdit(row)}
-            gridOptions={{
-              getRowStyle: (params: any) => {
-                const isEnabled = Boolean(params?.data?.enabled);
-                if (!isEnabled) {
-                  return { opacity: 0.6 } as any;
-                }
-                return undefined as any;
-              }
-            }}
-          />
-        </div>
-      </div>
+      <UrlTabs
+        tabs={[
+          {
+            value: "categories",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faTags} className="w-4 h-4" />
+                <span>Categories</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={filteredItems}
+                    columnDefs={colDefs}
+                    noRowsMessage="No categories found"
+                    rowSelection="single"
+                    onRowDoubleClicked={(row: any) => handleEdit(row)}
+                    gridOptions={{
+                      getRowStyle: (params: any) => {
+                        const isEnabled = Boolean(params?.data?.enabled);
+                        if (!isEnabled) {
+                          return { opacity: 0.6 } as any;
+                        }
+                        return undefined as any;
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "statistics",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+                <span>Statistics</span>
+              </div>
+            ),
+            content: (
+              <div className="flex-1 min-h-0 overflow-auto">
+                <Card>
+                  <CardHeader className="py-1">
+                    <CardTitle className="text-sm">Category Statistics</CardTitle>
+                    <CardDescription className="text-[11px] text-muted-foreground/70">
+                      Overview of your category usage
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{categories.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Categories</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{categories.filter((cat: Category) => cat.enabled).length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Enabled Categories</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{categories.filter((cat: Category) => !cat.enabled).length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Disabled Categories</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          }
+        ]}
+        defaultValue="categories"
+        basePath="/settings/categories"
+        className="h-full flex flex-col"
+      />
 
       {/* Search Input - Original Location */}
       <div className="mb-4">

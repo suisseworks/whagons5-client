@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUsers, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faUsers, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Team, Category, Task } from "@/store/types";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import { StatusIcon } from "@/pages/settings/components/StatusIcon";
 import {
   SettingsLayout,
@@ -341,16 +343,6 @@ function Teams() {
         message: error,
         onRetry: () => window.location.reload()
       } : undefined}
-      statistics={{
-        title: "Team Statistics",
-        description: "Overview of your teams and their usage",
-        items: [
-          { label: "Total Teams", value: teams.length },
-          { label: "Total Categories", value: categories.length },
-          { label: "Total Tasks", value: tasks.length },
-          { label: "Avg Categories/Team", value: teams.length > 0 ? Math.round(categories.length / teams.length * 10) / 10 : 0 }
-        ]
-      }}
       headerActions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/users')}>
@@ -366,17 +358,76 @@ function Teams() {
         </div>
       }
     >
-      <div className="flex h-full flex-col">
-        <div className="flex-1 min-h-0">
-          <SettingsGrid
-            rowData={filteredItems}
-            columnDefs={colDefs}
-            noRowsMessage="No teams found"
-            rowSelection="single"
-            onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
-          />
-        </div>
-      </div>
+      <UrlTabs
+        tabs={[
+          {
+            value: "teams",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faUsers} className="w-4 h-4" />
+                <span>Teams</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={filteredItems}
+                    columnDefs={colDefs}
+                    noRowsMessage="No teams found"
+                    rowSelection="single"
+                    onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "statistics",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+                <span>Statistics</span>
+              </div>
+            ),
+            content: (
+              <div className="flex-1 min-h-0 overflow-auto">
+                <Card>
+                  <CardHeader className="py-1">
+                    <CardTitle className="text-sm">Team Statistics</CardTitle>
+                    <CardDescription className="text-[11px] text-muted-foreground/70">
+                      Overview of your teams and their usage
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{teams.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Teams</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{categories.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Categories</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{tasks.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Tasks</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{teams.length > 0 ? Math.round(categories.length / teams.length * 10) / 10 : 0}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Avg Categories/Team</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          }
+        ]}
+        defaultValue="teams"
+        basePath="/settings/teams"
+        className="h-full flex flex-col"
+      />
 
       {/* Create Team Dialog */}
       <SettingsDialog

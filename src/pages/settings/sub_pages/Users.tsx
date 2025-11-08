@@ -3,7 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { faUser } from "@fortawesome/free-solid-svg-icons";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUser, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
 import { Team } from "@/store/types";
@@ -327,20 +330,6 @@ function Users() {
         message: error,
         onRetry: () => window.location.reload()
       } : undefined}
-      statistics={{
-        title: "User Statistics",
-        description: "Overview of users across your teams",
-        items: [
-          { label: "Total Users", value: users.length },
-          { label: "Admins", value: users.filter((user: UserData) => user.is_admin).length },
-          { 
-            label: "Active Subscriptions", 
-            value: users.length > 0 
-              ? `${Math.round((users.filter((user: UserData) => user.has_active_subscription).length / users.length) * 100)}%`
-              : "0%"
-          }
-        ]
-      }}
       headerActions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/teams')}>
@@ -355,16 +344,71 @@ function Users() {
         </div>
       }
     >
-      <div className="flex h-full flex-col">
-        <div className="flex-1 min-h-0">
-          <SettingsGrid
-            rowData={filteredItems}
-            columnDefs={columnDefs}
-            noRowsMessage="No users found"
-            onRowDoubleClicked={(row: UserData) => handleEdit(row)}
-          />
-        </div>
-      </div>
+      <UrlTabs
+        tabs={[
+          {
+            value: "users",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faUser} className="w-4 h-4" />
+                <span>Users</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={filteredItems}
+                    columnDefs={columnDefs}
+                    noRowsMessage="No users found"
+                    onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "statistics",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+                <span>Statistics</span>
+              </div>
+            ),
+            content: (
+              <div className="flex-1 min-h-0 overflow-auto">
+                <Card>
+                  <CardHeader className="py-1">
+                    <CardTitle className="text-sm">User Statistics</CardTitle>
+                    <CardDescription className="text-[11px] text-muted-foreground/70">
+                      Overview of users across your teams
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{users.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Users</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{users.filter((user: UserData) => user.is_admin).length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Admins</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{users.length > 0 ? `${Math.round((users.filter((user: UserData) => user.has_active_subscription).length / users.length) * 100)}%` : "0%"}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Active Subscriptions</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          }
+        ]}
+        defaultValue="users"
+        basePath="/settings/users"
+        className="h-full flex flex-col"
+      />
 
       {/* Create Invitation Dialog */}
       <SettingsDialog

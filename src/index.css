@@ -91,15 +91,15 @@
   --chart-5: oklch(0.78 0.15 260);
 
   /* Dark sidebar palette */
-  --sidebar: #1a1f28;
+  --sidebar: #0a0a0a;
   --sidebar-foreground: #e5e7eb;
   --sidebar-primary: oklch(0.78 0.2 280);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #252b36;
+  --sidebar-accent: #1a1a1a;
   --sidebar-accent-foreground: #e5e7eb;
   --sidebar-border: rgba(255,255,255,0.08);
   --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
-  --sidebar-header: color-mix(in oklab, var(--sidebar) 75%, var(--primary) 25%);
+  --sidebar-header: #0f0f0f;
 
   /* Dark mode gradients */
   --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);

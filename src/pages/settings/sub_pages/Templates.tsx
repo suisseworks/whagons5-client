@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt, faTags } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Template, Task, Category, Approval } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -576,16 +578,6 @@ function Templates() {
         message: error,
         onRetry: () => window.location.reload()
       } : undefined}
-      statistics={{
-        title: "Template Statistics",
-        description: "Overview of your template management",
-        items: [
-          { label: "Total Templates", value: templates.length },
-          { label: "With Default Spot", value: templates.filter((t: any) => t.default_spot_id).length },
-          { label: "With Default Users", value: templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length },
-          { label: "With Expected Duration", value: templates.filter((t: any) => (t.expected_duration ?? 0) > 0).length }
-        ]
-      }}
       headerActions={
         <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
@@ -593,17 +585,76 @@ function Templates() {
         </Button>
       }
     >
-      <div className="flex h-full flex-col">
-        <div className="flex-1 min-h-0">
-          <SettingsGrid
-            rowData={filteredItems}
-            columnDefs={colDefs}
-            noRowsMessage="No templates found"
-            onRowDoubleClicked={handleEdit}
-            onCellValueChanged={handleCellValueChanged}
-          />
-        </div>
-      </div>
+      <UrlTabs
+        tabs={[
+          {
+            value: "templates",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faClipboardList} className="w-4 h-4" />
+                <span>Templates</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={filteredItems}
+                    columnDefs={colDefs}
+                    noRowsMessage="No templates found"
+                    onRowDoubleClicked={handleEdit}
+                    onCellValueChanged={handleCellValueChanged}
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "statistics",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+                <span>Statistics</span>
+              </div>
+            ),
+            content: (
+              <div className="flex-1 min-h-0 overflow-auto">
+                <Card>
+                  <CardHeader className="py-1">
+                    <CardTitle className="text-sm">Template Statistics</CardTitle>
+                    <CardDescription className="text-[11px] text-muted-foreground/70">
+                      Overview of your template management
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="py-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{templates.length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Total Templates</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{templates.filter((t: any) => t.default_spot_id).length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">With Default Spot</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{templates.filter((t: any) => Array.isArray(t.default_user_ids) && t.default_user_ids.length > 0).length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">With Default Users</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base font-semibold leading-none">{templates.filter((t: any) => (t.expected_duration ?? 0) > 0).length}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">With Expected Duration</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          }
+        ]}
+        defaultValue="templates"
+        basePath="/settings/templates"
+        className="h-full flex flex-col"
+      />
 
       {/* Create Template Dialog */}
       <SettingsDialog

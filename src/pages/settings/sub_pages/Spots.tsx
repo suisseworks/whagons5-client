@@ -2,11 +2,12 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLocationDot, faPlus, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
+import { faLocationDot, faPlus, faLayerGroup, faChartBar } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { Spot } from "@/store/types";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import {
   SettingsLayout,
@@ -335,7 +336,12 @@ function Spots() {
   const spotsTabs = [
     {
       value: 'main',
-      label: 'Spots',
+      label: (
+        <div className="flex items-center gap-2">
+          <FontAwesomeIcon icon={faLocationDot} className="w-4 h-4" />
+          <span>Spots</span>
+        </div>
+      ),
       content: (
         <div className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
@@ -368,6 +374,47 @@ function Spots() {
           />
         </div>
       )
+    },
+    {
+      value: 'statistics',
+      label: (
+        <div className="flex items-center gap-2">
+          <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+          <span>Statistics</span>
+        </div>
+      ),
+      content: (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <Card>
+            <CardHeader className="py-1">
+              <CardTitle className="text-sm">Spot Statistics</CardTitle>
+              <CardDescription className="text-[11px] text-muted-foreground/70">
+                Overview of your hierarchical locations
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+                <div className="text-center">
+                  <div className="text-base font-semibold leading-none">{spots.length}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Total Spots</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-semibold leading-none">{tasks.length}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Total Tasks</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-semibold leading-none">{spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Avg Tasks/Spot</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-semibold leading-none">{spots.filter(s => !s.parent_id).length}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">Root Spots</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
     }
   ];
 
@@ -393,16 +440,6 @@ function Spots() {
         message: error,
         onRetry: () => window.location.reload()
       } : undefined}
-      statistics={{
-        title: "Spot Statistics",
-        description: "Overview of your hierarchical locations",
-        items: [
-          { label: "Total Spots", value: spots.length },
-          { label: "Total Tasks", value: tasks.length },
-          { label: "Avg Tasks/Spot", value: spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0 },
-          { label: "Root Spots", value: spots.filter(s => !s.parent_id).length }
-        ]
-      }}
       headerActions={
         <div className="flex items-center gap-2">
           <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
