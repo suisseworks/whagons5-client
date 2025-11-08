@@ -695,6 +695,21 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           } catch { onSelectionChanged([] as number[]); }
         }}
         onRowClicked={(e: any) => {
+          // Don't open edit task if click was on status column
+          if (e?.event?.target) {
+            const target = e.event.target as HTMLElement;
+            // Check if click originated from status column cell
+            const cellElement = target.closest('[col-id="status_id"]');
+            // Also check if the clicked element is inside a status cell
+            const statusCell = target.closest('.ag-cell[col-id="status_id"]');
+            if (cellElement || statusCell) {
+              return; // Ignore clicks on status column
+            }
+          }
+          // Also check the column property if available
+          if (e?.column?.colId === 'status_id') {
+            return; // Ignore clicks on status column
+          }
           if (onRowClicked && e?.data) {
             onRowClicked(e.data);
           }

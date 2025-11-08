@@ -433,10 +433,10 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                 <div className="text-xs text-muted-foreground">Toggle the Total / In progress / Completed today pills</div>
               </div>
               <Switch
-                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_show_kpis') ?? 'true') !== 'false')}
+                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`) ?? 'true') !== 'false')}
                 onCheckedChange={(checked) => {
-                  try { localStorage.setItem('wh_workspace_show_kpis', String(checked)); } catch {}
-                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showKpis: checked } })); } catch {}
+                  try { localStorage.setItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`, String(checked)); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showKpis: checked, workspaceId: workspaceId || 'all' } })); } catch {}
                 }}
               />
             </div>

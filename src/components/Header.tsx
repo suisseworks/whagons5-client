@@ -10,17 +10,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus, Layers } from "lucide-react";
+import { User, LogOut, Bell, Plus, Layers, Sparkles } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import CreateTaskDialogForEverything from '@/pages/spaces/components/CreateTaskDialogForEverything';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
 import AssistantWidget from '@/components/AssistantWidget';
-import { Bot } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 
@@ -262,8 +262,8 @@ function Header() {
 
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex items-center space-x-3 p-2">
+            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] bg-[#E8EAED] dark:bg-[#050505] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]">
+                <div className="flex items-center space-x-3 px-6 h-16">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="animate-pulse bg-gray-300 rounded-full h-6 w-6"></div>
@@ -276,8 +276,8 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex items-center space-x-3 p-2">
+            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] bg-[#E8EAED] dark:bg-[#050505] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]">
+                <div className="flex items-center space-x-3 px-6 h-16">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="bg-gray-300 rounded-full h-7 w-7"></div>
@@ -290,12 +290,12 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full bg-card wh-header border-b border-border/20" style={headerBackgroundStyle}>
+        <header className="sticky top-0 z-50 w-full bg-[#E8EAED] dark:bg-[#050505] backdrop-blur-xl wh-header border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={headerBackgroundStyle}>
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-5 h-16">
+            <div className="flex items-center justify-between px-6 h-16 relative z-10">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
@@ -375,27 +375,32 @@ function Header() {
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center space-x-2">
-                    {typeof currentWorkspaceId === 'number' && (
+                <div className="flex items-center gap-2">
+                    {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === 'Everything') && (
                         <button
-                            className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-[#FF6B6B] hover:bg-[#FF5555] text-white transition-all duration-200 hover:scale-105 active:scale-95"
                             onClick={() => setOpenCreateTask(true)}
                             title="Create Task"
+                            style={{
+                                boxShadow: '0 4px 12px 0 rgba(255, 107, 107, 0.4), 0 2px 6px 0 rgba(255, 107, 107, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2)',
+                            }}
                         >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Task
+                            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                                <Plus className="h-4 w-4 text-[#FF6B6B]" strokeWidth={3} />
+                            </div>
+                            <span className="font-semibold text-xs whitespace-nowrap">Create Task</span>
                         </button>
                     )}
-                    <ModeToggle className="h-9 w-9" />
+                    <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
                     <AssistantWidget
                         floating={false}
                         renderTrigger={(open) => (
                             <button
-                                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent text-foreground"
-                                title="AI Assistant"
+                                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent/50 text-foreground transition-colors bg-gradient-to-br from-[#0078D4] via-[#00B4D8] to-[#00D4AA] hover:from-[#006BB3] hover:via-[#0099B8] hover:to-[#00B899]"
+                                title="Copilot"
                                 onClick={open}
                             >
-                                <Bot className="h-5 w-5" />
+                                <Sparkles className="h-5 w-5 text-white" />
                             </button>
                         )}
                     />
@@ -403,9 +408,9 @@ function Header() {
                     {/* Notifications */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent text-foreground relative">
+                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent/50 text-foreground relative transition-colors">
                                 <Bell className="h-5 w-5" />
-                                <span className="absolute bottom-0.5 left-0.5 bg-red-500 rounded-full w-2 h-2"></span>
+                                <span className="absolute bottom-0.5 left-0.5 bg-red-500 rounded-full w-2 h-2 ring-2 ring-background"></span>
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 p-2">
@@ -415,7 +420,7 @@ function Header() {
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:opacity-80 transition-opacity overflow-hidden">
+                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
                                 <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
                                     {!imageError && imageUrl && !isLoading && (
                                         <AvatarImage 
@@ -456,6 +461,9 @@ function Header() {
 
         {typeof currentWorkspaceId === 'number' && (
             <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={currentWorkspaceId} />
+        )}
+        {currentWorkspaceName === 'Everything' && (
+            <CreateTaskDialogForEverything open={openCreateTask} onOpenChange={setOpenCreateTask} />
         )}
 
         </>

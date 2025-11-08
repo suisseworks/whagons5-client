@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, Plus, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search, SlidersHorizontal, ChevronUp } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search, SlidersHorizontal, ChevronUp } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import CreateTaskDialogForEverything from '@/pages/spaces/components/CreateTaskDialogForEverything';
 import EditTaskDialog from '@/pages/spaces/components/EditTaskDialog';
 import { motion } from 'motion/react';
 import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
@@ -68,21 +69,35 @@ export const Workspace = () => {
     try { localStorage.setItem('wh_workspace_controls_visible', String(controlsVisible)); } catch {}
   }, [controlsVisible]);
 
-  // Display options
+  // Display options - workspace-specific
   const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem('wh_workspace_show_kpis');
+      const key = `wh_workspace_show_kpis_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
       return saved == null ? true : saved === 'true';
     } catch { return true; }
   });
   useEffect(() => {
+    // Update when workspace changes
+    try {
+      const key = `wh_workspace_show_kpis_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      setShowHeaderKpis(saved == null ? true : saved === 'true');
+    } catch {}
+  }, [id]);
+  useEffect(() => {
     const handler = (e: any) => {
-      const v = e?.detail?.showKpis;
-      if (typeof v === 'boolean') setShowHeaderKpis(v);
+      const eventWorkspaceId = e?.detail?.workspaceId || 'all';
+      const currentWorkspaceId = id || 'all';
+      // Only update if the event is for the current workspace
+      if (eventWorkspaceId === currentWorkspaceId) {
+        const v = e?.detail?.showKpis;
+        if (typeof v === 'boolean') setShowHeaderKpis(v);
+      }
     };
     window.addEventListener('wh:displayOptionsChanged', handler as any);
     return () => window.removeEventListener('wh:displayOptionsChanged', handler as any);
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     try {
@@ -681,20 +696,14 @@ export const Workspace = () => {
       />
 
 
-      {/* Floating Action Button for mobile (bottom-right) */}
+      {/* Create Task Dialogs */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (
-        <>
-          <button
-            className="fixed right-5 bottom-20 sm:hidden inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg"
-            onClick={() => setOpenCreateTask(true)}
-            aria-label="Create Task"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
-          <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
-          <EditTaskDialog open={openEditTask} onOpenChange={setOpenEditTask} task={selectedTask} />
-        </>
+        <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
       )}
+      {isAllWorkspaces && (
+        <CreateTaskDialogForEverything open={openCreateTask} onOpenChange={setOpenCreateTask} />
+      )}
+      <EditTaskDialog open={openEditTask} onOpenChange={setOpenEditTask} task={selectedTask} />
     </div>
 
   );

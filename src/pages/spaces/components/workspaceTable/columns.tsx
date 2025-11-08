@@ -309,7 +309,17 @@ export function buildWorkspaceColumns(opts: any) {
                       {description}
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[520px] whitespace-pre-wrap text-[14px] leading-relaxed">
+                  <TooltipContent 
+                    side="bottom" 
+                    align="start"
+                    sideOffset={8}
+                    collisionPadding={{ left: 300, right: 16, top: 16, bottom: 16 }}
+                    avoidCollisions={true}
+                    className="max-w-[520px] whitespace-pre-wrap text-base leading-relaxed z-[100]"
+                    style={{ 
+                      maxWidth: 'min(520px, calc(100vw - 340px))' // Account for sidebar width (~280px) + padding
+                    }}
+                  >
                     {description}
                   </TooltipContent>
                 </Tooltip>
@@ -357,6 +367,19 @@ export function buildWorkspaceColumns(opts: any) {
             onChange={(to: number) => handleChangeStatus(row, to)}
           />
         );
+      },
+      onCellClicked: (params: any) => {
+        // Prevent row click event from firing when clicking anywhere in the status column
+        if (params.event) {
+          params.event.stopPropagation();
+          params.event.preventDefault();
+        }
+      },
+      onCellMouseDown: (params: any) => {
+        // Also prevent on mouse down to catch the event earlier
+        if (params.event) {
+          params.event.stopPropagation();
+        }
       },
       width: 170,
       minWidth: 160,

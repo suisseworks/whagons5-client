@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { Bot } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -72,17 +72,17 @@ const FloatingButton: React.FC<{ onClick: () => void }>= ({ onClick }) => {
             ref={btnRef}
             variant="default"
             size="icon"
-            aria-label="Open AI Assistant"
+            aria-label="Open Copilot"
             onClick={onClick}
             onMouseDown={startDrag}
             onTouchStart={startDrag}
-            className="fixed bottom-5 right-5 z-[60] shadow-lg rounded-full size-12 p-0"
+            className="fixed bottom-5 right-5 z-[60] shadow-lg rounded-full size-12 p-0 bg-gradient-to-br from-[#0078D4] via-[#00B4D8] to-[#00D4AA] hover:from-[#006BB3] hover:via-[#0099B8] hover:to-[#00B899] transition-all"
             style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
           >
-            <Bot className="size-5" />
+            <Sparkles className="size-5 text-white" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="top">AI Assistant</TooltipContent>
+        <TooltipContent side="top">Copilot</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
@@ -164,7 +164,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         <DialogContent className="sm:max-w-xl p-0">
           <div className="p-6 pb-3">
             <DialogHeader>
-              <DialogTitle>AI Assistant</DialogTitle>
+              <DialogTitle>Copilot</DialogTitle>
               <DialogDescription>
                 Ask about features, find settings, or get help with tasks.
               </DialogDescription>

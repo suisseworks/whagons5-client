@@ -14,13 +14,12 @@ import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { ChevronUp, Plus } from 'lucide-react';
 
-interface CreateTaskDialogProps {
+interface CreateTaskDialogForEverythingProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workspaceId: number;
 }
 
-export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: CreateTaskDialogProps) {
+export default function CreateTaskDialogForEverything({ open, onOpenChange }: CreateTaskDialogForEverythingProps) {
   const dispatch = useDispatch<AppDispatch>();
 
   const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
@@ -34,10 +33,11 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
   const { value: approvals = [] } = useSelector((s: RootState) => (s as any).approvals || { value: [] });
 
-  const currentWorkspace = workspaces.find((w: any) => w.id === workspaceId);
+  // Step 1: Category selection state
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [categoryIcon, setCategoryIcon] = useState<any>(null);
 
-  const workspaceCategories = useMemo(() => categories.filter((c: any) => c.workspace_id === workspaceId), [categories, workspaceId]);
-
+  // Step 2: Task creation state (only shown after category is selected)
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -47,11 +47,27 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const [dueDate, setDueDate] = useState<string>('');
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [categoryIcon, setCategoryIcon] = useState<any>(null);
   const [slaId, setSlaId] = useState<number | null>(null);
   const [approvalId, setApprovalId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
   const [showDescription, setShowDescription] = useState(false);
+
+  // Derive workspace from selected category
+  const derivedWorkspaceId = useMemo(() => {
+    if (!selectedCategoryId) return null;
+    const cat = categories.find((c: any) => c.id === selectedCategoryId);
+    return cat?.workspace_id || null;
+  }, [categories, selectedCategoryId]);
+
+  const currentWorkspace = useMemo(() => {
+    if (!derivedWorkspaceId) return null;
+    return workspaces.find((w: any) => w.id === derivedWorkspaceId);
+  }, [workspaces, derivedWorkspaceId]);
+
+  const workspaceCategories = useMemo(() => {
+    if (!derivedWorkspaceId) return [];
+    return categories.filter((c: any) => c.workspace_id === derivedWorkspaceId);
+  }, [categories, derivedWorkspaceId]);
 
   const categoryInitialStatusId = useMemo(() => {
     // Statuses are global; pick the one marked initial, otherwise first available
@@ -69,6 +85,26 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     return categories.find((c: any) => c.id === categoryId);
   }, [categories, categoryId]);
 
+  // Load category icon
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cat = categories.find((c: any) => c.id === selectedCategoryId);
+        if (cat?.icon) {
+          const icon = await iconService.getIcon(cat.icon);
+          if (!cancelled) setCategoryIcon(icon);
+        } else {
+          if (!cancelled) setCategoryIcon(null);
+        }
+      } catch {
+        if (!cancelled) setCategoryIcon(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [categories, selectedCategoryId]);
+
+  // Also load icon for the task creation category
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -91,11 +127,6 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     return priorities.filter((p: any) => p.category_id === categoryId);
   }, [priorities, categoryId]);
 
-  // Keep selectedPriority derivation available for future inline display needs
-  // const selectedPriority = useMemo(() => {
-  //   return categoryPriorities.find((p: any) => p.id === priorityId) || null;
-  // }, [categoryPriorities, priorityId]);
-
   const workspaceTemplates = useMemo(() => {
     // Only show templates for workspaces of type "DEFAULT"
     if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
@@ -110,21 +141,48 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   }, [templates, currentWorkspace]);
 
   const workspaceUsers = useMemo(() => {
-    return users.filter((u: any) => !u.workspace_id || u.workspace_id === workspaceId);
-  }, [users, workspaceId]);
+    if (!derivedWorkspaceId) return [];
+    return users.filter((u: any) => !u.workspace_id || u.workspace_id === derivedWorkspaceId);
+  }, [users, derivedWorkspaceId]);
 
   const workspaceSpots = useMemo(() => {
+    if (!derivedWorkspaceId) return [];
     // Filter spots by spotType.workspace_id when available
     const typeById = new Map(spotTypes.map((st: any) => [st.id, st]));
     return spots.filter((s: any) => {
       const st: any = typeById.get(s.spot_type_id);
-      return !st?.workspace_id || st.workspace_id === workspaceId;
+      return !st?.workspace_id || st.workspace_id === derivedWorkspaceId;
     });
-  }, [spots, spotTypes, workspaceId]);
+  }, [spots, spotTypes, derivedWorkspaceId]);
 
+  // Group categories by workspace for display
+  const categoriesByWorkspace = useMemo(() => {
+    const grouped = new Map<number, { workspace: any; categories: any[] }>();
+    categories.forEach((cat: any) => {
+      const wsId = cat.workspace_id;
+      if (!wsId) return;
+      if (!grouped.has(wsId)) {
+        const ws = workspaces.find((w: any) => w.id === wsId);
+        grouped.set(wsId, { workspace: ws, categories: [] });
+      }
+      grouped.get(wsId)!.categories.push(cat);
+    });
+    return Array.from(grouped.values());
+  }, [categories, workspaces]);
+
+  // Handle category selection - move to task creation step
+  const handleCategorySelect = (catId: number) => {
+    setSelectedCategoryId(catId);
+    setCategoryId(catId);
+  };
+
+  // Reset when dialog opens/closes
   useEffect(() => {
-    // Prefill defaults when panel opens
     if (open) {
+      // Reset to category selection step
+      setSelectedCategoryId(null);
+      setCategoryId(null);
+      setName('');
       setDescription('');
       setSpotId(null);
       setSelectedUserIds([]);
@@ -134,35 +192,38 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
       setApprovalId(null);
       setActiveTab('basic');
       setShowDescription(false);
+      setTemplateId(null);
+      setPriorityId(null);
+    }
+  }, [open]);
 
+  // When category is selected, initialize task creation form
+  useEffect(() => {
+    if (selectedCategoryId && derivedWorkspaceId) {
       // Choose first template and derive defaults
       const firstTemplate = workspaceTemplates[0];
       if (firstTemplate) {
         setTemplateId(firstTemplate.id);
-        setCategoryId(firstTemplate.category_id || null);
-        // If template doesn't define priority, it will be set to "low" by the category change effect
+        setCategoryId(firstTemplate.category_id || selectedCategoryId);
         setPriorityId(firstTemplate.default_priority || null);
-        // Set name automatically from template
         setName(firstTemplate.name || '');
         setSlaId(firstTemplate.sla_id || null);
         setApprovalId(firstTemplate.approval_id || null);
       } else {
         setTemplateId(null);
         setName('');
-        // fall back to first category in workspace if no templates
-        const defaultCategory = workspaceCategories[0];
-        setCategoryId(defaultCategory ? defaultCategory.id : null);
+        setCategoryId(selectedCategoryId);
         setPriorityId(null);
       }
     }
-  }, [open, workspaceCategories, workspaceTemplates]);
+  }, [selectedCategoryId, derivedWorkspaceId, workspaceTemplates]);
 
   useEffect(() => {
     // When template changes, derive category/priority defaults and set name automatically
     if (templateId) {
       const t = workspaceTemplates.find((x: any) => x.id === templateId);
       if (t) {
-        setCategoryId(t.category_id || null);
+        setCategoryId(t.category_id || selectedCategoryId);
         // If template doesn't define priority, default to "low"
         if (t.default_priority) {
           setPriorityId(t.default_priority);
@@ -178,7 +239,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         setApprovalId(t.approval_id || null);
       }
     }
-  }, [templateId, workspaceTemplates, categoryPriorities]);
+  }, [templateId, workspaceTemplates, categoryPriorities, selectedCategoryId]);
 
   useEffect(() => {
     // When category changes without template default, set priority to "low"
@@ -203,22 +264,22 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const canSubmit = useMemo(() => {
     return Boolean(
       name.trim().length > 0 &&
-      workspaceId &&
+      derivedWorkspaceId &&
       categoryId &&
       derivedTeamId &&
       categoryInitialStatusId &&
       (priorityId || categoryPriorities.length === 0)
     );
-  }, [name, workspaceId, categoryId, derivedTeamId, categoryInitialStatusId, priorityId, categoryPriorities.length]);
+  }, [name, derivedWorkspaceId, categoryId, derivedTeamId, categoryInitialStatusId, priorityId, categoryPriorities.length]);
 
   const handleSubmit = async () => {
-    if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId) return;
+    if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId || !derivedWorkspaceId) return;
     try {
       setIsSubmitting(true);
       const payload: any = {
         name: name.trim(),
         description: description.trim() || null,
-        workspace_id: workspaceId,
+        workspace_id: derivedWorkspaceId,
         category_id: categoryId,
         team_id: derivedTeamId,
         template_id: templateId,
@@ -252,6 +313,78 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     }
   };
 
+  // Step 1: Category Selection
+  if (!selectedCategoryId) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent 
+          side="right" 
+          className="w-full sm:w-[600px] max-w-[600px] p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
+        >
+          <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
+            <SheetTitle className="text-xl sm:text-2xl font-semibold font-[600] text-foreground">Create New Task</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex flex-col flex-1 min-h-0 overflow-auto p-4 sm:p-6">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="category-select" className="text-sm font-medium font-[500] text-foreground">
+                Category
+              </Label>
+              {categoriesByWorkspace.length === 0 ? (
+                <div className="text-sm text-[#6B7280] py-4">
+                  No categories available. Please create a category first.
+                </div>
+              ) : (
+                <Select 
+                  value={selectedCategoryId ? String(selectedCategoryId) : undefined} 
+                  onValueChange={(v) => handleCategorySelect(parseInt(v, 10))}
+                >
+                  <SelectTrigger 
+                    id="category-select"
+                    className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                  >
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoriesByWorkspace.map((group) => (
+                      <div key={group.workspace?.id || 'unknown'}>
+                        {group.workspace && (
+                          <div className="px-2 py-1.5 text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+                            {group.workspace.name}
+                          </div>
+                        )}
+                        {group.categories.map((cat: any) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>
+                            <div className="flex items-center gap-2">
+                              <span>{cat.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-6 border-t border-border/40 bg-background">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+              <Button 
+                variant="ghost" 
+                onClick={() => onOpenChange(false)} 
+                className="h-12 px-6 text-[#6B7280] border border-black/20 bg-transparent hover:bg-[#F3F4F6] rounded-[10px] transition-all duration-200 font-medium order-2 sm:order-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  // Step 2: Task Creation Form (same as CreateTaskDialog)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
@@ -536,16 +669,28 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
             <Button 
               variant="ghost" 
-              onClick={() => onOpenChange(false)} 
+              onClick={() => {
+                // Go back to category selection
+                setSelectedCategoryId(null);
+                setCategoryId(null);
+              }} 
               disabled={isSubmitting} 
               className="h-12 px-6 text-[#6B7280] border border-black/20 bg-transparent hover:bg-[#F3F4F6] rounded-[10px] transition-all duration-200 font-medium order-2 sm:order-1"
+            >
+              Back
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => onOpenChange(false)} 
+              disabled={isSubmitting} 
+              className="h-12 px-6 text-[#6B7280] border border-black/20 bg-transparent hover:bg-[#F3F4F6] rounded-[10px] transition-all duration-200 font-medium order-3 sm:order-2"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSubmit} 
               disabled={!canSubmit || isSubmitting} 
-              className="h-12 px-8 bg-[#00BFA5] hover:bg-[#00AA92] text-white rounded-[10px] transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
+              className="h-12 px-8 bg-[#00BFA5] hover:bg-[#00AA92] text-white rounded-[10px] transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-3"
             >
               {isSubmitting ? 'Creating...' : 'Create Task'}
             </Button>
@@ -555,5 +700,4 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
     </Sheet>
   );
 }
-
 
