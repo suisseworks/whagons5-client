@@ -63,7 +63,19 @@ export function TaskRow({
       })();
       return () => { cancelled = true; };
     }, [iconClass]);
-    return <FontAwesomeIcon icon={iconEl as any} className="mr-1" style={{ color: color || '#6b7280', width: 18, height: 18 }} />;
+    const iconColor = color || '#6b7280';
+    return (
+      <div 
+        className="w-6 h-6 min-w-[1.5rem] rounded-lg flex items-center justify-center flex-shrink-0 mr-1"
+        style={{ backgroundColor: iconColor }}
+      >
+        <FontAwesomeIcon 
+          icon={iconEl as any} 
+          style={{ color: '#ffffff', fontSize: '12px' }}
+          className="text-white"
+        />
+      </div>
+    );
   };
 
   return (

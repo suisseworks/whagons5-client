@@ -267,14 +267,16 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   return (
     <Sidebar
       collapsible="icon"
-      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground font-montserrat text-[1rem]`}
+      className={`bg-sidebar transition-all duration-300 text-sidebar-foreground font-montserrat text-[1rem]`}
+      style={{ borderRight: '1px solid #E2E8F0' }}
       overlayExpanded={overlayOnExpand && !getPinnedState()}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar-header h-16 transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
+        className={`shadow-md bg-sidebar-header transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
         }`}
+        style={{ paddingTop: '12px', paddingBottom: '10px', height: '52px', flexShrink: 0 }}
       >
         <div className="flex items-center justify-center w-full h-full">
           <Link
@@ -284,14 +286,14 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             }`}
           >
             <WhagonsCheck
-              width={showExpandedContent ? 56 : 38}
-              height={showExpandedContent ? 26 : 18}
-              color="#27C1A7"
+              width={showExpandedContent ? 40 : 28}
+              height={showExpandedContent ? 18 : 14}
+              color="#00BFA5"
             />
             {showExpandedContent && (
               <div
-                className="text-xl pl-2 font-semibold text-[#27C1A7]"
-                style={{ fontFamily: 'Montserrat' }}
+                className="pl-2 font-semibold text-[#00BFA5]"
+                style={{ fontFamily: 'Montserrat', fontSize: '20px', fontWeight: 600 }}
               >
                 Whagons
               </div>
@@ -303,140 +305,143 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar">
-        <SidebarGroup>
-          {/* Everything workspace - above the Spaces dropdown */}
-          {(!isCollapsed || isMobile) && (
-            <div className="px-3">
-              <Link
-                to={`/workspace/all`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${pathname === `/workspace/all`
-                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-              >
-                <span>
-                  <Layers className="w-5 h-5 text-[#27C1A7]" />
-                </span>
-                <span className="font-semibold">Everything</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Show Everything icon when collapsed - DESKTOP ONLY */}
-          {isCollapsed && !isMobile && (
-            <div className="px-2 flex justify-center">
-              <Link
-                to={`/workspace/all`}
-                className={`flex items-center justify-center w-10 h-10 rounded text-xs font-medium transition-colors ${pathname === `/workspace/all`
-                    ? 'bg-primary/20 text-primary border border-primary/40'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                }`}
-                title={'Everything'}
-              >
-                <Layers className="w-5 h-5 text-[#27C1A7]" />
-              </Link>
-            </div>
-          )}
-
+      <SidebarContent className="bg-sidebar" style={{ paddingLeft: '20px', paddingRight: '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        {/* Spaces section - scrollable */}
+        <SidebarGroup style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <AppSidebarWorkspaces
               workspaces={uniqueWorkspaces}
               pathname={pathname}
               getWorkspaceIcon={getWorkspaceIcon}
+              showEverythingButton={true}
             />
-          {/* TeamConnect (replaces Messages) */}
-          <SidebarGroup>
-            {(!isCollapsed || isMobile) && (
-              <div className="px-3 py-2">
-                <Link
-                  to={`/teamconnect`}
-                  className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors h-10 px-3 ${pathname === `/teamconnect`
-                      ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-                >
-                  <span>
-                    <Users2 className="w-4 h-4" />
-                  </span>
-                  <span className="font-semibold">TeamConnect</span>
-                </Link>
-              </div>
-            )}
-
-            {/* Collapsed icon only */}
-            {isCollapsed && !isMobile && (
-              <div className="px-2 flex justify-center">
-                <Link
-                  to={`/teamconnect`}
-                  className={`flex items-center justify-center w-10 h-10 rounded text-xs font-medium transition-colors ${pathname === `/teamconnect`
-                      ? 'bg-primary/20 text-primary border border-primary/40'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  }`}
-                  title={'TeamConnect'}
-                >
-                  <Users2 className="w-5 h-5 text-[#27C1A7]" />
-                </Link>
-              </div>
-            )}
-          </SidebarGroup>
-
-          {/* <AppSidebarDummy /> */}
+          </div>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar border-t border-sidebar-border">
-        {/* Section: Analytics & Plugins */}
-        <SidebarGroup>
+      <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid #E2E8F0', paddingLeft: '20px', paddingRight: '20px', flexShrink: 0 }}>
+        {/* Section: TeamConnect */}
+        <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px', marginTop: '4px' }}>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem className="pt-1 pb-1">
+              <SidebarMenuItem style={{ marginBottom: '0' }}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/teamconnect'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                        }`
+                      : `${pathname === '/teamconnect'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                        }`
+                  }`}
+                  style={{
+                    height: '32px',
+                    padding: '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/teamconnect' ? 600 : 500,
+                    fontSize: '13px'
+                  }}
+                >
+                  <Link
+                    to="/teamconnect"
+                    className={`${isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : 'flex items-center'
+                    } group relative overflow-hidden`}
+                  >
+                    <div
+                      className="flex items-center justify-center rounded-[4px] flex-shrink-0"
+                      style={{
+                        backgroundColor: '#8B5CF6',
+                        width: '20px',
+                        height: '20px',
+                      }}
+                    >
+                      <Users2 size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                    </div>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">TeamConnect</span>
+                    ) : (
+                      <span className="ml-1.5">TeamConnect</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: '#E2E8F0', marginBottom: '4px' }} />
+
+        {/* Section: Analytics & Plugins */}
+        <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px' }}>
+          <SidebarGroupContent className="py-0">
+            <SidebarMenu className="space-y-0">
+              <SidebarMenuItem style={{ marginBottom: '1px' }}>
                 <SidebarMenuButton
                   asChild
                   tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
-                  className={`rounded-md relative transition-colors ${isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${pathname === '/analytics'
-                            ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/analytics'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
-                      : `h-10 ${pathname === '/analytics'
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      : `${pathname === '/analytics'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
                   }`}
+                  style={{
+                    height: '32px',
+                    padding: '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/analytics' ? 600 : 500,
+                    fontSize: '13px'
+                  }}
                 >
                   <Link
                     to="/analytics"
                     className={`${isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
+                    } group relative overflow-hidden`}
                   >
-                    <BarChart3 size={20} className="w-5! h-5! p-[1px]" />
+                    <BarChart3 size={16} className="w-4 h-4" style={{ opacity: pathname === '/analytics' ? 1 : 0.7, strokeWidth: 2 }} />
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Analytics</span>
                     ) : (
-                      <span className="ml-3 text-sm font-medium">Analytics</span>
+                      <span className="ml-1.5">Analytics</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem className="pt-1 pb-1">
+              <SidebarMenuItem style={{ marginBottom: '0' }}>
                 <SidebarMenuButton
                   asChild
                   tooltip={isCollapsed && !isMobile ? 'Plugins' : undefined}
-                  className={`rounded-md relative transition-colors ${
+                  className={`rounded-[8px] relative transition-colors ${
                     isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${
+                      ? `flex justify-center items-center ${
                           pathname === '/plugins'
-                            ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
-                      : `h-10 ${
+                      : `${
                           pathname === '/plugins'
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
                   }`}
+                  style={{
+                    height: '32px',
+                    padding: '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/plugins' ? 600 : 500,
+                    fontSize: '13px'
+                  }}
                 >
                   <Link
                     to="/plugins"
@@ -444,13 +449,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                       isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
+                    } group relative overflow-hidden`}
                   >
-                    <Plug size={20} className="w-5! h-5! p-[1px]" />
+                    <Plug size={16} className="w-4 h-4" style={{ opacity: pathname === '/plugins' ? 1 : 0.7, strokeWidth: 2 }} />
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Plugins</span>
                     ) : (
-                      <span className="ml-3 text-sm font-medium">Plugins</span>
+                      <span className="ml-1.5">Plugins</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
@@ -459,70 +464,102 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator className="h-[2px]" />
+        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: '#E2E8F0', marginBottom: '4px' }} />
 
         {/* Section: Settings */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem className="pt-1 pb-0">
+        <SidebarGroup style={{ flexShrink: 0, paddingTop: '2px', marginTop: 'auto' }}>
+          <SidebarGroupContent className="py-0">
+            <SidebarMenu className="space-y-0">
+              <SidebarMenuItem style={{ marginBottom: '1px' }}>
                 <SidebarMenuButton
                   asChild
                   tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
-                  className={`rounded-md relative transition-colors ${isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${pathname === '/settings'
-                            ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/settings'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
-                      : `h-10 ${pathname === '/settings'
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      : `${pathname === '/settings'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
                   }`}
+                  style={{
+                    height: '32px',
+                    padding: '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/settings' ? 600 : 500,
+                    fontSize: '13px'
+                  }}
                 >
                   <Link
                     to="/settings"
                     className={`${isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
+                    } group relative overflow-hidden`}
                   >
-                    <Settings size={20} className="w-5! h-5! p-[1px]" />
+                    <div
+                      className="flex items-center justify-center rounded-[4px] flex-shrink-0"
+                      style={{
+                        backgroundColor: '#64748B',
+                        width: '20px',
+                        height: '20px',
+                      }}
+                    >
+                      <Settings size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                    </div>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Settings</span>
                     ) : (
-                      <span className="ml-3 text-sm font-medium">Settings</span>
+                      <span className="ml-1.5">Settings</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem className="pt-0 pb-1">
+              <SidebarMenuItem style={{ marginBottom: '0' }}>
                 <SidebarMenuButton
                   asChild
                   tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
-                  className={`rounded-md relative transition-colors ${isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${pathname === '/settings/global'
-                            ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/settings/global'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
-                      : `h-10 ${pathname === '/settings/global'
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      : `${pathname === '/settings/global'
+                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
+                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
                         }`
                   }`}
+                  style={{
+                    height: '32px',
+                    padding: '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/settings/global' ? 600 : 500,
+                    fontSize: '13px'
+                  }}
                 >
                   <Link
                     to="/settings/global"
                     className={`${isCollapsed && !isMobile
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 after:bg-primary/60`}
+                    } group relative overflow-hidden`}
                   >
-                    <Globe size={20} className="w-5! h-5! p-[1px]" />
+                    <div
+                      className="flex items-center justify-center rounded-[4px] flex-shrink-0"
+                      style={{
+                        backgroundColor: '#64748B',
+                        width: '20px',
+                        height: '20px',
+                      }}
+                    >
+                      <Globe size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                    </div>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Global Settings</span>
                     ) : (
-                      <span className="ml-3 text-sm font-medium">Global Settings</span>
+                      <span className="ml-1.5">Global Settings</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
@@ -534,7 +571,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         {/* Messages create board dialog removed */}
 
         {showExpandedContent && (
-          <div className="px-2 py-1 text-xs text-muted-foreground">
+          <div style={{ padding: '4px 16px', fontSize: '12px', color: '#94A3B8', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
             Version 5.0.0
           </div>
         )}

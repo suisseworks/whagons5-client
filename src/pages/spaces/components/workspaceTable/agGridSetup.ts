@@ -63,6 +63,9 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     getRowId: (params: any) => String(params.data.id),
     groupDisplayType: 'groupRows',
     groupDefaultExpanded: collapseGroups ? 0 : 1,
+    // IMPORTANT: We're doing our own filtering in TasksCache, so disable AG Grid's client-side filtering
+    // This prevents AG Grid from re-filtering already-filtered data
+    suppressClientSideFiltering: true,
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,

@@ -1,14 +1,13 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTasks } from "@fortawesome/free-solid-svg-icons";
+import { faSpinner, faExclamationTriangle, faCheckCircle, faTasks } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Task, Category, Team, Workspace } from "@/store/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
-import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
 
 interface WorkspaceStatisticsProps {
@@ -16,15 +15,12 @@ interface WorkspaceStatisticsProps {
 }
 
 function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
-  const dispatch = useDispatch();
-  
   // Debug: Log props
   useEffect(() => {
     console.log('WorkspaceStatistics - Component mounted/updated, workspaceId:', workspaceId);
   }, [workspaceId]);
   
   // Redux state - ensure we get arrays, not undefined
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const categories = useSelector((state: RootState) => (state.categories as any)?.value ?? []) as Category[];
   const teams = useSelector((state: RootState) => (state.teams as any)?.value ?? []) as Team[];
   const workspaces = useSelector((state: RootState) => (state as any).workspaces?.value ?? []) as Workspace[];
@@ -226,7 +222,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           const category = Array.isArray(categories) ? categories.find((c: Category) => c.id === categoryId) : null;
           return { category, count };
         })
-        .filter(item => item.category)
+        .filter((item): item is { category: Category; count: number } => item.category !== null && item.category !== undefined)
         .sort((a, b) => b.count - a.count);
 
       // Recent task types (categories from latest tasks)
@@ -241,7 +237,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           const category = Array.isArray(categories) ? categories.find((c: Category) => c.id === categoryId) : null;
           return { category, count };
         })
-        .filter(item => item.category)
+        .filter((item): item is { category: Category; count: number } => item.category !== null && item.category !== undefined)
         .sort((a, b) => b.count - a.count);
 
       // Most active users (by task assignment)

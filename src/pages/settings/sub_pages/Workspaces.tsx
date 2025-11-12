@@ -15,7 +15,6 @@ import {
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  ColorIndicatorCellRenderer,
   TextField,
   SelectField
 } from "../components";
@@ -791,10 +790,12 @@ function Workspaces() {
             label="Description"
             defaultValue=""
           />
-          <ColorIndicatorCellRenderer
+          <TextField
+            id="color"
+            label="Color"
+            type="color"
             value={createFormData.color}
             onChange={(color) => setCreateFormData(prev => ({ ...prev, color }))}
-            label="Color"
           />
           <SelectField
             id="type"
@@ -847,10 +848,12 @@ function Workspaces() {
               label="Description"
               defaultValue={editingWorkspace.description || ''}
             />
-            <ColorIndicatorCellRenderer
+            <TextField
+              id="edit-color"
+              label="Color"
+              type="color"
               value={editFormData.color}
               onChange={(color) => setEditFormData(prev => ({ ...prev, color }))}
-              label="Color"
             />
             <SelectField
               id="edit-type"

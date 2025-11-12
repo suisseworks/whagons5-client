@@ -26,12 +26,31 @@ export function buildGetRows(TasksCache: any, refs: any) {
         const raw = localStorage.getItem(key);
         if (raw) persisted = JSON.parse(raw) || {};
       } catch {}
-      // Merge in priority: params.filterModel (from grid) -> external -> persisted
-      const mergedFm = { ...(persisted || {}), ...(externalFilterModelRef?.current || {}), ...(params?.filterModel || {}) };
+      // Merge filters: persisted -> external -> grid (but ignore grid filters with empty values)
+      // AG Grid returns empty values array for set filters when "show all" is selected
+      const gridFm = params?.filterModel || {};
+      const cleanedGridFm: any = {};
+      for (const [key, value] of Object.entries(gridFm)) {
+        // For set filters, empty values array means "show all" - ignore it
+        if (value && typeof value === 'object' && (value as any).filterType === 'set') {
+          const values = (value as any).values || [];
+          if (values.length > 0) {
+            cleanedGridFm[key] = value;
+          }
+        } else {
+          // For other filter types, include them
+          cleanedGridFm[key] = value;
+        }
+      }
+      
+      // Merge: persisted -> external -> cleaned grid (grid overrides only if it has actual filter values)
+      const mergedFm = { ...(persisted || {}), ...(externalFilterModelRef?.current || {}), ...cleanedGridFm };
       normalized.filterModel = Object.keys(mergedFm).length > 0 ? normalizeFilterModelForQuery(mergedFm) : undefined;
       try {
         if (localStorage.getItem('wh-debug-filters') === 'true') {
-          console.log('[WT getRows] merged filter=', mergedFm, 'normalized=', normalized.filterModel, 'search=', searchRef.current, 'ws=', workspaceRef.current);
+          console.log('[WT getRows] merged filter=', JSON.stringify(mergedFm, null, 2));
+          console.log('[WT getRows] normalized filterModel=', JSON.stringify(normalized.filterModel, null, 2));
+          console.log('[WT getRows] search=', searchRef.current, 'ws=', workspaceRef.current);
         }
       } catch {}
       const queryParams: any = {

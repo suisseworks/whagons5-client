@@ -493,7 +493,20 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         baseParams.__spotMap = spotMapRef.current;
         baseParams.__userMap = userMapRef.current;
         const activeFm = gridRef.current.api.getFilterModel?.() || {};
-        const mergedFm = { ...(activeFm || {}), ...(externalFilterModelRef.current || {}) };
+        // Clean grid filter model - remove set filters with empty values (means "show all")
+        const cleanedActiveFm: any = {};
+        for (const [key, value] of Object.entries(activeFm)) {
+          if (value && typeof value === 'object' && (value as any).filterType === 'set') {
+            const values = (value as any).values || [];
+            if (values.length > 0) {
+              cleanedActiveFm[key] = value;
+            }
+          } else {
+            cleanedActiveFm[key] = value;
+          }
+        }
+        // Merge: external filter takes precedence over grid filter
+        const mergedFm = { ...cleanedActiveFm, ...(externalFilterModelRef.current || {}) };
         const normalizedFm = normalizeFilterModelForQuery(mergedFm);
         baseParams.filterModel = normalizedFm;
         // Get sort model from grid and pass to query
@@ -504,13 +517,50 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           // Default to created_at desc if no sort is set
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
         }
-        console.log('[WT Filters] refreshGrid client-side baseParams.filterModel:', normalizedFm);
+        console.log('[WT Filters] refreshGrid client-side baseParams.filterModel:', JSON.stringify(normalizedFm, null, 2));
+        console.log('[WT Filters] refreshGrid client-side activeFm from grid:', JSON.stringify(activeFm, null, 2));
+        console.log('[WT Filters] refreshGrid client-side externalFm:', JSON.stringify(externalFilterModelRef.current, null, 2));
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
         const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
         const rows = rowsResp?.rows || [];
+        console.log('[WT Filters] refreshGrid - Setting', rows.length, 'filtered rows to grid (totalFiltered:', totalFiltered, ')');
+        
+        // IMPORTANT: Update grid's filter model to match what we're filtering, so AG Grid doesn't re-filter
+        // If we have an external filter, ensure the grid's filter model reflects it
+        // Set filter model BEFORE setting rowData so AG Grid knows what filter is active
+        if (normalizedFm && Object.keys(normalizedFm).length > 0) {
+          // Temporarily suppress filter persistence to avoid loops
+          suppressPersistRef.current = true;
+          console.log('[WT Filters] refreshGrid - Setting grid filter model to:', JSON.stringify(normalizedFm, null, 2));
+          gridRef.current.api.setFilterModel(normalizedFm);
+          // Wait a tick for filter to be applied
+          await new Promise(resolve => setTimeout(resolve, 0));
+          suppressPersistRef.current = false;
+        } else {
+          // No filter - clear grid filter model
+          suppressPersistRef.current = true;
+          gridRef.current.api.setFilterModel(null);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          suppressPersistRef.current = false;
+        }
+        
         setClientRows(rows);
+        // Set rowData - this should display the filtered rows
         gridRef.current.api.setGridOption('rowData', rows);
+        // Call onFilterChanged to ensure grid recognizes the filter state
+        gridRef.current.api.onFilterChanged?.();
+        // Force refresh of client-side row model to ensure grid updates
+        gridRef.current.api.refreshClientSideRowModel?.('everything');
+        // Verify the grid received the data
+        setTimeout(() => {
+          const displayedCount = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
+          console.log('[WT Filters] refreshGrid - Grid now displaying', displayedCount, 'rows');
+          if (displayedCount === 0 && rows.length > 0) {
+            console.warn('[WT Filters] refreshGrid - WARNING: Grid shows 0 rows but we set', rows.length, 'rows!');
+            console.warn('[WT Filters] refreshGrid - Current grid filter model:', JSON.stringify(gridRef.current.api.getFilterModel?.(), null, 2));
+          }
+        }, 100);
         try { if (debugFilters.current) console.log('[WT Filters] client refresh rows=', rows.length, 'totalFiltered=', totalFiltered); } catch {}
       } catch (e) {
         console.warn('refreshGrid (client-side) failed', e);
@@ -610,7 +660,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       if (!gridRef.current?.api) return;
       externalFilterModelRef.current = model || {};
       try { if (debugFilters.current) console.log('[WT] setFilterModel external=', externalFilterModelRef.current); } catch {}
-      gridRef.current.api.setFilterModel(model || null);
+      
+      // Merge external filter with current grid filter, but external takes precedence
+      const currentGridFm = gridRef.current.api.getFilterModel?.() || {};
+      const mergedForGrid = { ...currentGridFm, ...(model || {}) };
+      
+      // Set the merged filter model on the grid so it displays correctly
+      gridRef.current.api.setFilterModel(Object.keys(mergedForGrid).length > 0 ? mergedForGrid : null);
+      
       onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
       try {
         const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
@@ -673,6 +730,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
             const gm = e.api.getFilterModel?.() || {};
             const merged = { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
+            console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+            console.log('[WT Filters] onFilterChanged - merged filterModel:', JSON.stringify(merged, null, 2));
             if (merged && Object.keys(merged).length > 0) {
               localStorage.setItem(key, JSON.stringify(merged));
             } else {

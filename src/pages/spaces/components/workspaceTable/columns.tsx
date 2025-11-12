@@ -6,9 +6,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MapPin, Flag, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { iconService } from '@/database/iconService';
+import { useState, useEffect } from 'react';
 import { faTags } from "@fortawesome/free-solid-svg-icons";
-import { iconService } from "@/database/iconService";
-import { useEffect, useState } from "react";
 
 export function buildWorkspaceColumns(opts: any) {
   const {
@@ -31,20 +31,39 @@ export function buildWorkspaceColumns(opts: any) {
   } = opts;
 
   const CategoryIconSmall = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
-    const [iconEl, setIconEl] = useState<any>(faTags);
+    const iconColor = color || '#6b7280';
+    const [icon, setIcon] = useState<any>(faTags);
+    
     useEffect(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const loaded = await iconService.getIcon(iconClass);
-          if (!cancelled) setIconEl(loaded || faTags);
-        } catch {
-          if (!cancelled) setIconEl(faTags);
+      const loadIcon = async () => {
+        if (!iconClass) {
+          setIcon(faTags);
+          return;
         }
-      })();
-      return () => { cancelled = true; };
+        try {
+          const parts = iconClass.split(' ');
+          const last = parts[parts.length - 1];
+          const loadedIcon = await iconService.getIcon(last);
+          setIcon(loadedIcon || faTags);
+        } catch (error) {
+          setIcon(faTags);
+        }
+      };
+      loadIcon();
     }, [iconClass]);
-    return <FontAwesomeIcon icon={iconEl as any} className="mr-1" style={{ color: color || '#6b7280', width: 18, height: 18 }} />;
+    
+    return (
+      <div 
+        className="w-6 h-6 min-w-[1.5rem] rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: iconColor }}
+      >
+        <FontAwesomeIcon 
+          icon={icon} 
+          style={{ color: '#ffffff', fontSize: '12px' }}
+          className="text-white"
+        />
+      </div>
+    );
   };
 
   // Always render initials instead of profile pictures

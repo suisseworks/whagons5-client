@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Plus,
   ChevronDown,
-  Briefcase,  
+  Briefcase,
+  Search,
+  MoreHorizontal,
+  Layers,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -29,7 +33,12 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ColorPicker, ColorPickerAlpha, ColorPickerFormat, ColorPickerHue, ColorPickerSelection, ColorPickerEyeDropper } from '@/components/ui/shadcn-io/color-picker';
+import Color, { ColorLike } from 'color';
 import { Workspace } from '@/store/types';
+import { genericActions } from '@/store/genericSlices';
 import {
   DndContext,
   closestCenter,
@@ -75,6 +84,7 @@ export interface AppSidebarWorkspacesProps {
   workspaces: Workspace[];
   pathname: string;
   getWorkspaceIcon: (iconName?: string) => any;
+  showEverythingButton?: boolean;
 }
 
 interface SortableWorkspaceItemProps {
@@ -105,7 +115,7 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
       <div
         ref={setNodeRef}
         style={style}
-        className="flex items-center justify-center h-8 w-8 mx-0 rounded-md"
+        className="flex items-center justify-center mx-0 rounded-[12px]"
       >
         <div
           {...listeners}
@@ -120,17 +130,31 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
                 e.preventDefault();
               }
             }}
-            className={`group flex items-center justify-center w-full h-full text-xs font-medium rounded-md ${
+            className={`group flex items-center justify-center w-full h-full rounded-[6px] ${
               pathname === `/workspace/${workspace.id}`
-                ? 'bg-primary/20 text-primary border border-primary/40'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                ? 'bg-[#F3E8FF]'
+                : 'hover:bg-[#F8F9FA]'
             }`}
+            style={{
+              width: '32px',
+              height: '32px',
+              opacity: pathname === `/workspace/${workspace.id}` ? 1 : 0.7
+            }}
           >
-            <FontAwesomeIcon
-              icon={getWorkspaceIcon(workspace.icon)}
-              style={{ color: workspace.color }}
-              className="w-4 h-4"
-            />
+            <div
+              className="flex items-center justify-center rounded-[4px]"
+              style={{
+                backgroundColor: workspace.color || '#3b82f6',
+                width: '20px',
+                height: '20px',
+              }}
+            >
+              <FontAwesomeIcon
+                icon={getWorkspaceIcon(workspace.icon)}
+                className="w-3 h-3"
+                style={{ color: '#ffffff' }}
+              />
+            </div>
             <span className="sr-only">{workspace.name}</span>
           </Link>
         </div>
@@ -141,10 +165,10 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, marginBottom: '2px' }}
       {...listeners}
       {...attributes}
-      className="flex items-center h-10 rounded-md relative cursor-grab active:cursor-grabbing"
+      className="flex items-center rounded-[8px] relative cursor-grab active:cursor-grabbing"
     >
       <Link
         to={`/workspace/${workspace.id}`}
@@ -156,27 +180,45 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
             e.stopPropagation();
           }
         }}
-        className={`group flex items-center rounded-md flex-1 space-x-3 h-10 px-3 pointer-events-auto ${
+        className={`group flex items-center rounded-[6px] flex-1 pointer-events-auto ${
           pathname === `/workspace/${workspace.id}`
-            ? 'bg-primary/10 text-primary border-l-[3px] border-primary rounded-l-md'
-            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-        } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:rounded-l-md`}
-        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
+            ? 'bg-[#F3E8FF] text-[#9333EA]'
+            : 'text-[#64748B] hover:bg-[#F8F9FA]'
+        }`}
+        style={{ 
+          pointerEvents: isDragging ? 'none' : 'auto',
+          height: '32px',
+          padding: '6px 8px',
+          gap: '8px',
+          fontWeight: pathname === `/workspace/${workspace.id}` ? 500 : 400,
+          fontSize: '14px',
+          color: pathname === `/workspace/${workspace.id}` ? '#9333EA' : '#64748B'
+        }}
       >
-        <span className="flex items-center justify-center">
-          <FontAwesomeIcon
-            icon={getWorkspaceIcon(workspace.icon)}
-            style={{ color: workspace.color }}
-            className="w-4 h-4"
-          />
+        <span className="flex items-center justify-center flex-shrink-0" style={{ width: '20px', height: '20px' }}>
+          <div
+            className="flex items-center justify-center rounded-[4px]"
+            style={{
+              backgroundColor: workspace.color || '#3b82f6',
+              width: '20px',
+              height: '20px',
+            }}
+          >
+            <FontAwesomeIcon
+              icon={getWorkspaceIcon(workspace.icon)}
+              className="w-3 h-3"
+              style={{ color: '#ffffff' }}
+            />
+          </div>
         </span>
-        <span className="truncate font-medium text-[14px]">{workspace.name}</span>
+        <span className="truncate">{workspace.name}</span>
       </Link>
     </div>
   );
 }
 
-export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }: AppSidebarWorkspacesProps) {
+export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, showEverythingButton = true }: AppSidebarWorkspacesProps) {
+  const dispatch = useDispatch();
   const { isMobile, state } = useSidebar();
   const isCollapsedState = state === 'collapsed';
   const collapsed = isCollapsedState && !isMobile;
@@ -184,6 +226,8 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
+  const [workspaceColor, setWorkspaceColor] = useState('#3b82f6');
+  const [workspaceType, setWorkspaceType] = useState('standard');
 
   const [orderKey, setOrderKey] = useState(0);
 
@@ -248,15 +292,30 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
 
 
 
-  const handleAddWorkspace = () => {
-    if (!workspaceName.trim() || !workspaceDescription.trim()) {
-      alert('Please enter both name and description.');
+  const handleAddWorkspace = async () => {
+    if (!workspaceName.trim()) {
+      alert('Please enter a workspace name.');
       return;
     }
 
-    setWorkspaceName('');
-    setWorkspaceDescription('');
-    setIsModalOpen(false);
+    try {
+      await dispatch((genericActions.workspaces.addAsync as any)({
+        name: workspaceName.trim(),
+        description: workspaceDescription.trim() || null,
+        color: workspaceColor,
+        icon: 'fas fa-folder',
+        type: workspaceType
+      })).unwrap();
+
+      setWorkspaceName('');
+      setWorkspaceDescription('');
+      setWorkspaceColor('#3b82f6');
+      setWorkspaceType('standard');
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+      alert('Failed to create workspace. Please try again.');
+    }
   };
 
   // When sidebar is collapsed, always keep workspace section open so icons are visible
@@ -271,47 +330,137 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
 
   return (
     <Collapsible open={collapsed ? true : collapsibleOpen} onOpenChange={handleCollapsibleChange} className="group/collapsible">
-      <SidebarGroup>
-        <SidebarGroupLabel asChild className="text-sm font-normal">
-          <div
-            className={`flex items-center w-full pr-3 ${collapsed ? 'justify-center px-0' : 'justify-between'
-              }`}
+      {/* Everything workspace - aligned above Spaces section */}
+      {showEverythingButton && !collapsed && (
+        <div style={{ marginBottom: '8px' }}>
+          <Link
+            to={`/workspace/all`}
+            className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/workspace/all`
+                ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+            }`}
+            style={{
+              height: '36px',
+              padding: '8px 12px',
+              gap: '10px',
+              boxShadow: pathname === `/workspace/all` ? '0 1px 3px rgba(0, 191, 165, 0.1)' : 'none',
+              fontWeight: pathname === `/workspace/all` ? 600 : 500,
+              fontSize: '15px'
+            }}
           >
-            <CollapsibleTrigger
-              className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 ${collapsed
-                ? 'flex-col justify-center ml-0 px-2'
-                : 'justify-start flex-1'
-                }`}
-            >
+            <span>
+              <Layers className="w-[18px] h-[18px] text-[#00BFA5]" style={{ opacity: pathname === `/workspace/all` ? 1 : 0.7 }} />
+            </span>
+            <span>Everything</span>
+          </Link>
+        </div>
+      )}
+
+      {showEverythingButton && collapsed && !isMobile && (
+        <div className="px-2 flex justify-center" style={{ marginBottom: '8px' }}>
+          <Link
+            to={`/workspace/all`}
+            className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/workspace/all`
+                ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
+                : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+            }`}
+            style={{
+              width: '32px',
+              height: '32px',
+              opacity: pathname === `/workspace/all` ? 1 : 0.7
+            }}
+            title={'Everything'}
+          >
+            <Layers className="w-4 h-4 text-[#00BFA5]" />
+          </Link>
+        </div>
+      )}
+
+      <SidebarGroup>
+        <SidebarGroupLabel asChild>
+          <div
+            className={`flex items-center w-full ${collapsed ? 'justify-center px-0' : 'justify-between'
+              }`}
+            style={{ 
+              borderTop: collapsed ? 'none' : '1px solid #E2E8F0',
+              paddingTop: collapsed ? '0' : '8px',
+              marginTop: collapsed ? '0' : '0px',
+              marginBottom: '8px'
+            }}
+          >
+            <>
               {collapsed ? (
-                <div className="flex flex-col items-center">
-                  <Briefcase className="text-sidebar-foreground w-5 h-5 mb-1" />
-                </div>
+                <CollapsibleTrigger
+                  className="flex flex-col justify-center px-2 cursor-pointer hover:bg-[#F1F3F5] hover:text-[#1A2332] rounded-sm"
+                  style={{ padding: '8px' }}
+                >
+                  <Briefcase className="text-[#1A2332] w-5 h-5 mb-1" style={{ opacity: 0.7 }} />
+                </CollapsibleTrigger>
               ) : (
                 <>
-                  <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
-                  <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
-                    <Briefcase className="w-4 h-4 mr-2" />
-                    Spaces
-                  </span>
+                  <CollapsibleTrigger
+                    className="flex items-center cursor-pointer hover:bg-[#F1F3F5] hover:text-[#1A2332] rounded-sm justify-start flex-1"
+                    style={{
+                      padding: '4px 8px 4px 0',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}
+                  >
+                    <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-[#1A2332]" style={{ opacity: 0.7 }} />
+                    <span className="pl-2 text-[#1A2332]" style={{ fontSize: '14px', fontWeight: 600 }}>
+                      Spaces
+                    </span>
+                  </CollapsibleTrigger>
+                  
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 hover:bg-transparent"
+                      title="More options"
+                      type="button"
+                      style={{ width: '20px', height: '20px', padding: 0 }}
+                    >
+                      <MoreHorizontal size={16} className="text-[#64748B]" />
+                      <span className="sr-only">More options</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 hover:bg-transparent"
+                      title="Search"
+                      type="button"
+                      style={{ width: '20px', height: '20px', padding: 0 }}
+                    >
+                      <Search size={16} className="text-[#64748B]" />
+                      <span className="sr-only">Search</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 hover:bg-transparent"
+                      title="Add Workspace"
+                      type="button"
+                      onClick={() => setIsModalOpen(true)}
+                      style={{ width: '20px', height: '20px', padding: 0 }}
+                    >
+                      <Plus size={16} className="text-[#64748B]" />
+                      <span className="sr-only">Add Workspace</span>
+                    </Button>
+                  </div>
                 </>
               )}
-            </CollapsibleTrigger>
-
-            {(!isCollapsedState || isMobile) && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  title="Add Workspace"
-                  type="button"
-                  onClick={() => setIsModalOpen(true)}
-                >
-                  <Plus />
-                  <span className="sr-only">Add Workspace</span>
-                </Button>
-                <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+              
+              {(!isCollapsedState || isMobile) && (
+                <Dialog open={isModalOpen} onOpenChange={(open) => {
+                  setIsModalOpen(open);
+                  if (!open) {
+                    setWorkspaceName('');
+                    setWorkspaceDescription('');
+                    setWorkspaceColor('#3b82f6');
+                    setWorkspaceType('standard');
+                  }
+                }}>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>Add New Workspace</DialogTitle>
@@ -344,6 +493,73 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                           placeholder="e.g., For managing project tasks"
                         />
                       </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="workspace-color" className="text-right">
+                          Color
+                        </Label>
+                        <div className="col-span-3">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                id="workspace-color"
+                                type="button"
+                                className="h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                style={{ backgroundColor: workspaceColor }}
+                                aria-label="Open color picker"
+                              />
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-72 pointer-events-auto select-text"
+                              align="start"
+                              side="top"
+                              sideOffset={8}
+                              avoidCollisions={false}
+                              onOpenAutoFocus={(e) => e.preventDefault()}
+                            >
+                              <ColorPicker
+                                className="max-w-xs rounded-md p-2"
+                                defaultValue={workspaceColor || "#3b82f6"}
+                                onChange={(color: ColorLike) => {
+                                  const colorInstance = new Color(color);
+                                  const hex = colorInstance.hex();
+                                  setWorkspaceColor(hex);
+                                }}
+                              >
+                                <div className="aspect-square w-full rounded-md border">
+                                  <ColorPickerSelection className="h-full w-full" />
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <ColorPickerEyeDropper />
+                                  <div className="grid w-full gap-1">
+                                    <ColorPickerHue />
+                                    <ColorPickerAlpha />
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <ColorPickerFormat />
+                                </div>
+                              </ColorPicker>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="workspace-type" className="text-right">
+                          Type
+                        </Label>
+                        <div className="col-span-3">
+                          <Select value={workspaceType} onValueChange={setWorkspaceType}>
+                            <SelectTrigger id="workspace-type">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="standard">Standard</SelectItem>
+                              <SelectItem value="project">Project</SelectItem>
+                              <SelectItem value="department">Department</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsModalOpen(false)}>
@@ -355,13 +571,13 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-              </>
-            )}
+              )}
+            </>
           </div>
         </SidebarGroupLabel>
 
         <CollapsibleContent keepRendered>
-          <SidebarGroupContent className={collapsed ? 'pt-2' : 'pt-2'}>
+          <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -371,7 +587,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon }:
                 items={workspaceIds}
                 strategy={verticalListSortingStrategy}
               >
-                <div className={collapsed ? 'flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent z-300' : 'space-y-1'}>
+                <div className={collapsed ? 'flex flex-col items-center space-y-0.5 px-1 py-0.5 rounded-md bg-sidebar-accent z-300' : 'space-y-0.5'}>
                   {localWorkspaces.map((workspace) => (
                     <SortableWorkspaceItem
                       key={workspace.id}

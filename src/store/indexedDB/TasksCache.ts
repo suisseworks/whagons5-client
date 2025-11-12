@@ -555,14 +555,18 @@ export class TasksCache {
                 this._memTasksStamp = now;
             }
 
-            // Apply simple parameter filters
+            // Check if filterModel is present - if so, skip simple filters for columns that are in filterModel
+            const hasFilterModel = params.filterModel && typeof params.filterModel === 'object' && Object.keys(params.filterModel).length > 0;
+            const filterModelKeys = hasFilterModel ? new Set(Object.keys(params.filterModel)) : new Set();
+            
+            // Apply simple parameter filters (skip if column is in filterModel, as filterModel will handle it)
             if (params.workspace_id) {
                 tasks = tasks.filter(task => task.workspace_id === parseInt(params.workspace_id));
             }
-            if (params.status_id) {
+            if (params.status_id && !filterModelKeys.has('status_id')) {
                 tasks = tasks.filter(task => task.status_id === parseInt(params.status_id));
             }
-            if (params.priority_id) {
+            if (params.priority_id && !filterModelKeys.has('priority_id')) {
                 tasks = tasks.filter(task => task.priority_id === parseInt(params.priority_id));
             }
             if (params.team_id) {
@@ -571,7 +575,7 @@ export class TasksCache {
             if (params.template_id) {
                 tasks = tasks.filter(task => task.template_id === parseInt(params.template_id));
             }
-            if (params.spot_id) {
+            if (params.spot_id && !filterModelKeys.has('spot_id')) {
                 tasks = tasks.filter(task => task.spot_id === parseInt(params.spot_id));
             }
             if (params.category_id) {
@@ -704,14 +708,42 @@ export class TasksCache {
      * Apply complex filterModel to tasks array
      */
     private static applyFilterModel(tasks: Task[], filterModel: any): Task[] {
-        return tasks.filter(task => {
+        // Debug logging if enabled
+        const debugFilters = typeof localStorage !== 'undefined' && localStorage.getItem('wh-debug-filters') === 'true';
+        if (debugFilters) {
+            console.log('[TasksCache] applyFilterModel - filterModel:', JSON.stringify(filterModel, null, 2));
+            console.log('[TasksCache] applyFilterModel - tasks before filter:', tasks.length);
+            
+            // Log sample of task priority_ids if filtering by priority
+            if (filterModel.priority_id) {
+                const samplePriorities = tasks.slice(0, 10).map(t => ({ id: t.id, priority_id: t.priority_id }));
+                console.log('[TasksCache] applyFilterModel - sample task priority_ids:', samplePriorities);
+                const allPriorities = [...new Set(tasks.map(t => t.priority_id).filter(p => p != null))];
+                console.log('[TasksCache] applyFilterModel - all unique priority_ids in tasks:', allPriorities);
+            }
+        }
+        
+        const filtered = tasks.filter(task => {
             for (const [column, filterDetails] of Object.entries(filterModel)) {
-                if (!this.taskMatchesFilter(task, column, filterDetails as any)) {
+                const matches = this.taskMatchesFilter(task, column, filterDetails as any);
+                if (debugFilters && column === 'priority_id') {
+                    console.log(`[TasksCache] task ${task.id} priority_id=${task.priority_id} (type: ${typeof task.priority_id}), filter=${JSON.stringify(filterDetails)}, matches=${matches}`);
+                }
+                if (!matches) {
                     return false;
                 }
             }
             return true;
         });
+        
+        if (debugFilters) {
+            console.log('[TasksCache] applyFilterModel - tasks after filter:', filtered.length);
+        }
+        if (filtered.length === 0 && tasks.length > 0) {
+            console.warn('[TasksCache] applyFilterModel - WARNING: Filter resulted in 0 tasks but had', tasks.length, 'tasks before filtering');
+        }
+        
+        return filtered;
     }
 
     /**
@@ -744,19 +776,35 @@ export class TasksCache {
         if (filterType === 'set') {
             const selected = Array.isArray(values) ? values : [];
             if (selected.length === 0) return true;
+            
+            // Handle null/undefined values explicitly
+            if (value === null || value === undefined) {
+                // Check if null/undefined is explicitly in the selected values
+                return selected.includes(null) || selected.includes(undefined) || selected.includes('null') || selected.includes('undefined');
+            }
+            
             // Normalize selected values to both numeric and string sets for robust matching
             const normalizedSelectedNums = selected.map((v: any) => {
+                if (v === null || v === undefined) return null;
                 const n = Number(v);
                 return Number.isFinite(n) ? n : null;
             }).filter((n: any) => n !== null);
-            const normalizedSelectedStrs = selected.map((v: any) => String(v));
+            const normalizedSelectedStrs = selected.map((v: any) => {
+                if (v === null) return 'null';
+                if (v === undefined) return 'undefined';
+                return String(v);
+            });
 
+            // Try numeric comparison first (most reliable for IDs)
             const asNum = Number(value);
             if (Number.isFinite(asNum) && normalizedSelectedNums.length > 0) {
-                if (normalizedSelectedNums.includes(asNum)) return true;
+                const numericMatch = normalizedSelectedNums.includes(asNum);
+                if (numericMatch) return true;
             }
-            // Fallback to string compare
-            return normalizedSelectedStrs.includes(String(value));
+            
+            // Fallback to string compare (handles string IDs and edge cases)
+            const valueStr = value === null ? 'null' : value === undefined ? 'undefined' : String(value);
+            return normalizedSelectedStrs.includes(valueStr);
         }
         
         if (type === 'inRange') {
