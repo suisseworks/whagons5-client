@@ -123,7 +123,7 @@ export function UrlTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>
-      <div className="relative flex-1 flex flex-col min-h-0 w-full">
+      <div className="relative flex-1 flex flex-col min-h-0 w-full pt-0">
         <TabsList>
           {tabs.map((tab) => (
             <TabsTrigger

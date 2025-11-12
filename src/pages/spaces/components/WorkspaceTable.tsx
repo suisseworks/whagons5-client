@@ -702,7 +702,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   return createGridContainer(
     <Suspense fallback={<div>Loading AgGridReact...</div>}>
       <AgGridReact
-        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}`}
+        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
         ref={gridRef}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}

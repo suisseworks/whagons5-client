@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, Search, SlidersHorizontal, ChevronUp, BarChart3 } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3 } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -11,7 +11,6 @@ import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
-import { Input } from '@/components/ui/input';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
@@ -62,13 +61,6 @@ export const Workspace = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStartX, setResizeStartX] = useState<number | null>(null);
   const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
-  // Toggle visibility of search/filters header
-  const [controlsVisible, setControlsVisible] = useState<boolean>(() => {
-    try { return (localStorage.getItem('wh_workspace_controls_visible') ?? 'true') !== 'false'; } catch { return true; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('wh_workspace_controls_visible', String(controlsVisible)); } catch {}
-  }, [controlsVisible]);
 
   // Display options - workspace-specific
   const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
@@ -172,10 +164,70 @@ export const Workspace = () => {
   });
   useEffect(() => {
     try { localStorage.setItem(`wh_workspace_group_by_${id || 'all'}`, groupBy); } catch {}
-  }, [groupBy, id]);
+    // Dispatch to Header component
+    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
+      detail: { groupBy, collapseGroups } 
+    }));
+  }, [groupBy, id, collapseGroups]);
   useEffect(() => {
     try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
-  }, [collapseGroups, id]);
+    // Dispatch to Header component
+    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
+      detail: { groupBy, collapseGroups } 
+    }));
+  }, [collapseGroups, id, groupBy]);
+
+  // Listen for group changes from Header component
+  useEffect(() => {
+    const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
+      const newGroupBy = event.detail.groupBy as any;
+      if (newGroupBy !== groupBy) {
+        setGroupBy(newGroupBy);
+      }
+      if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
+        setCollapseGroups(event.detail.collapseGroups);
+      }
+    };
+    window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
+    return () => {
+      window.removeEventListener('workspace-group-changed', handleGroupChange as EventListener);
+    };
+  }, [groupBy, collapseGroups]);
+
+  // Listen for filter apply events from Header component
+  useEffect(() => {
+    const handleFilterApply = (event: CustomEvent<{ filterModel: any; clearSearch?: boolean }>) => {
+      if (tableRef.current) {
+        tableRef.current.setFilterModel(event.detail.filterModel);
+        const key = `wh_workspace_filters_${id || 'all'}`;
+        try {
+          if (event.detail.filterModel) {
+            localStorage.setItem(key, JSON.stringify(event.detail.filterModel));
+          } else {
+            localStorage.removeItem(key);
+          }
+        } catch {}
+        if (event.detail.clearSearch) {
+          setSearchText('');
+        }
+      }
+    };
+    window.addEventListener('workspace-filter-apply', handleFilterApply as EventListener);
+    return () => {
+      window.removeEventListener('workspace-filter-apply', handleFilterApply as EventListener);
+    };
+  }, [id]);
+
+  // Listen for filter dialog open events from Header component
+  useEffect(() => {
+    const handleFilterDialogOpen = () => {
+      setFiltersOpen(true);
+    };
+    window.addEventListener('workspace-filter-dialog-open', handleFilterDialogOpen as EventListener);
+    return () => {
+      window.removeEventListener('workspace-filter-dialog-open', handleFilterDialogOpen as EventListener);
+    };
+  }, []);
 
   // Check if this is the "all" workspace route (needed for stats and presets)
   const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
@@ -264,11 +316,20 @@ export const Workspace = () => {
   useEffect(() => {
     const ws = isAllWorkspaces ? 'all' : (id || 'all');
     try {
-      setQuickPresets(listPinnedPresets(ws).slice(0, 4));
-      setAllPresets(listPresets(ws));
+      const quick = listPinnedPresets(ws).slice(0, 4);
+      const all = listPresets(ws);
+      setQuickPresets(quick);
+      setAllPresets(all);
+      // Dispatch to Header component
+      window.dispatchEvent(new CustomEvent('workspace-presets-changed', { 
+        detail: { quickPresets: quick, allPresets: all } 
+      }));
     } catch {
       setQuickPresets([]);
       setAllPresets([]);
+      window.dispatchEvent(new CustomEvent('workspace-presets-changed', { 
+        detail: { quickPresets: [], allPresets: [] } 
+      }));
     }
   }, [id, isAllWorkspaces, filtersOpen]);
 
@@ -280,6 +341,35 @@ export const Workspace = () => {
       if (saved != null) setSearchText(saved);
     } catch {}
   }, []);
+
+  // Listen for search changes from Header component
+  useEffect(() => {
+    const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
+      const newSearchText = event.detail.searchText;
+      // Only update if different to prevent unnecessary re-renders
+      if (newSearchText !== searchText) {
+        setSearchText(newSearchText);
+      }
+    };
+    window.addEventListener('workspace-search-changed', handleSearchChange as EventListener);
+    return () => {
+      window.removeEventListener('workspace-search-changed', handleSearchChange as EventListener);
+    };
+  }, [searchText]);
+
+  // Dispatch event when searchText changes (for Header sync)
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      if (searchText) {
+        localStorage.setItem(key, searchText);
+      } else {
+        localStorage.removeItem(key);
+      }
+      // Dispatch custom event to notify Header component
+      window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
+    } catch {}
+  }, [searchText]);
 
   // Restore saved filters for this workspace when grid is ready
   const appliedInitialFilters = useRef(false);
@@ -296,16 +386,6 @@ export const Workspace = () => {
     } catch {}
   }, [id]);
 
-  useEffect(() => {
-    const key = `wh_workspace_search_global`;
-    try {
-      if (searchText) {
-        localStorage.setItem(key, searchText);
-      } else {
-        localStorage.removeItem(key);
-      }
-    } catch {}
-  }, [searchText]);
 
   if (invalidWorkspaceRoute) {
     return (
@@ -425,6 +505,28 @@ export const Workspace = () => {
       )
     },
     {
+      value: 'statistics',
+      label: (
+        <div className="flex items-center gap-2" aria-label="Statistics">
+          <div
+            className="flex items-center justify-center rounded-[4px] flex-shrink-0"
+            style={{
+              backgroundColor: '#3B82F6',
+              width: '20px',
+              height: '20px',
+            }}
+          >
+            <BarChart3 size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+          </div>
+        </div>
+      ),
+      content: (
+        <motion.div key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <WorkspaceStatistics workspaceId={id} />
+        </motion.div>
+      )
+    },
+    {
       value: 'settings',
       label: (
         <div className="flex items-center gap-2" aria-label="Settings">
@@ -436,164 +538,18 @@ export const Workspace = () => {
           <SettingsComponent workspaceId={id} />
         </motion.div>
       )
-    },
-    {
-      value: 'statistics',
-      label: (
-        <div className="flex items-center gap-2" aria-label="Statistics">
-          <BarChart3 />
-        </div>
-      ),
-      content: (
-        <motion.div key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <WorkspaceStatistics workspaceId={id} />
-        </motion.div>
-      )
     }
   ];
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Toggle controls button */}
-      <div className="flex items-center justify-end mb-2 pr-8">
+      {/* Controls moved to Header toolbar */}
+      <div className="ml-auto flex items-center gap-4 pr-2 -mt-2">
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Toggle controls"
-          title={controlsVisible ? 'Hide controls' : 'Show controls'}
-          onClick={() => setControlsVisible(v => !v)}
-          className="mr-12 mt-[-10px]"
-        >
-          {controlsVisible ? <ChevronUp className="w-5 h-5" /> : <SlidersHorizontal className="w-5 h-5" />}
-        </Button>
-      </div>
-
-      {controlsVisible && (
-      <div className="flex items-center gap-6 mb-2 mt-[-24px]">
-        <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
-          <Input
-            placeholder="Search…"
-            className="h-10 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
-        </div>
-        {/* Quick filter chips */}
-        <div className="flex items-center gap-2 ml-2">
-          <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-            title="All tasks"
-            onClick={() => {
-              tableRef.current?.setFilterModel(null);
-              try { localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`); } catch {}
-            }}
-          >All</Button>
-          {quickPresets.map((p, idx) => (
-            <div
-              key={p.id}
-              draggable
-              onDragStart={() => { dragIdRef.current = p.id; }}
-              onDragOver={(e) => { e.preventDefault(); }}
-              onDrop={() => {
-                const draggedId = dragIdRef.current;
-                dragIdRef.current = null;
-                if (!draggedId || draggedId === p.id) return;
-                const scope = isAllWorkspaces ? 'all' : (id || 'all');
-                const current = quickPresets.slice();
-                const from = current.findIndex(x => x.id === draggedId);
-                const to = idx;
-                if (from < 0 || to < 0) return;
-                const moved = current.splice(from, 1)[0];
-                current.splice(to, 0, moved);
-                setQuickPresets(current);
-                try { setPinnedOrder(scope, current.map(x => x.id)); } catch {}
-              }}
-              className="inline-flex"
-              title="Drag to reorder pinned preset"
-            >
-              <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-                title={p.name}
-                onClick={() => {
-                  tableRef.current?.setFilterModel(p.model);
-                  try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(p.model)); } catch {}
-                  setSearchText('');
-                }}
-              >{p.name}</Button>
-            </div>
-          ))}
-          <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-            title="Custom filters"
-            onClick={() => setFiltersOpen(true)}
-          >Filters…</Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" title="More presets">More…</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[240px]">
-              <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
-              {allPresets.length === 0 ? (
-                <DropdownMenuItem disabled>No presets yet</DropdownMenuItem>
-              ) : (
-                allPresets.map((p) => (
-                  <DropdownMenuItem key={p.id} onClick={() => {
-                    tableRef.current?.setFilterModel(p.model);
-                    try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(p.model)); } catch {}
-                    setSearchText('');
-                  }}>
-                    {p.name}
-                  </DropdownMenuItem>
-                ))
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Pin to toolbar</DropdownMenuLabel>
-              {allPresets.map((p) => (
-                <DropdownMenuCheckboxItem
-                  key={p.id}
-                  checked={isAllWorkspaces ? isPinned('all', p.id) : isPinned(id || 'all', p.id)}
-                  onCheckedChange={() => {
-                    const scope = isAllWorkspaces ? 'all' : (id || 'all');
-                    togglePin(scope, p.id);
-                    // refresh pinned list after toggle
-                    try {
-                      setQuickPresets(listPinnedPresets(scope).slice(0, 4));
-                    } catch {}
-                  }}
-                >
-                  {p.name}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        {/* Density toggles */}
-        {/* Density moved to Settings screen */}
-        {/* Group by control */}
-        <div className="flex items-center gap-2 ml-2">
-          <Label className="text-xs text-muted-foreground">Group</Label>
-          <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-            <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5">
-              <SelectValue placeholder="Group" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="spot_id">Location</SelectItem>
-              <SelectItem value="status_id">Status</SelectItem>
-              <SelectItem value="priority_id">Priority</SelectItem>
-            </SelectContent>
-          </Select>
-          {groupBy !== 'none' && (
-            <div className="flex items-center gap-2">
-              <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
-              <Label className="text-sm text-muted-foreground">Collapse</Label>
-            </div>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-4 pr-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle Chat"
-            onClick={() => setRightPanel(prev => prev === 'chat' ? null : 'chat')}
+          aria-label="Toggle Chat"
+          onClick={() => setRightPanel(prev => prev === 'chat' ? null : 'chat')}
             title="Chat"
           >
             <MessageSquare className="w-6 h-6" strokeWidth={2.2} />
@@ -608,11 +564,9 @@ export const Workspace = () => {
             <FolderPlus className="w-6 h-6" strokeWidth={2.2} />
           </Button>
         </div>
-      </div>
-      )}
       {/* Stats summary (chips) */}
       {showHeaderKpis && (
-        <div className="flex flex-wrap gap-2.5 mb-0">
+        <div className="flex flex-wrap gap-2.5">
           <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
             <ClipboardList className="h-[18px] w-[18px] text-cyan-600" />
             <span className="text-[12px] text-muted-foreground">Total</span>
@@ -657,7 +611,7 @@ export const Workspace = () => {
           defaultValue="grid"
           basePath={`/workspace/${id}`}
           pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' }}
-          className="w-full h-full flex flex-col"
+          className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
           onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v); }}
           showClearFilters={showClearFilters}
           onClearFilters={() => tableRef.current?.clearFilters()}

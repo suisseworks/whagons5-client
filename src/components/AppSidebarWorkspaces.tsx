@@ -142,17 +142,24 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
             }}
           >
             <div
-              className="flex items-center justify-center rounded-[4px]"
+              className="flex items-center justify-center rounded-[4px] flex-shrink-0"
               style={{
                 backgroundColor: workspace.color || '#3b82f6',
                 width: '20px',
                 height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <FontAwesomeIcon
                 icon={getWorkspaceIcon(workspace.icon)}
-                className="w-3 h-3"
-                style={{ color: '#ffffff' }}
+                style={{ 
+                  color: '#ffffff', 
+                  fontSize: '16px',
+                  width: '16px',
+                  height: '16px',
+                }}
               />
             </div>
             <span className="sr-only">{workspace.name}</span>
@@ -197,17 +204,24 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
       >
         <span className="flex items-center justify-center flex-shrink-0" style={{ width: '20px', height: '20px' }}>
           <div
-            className="flex items-center justify-center rounded-[4px]"
+            className="flex items-center justify-center rounded-[4px] flex-shrink-0"
             style={{
               backgroundColor: workspace.color || '#3b82f6',
               width: '20px',
               height: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <FontAwesomeIcon
               icon={getWorkspaceIcon(workspace.icon)}
-              className="w-3 h-3"
-              style={{ color: '#ffffff' }}
+              style={{ 
+                color: '#ffffff', 
+                fontSize: '16px',
+                width: '16px',
+                height: '16px',
+              }}
             />
           </div>
         </span>

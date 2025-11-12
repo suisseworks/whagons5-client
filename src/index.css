@@ -309,13 +309,13 @@
 }
 
 .ag-theme-quartz {
-  --ag-background-color: #fafafa;
+  --ag-background-color: #ffffff;
   --ag-foreground-color: var(--color-foreground);
   /* Modern header styling */
-  --ag-header-background-color: #fafafa; /* subtle tinted bg */
+  --ag-header-background-color: #ffffff; /* white background */
   --ag-header-foreground-color: var(--color-foreground);
   --ag-header-column-resize-handle-color: var(--color-border);
-  --ag-odd-row-background-color: #fafafa;
+  --ag-odd-row-background-color: #ffffff;
   --ag-row-border-color: transparent;
   /* Light gray selection (pure neutral, no tint) */
   --ag-selected-row-background-color: #f0f0f0;
@@ -580,7 +580,7 @@
   /* Use horizontal margins only to avoid AG Grid row stacking issues */
   margin: 0 8px 2px 8px;
   border-radius: 0;
-  background-color: #fafafa;
+  background-color: #ffffff;
   border: none;
   border-bottom: 1px solid rgba(0,0,0,0.06);
   /* Remove all inset/left shadows to avoid glow on selection */
@@ -644,7 +644,7 @@
 
 /* Reduce gridlines and header chrome */
 .wh-modern-grid .ag-header {
-  background: #fafafa;
+  background: #ffffff;
   border-bottom: 1px solid rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
@@ -699,8 +699,8 @@
 /* Zebra hover nuance: faint divider on alternating rows only when not selected */
 /* Zebra striping: very subtle alternate row background */
 .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
-  /* Lighter, subtle striping for light mode */
-  background-color: #fafafa;
+  /* White background for light mode */
+  background-color: #ffffff;
 }
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
   background-color: #1a1a1a;
@@ -717,7 +717,7 @@
 /* Soft blurred header strip to separate from content without hard border */
 .wh-modern-grid .ag-header-viewport {
   backdrop-filter: none;
-  background: #fafafa;
+  background: #ffffff;
   border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
@@ -746,4 +746,7 @@
 
 .wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 12px; }
 .wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 10px; }
+
+.wh-modern-grid.wh-density-spacious .ag-center-cols-container .ag-row { margin: 0 18px; }
+.wh-modern-grid.wh-density-spacious .ag-cell { padding-block: 16px; }
 

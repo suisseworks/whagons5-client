@@ -9,8 +9,10 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuCheckboxItem,
+    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus, Layers, Sparkles } from "lucide-react";
+import { User, LogOut, Bell, Plus, Layers, Sparkles, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
@@ -23,6 +25,11 @@ import { MultiStateBadge } from "@/animated/Status";
 import AssistantWidget from '@/components/AssistantWidget';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -95,6 +102,11 @@ function Header() {
         return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
     }, [location.pathname, workspaces]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>('none');
+    const [collapseGroups, setCollapseGroups] = useState<boolean>(true);
+    const [quickPresets, setQuickPresets] = useState<any[]>([]);
+    const [allPresets, setAllPresets] = useState<any[]>([]);
 
     const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
     useEffect(() => {
@@ -113,6 +125,121 @@ function Header() {
         })();
         return () => { cancelled = true; };
     }, [currentWorkspaceIcon]);
+
+    // Load search text from localStorage on mount and when workspace changes
+    useEffect(() => {
+        const key = `wh_workspace_search_global`;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved != null) {
+                setSearchText(saved);
+            } else {
+                setSearchText('');
+            }
+        } catch {}
+    }, [currentWorkspaceName]);
+
+    // Listen for search changes from Workspace component
+    useEffect(() => {
+        const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
+            const newSearchText = event.detail.searchText;
+            // Only update if different to prevent unnecessary re-renders
+            if (newSearchText !== searchText) {
+                setSearchText(newSearchText);
+            }
+        };
+        window.addEventListener('workspace-search-changed', handleSearchChange as EventListener);
+        return () => {
+            window.removeEventListener('workspace-search-changed', handleSearchChange as EventListener);
+        };
+    }, [searchText]);
+
+    // Save search text to localStorage and dispatch custom event
+    useEffect(() => {
+        const key = `wh_workspace_search_global`;
+        try {
+            if (searchText) {
+                localStorage.setItem(key, searchText);
+            } else {
+                localStorage.removeItem(key);
+            }
+            // Dispatch custom event to notify Workspace component
+            window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
+        } catch {}
+    }, [searchText]);
+
+    // Load groupBy and collapseGroups from localStorage when workspace changes
+    useEffect(() => {
+        if (!currentWorkspaceName) return;
+        const workspaceId = currentWorkspaceId || 'all';
+        try {
+            const groupKey = `wh_workspace_group_by_${workspaceId}`;
+            const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
+            const savedGroup = localStorage.getItem(groupKey) as any;
+            const savedCollapse = localStorage.getItem(collapseKey);
+            if (savedGroup) setGroupBy(savedGroup);
+            if (savedCollapse !== null) setCollapseGroups(savedCollapse === 'true');
+        } catch {}
+    }, [currentWorkspaceName, currentWorkspaceId]);
+
+    const isInternalGroupChange = useRef(false);
+
+    // Listen for groupBy changes from Workspace component
+    useEffect(() => {
+        const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
+            // Only update if different to prevent loops
+            if (event.detail.groupBy !== groupBy) {
+                isInternalGroupChange.current = true;
+                setGroupBy(event.detail.groupBy as any);
+                setTimeout(() => { isInternalGroupChange.current = false; }, 0);
+            }
+            if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
+                isInternalGroupChange.current = true;
+                setCollapseGroups(event.detail.collapseGroups);
+                setTimeout(() => { isInternalGroupChange.current = false; }, 0);
+            }
+        };
+        window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
+        return () => {
+            window.removeEventListener('workspace-group-changed', handleGroupChange as EventListener);
+        };
+    }, [groupBy, collapseGroups]);
+
+    // Listen for filter presets from Workspace component
+    useEffect(() => {
+        const handlePresetsChange = (event: CustomEvent<{ quickPresets: any[]; allPresets: any[] }>) => {
+            setQuickPresets(event.detail.quickPresets || []);
+            setAllPresets(event.detail.allPresets || []);
+        };
+        window.addEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
+        return () => {
+            window.removeEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
+        };
+    }, []);
+
+    // Save groupBy and dispatch event when changed (only if changed internally)
+    useEffect(() => {
+        if (!currentWorkspaceName || isInternalGroupChange.current) return;
+        const workspaceId = currentWorkspaceId || 'all';
+        try {
+            localStorage.setItem(`wh_workspace_group_by_${workspaceId}`, groupBy);
+            window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
+                detail: { groupBy, collapseGroups } 
+            }));
+        } catch {}
+    }, [groupBy, currentWorkspaceName, currentWorkspaceId, collapseGroups]);
+
+    // Save collapseGroups and dispatch event when changed (only if changed internally)
+    useEffect(() => {
+        if (!currentWorkspaceName || isInternalGroupChange.current) return;
+        const workspaceId = currentWorkspaceId || 'all';
+        try {
+            localStorage.setItem(`wh_workspace_group_collapse_${workspaceId}`, String(collapseGroups));
+            window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
+                detail: { groupBy, collapseGroups } 
+            }));
+        } catch {}
+    }, [collapseGroups, currentWorkspaceName, currentWorkspaceId, groupBy]);
 
     // Track theme changes (dark/light) so the gradient updates without hard refresh
     const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => {
@@ -392,6 +519,21 @@ function Header() {
                     )}
                 </div>
 
+                {/* Center: Search bar (only shown in workspace) */}
+                {currentWorkspaceName && (
+                    <div className="flex-1 flex items-center justify-center px-4 max-w-md mx-auto">
+                        <div className="relative w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
+                            <Input
+                                placeholder="Search…"
+                                className="h-9 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {/* Right: Actions */}
                 <div className="flex items-center gap-2">
                     {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === 'Everything') && (
@@ -476,6 +618,110 @@ function Header() {
             </div>
 
         </header>
+
+        {/* Secondary Toolbar: Filters and Grouping (only shown in workspace) */}
+        {currentWorkspaceName && (
+            <div className="sticky top-16 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur-sm px-6 py-2">
+                <div className="flex items-center gap-4">
+                    {/* Quick filter chips */}
+                    <div className="flex items-center gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+                            title="All tasks"
+                            onClick={() => {
+                                window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                    detail: { filterModel: null, clearSearch: true } 
+                                }));
+                            }}
+                        >
+                            All
+                        </Button>
+                        {quickPresets.map((p: any, idx: number) => (
+                            <Button
+                                key={p.id || idx}
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+                                title={p.name}
+                                onClick={() => {
+                                    window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                        detail: { filterModel: p.model, clearSearch: true } 
+                                    }));
+                                }}
+                            >
+                                {p.name}
+                            </Button>
+                        ))}
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+                            title="Custom filters"
+                            onClick={() => {
+                                window.dispatchEvent(new CustomEvent('workspace-filter-dialog-open', { detail: {} }));
+                            }}
+                        >
+                            Filters…
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" 
+                                    title="More presets"
+                                >
+                                    More…
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="min-w-[240px]">
+                                <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
+                                {allPresets.length === 0 ? (
+                                    <DropdownMenuItem disabled>No presets yet</DropdownMenuItem>
+                                ) : (
+                                    allPresets.map((p: any) => (
+                                        <DropdownMenuItem 
+                                            key={p.id} 
+                                            onClick={() => {
+                                                window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                                    detail: { filterModel: p.model, clearSearch: true } 
+                                                }));
+                                            }}
+                                        >
+                                            {p.name}
+                                        </DropdownMenuItem>
+                                    ))
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+
+                    {/* Group by control */}
+                    <div className="flex items-center gap-2 ml-auto">
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
+                        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                            <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
+                                <SelectValue placeholder="Group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="spot_id">Location</SelectItem>
+                                <SelectItem value="status_id">Status</SelectItem>
+                                <SelectItem value="priority_id">Priority</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {groupBy !== 'none' && (
+                            <div className="flex items-center gap-2">
+                                <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
+                                <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
 
         {typeof currentWorkspaceId === 'number' && (
             <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={currentWorkspaceId} />

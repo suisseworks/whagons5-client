@@ -28,7 +28,7 @@ export const createGridContainer = (children: React.ReactNode) => {
   try {
     const v = (localStorage.getItem('wh_workspace_density') as any) || 'comfortable';
     if (v === 'compact') densityClass = 'wh-density-compact';
-    else if (v === 'spacious') densityClass = 'wh-density-comfortable'; // keep comfortable spacing for L; rowHeight handles height
+    else if (v === 'spacious') densityClass = 'wh-density-spacious';
     else densityClass = 'wh-density-comfortable';
   } catch {}
   return (

@@ -66,8 +66,8 @@ interface WorkspaceInfo {
 }
 
 function Settings({ workspaceId }: { workspaceId?: string }) {
-  const [prevActiveTab, setPrevActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('overview');
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('overview');
+  const [prevActiveTab, setPrevActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('display');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('display');
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const [workspaceOverview, setWorkspaceOverview] = useState<WorkspaceOverview | null>(null);
   const [workspaceFilters, setWorkspaceFilters] = useState<WorkspaceFilters | null>(null);
@@ -141,12 +141,12 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     } else if (path.includes('/creation')) {
       setActiveTab('filters');
       setPrevActiveTab('filters');
-    } else if (path.includes('/display')) {
-      setActiveTab('display');
-      setPrevActiveTab('display');
-    } else {
+    } else if (path.includes('/overview')) {
       setActiveTab('overview');
       setPrevActiveTab('overview');
+    } else {
+      setActiveTab('display');
+      setPrevActiveTab('display');
     }
   }, [location.pathname]);
 
@@ -332,6 +332,59 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   // Define tabs for URL persistence
   const settingsTabs = [
     {
+      value: 'display',
+      label: (
+        <div className="flex items-center space-x-2">
+          <SlidersHorizontal className="w-4 h-4" />
+          <span>Display</span>
+        </div>
+      ),
+      content: (
+        <motion.div
+          className="mt-4 flex-1 h-full"
+          key="display"
+          initial={{ x: getWorkspaceSettingsTabInitialX(prevActiveTab, 'display') }}
+          animate={{ x: 0 }}
+          transition={WORKSPACE_SETTINGS_TAB_ANIMATION.transition}
+        >
+          {/* Display options */}
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Show header KPIs</div>
+                <div className="text-xs text-muted-foreground">Toggle the Total / In progress / Completed today pills</div>
+              </div>
+              <Switch
+                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`) ?? 'true') !== 'false')}
+                onCheckedChange={(checked) => {
+                  try { localStorage.setItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`, String(checked)); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showKpis: checked, workspaceId: workspaceId || 'all' } })); } catch {}
+                }}
+              />
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center gap-3">
+              <Label>Table density</Label>
+              <ToggleGroup
+                type="single"
+                defaultValue={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_density') as any)) || 'compact'}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  try { localStorage.setItem('wh_workspace_density', v); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
+                }}
+              >
+                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-2 text-xs">C</ToggleGroupItem>
+                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
+                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </div>
+        </motion.div>
+      )
+    },
+    {
       value: 'overview',
       label: (
         <div className="flex items-center space-x-2">
@@ -408,59 +461,6 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
           />
         </motion.div>
       )
-    },
-    {
-      value: 'display',
-      label: (
-        <div className="flex items-center space-x-2">
-          <SlidersHorizontal className="w-4 h-4" />
-          <span>Display</span>
-        </div>
-      ),
-      content: (
-        <motion.div
-          className="mt-4 flex-1 h-full"
-          key="display"
-          initial={{ x: getWorkspaceSettingsTabInitialX(prevActiveTab, 'display') }}
-          animate={{ x: 0 }}
-          transition={WORKSPACE_SETTINGS_TAB_ANIMATION.transition}
-        >
-          {/* Display options */}
-          <div className="mb-4 p-3 border rounded-md bg-background">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium">Show header KPIs</div>
-                <div className="text-xs text-muted-foreground">Toggle the Total / In progress / Completed today pills</div>
-              </div>
-              <Switch
-                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`) ?? 'true') !== 'false')}
-                onCheckedChange={(checked) => {
-                  try { localStorage.setItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`, String(checked)); } catch {}
-                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showKpis: checked, workspaceId: workspaceId || 'all' } })); } catch {}
-                }}
-              />
-            </div>
-          </div>
-          <div className="mb-4 p-3 border rounded-md bg-background">
-            <div className="flex items-center gap-3">
-              <Label>Table density</Label>
-              <ToggleGroup
-                type="single"
-                defaultValue={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_density') as any)) || 'compact'}
-                onValueChange={(v) => {
-                  if (!v) return;
-                  try { localStorage.setItem('wh_workspace_density', v); } catch {}
-                  try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
-                }}
-              >
-                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-2 text-xs">C</ToggleGroupItem>
-                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
-                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          </div>
-        </motion.div>
-      )
     }
   ];
 
@@ -524,9 +524,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
       <UrlTabs
         tabs={settingsTabs}
-        defaultValue="overview"
+        defaultValue="display"
         basePath={`/workspace/${workspaceId}/settings`}
-        pathMap={{ overview: '', users: '/users', filters: '/creation', display: '/display' }}
+        pathMap={{ display: '', overview: '/overview', users: '/users', filters: '/creation' }}
         className="w-full h-full flex flex-col"
         onValueChange={(value) => {
           setPrevActiveTab(activeTab);

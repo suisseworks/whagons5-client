@@ -305,7 +305,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar" style={{ paddingLeft: '20px', paddingRight: '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <SidebarContent className="bg-sidebar" style={{ paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Spaces section - scrollable */}
         <SidebarGroup style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -319,7 +319,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid #E2E8F0', paddingLeft: '20px', paddingRight: '20px', flexShrink: 0 }}>
+      <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid #E2E8F0', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
         {/* Section: TeamConnect */}
         <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px', marginTop: '4px' }}>
           <SidebarGroupContent>
@@ -340,7 +340,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   }`}
                   style={{
                     height: '32px',
-                    padding: '6px 10px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/teamconnect' ? 600 : 500,
                     fontSize: '13px'
@@ -396,7 +396,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   }`}
                   style={{
                     height: '32px',
-                    padding: '6px 10px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/analytics' ? 600 : 500,
                     fontSize: '13px'
@@ -437,7 +437,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   }`}
                   style={{
                     height: '32px',
-                    padding: '6px 10px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/plugins' ? 600 : 500,
                     fontSize: '13px'
@@ -486,7 +486,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   }`}
                   style={{
                     height: '32px',
-                    padding: '6px 10px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/settings' ? 600 : 500,
                     fontSize: '13px'
@@ -533,7 +533,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   }`}
                   style={{
                     height: '32px',
-                    padding: '6px 10px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/settings/global' ? 600 : 500,
                     fontSize: '13px'
