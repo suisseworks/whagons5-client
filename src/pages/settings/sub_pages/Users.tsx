@@ -11,7 +11,10 @@ import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
 import { Team } from "@/store/types";
 import { Role } from "@/store/types";
+import { UserTeam } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Label } from "@/components/ui/label";
 
 // Extended User type based on actual API data structure
 interface UserData {
@@ -51,6 +54,7 @@ function Users() {
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
   const { value: roles, loading: rolesLoading } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+  const { value: userTeams, loading: userTeamsLoading } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
   
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
@@ -63,10 +67,14 @@ function Users() {
     searchQuery,
     setSearchQuery,
     handleSearch,
+    createItem,
     updateItem,
     deleteItem,
     isSubmitting,
     formError,
+    setFormError,
+    isCreateDialogOpen,
+    setIsCreateDialogOpen,
     isEditDialogOpen,
     setIsEditDialogOpen,
     isDeleteDialogOpen,
@@ -93,10 +101,37 @@ function Users() {
     
     // Load roles (needed for invitation form)
     dispatch((genericActions as any).roles.getFromIndexedDB());
+    
+    // Load user-teams pivot table (needed for team assignments)
+    dispatch((genericActions as any).userTeams.getFromIndexedDB());
   }, [dispatch]);
 
   // Form state for controlled components
   const [editFormData, setEditFormData] = useState<{
+    name: string;
+    email: string;
+    job_position_id: string;
+    organization_name: string;
+    color: string;
+    is_admin: boolean;
+    has_active_subscription: boolean;
+  }>({
+    name: '',
+    email: '',
+    job_position_id: '',
+    organization_name: '',
+    color: '',
+    is_admin: false,
+    has_active_subscription: false
+  });
+
+  // Selected teams state (using string IDs for MultiSelect)
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Create form state
+  const [createFormData, setCreateFormData] = useState<{
     name: string;
     email: string;
     job_position_id: string;
@@ -126,8 +161,31 @@ function Users() {
         is_admin: !!editingUser.is_admin,
         has_active_subscription: !!editingUser.has_active_subscription
       });
+
+      // Load existing user-team relationships
+      const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
+      setSelectedTeams(existingUserTeams.map((ut: UserTeam) => ut.team_id.toString()));
+    } else {
+      // Reset selected teams when dialog closes
+      setSelectedTeams([]);
     }
-  }, [editingUser]);
+  }, [editingUser, userTeams]);
+
+  // Reset create form when create dialog closes
+  useEffect(() => {
+    if (!isCreateDialogOpen) {
+      setCreateFormData({
+        name: '',
+        email: '',
+        job_position_id: '',
+        organization_name: '',
+        color: '',
+        is_admin: false,
+        has_active_subscription: false
+      });
+      setCreateSelectedTeams([]);
+    }
+  }, [isCreateDialogOpen]);
 
   const columnDefs = useMemo<ColDef[]>(() => ([
     {
@@ -157,15 +215,33 @@ function Users() {
       flex: 2,
       minWidth: 240,
       cellRenderer: (params: ICellRendererParams) => {
-        const userTeams = params.data?.teams || [];
-        if (!userTeams || userTeams.length === 0) return <span className="text-muted-foreground">No Teams</span>;
+        const userId = params.data?.id;
+        if (!userId) return <span className="text-muted-foreground">No Teams</span>;
+
+        // Get user-team relationships from reducer
+        const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userId);
+        
+        if (!userTeamRelationships || userTeamRelationships.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
+        // Map relationships to team objects
+        const userTeamObjects = userTeamRelationships
+          .map((ut: UserTeam) => {
+            const team = teams.find((t: Team) => t.id === ut.team_id);
+            return team ? { id: team.id, name: team.name, color: team.color } : null;
+          })
+          .filter((team): team is { id: number; name: string; color?: string | null } => team !== null);
+
+        if (userTeamObjects.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
 
         return (
           <div className="flex flex-wrap gap-1">
-            {userTeams.map((team: { id: number; name: string; color?: string }) => {
-              const teamData = teams.find((t: Team) => t.id === team.id);
+            {userTeamObjects.map((team: { id: number; name: string; color?: string | null }) => {
               const initial = (team.name || '').charAt(0).toUpperCase();
-              const hex = String(team.color || teamData?.color || '').trim();
+              const hex = String(team.color || '').trim();
               let bg = hex;
               let fg = '#fff';
               try {
@@ -241,36 +317,47 @@ function Users() {
       resizable: false,
       pinned: 'right'
     }
-  ]), [teams, jobPositions, handleEdit, handleDelete]);
+  ]), [teams, jobPositions, userTeams, handleEdit, handleDelete]);
 
   // Render entity preview for delete dialog
-  const renderUserPreview = (user: UserData) => (
-    <div className="flex items-center space-x-3">
-      <div className="w-8 h-8 min-w-[2rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
-        {user.name.charAt(0).toUpperCase()}
-      </div>
-      <div>
-        <div className="font-medium">{user.name}</div>
-        <div className="text-sm text-muted-foreground">{user.email}</div>
-        <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
-          {user.teams && user.teams.length > 0 && user.teams.map((team: { id: number; name: string; color?: string }) => (
-            <Badge key={team.id} variant="secondary" className="text-xs">
-              {team.name}
+  const renderUserPreview = (user: UserData) => {
+    // Get user-team relationships from reducer
+    const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === user.id);
+    const userTeamObjects = userTeamRelationships
+      .map((ut: UserTeam) => {
+        const team = teams.find((t: Team) => t.id === ut.team_id);
+        return team ? { id: team.id, name: team.name, color: team.color } : null;
+      })
+      .filter((team): team is { id: number; name: string; color?: string | null } => team !== null);
+
+    return (
+      <div className="flex items-center space-x-3">
+        <div className="w-8 h-8 min-w-[2rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+          {user.name.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <div className="font-medium">{user.name}</div>
+          <div className="text-sm text-muted-foreground">{user.email}</div>
+          <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
+            {userTeamObjects.length > 0 && userTeamObjects.map((team: { id: number; name: string; color?: string | null }) => (
+              <Badge key={team.id} variant="secondary" className="text-xs">
+                {team.name}
+              </Badge>
+            ))}
+            <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
+              {user.is_admin ? "Admin" : "User"}
             </Badge>
-          ))}
-          <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
-            {user.is_admin ? "Admin" : "User"}
-          </Badge>
-          <Badge 
-            variant={user.has_active_subscription ? "default" : "destructive"} 
-            className="text-xs"
-          >
-            {user.has_active_subscription ? "Active" : "Inactive"}
-          </Badge>
+            <Badge 
+              variant={user.has_active_subscription ? "default" : "destructive"} 
+              className="text-xs"
+            >
+              {user.has_active_subscription ? "Active" : "Inactive"}
+            </Badge>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Invitation dialog state
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
@@ -296,6 +383,57 @@ function Users() {
     setInviteFormData({ team_id: '', role_id: '', job_position_id: '' });
   };
 
+  // Create submit handler
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const userData: Omit<UserData, 'id' | 'created_at' | 'updated_at'> = {
+      name: createFormData.name,
+      email: createFormData.email,
+      job_position_id: createFormData.job_position_id ? Number(createFormData.job_position_id) : null,
+      organization_name: createFormData.organization_name || null,
+      color: createFormData.color || null,
+      is_admin: createFormData.is_admin,
+      has_active_subscription: createFormData.has_active_subscription
+    };
+
+    try {
+      setIsCreating(true);
+      setFormError(null);
+      // Create user directly using addAsync to get the created user back
+      const createdUserResult = await dispatch((genericActions as any).users.addAsync(userData)).unwrap();
+      const createdUser = createdUserResult as UserData;
+      
+      if (createdUser && createSelectedTeams.length > 0) {
+        // Add user-team relationships
+        for (const teamIdStr of createSelectedTeams) {
+          const teamId = Number(teamIdStr);
+          try {
+            await dispatch((genericActions as any).userTeams.addAsync({
+              user_id: createdUser.id,
+              team_id: teamId
+            })).unwrap();
+          } catch (error) {
+            console.error(`Failed to add user-team relationship:`, error);
+          }
+        }
+      }
+      
+      // Close dialog
+      setIsCreateDialogOpen(false);
+    } catch (error: any) {
+      // Handle and display errors
+      const backendErrors = error?.response?.data?.errors;
+      const backendMessage = error?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || error?.message || 'Failed to create user');
+      setFormError(errorMessage);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   // Edit submit handler
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,7 +449,44 @@ function Users() {
       is_admin: editFormData.is_admin,
       has_active_subscription: editFormData.has_active_subscription
     };
+    
+    // Update user first
     await updateItem(editingUser.id, updates);
+
+    // Handle user-team relationships
+    const selectedTeamIds = selectedTeams.map(id => Number(id));
+    const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
+    const existingTeamIds = existingUserTeams.map((ut: UserTeam) => ut.team_id);
+
+    // Find teams to add (in selectedTeams but not in existing)
+    const teamsToAdd = selectedTeamIds.filter(teamId => !existingTeamIds.includes(teamId));
+    
+    // Find teams to remove (in existing but not in selectedTeams)
+    const teamsToRemove = existingTeamIds.filter(teamId => !selectedTeamIds.includes(teamId));
+
+    // Add new user-team relationships
+    for (const teamId of teamsToAdd) {
+      try {
+        await dispatch((genericActions as any).userTeams.addAsync({
+          user_id: editingUser.id,
+          team_id: teamId
+        })).unwrap();
+      } catch (error) {
+        console.error(`Failed to add user-team relationship:`, error);
+      }
+    }
+
+    // Remove deleted user-team relationships
+    for (const teamId of teamsToRemove) {
+      const userTeamToRemove = existingUserTeams.find((ut: UserTeam) => ut.team_id === teamId);
+      if (userTeamToRemove) {
+        try {
+          await dispatch((genericActions as any).userTeams.removeAsync(userTeamToRemove.id)).unwrap();
+        } catch (error) {
+          console.error(`Failed to remove user-team relationship:`, error);
+        }
+      }
+    }
   };
 
   return (
@@ -343,6 +518,9 @@ function Users() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
             Manage Job Positions
+          </Button>
+          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
+            Create User
           </Button>
           <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
             Create Invitation
@@ -415,6 +593,91 @@ function Users() {
         basePath="/settings/users"
         className="h-full flex flex-col"
       />
+
+      {/* Create User Dialog */}
+      <SettingsDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        type="create"
+        title="Create User"
+        description="Create a new user account."
+        onSubmit={handleCreateSubmit}
+        isSubmitting={isCreating}
+        error={formError}
+        submitDisabled={isCreating}
+      >
+        <div className="grid gap-4">
+          <TextField
+            id="create-name"
+            label="Name"
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
+            required
+          />
+          <TextField
+            id="create-email"
+            label="Email"
+            type="email"
+            value={createFormData.email}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
+            required
+          />
+          <TextField
+            id="create-color"
+            label="Color"
+            type="color"
+            value={createFormData.color}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
+          />
+          <SelectField
+            id="create-job_position_id"
+            label="Job Position"
+            value={createFormData.job_position_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
+            placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+            options={jobPositions.map((jp: any) => ({
+              value: jp.id?.toString?.() ?? String(jp.id),
+              label: jp.title
+            }))}
+          />
+          <TextField
+            id="create-organization_name"
+            label="Organization"
+            value={createFormData.organization_name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
+          />
+          <CheckboxField
+            id="create-is_admin"
+            label="Admin"
+            checked={createFormData.is_admin}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
+            description="Grant admin role"
+          />
+          <CheckboxField
+            id="create-has_active_subscription"
+            label="Subscription"
+            checked={createFormData.has_active_subscription}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
+            description="Active subscription"
+          />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Teams</Label>
+            <div className="col-span-3">
+              <MultiSelect
+                options={teams.map((team: Team) => ({
+                  value: team.id.toString(),
+                  label: team.name
+                }))}
+                onValueChange={setCreateSelectedTeams}
+                defaultValue={createSelectedTeams}
+                placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                maxCount={10}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+      </SettingsDialog>
 
       {/* Create Invitation Dialog */}
       <SettingsDialog
@@ -523,6 +786,22 @@ function Users() {
               onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
               description="Active subscription"
             />
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Teams</Label>
+              <div className="col-span-3">
+                <MultiSelect
+                  options={teams.map((team: Team) => ({
+                    value: team.id.toString(),
+                    label: team.name
+                  }))}
+                  onValueChange={setSelectedTeams}
+                  defaultValue={selectedTeams}
+                  placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                  maxCount={10}
+                  className="w-full"
+                />
+              </div>
+            </div>
           </div>
         )}
       </SettingsDialog>

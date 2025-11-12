@@ -89,35 +89,96 @@ export function TextField({
           >
             {(() => {
               const colorValue = isControlled ? value : defaultValue;
-              let realColor = new Color(colorValue);
-              let stringColor = realColor.toString();
-              return (
-                <ColorPicker
-                  className="max-w-xs rounded-md p-2"
-                  defaultValue={stringColor || "#000000"}
-                  onChange={(color : ColorLike) => {
-                    const colorInstance = new Color(color);
-                    const hex = colorInstance.hex();
-                    if (isControlled && onChange) {
-                      onChange(hex);
-                    }
-                  }}
-                >
-                  <div className="aspect-square w-full rounded-md border">
-                    <ColorPickerSelection className="h-full w-full" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <ColorPickerEyeDropper  />
-                    <div className="grid w-full gap-1">
-                      <ColorPickerHue  />
-                      <ColorPickerAlpha />
+              // Handle empty or invalid color values
+              if (!colorValue || colorValue.trim() === '') {
+                return (
+                  <ColorPicker
+                    className="max-w-xs rounded-md p-2"
+                    defaultValue="#000000"
+                    onChange={(color : ColorLike) => {
+                      const colorInstance = new Color(color);
+                      const hex = colorInstance.hex();
+                      if (isControlled && onChange) {
+                        onChange(hex);
+                      }
+                    }}
+                  >
+                    <div className="aspect-square w-full rounded-md border">
+                      <ColorPickerSelection className="h-full w-full" />
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ColorPickerFormat />
-                  </div>
-                </ColorPicker>
-              );
+                    <div className="flex items-center gap-3">
+                      <ColorPickerEyeDropper  />
+                      <div className="grid w-full gap-1">
+                        <ColorPickerHue  />
+                        <ColorPickerAlpha />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ColorPickerFormat />
+                    </div>
+                  </ColorPicker>
+                );
+              }
+              try {
+                let realColor = new Color(colorValue);
+                let stringColor = realColor.toString();
+                return (
+                  <ColorPicker
+                    className="max-w-xs rounded-md p-2"
+                    defaultValue={stringColor || "#000000"}
+                    onChange={(color : ColorLike) => {
+                      const colorInstance = new Color(color);
+                      const hex = colorInstance.hex();
+                      if (isControlled && onChange) {
+                        onChange(hex);
+                      }
+                    }}
+                  >
+                    <div className="aspect-square w-full rounded-md border">
+                      <ColorPickerSelection className="h-full w-full" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ColorPickerEyeDropper  />
+                      <div className="grid w-full gap-1">
+                        <ColorPickerHue  />
+                        <ColorPickerAlpha />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ColorPickerFormat />
+                    </div>
+                  </ColorPicker>
+                );
+              } catch (error) {
+                // Fallback if color parsing fails
+                return (
+                  <ColorPicker
+                    className="max-w-xs rounded-md p-2"
+                    defaultValue="#000000"
+                    onChange={(color : ColorLike) => {
+                      const colorInstance = new Color(color);
+                      const hex = colorInstance.hex();
+                      if (isControlled && onChange) {
+                        onChange(hex);
+                      }
+                    }}
+                  >
+                    <div className="aspect-square w-full rounded-md border">
+                      <ColorPickerSelection className="h-full w-full" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ColorPickerEyeDropper  />
+                      <div className="grid w-full gap-1">
+                        <ColorPickerHue  />
+                        <ColorPickerAlpha />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ColorPickerFormat />
+                    </div>
+                  </ColorPicker>
+                );
+              }
             })()}
           </PopoverContent>
         </Popover>

@@ -268,7 +268,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     <Sidebar
       collapsible="icon"
       className={`bg-sidebar transition-all duration-300 text-sidebar-foreground font-montserrat text-[1rem]`}
-      style={{ borderRight: '1px solid #E2E8F0' }}
+      style={{ borderRight: '1px solid var(--sidebar-border)' }}
       overlayExpanded={overlayOnExpand && !getPinnedState()}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -288,11 +288,11 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <WhagonsCheck
               width={showExpandedContent ? 40 : 28}
               height={showExpandedContent ? 18 : 14}
-              color="#00BFA5"
+              style={{ color: 'var(--sidebar-primary)' }}
             />
             {showExpandedContent && (
               <div
-                className="pl-2 font-semibold text-[#00BFA5]"
+                className="pl-2 font-semibold text-[var(--sidebar-primary)]"
                 style={{ fontFamily: 'Montserrat', fontSize: '20px', fontWeight: 600 }}
               >
                 Whagons
@@ -319,7 +319,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid #E2E8F0', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
+      <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid var(--sidebar-border)', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
         {/* Section: TeamConnect */}
         <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px', marginTop: '4px' }}>
           <SidebarGroupContent>
@@ -330,12 +330,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/teamconnect'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/teamconnect'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
                   style={{
@@ -374,7 +374,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: '#E2E8F0', marginBottom: '4px' }} />
+        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: 'var(--sidebar-border)', marginBottom: '4px' }} />
 
         {/* Section: Analytics & Plugins */}
         <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px' }}>
@@ -386,12 +386,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/analytics'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/analytics'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
                   style={{
@@ -426,13 +426,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     isCollapsed && !isMobile
                       ? `flex justify-center items-center ${
                           pathname === '/plugins'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${
                           pathname === '/plugins'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
                   style={{
@@ -464,7 +464,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: '#E2E8F0', marginBottom: '4px' }} />
+        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: 'var(--sidebar-border)', marginBottom: '4px' }} />
 
         {/* Section: Settings */}
         <SidebarGroup style={{ flexShrink: 0, paddingTop: '2px', marginTop: 'auto' }}>
@@ -476,12 +476,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/settings'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/settings'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
                   style={{
@@ -523,12 +523,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/settings/global'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/settings/global'
-                            ? 'bg-[#E8F5F3] text-[#00BFA5]'
-                            : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
                   style={{
@@ -571,7 +571,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         {/* Messages create board dialog removed */}
 
         {showExpandedContent && (
-          <div style={{ padding: '4px 16px', fontSize: '12px', color: '#94A3B8', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
+          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
             Version 5.0.0
           </div>
         )}

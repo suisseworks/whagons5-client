@@ -132,8 +132,8 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
             }}
             className={`group flex items-center justify-center w-full h-full rounded-[6px] ${
               pathname === `/workspace/${workspace.id}`
-                ? 'bg-[#F3E8FF]'
-                : 'hover:bg-[#F8F9FA]'
+                ? 'bg-[var(--sidebar-selected-bg)]'
+                : 'hover:bg-[var(--sidebar-accent)]'
             }`}
             style={{
               width: '32px',
@@ -189,8 +189,8 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
         }}
         className={`group flex items-center rounded-[6px] flex-1 pointer-events-auto ${
           pathname === `/workspace/${workspace.id}`
-            ? 'bg-[#F3E8FF] text-[#9333EA]'
-            : 'text-[#64748B] hover:bg-[#F8F9FA]'
+            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
         }`}
         style={{ 
           pointerEvents: isDragging ? 'none' : 'auto',
@@ -199,7 +199,7 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
           gap: '8px',
           fontWeight: pathname === `/workspace/${workspace.id}` ? 500 : 400,
           fontSize: '14px',
-          color: pathname === `/workspace/${workspace.id}` ? '#9333EA' : '#64748B'
+          color: pathname === `/workspace/${workspace.id}` ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)'
         }}
       >
         <span className="flex items-center justify-center flex-shrink-0" style={{ width: '20px', height: '20px' }}>
@@ -350,8 +350,8 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           <Link
             to={`/workspace/all`}
             className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/workspace/all`
-                ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
             }`}
             style={{
               height: '36px',
@@ -363,7 +363,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             }}
           >
             <span>
-              <Layers className="w-[18px] h-[18px] text-[#00BFA5]" style={{ opacity: pathname === `/workspace/all` ? 1 : 0.7 }} />
+              <Layers className="w-[18px] h-[18px]" style={{ color: pathname === `/workspace/all` ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)', opacity: pathname === `/workspace/all` ? 1 : 0.7 }} />
             </span>
             <span>Everything</span>
           </Link>
@@ -375,8 +375,8 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           <Link
             to={`/workspace/all`}
             className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/workspace/all`
-                ? 'bg-[#E8F5F3] text-[#00BFA5] border border-[rgba(0,191,165,0.2)]'
-                : 'text-[#1A2332] hover:bg-[#F1F3F5] hover:text-[#1A2332]'
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
             }`}
             style={{
               width: '32px',
@@ -385,7 +385,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             }}
             title={'Everything'}
           >
-            <Layers className="w-4 h-4 text-[#00BFA5]" />
+            <Layers className="w-4 h-4" style={{ color: 'var(--sidebar-primary)' }} />
           </Link>
         </div>
       )}
@@ -396,7 +396,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             className={`flex items-center w-full ${collapsed ? 'justify-center px-0' : 'justify-between'
               }`}
             style={{ 
-              borderTop: collapsed ? 'none' : '1px solid #E2E8F0',
+              borderTop: collapsed ? 'none' : `1px solid var(--sidebar-border)`,
               paddingTop: collapsed ? '0' : '8px',
               marginTop: collapsed ? '0' : '0px',
               marginBottom: '8px'
@@ -405,23 +405,24 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             <>
               {collapsed ? (
                 <CollapsibleTrigger
-                  className="flex flex-col justify-center px-2 cursor-pointer hover:bg-[#F1F3F5] hover:text-[#1A2332] rounded-sm"
-                  style={{ padding: '8px' }}
+                  className="flex flex-col justify-center px-2 cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm"
+                  style={{ padding: '8px', color: 'var(--sidebar-text-primary)' }}
                 >
-                  <Briefcase className="text-[#1A2332] w-5 h-5 mb-1" style={{ opacity: 0.7 }} />
+                  <Briefcase className="w-5 h-5 mb-1" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
                 </CollapsibleTrigger>
               ) : (
                 <>
                   <CollapsibleTrigger
-                    className="flex items-center cursor-pointer hover:bg-[#F1F3F5] hover:text-[#1A2332] rounded-sm justify-start flex-1"
+                    className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm justify-start flex-1"
                     style={{
                       padding: '4px 8px 4px 0',
                       fontSize: '14px',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      color: 'var(--sidebar-text-primary)'
                     }}
                   >
-                    <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-[#1A2332]" style={{ opacity: 0.7 }} />
-                    <span className="pl-2 text-[#1A2332]" style={{ fontSize: '14px', fontWeight: 600 }}>
+                    <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
+                    <span className="pl-2" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--sidebar-text-primary)' }}>
                       Spaces
                     </span>
                   </CollapsibleTrigger>
@@ -435,7 +436,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       type="button"
                       style={{ width: '20px', height: '20px', padding: 0 }}
                     >
-                      <MoreHorizontal size={16} className="text-[#64748B]" />
+                      <MoreHorizontal size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
                       <span className="sr-only">More options</span>
                     </Button>
                     <Button
@@ -446,7 +447,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       type="button"
                       style={{ width: '20px', height: '20px', padding: 0 }}
                     >
-                      <Search size={16} className="text-[#64748B]" />
+                      <Search size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
                       <span className="sr-only">Search</span>
                     </Button>
                     <Button
@@ -458,7 +459,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       onClick={() => setIsModalOpen(true)}
                       style={{ width: '20px', height: '20px', padding: 0 }}
                     >
-                      <Plus size={16} className="text-[#64748B]" />
+                      <Plus size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
                       <span className="sr-only">Add Workspace</span>
                     </Button>
                   </div>

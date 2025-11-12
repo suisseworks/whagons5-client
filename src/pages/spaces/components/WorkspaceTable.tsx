@@ -529,31 +529,27 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         // IMPORTANT: Update grid's filter model to match what we're filtering, so AG Grid doesn't re-filter
         // If we have an external filter, ensure the grid's filter model reflects it
         // Set filter model BEFORE setting rowData so AG Grid knows what filter is active
+        // suppressPersistRef is already true from the start of refreshGrid
         if (normalizedFm && Object.keys(normalizedFm).length > 0) {
-          // Temporarily suppress filter persistence to avoid loops
-          suppressPersistRef.current = true;
           console.log('[WT Filters] refreshGrid - Setting grid filter model to:', JSON.stringify(normalizedFm, null, 2));
           gridRef.current.api.setFilterModel(normalizedFm);
-          // Wait a tick for filter to be applied
-          await new Promise(resolve => setTimeout(resolve, 0));
-          suppressPersistRef.current = false;
         } else {
           // No filter - clear grid filter model
-          suppressPersistRef.current = true;
           gridRef.current.api.setFilterModel(null);
-          await new Promise(resolve => setTimeout(resolve, 0));
-          suppressPersistRef.current = false;
         }
+        
+        // Wait a tick for filter events to settle
+        await new Promise(resolve => setTimeout(resolve, 10));
         
         setClientRows(rows);
         // Set rowData - this should display the filtered rows
         gridRef.current.api.setGridOption('rowData', rows);
-        // Call onFilterChanged to ensure grid recognizes the filter state
-        gridRef.current.api.onFilterChanged?.();
         // Force refresh of client-side row model to ensure grid updates
+        // Note: We don't call onFilterChanged here as it would trigger the event handler and cause a loop
         gridRef.current.api.refreshClientSideRowModel?.('everything');
         // Verify the grid received the data
         setTimeout(() => {
+          if (!gridRef.current?.api) return;
           const displayedCount = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
           console.log('[WT Filters] refreshGrid - Grid now displaying', displayedCount, 'rows');
           if (displayedCount === 0 && rows.length > 0) {
@@ -738,7 +734,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
               localStorage.removeItem(key);
             }
           } catch {}
-          refreshGrid();
+          // Only refresh if not in client-side mode (client-side mode handles filtering internally)
+          // or if suppressPersistRef is false (meaning this is a user-initiated filter change)
+          if (!useClientSide) {
+            refreshGrid();
+          }
         }}
         onModelUpdated={(e: any) => {
           const api = e.api;

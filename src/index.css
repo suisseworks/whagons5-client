@@ -103,17 +103,25 @@
   --chart-3: oklch(0.72 0.14 230);
   --chart-4: oklch(0.74 0.13 170);
   --chart-5: oklch(0.78 0.15 260);
+  --radius: 0.625rem;
 
   /* Dark sidebar palette */
   --sidebar: #0a0a0a;
-  --sidebar-foreground: #e5e7eb;
+  --sidebar-foreground: #f3f4f6; /* Brighter for better contrast, especially at 70% opacity */
   --sidebar-primary: oklch(0.78 0.2 280);
+  --sidebar-primary-hover: oklch(0.8 0.2 280);
   --sidebar-primary-foreground: #ffffff;
+  --sidebar-selected-bg: #1a1a1a;
   --sidebar-accent: #1a1a1a;
-  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-accent-foreground: #f3f4f6; /* Match sidebar-foreground for consistency */
   --sidebar-border: rgba(255,255,255,0.08);
   --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
   --sidebar-header: #0f0f0f;
+  
+  /* Sidebar text colors */
+  --sidebar-text-primary: #f3f4f6; /* Brighter for better visibility */
+  --sidebar-text-secondary: #d1d5db; /* Brighter secondary text */
+  --sidebar-text-tertiary: #9ca3af; /* Brighter tertiary text */
 
   /* Dark mode gradients */
   --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);
@@ -196,6 +204,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-header: var(--sidebar-header);
+  --color-sidebar-primary-hover: var(--sidebar-primary-hover);
+  --color-sidebar-selected-bg: var(--sidebar-selected-bg);
+  --color-sidebar-text-primary: var(--sidebar-text-primary);
+  --color-sidebar-text-secondary: var(--sidebar-text-secondary);
+  --color-sidebar-text-tertiary: var(--sidebar-text-tertiary);
 
   /* Collapsible animations */
   --animate-collapsible-down: collapsible-down 0.1s ease-in-out;
@@ -236,6 +250,24 @@
   /* Sidebar font utility */
   .font-montserrat {
     font-family: 'Montserrat', sans-serif;
+  }
+  
+  /* Improve sidebar group label visibility in dark mode - make it much brighter */
+  .dark [data-sidebar="group-label"] {
+    opacity: 1 !important;
+    color: #ffffff !important; /* Pure white for maximum visibility */
+    font-weight: 600 !important;
+  }
+  
+  /* Make sidebar group label icons more visible in dark mode */
+  .dark [data-sidebar="group-label"] svg {
+    opacity: 1 !important;
+    color: #ffffff !important; /* Pure white for maximum visibility */
+  }
+  
+  /* Also target any child elements that might have opacity applied */
+  .dark [data-sidebar="group-label"] * {
+    opacity: 1 !important;
   }
   
   /* Workspace header */
