@@ -4,6 +4,7 @@ import { PrivateRoute, PublicRoute, AuthRoute } from './guard';
 import { HomeRoutes } from './HomeRouter';
 import SignIn from '@/pages/authentication/SignIn';
 import SignUp from '@/pages/authentication/SignUp';
+import InvitationSignUp from '@/pages/authentication/InvitationSignUp';
 import OnboardingRoute from './OnboardingRoute';
 
 export const AppRouter = () => {
@@ -24,6 +25,14 @@ export const AppRouter = () => {
         element={
           <PublicRoute>
             <SignUp />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/auth/invitation/:token"
+        element={
+          <PublicRoute>
+            <InvitationSignUp />
           </PublicRoute>
         }
       />

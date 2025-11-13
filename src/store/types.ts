@@ -475,9 +475,8 @@ export interface Invitation {
     id: number;
     invitation_token: string;
     user_email?: string | null;
-    team_id?: number | null;
-    role_id?: number | null;
-    job_position_id?: number | null;
+    team_ids?: number[] | null;
+    tenant_domain_prefix?: string | null;
     created_at: string;
     updated_at: string;
 }

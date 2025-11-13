@@ -233,9 +233,10 @@ export class GenericCache {
 			// Global short-circuit
 			const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
 			const localGlobalHash = await this.sha256Hex(localGlobalConcat);
+			let serverGlobal: string | undefined | null = null;
 			try {
 				const globalResp = await api.get('/integrity/global', { params: { table: this.table } });
-				const serverGlobal = (globalResp.data?.data?.global_hash ?? globalResp.data?.global_hash) as string | undefined;
+				serverGlobal = (globalResp.data?.data?.global_hash ?? globalResp.data?.global_hash) as string | undefined | null;
 				const rawBlockCount = (globalResp.data?.data?.block_count ?? globalResp.data?.block_count ?? null) as number | string | null;
 				const serverBlockCount = rawBlockCount === null ? null : Number(rawBlockCount);
 				this.dlog('validate: global compare', { table: this.table, localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash, serverGlobal: (serverGlobal||'').slice(0,16), localGlobal: localGlobalHash.slice(0,16) });
@@ -255,13 +256,34 @@ export class GenericCache {
 			// Server blocks; rebuild if empty
 			let serverBlocksResp = await api.get('/integrity/blocks', { params: { table: this.table } });
 			let serverBlocks: Array<{ block_id: number; block_hash: string; row_count: number }> = serverBlocksResp.data.data || [];
+			
+			// If blocks are empty and global hash is null, backend table is empty - clear IndexedDB
+			if (serverBlocks.length === 0 && (!serverGlobal || serverGlobal === null) && localBlocks.length > 0) {
+				this.dlog('server blocks empty and global hash is null; clearing local store (backend table is empty)', { table: this.table });
+				if (!DB.inited) await DB.init();
+				await DB.clear(this.store as any);
+				this.validating = false;
+				return true;
+			}
+			
+			// If blocks are empty but we have local data, try rebuild first
 			if (serverBlocks.length === 0 && localBlocks.length > 0) {
 				try {
 					await api.post('/integrity/rebuild', { table: this.table });
 					serverBlocksResp = await api.get('/integrity/blocks', { params: { table: this.table } });
 					serverBlocks = serverBlocksResp.data.data || [];
-					if (serverBlocks.length === 0) { this.validating = false; return true; }
-				} catch (_) { this.validating = false; return true; }
+					// If blocks are still empty after rebuild, backend table is empty - clear IndexedDB
+					if (serverBlocks.length === 0) {
+						this.dlog('server blocks empty after rebuild; clearing local store (backend table is empty)', { table: this.table });
+						if (!DB.inited) await DB.init();
+						await DB.clear(this.store as any);
+						this.validating = false;
+						return true;
+					}
+				} catch (_) { 
+					this.validating = false; 
+					return true; 
+				}
 			}
 
 			const serverMap = new Map(serverBlocks.map(b => [b.block_id, b]));
@@ -303,12 +325,18 @@ export class GenericCache {
 				if (toRefetch.length) {
 					this.dlog('refetch ids', { blockId, count: toRefetch.length });
 					const chunk = 200;
+					const fetchedIds = new Set<number>();
 					for (let i = 0; i < toRefetch.length; i += chunk) {
 						const ids = toRefetch.slice(i, i + chunk);
 						try {
 							const resp = await api.get(this.endpoint, { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
 							const rows = (resp.data?.data || resp.data?.rows) as any[];
 							if (rows?.length) {
+								// Track which IDs we successfully fetched
+								for (const r of rows) {
+									const idNum = Number(this.getId(r));
+									fetchedIds.add(idNum);
+								}
 								// attach server row hash for stability
 								const rowsWithHash = rows.map(r => {
 									const idNum = Number(this.getId(r));
@@ -330,20 +358,48 @@ export class GenericCache {
 									this.dlog('post-refetch hash', { table: this.table, rowId: idNum, localHash: newLocalHash, serverHash });
 								}
 							} else {
-								// Fallback: some endpoints may not support ids filter (e.g., workspaces)
-								try {
-									this.dlog('ids fetch returned 0; falling back to full fetchAll');
-									await this.fetchAll();
-								} catch { /* ignore */ }
+								// If ids filter returned empty, check if endpoint supports ids filter
+								// If it does, the rows were deleted - we'll handle deletion below
+								// If it doesn't, fallback to full fetchAll
+								const idsSet = new Set(ids.map(id => Number(id)));
+								const hasServerRowsForIds = Array.from(idsSet).some(id => serverRowMap.has(id));
+								if (!hasServerRowsForIds) {
+									// None of the requested IDs exist on server - they were deleted
+									// Don't fallback to fetchAll, just mark them for deletion
+									this.dlog('ids fetch returned 0 and no server rows found - rows were deleted', { ids: Array.from(idsSet) });
+								} else {
+									// Fallback: some endpoints may not support ids filter (e.g., workspaces)
+									try {
+										this.dlog('ids fetch returned 0; falling back to full fetchAll');
+										await this.fetchAll();
+										// After fetchAll, mark all server rows as fetched
+										const allServerRows = await this.getAll();
+										for (const r of allServerRows) {
+											const idNum = Number(this.getId(r));
+											fetchedIds.add(idNum);
+										}
+									} catch { /* ignore */ }
+								}
 							}
 						} catch (e) { console.warn('validate: batch fetch failed', e); }
 					}
+					
+					// Delete local rows that were requested but not returned (deleted on server)
+					for (const requestedId of toRefetch) {
+						if (!fetchedIds.has(requestedId) && !serverRowMap.has(requestedId)) {
+							this.dlog('deleting local row that was deleted on server', { table: this.table, rowId: requestedId });
+							await this.remove(requestedId);
+						}
+					}
 				}
 
-				// Cleanup: remove local-only rows
+				// Cleanup: remove local-only rows that don't exist in serverRows
 				const serverIds = new Set<number>(serverRows.map(r => r.row_id));
 				for (const localId of Array.from(localRowMap.keys())) {
-					if (!serverIds.has(localId)) await this.remove(localId);
+					if (!serverIds.has(localId)) {
+						this.dlog('deleting local row not found in server rows', { table: this.table, rowId: localId });
+						await this.remove(localId);
+					}
 				}
 			}
 

@@ -46,7 +46,15 @@ const OnboardingRoute: React.FC = () => {
     return <Navigate to="/" replace />;
   }
 
-  // Show onboarding flow
+  // Users with tenant subdomain should never see onboarding
+  // Onboarding is only for users creating a new tenant (no subdomain)
+  const hasTenant = user.tenant_domain_prefix && user.tenant_domain_prefix.trim() !== '';
+  if (hasTenant) {
+    // User has a tenant, redirect to home (they're joining an existing tenant)
+    return <Navigate to="/" replace />;
+  }
+
+  // Show onboarding flow (only for users without tenant - creating new tenant)
   return <OnboardingWrapper user={user} />;
 };
 

@@ -109,7 +109,7 @@ export const getCurrentTenant = (): string => {
   return sd.endsWith('.') ? sd.slice(0, -1) : sd;
 };
 
-const setSubdomain = (subdomain: string) => {
+export const setSubdomain = (subdomain: string) => {
   //add a dot at the end if missing, but only if subdomain is not empty
   if (subdomain && !subdomain.endsWith('.')) {
     subdomain += '.';
@@ -260,10 +260,18 @@ api.interceptors.request.use(
     const currentSubdomain = getSubdomain();
     const correctBaseURL = `${PROTOCOL}://${currentSubdomain}${VITE_API_URL}/api`;
     
-    // console.log('Request interceptor - URL:', config.url, 'Current subdomain:', currentSubdomain, 'Base URL:', correctBaseURL);
-    
-    // Override the baseURL for this specific request
+    // Override the baseURL for this specific request to ensure correct tenant routing
     config.baseURL = correctBaseURL;
+    
+    // Debug logging for invitation signup requests
+    if (config.url?.includes('/invitations/signup/')) {
+      console.log('Invitation signup request:', {
+        url: config.url,
+        subdomain: currentSubdomain,
+        baseURL: config.baseURL,
+        fullURL: `${config.baseURL}${config.url}`
+      });
+    }
     
     return config;
   },

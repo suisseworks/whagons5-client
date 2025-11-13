@@ -22,6 +22,13 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
   const { firebaseUser, user, loading, userLoading } = useAuth();
   const location = useLocation();
   const isAuthPage = location.pathname === '/auth/signin' || location.pathname === '/auth/signup';
+  const isInvitationPage = location.pathname.startsWith('/auth/invitation/');
+
+  // For invitation pages, always show the invitation form (don't redirect)
+  // Users joining via invitation should never see onboarding
+  if (isInvitationPage) {
+    return <>{children}</>;
+  }
 
   // For auth pages, show form immediately - don't wait for loading states
   // This prevents hanging if Firebase auth state check or API calls hang
@@ -36,12 +43,17 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
       return <>{children}</>;
     }
     
+    // Check if user has a tenant subdomain - if yes, they're joining an existing tenant
+    // and should never see onboarding (onboarding is only for creating new tenants)
+    const hasTenant = user.tenant_domain_prefix && user.tenant_domain_prefix.trim() !== '';
+    
     // User is authenticated - redirect based on onboarding status
-    if (user.initialization_stage !== InitializationStage.COMPLETED) {
+    // BUT: Users with tenants should never see onboarding
+    if (!hasTenant && user.initialization_stage !== InitializationStage.COMPLETED) {
       return <Navigate to="/onboarding" replace />;
     }
     
-    // User completed onboarding - redirect to home
+    // User completed onboarding OR has tenant - redirect to home
     return <Navigate to="/" replace />;
   }
 
@@ -87,9 +99,19 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
   }
 
   // If user needs onboarding and not already on onboarding page, redirect to onboarding
-  if (user.initialization_stage !== InitializationStage.COMPLETED && 
+  // BUT: Users with tenant subdomain should never see onboarding (they're joining existing tenant)
+  const hasTenant = user.tenant_domain_prefix && user.tenant_domain_prefix.trim() !== '';
+  if (!hasTenant && 
+      user.initialization_stage !== InitializationStage.COMPLETED && 
       location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
+  }
+  
+  // If user has tenant but initialization_stage is not completed, still allow access
+  // (they might be in the process of joining via invitation)
+  if (hasTenant && user.initialization_stage !== InitializationStage.COMPLETED) {
+    // Allow access to the route - don't redirect to onboarding
+    return <>{children}</>;
   }
 
   // If user has completed onboarding and tries to access onboarding, redirect to home

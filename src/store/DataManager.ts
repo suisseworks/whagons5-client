@@ -20,6 +20,8 @@ const coreKeys = [
   'approvalApprovers',
   'spots',
   'users',
+  'userTeams',
+  'invitations',
   'jobPositions',
   'forms',
   'formVersions',
