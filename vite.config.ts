@@ -99,6 +99,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      // Enable build caching for faster rebuilds
+      cacheDir: 'node_modules/.vite',
+      // Optimize chunk size warnings
+      chunkSizeWarningLimit: 1000,
+      // Use esbuild for faster minification (faster than terser)
+      minify: 'esbuild',
       rollupOptions: {
         output: {
           manualChunks(id) {
