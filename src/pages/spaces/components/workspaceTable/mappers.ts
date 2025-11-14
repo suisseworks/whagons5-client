@@ -89,4 +89,16 @@ export function createFilteredPriorities(priorities: any[], defaultCategoryId: n
   return (priorities || []).filter((p: any) => Number((p as any).category_id) === Number(defaultCategoryId));
 }
 
+export function createTagMap(tags: any[]): Record<number, any> {
+  const m: Record<number, any> = {};
+  for (const tag of tags || []) {
+    const anyTag: any = tag as any;
+    if (anyTag && typeof anyTag.id !== 'undefined') {
+      const idNum = Number(anyTag.id);
+      m[idNum] = { name: anyTag.name || `Tag ${idNum}`, color: anyTag.color || '#6B7280' };
+    }
+  }
+  return m;
+}
+
 

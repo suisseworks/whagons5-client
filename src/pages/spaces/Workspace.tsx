@@ -437,7 +437,7 @@ export const Workspace = () => {
             searchText={searchText}
             onFiltersChanged={(active) => setShowClearFilters(!!active)}
             onSelectionChanged={setSelectedIds}
-            onRowClicked={(task) => {
+            onRowDoubleClicked={(task) => {
               setSelectedTask(task);
               setOpenEditTask(true);
             }}

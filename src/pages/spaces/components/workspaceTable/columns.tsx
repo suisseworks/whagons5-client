@@ -10,6 +10,59 @@ import { iconService } from '@/database/iconService';
 import { useState, useEffect } from 'react';
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 
+// Calculate text color based on background color luminance
+function getContrastTextColor(backgroundColor: string): string {
+  if (!backgroundColor) return '#1a1a1a';
+  
+  let r = 0, g = 0, b = 0;
+  
+  // Handle hex colors (#RRGGBB or #RGB)
+  if (backgroundColor.startsWith('#')) {
+    const hex = backgroundColor.slice(1);
+    
+    if (hex.length === 3) {
+      // 3-digit hex (#RGB)
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+      // 6-digit hex (#RRGGBB)
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+    }
+  } else if (backgroundColor.startsWith('rgb')) {
+    // Handle rgb/rgba colors
+    const matches = backgroundColor.match(/\d+/g);
+    if (matches && matches.length >= 3) {
+      r = parseInt(matches[0], 10);
+      g = parseInt(matches[1], 10);
+      b = parseInt(matches[2], 10);
+    }
+  }
+  
+  // Validate RGB values
+  if (isNaN(r) || isNaN(g) || isNaN(b)) {
+    return '#1a1a1a'; // Default to dark text
+  }
+  
+  // Calculate relative luminance (per WCAG 2.1)
+  // Normalize RGB values to 0-1 range
+  const normalize = (val: number) => {
+    val = val / 255;
+    return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+  };
+  
+  const rNorm = normalize(r);
+  const gNorm = normalize(g);
+  const bNorm = normalize(b);
+  
+  const luminance = 0.2126 * rNorm + 0.7152 * gNorm + 0.0722 * bNorm;
+  
+  // Return white for dark backgrounds (luminance < 0.5), dark for light backgrounds
+  return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
+}
+
 export function buildWorkspaceColumns(opts: any) {
   const {
     getUserDisplayName,
@@ -28,6 +81,8 @@ export function buildWorkspaceColumns(opts: any) {
     userMap,
     groupField,
     showDescriptions,
+    tagMap,
+    taskTags,
   } = opts;
 
   const CategoryIconSmall = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
@@ -156,11 +211,25 @@ export function buildWorkspaceColumns(opts: any) {
           ? approval.trigger_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
           : null;
         
+        // Get tags for this task
+        const taskId = Number(p.data?.id);
+        const taskTagIds = taskTags
+          ?.filter((tt: any) => tt.task_id === taskId)
+          .map((tt: any) => Number(tt.tag_id)) || [];
+        const taskTagsData = taskTagIds
+          .map((tagId: number) => {
+            const tag = tagMap?.[tagId];
+            return tag && tag.name ? { ...tag, id: tagId } : null;
+          })
+          .filter((tag: any) => tag !== null);
+        // Show all tags (they will wrap to 2 lines max)
+        const remainingTagsCount = 0; // Removed limit - show all tags
+
         return (
           <div className="flex flex-col gap-1 py-1.5">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
-              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white">{name}</div>
+              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1">{name}</div>
               {hasApproval && (
                 <TooltipProvider>
                   <Tooltip>
@@ -310,6 +379,47 @@ export function buildWorkspaceColumns(opts: any) {
                 </TooltipProvider>
               )}
             </div>
+            {/* Tags - on separate row, can wrap to 2 lines */}
+            {(taskTagsData && taskTagsData.length > 0) && (
+              <div 
+                className="flex items-center gap-1 flex-wrap pl-8"
+                style={{
+                  maxHeight: '2.5rem', // Allow 2 lines max (each tag ~1.25rem height)
+                  overflow: 'hidden',
+                }}
+              >
+                {taskTagsData.map((tag: any, idx: number) => {
+                  if (!tag || !tag.name) return null;
+                  const bgColor = tag.color || '#6B7280';
+                  const textColor = getContrastTextColor(bgColor);
+                  return (
+                    <div
+                      key={tag.id || `tag-${idx}`}
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none truncate max-w-[80px] flex-shrink-0"
+                      style={{
+                        backgroundColor: bgColor,
+                        color: textColor,
+                      }}
+                      title={tag.name}
+                    >
+                      {tag.name}
+                    </div>
+                  );
+                })}
+                {remainingTagsCount > 0 && (
+                  <div
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-muted-foreground flex-shrink-0"
+                    style={{
+                      backgroundColor: '#F3F4F6',
+                      border: '1px solid #E5E7EB',
+                    }}
+                    title={`${remainingTagsCount} more tag${remainingTagsCount > 1 ? 's' : ''}`}
+                  >
+                    +{remainingTagsCount}
+                  </div>
+                )}
+              </div>
+            )}
             {showDescriptions && description && (
               <TooltipProvider>
                 <Tooltip>

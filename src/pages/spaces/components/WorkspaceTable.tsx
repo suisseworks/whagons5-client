@@ -31,7 +31,8 @@ import {
   createUserMap,
   createCategoryToGroup,
   createTransitionsByGroupFrom,
-  createFilteredPriorities
+  createFilteredPriorities,
+  createTagMap
 } from './workspaceTable/mappers';
 const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'name', 'description', 'due_date']);
 
@@ -83,7 +84,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   searchText?: string;
   onFiltersChanged?: (active: boolean) => void;
   onSelectionChanged?: (selectedIds: number[]) => void;
-  onRowClicked?: (task: any) => void;
+  onRowDoubleClicked?: (task: any) => void;
   rowHeight?: number;
   groupBy?: 'none' | 'spot_id' | 'status_id' | 'priority_id';
   collapseGroups?: boolean;
@@ -95,7 +96,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   searchText = '',
   onFiltersChanged,
   onSelectionChanged,
-  onRowClicked,
+  onRowDoubleClicked,
   rowHeight,
   groupBy = 'none',
   collapseGroups = true,
@@ -106,6 +107,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const gridRef = useRef<any>(null);
   const externalFilterModelRef = useRef<any>({});
   const debugFilters = useRef<boolean>(false);
+  const lastDoubleClickRef = useRef<{ rowId: any; timestamp: number } | null>(null);
   useEffect(() => {
     try { debugFilters.current = localStorage.getItem('wh-debug-filters') === 'true'; } catch { debugFilters.current = false; }
   }, []);
@@ -134,7 +136,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
 
   // Extract state from abstracted hooks
-  const { statuses, priorities, spots, users, categories, statusTransitions, approvals, taskApprovalInstances } = reduxState;
+  const { statuses, priorities, spots, users, categories, statusTransitions, approvals, taskApprovalInstances, tags, taskTags } = reduxState;
   const { defaultCategoryId } = derivedState;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
 
@@ -209,6 +211,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const spotMap = useMemo(() => createSpotMap(spots), [spots]);
   const userMap = useMemo(() => createUserMap(users), [users]);
   const filteredPriorities = useMemo(() => createFilteredPriorities(priorities, defaultCategoryId), [priorities, defaultCategoryId]);
+  const tagMap = useMemo(() => createTagMap(tags), [tags]);
   const categoryMap = useMemo(() => {
     const m: Record<number, any> = {};
     for (const c of categories || []) {
@@ -385,8 +388,10 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     showDescriptions: density !== 'compact',
     approvalMap,
     taskApprovalInstances: stableTaskApprovalInstances,
+    tagMap,
+    taskTags,
   } as any), [
-    statusMap, priorityMap, spotMap, userMap,
+    statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
@@ -753,25 +758,46 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             onSelectionChanged(ids);
           } catch { onSelectionChanged([] as number[]); }
         }}
-        onRowClicked={(e: any) => {
-          // Don't open edit task if click was on status column
-          if (e?.event?.target) {
-            const target = e.event.target as HTMLElement;
-            // Check if click originated from status column cell
+        onRowDoubleClicked={(e: any) => {
+          // Don't open edit task if double click was on status column
+          const target = e?.event?.target as HTMLElement;
+          if (target) {
             const cellElement = target.closest('[col-id="status_id"]');
-            // Also check if the clicked element is inside a status cell
             const statusCell = target.closest('.ag-cell[col-id="status_id"]');
             if (cellElement || statusCell) {
-              return; // Ignore clicks on status column
+              return; // Ignore double clicks on status column
             }
           }
           // Also check the column property if available
           if (e?.column?.colId === 'status_id') {
-            return; // Ignore clicks on status column
+            return; // Ignore double clicks on status column
           }
-          if (onRowClicked && e?.data) {
-            onRowClicked(e.data);
+          // Call the handler if provided
+          if (onRowDoubleClicked && e?.data) {
+            onRowDoubleClicked(e.data);
           }
+        }}
+        onCellDoubleClicked={(e: any) => {
+          // Fallback: handle double click at cell level if row-level doesn't work
+          // Only process if it's not the status column
+          if (e?.column?.colId === 'status_id') {
+            return; // Ignore double clicks on status column
+          }
+          // Prevent multiple calls for the same row (onCellDoubleClicked fires for each cell)
+          const rowId = e?.data?.id;
+          const now = Date.now();
+          if (lastDoubleClickRef.current?.rowId === rowId && now - lastDoubleClickRef.current.timestamp < 100) {
+            return; // Already handled this row's double-click
+          }
+          lastDoubleClickRef.current = { rowId, timestamp: now };
+          // Call the handler if provided
+          if (onRowDoubleClicked && e?.data) {
+            onRowDoubleClicked(e.data);
+          }
+        }}
+        onRowClicked={(e: any) => {
+          // Prevent single click from doing anything (we only want double click)
+          // But still allow row selection
         }}
         animateRows={false}
         suppressColumnVirtualisation={true}

@@ -12,7 +12,10 @@ import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { ChevronUp, Plus } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
+import { genericActions } from '@/store/genericSlices';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -33,6 +36,9 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
   const { value: approvals = [] } = useSelector((s: RootState) => (s as any).approvals || { value: [] });
+  const { value: tags = [] } = useSelector((s: RootState) => (s as any).tags || { value: [] });
+  
+  const { user } = useAuth();
 
   const currentWorkspace = workspaces.find((w: any) => w.id === workspaceId);
 
@@ -52,6 +58,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const [approvalId, setApprovalId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
   const [showDescription, setShowDescription] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 
   const categoryInitialStatusId = useMemo(() => {
     // Statuses are global; pick the one marked initial, otherwise first available
@@ -68,6 +75,13 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   const currentCategory = useMemo(() => {
     return categories.find((c: any) => c.id === categoryId);
   }, [categories, categoryId]);
+
+  // Load tags from IndexedDB when dialog opens
+  useEffect(() => {
+    if (open) {
+      dispatch(genericActions.tags.getFromIndexedDB());
+    }
+  }, [open, dispatch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,8 +101,21 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   }, [currentCategory?.icon]);
 
   const categoryPriorities = useMemo(() => {
-    if (!categoryId) return [] as any[];
-    return priorities.filter((p: any) => p.category_id === categoryId);
+    if (!categoryId) {
+      // If no category selected, return global priorities (category_id is null)
+      return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
+    }
+    
+    // First, try to get category-specific priorities
+    const categorySpecific = priorities.filter((p: any) => p.category_id === categoryId);
+    
+    // If category has priorities, use them; otherwise fall back to global priorities
+    if (categorySpecific.length > 0) {
+      return categorySpecific;
+    }
+    
+    // Fall back to global priorities (category_id is null)
+    return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
   }, [priorities, categoryId]);
 
   // Keep selectedPriority derivation available for future inline display needs
@@ -108,6 +135,54 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
       return template.category_id === currentWorkspace.category_id;
     });
   }, [templates, currentWorkspace]);
+
+  const selectedTemplate = useMemo(() => {
+    if (!templateId) return null;
+    // Handle both string and number ID comparisons
+    const found = workspaceTemplates.find((t: any) => 
+      t.id === templateId || 
+      Number(t.id) === Number(templateId) ||
+      String(t.id) === String(templateId)
+    );
+    
+    // Debug logging (remove in production)
+    if (process.env.NODE_ENV === 'development' && templateId) {
+      console.log('Template lookup:', {
+        templateId,
+        templateIdType: typeof templateId,
+        workspaceTemplatesCount: workspaceTemplates.length,
+        templateIds: workspaceTemplates.map((t: any) => ({ id: t.id, name: t.name, type: typeof t.id })),
+        found: found ? { id: found.id, name: found.name } : null
+      });
+    }
+    
+    return found || null;
+  }, [templateId, workspaceTemplates]);
+
+  const spotsApplicable = useMemo(() => {
+    if (!selectedTemplate) return true; // Default to showing location if no template selected
+    // Explicitly convert to boolean to handle various formats from API
+    // Handle: true, "true", 1, "1" as truthy values
+    const spotsNotApplicableValue = selectedTemplate.spots_not_applicable;
+    const spotsNotApplicable = 
+      spotsNotApplicableValue === true || 
+      spotsNotApplicableValue === 'true' || 
+      spotsNotApplicableValue === 1 || 
+      spotsNotApplicableValue === '1';
+    
+    // Debug logging (remove in production)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Template spots_not_applicable check:', {
+        templateId: selectedTemplate.id,
+        templateName: selectedTemplate.name,
+        spots_not_applicable: spotsNotApplicableValue,
+        spotsNotApplicable,
+        spotsApplicable: !spotsNotApplicable
+      });
+    }
+    
+    return !spotsNotApplicable;
+  }, [selectedTemplate]);
 
   const workspaceUsers = useMemo(() => {
     return users.filter((u: any) => !u.workspace_id || u.workspace_id === workspaceId);
@@ -134,6 +209,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
       setApprovalId(null);
       setActiveTab('basic');
       setShowDescription(false);
+      setSelectedTagIds([]);
 
       // Choose first template and derive defaults
       const firstTemplate = workspaceTemplates[0];
@@ -146,6 +222,14 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         setName(firstTemplate.name || '');
         setSlaId(firstTemplate.sla_id || null);
         setApprovalId(firstTemplate.approval_id || null);
+        // Clear spot if spots are not applicable for this template
+        // Explicitly convert to boolean to handle string "true"/"false" from API
+        const spotsNotApplicable = firstTemplate.spots_not_applicable === true || firstTemplate.spots_not_applicable === 'true';
+        if (spotsNotApplicable) {
+          setSpotId(null);
+        } else if (firstTemplate.default_spot_id) {
+          setSpotId(firstTemplate.default_spot_id);
+        }
       } else {
         setTemplateId(null);
         setName('');
@@ -159,32 +243,32 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
 
   useEffect(() => {
     // When template changes, derive category/priority defaults and set name automatically
-    if (templateId) {
-      const t = workspaceTemplates.find((x: any) => x.id === templateId);
-      if (t) {
-        setCategoryId(t.category_id || null);
-        // If template doesn't define priority, default to "low"
-        if (t.default_priority) {
-          setPriorityId(t.default_priority);
-        } else {
-          // Find "low" priority in category priorities
-          const lowPriority = categoryPriorities.find((p: any) => 
-            p.name?.toLowerCase() === 'low'
-          );
-          setPriorityId(lowPriority?.id || null);
-        }
-        setName(t.name || ''); // Always set name from template
-        setSlaId(t.sla_id || null);
-        setApprovalId(t.approval_id || null);
-        // Clear spot if spots are not applicable for this template
-        if (t.spots_not_applicable) {
-          setSpotId(null);
-        } else if (t.default_spot_id) {
-          setSpotId(t.default_spot_id);
-        }
+    if (selectedTemplate) {
+      const t = selectedTemplate;
+      setCategoryId(t.category_id || null);
+      // If template doesn't define priority, default to "low"
+      if (t.default_priority) {
+        setPriorityId(t.default_priority);
+      } else {
+        // Find "low" priority in category priorities
+        const lowPriority = categoryPriorities.find((p: any) => 
+          p.name?.toLowerCase() === 'low'
+        );
+        setPriorityId(lowPriority?.id || null);
+      }
+      setName(t.name || ''); // Always set name from template
+      setSlaId(t.sla_id || null);
+      setApprovalId(t.approval_id || null);
+      // Clear spot if spots are not applicable for this template
+      // Explicitly convert to boolean to handle string "true"/"false" from API
+      const spotsNotApplicable = t.spots_not_applicable === true || t.spots_not_applicable === 'true';
+      if (spotsNotApplicable) {
+        setSpotId(null);
+      } else if (t.default_spot_id) {
+        setSpotId(t.default_spot_id);
       }
     }
-  }, [templateId, workspaceTemplates, categoryPriorities]);
+  }, [selectedTemplate, categoryPriorities]);
 
   useEffect(() => {
     // When category changes without template default, set priority to "low"
@@ -218,11 +302,9 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
   }, [name, workspaceId, categoryId, derivedTeamId, categoryInitialStatusId, priorityId, categoryPriorities.length]);
 
   const handleSubmit = async () => {
-    if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId) return;
+    if (!canSubmit || !categoryId || !derivedTeamId || !categoryInitialStatusId || !user?.id) return;
     try {
       setIsSubmitting(true);
-      const selectedTemplate = workspaceTemplates.find((t: any) => t.id === templateId);
-      const spotsApplicable = !selectedTemplate?.spots_not_applicable;
       
       const payload: any = {
         name: name.trim(),
@@ -238,8 +320,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         start_date: null,
         due_date: dueDate || null,
         expected_duration: (() => {
-          const t = workspaceTemplates.find((x: any) => x.id === templateId);
-          const v = t?.expected_duration ?? t?.default_duration ?? 0;
+          const v = selectedTemplate?.expected_duration ?? selectedTemplate?.default_duration ?? 0;
           return Number.isFinite(v) ? v : 0;
         })(),
         response_date: null,
@@ -256,7 +337,20 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
         payload.spot_id = spotId;
       }
 
-      await dispatch(addTaskAsync(payload)).unwrap();
+      const result = await dispatch(addTaskAsync(payload)).unwrap();
+      const newTaskId = result?.id || result?.data?.id;
+      
+      // Create task tags if any tags were selected
+      if (newTaskId && selectedTagIds.length > 0) {
+        for (const tagId of selectedTagIds) {
+          await dispatch(genericActions.taskTags.addAsync({
+            task_id: Number(newTaskId),
+            tag_id: tagId,
+            user_id: user.id,
+          })).unwrap();
+        }
+      }
+      
       onOpenChange(false);
     } catch (e) {
       // Error is handled by slice; keep dialog open for correction
@@ -392,11 +486,18 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
 
                 {/* Location */}
                 {(() => {
-                  const selectedTemplate = workspaceTemplates.find((t: any) => t.id === templateId);
-                  const spotsApplicable = !selectedTemplate?.spots_not_applicable;
+                  // Double-check: if spotsApplicable is false, definitely hide
+                  if (!spotsApplicable) return null;
                   
-                  if (!spotsApplicable) {
-                    return null; // Hide the Location field when spots are not applicable
+                  // Additional safety check: verify template directly
+                  if (selectedTemplate) {
+                    const spotsNotApplicableValue = selectedTemplate.spots_not_applicable;
+                    const isNotApplicable = 
+                      spotsNotApplicableValue === true || 
+                      spotsNotApplicableValue === 'true' || 
+                      spotsNotApplicableValue === 1 || 
+                      spotsNotApplicableValue === '1';
+                    if (isNotApplicable) return null;
                   }
                   
                   return (
@@ -404,21 +505,21 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                       <Label className="text-sm font-medium font-[500] text-foreground">
                         Location
                       </Label>
-                      <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
-                        <Combobox
-                          options={workspaceSpots.map((s: any) => ({
-                            value: String(s.id),
-                            label: s.name,
-                          }))}
-                          value={spotId ? String(spotId) : undefined}
-                          onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
-                          placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
-                          searchPlaceholder="Search locations..."
-                          emptyText="No locations found."
-                          className="w-full"
-                        />
-                      </div>
+                    <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <Combobox
+                        options={workspaceSpots.map((s: any) => ({
+                          value: String(s.id),
+                          label: s.name,
+                        }))}
+                        value={spotId ? String(spotId) : undefined}
+                        onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
+                        placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
+                        searchPlaceholder="Search locations..."
+                        emptyText="No locations found."
+                        className="w-full"
+                      />
                     </div>
+                  </div>
                   );
                 })()}
 
@@ -431,23 +532,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                     <SelectTrigger 
                       className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
-                      <div className="flex items-center gap-2 flex-1">
-                        {priorityId && (() => {
-                          const selectedPriority = categoryPriorities.find((p: any) => p.id === priorityId);
-                          if (selectedPriority) {
-                            return (
-                              <>
-                                <span 
-                                  className="w-2 h-2 rounded-full flex-shrink-0" 
-                                  style={{ backgroundColor: selectedPriority.color }}
-                                />
-                                <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
-                              </>
-                            );
-                          }
-                          return <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />;
-                        })()}
-                      </div>
+                      <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
                     </SelectTrigger>
                     <SelectContent>
                       {categoryPriorities.map((p: any) => (
@@ -470,7 +555,7 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                   <Label className="text-sm font-medium font-[500] text-foreground">
                     Responsible
                   </Label>
-                  <div className="[&_button]:h-auto [&_button]:min-h-[48px] [&_button]:px-4 [&_button]:py-2.5 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                  <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                     <MultiSelectCombobox
                       options={workspaceUsers.map((u: any) => ({
                         value: String(u.id),
@@ -483,6 +568,26 @@ export default function CreateTaskDialog({ open, onOpenChange, workspaceId }: Cr
                       placeholder="Select users..."
                       searchPlaceholder="Search users..."
                       emptyText="No users found."
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Tags
+                  </Label>
+                  <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                    <TagMultiSelect
+                      tags={tags}
+                      value={selectedTagIds}
+                      onValueChange={(values) => {
+                        setSelectedTagIds(values);
+                      }}
+                      placeholder="Select tags..."
+                      searchPlaceholder="Search tags..."
+                      emptyText="No tags found."
                       className="w-full"
                     />
                   </div>
