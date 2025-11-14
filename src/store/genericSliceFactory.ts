@@ -201,11 +201,28 @@ let inflightLoad: Promise<T[]> | null = null;
                 dispatch((slice.actions as any).removeItem(id));
                 GenericEvents.emit(events.DELETED, { id });
 
-                // Remote delete
-                await cacheInstance.deleteRemote(id as any);
+                // Remote delete (404 means already deleted, treat as success)
+                try {
+                    await cacheInstance.deleteRemote(id as any);
+                } catch (error: any) {
+                    // If 404, item is already deleted on server - treat as success
+                    if (error?.response?.status === 404) {
+                        console.log(`${name}/removeAsync: Item ${id} already deleted on server (404)`);
+                    } else {
+                        throw error; // Re-throw other errors
+                    }
+                }
 
-                // Remove from IndexedDB
-                await cacheInstance.remove(id);
+                // Remove from IndexedDB (idempotent - safe if already deleted)
+                try {
+                    await cacheInstance.remove(id);
+                } catch (error: any) {
+                    // Ignore errors if item doesn't exist in IndexedDB
+                    console.warn(`${name}/removeAsync: Failed to remove from IndexedDB (may already be deleted)`, error);
+                }
+
+                // Always refresh Redux from IndexedDB to ensure sync
+                dispatch(getFromIndexedDB());
 
                 return id;
             } catch (error: any) {

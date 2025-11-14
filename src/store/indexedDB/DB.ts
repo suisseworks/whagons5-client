@@ -789,14 +789,55 @@ export class DB {
   ): Promise<void> {
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
-      DB.getStoreWrite(storeName as any).delete(DB.toKey(key));
+      if (!DB.inited || !DB.db) {
+        throw new Error('DB not initialized');
+      }
+      
+      const tx = DB.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName as any);
+      const deleteRequest = store.delete(DB.toKey(key));
+      
+      deleteRequest.onerror = (event) => {
+        console.error(`DB.delete: IndexedDB delete request failed for ${storeName}`, {
+          error: deleteRequest.error,
+          event,
+          key,
+          storeName
+        });
+      };
+      
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
     });
   }
 
   public static async clear(storeName: string): Promise<void> {
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
-      DB.getStoreWrite(storeName as any).clear();
+      if (!DB.inited || !DB.db) {
+        throw new Error('DB not initialized');
+      }
+      
+      const tx = DB.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName as any);
+      const clearRequest = store.clear();
+      
+      clearRequest.onerror = (event) => {
+        console.error(`DB.clear: IndexedDB clear request failed for ${storeName}`, {
+          error: clearRequest.error,
+          event,
+          storeName
+        });
+      };
+      
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
     });
   }
 

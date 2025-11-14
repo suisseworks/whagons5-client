@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
+import { Check, Copy as CopyIcon } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
 import { Team } from "@/store/types";
-import { Role } from "@/store/types";
 import { UserTeam } from "@/store/types";
+import { Invitation } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
@@ -53,8 +54,8 @@ function Users() {
   // Redux state for related data
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
-  const { value: roles, loading: rolesLoading } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
-  const { value: userTeams, loading: userTeamsLoading } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
+  const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
+  const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
   
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
@@ -67,7 +68,6 @@ function Users() {
     searchQuery,
     setSearchQuery,
     handleSearch,
-    createItem,
     updateItem,
     deleteItem,
     isSubmitting,
@@ -104,6 +104,9 @@ function Users() {
     
     // Load user-teams pivot table (needed for team assignments)
     dispatch((genericActions as any).userTeams.getFromIndexedDB());
+    
+    // Load invitations from IndexedDB only (no automatic API fetch)
+    dispatch((genericActions as any).invitations.getFromIndexedDB());
   }, [dispatch]);
 
   // Form state for controlled components
@@ -229,9 +232,9 @@ function Users() {
         const userTeamObjects = userTeamRelationships
           .map((ut: UserTeam) => {
             const team = teams.find((t: Team) => t.id === ut.team_id);
-            return team ? { id: team.id, name: team.name, color: team.color } : null;
+            return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
           })
-          .filter((team): team is { id: number; name: string; color?: string | null } => team !== null);
+          .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
 
         if (userTeamObjects.length === 0) {
           return <span className="text-muted-foreground">No Teams</span>;
@@ -239,7 +242,7 @@ function Users() {
 
         return (
           <div className="flex flex-wrap gap-1">
-            {userTeamObjects.map((team: { id: number; name: string; color?: string | null }) => {
+            {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
               const initial = (team.name || '').charAt(0).toUpperCase();
               const hex = String(team.color || '').trim();
               let bg = hex;
@@ -319,6 +322,279 @@ function Users() {
     }
   ]), [teams, jobPositions, userTeams, handleEdit, handleDelete]);
 
+  // Copy button component for table cells
+  const CopyButton = ({ text }: { text: string }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 4000);
+    };
+
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleCopy}
+        className="min-w-[80px]"
+      >
+        {copied ? (
+          <>
+            <Check className="h-4 w-4 mr-1" />
+            Copied
+          </>
+        ) : (
+          <>
+            <CopyIcon className="h-4 w-4 mr-1" />
+            Copy
+          </>
+        )}
+      </Button>
+    );
+  };
+
+  // Invitation column definitions
+  const invitationColumnDefs = useMemo<ColDef[]>(() => ([
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 90,
+      hide: true
+    },
+    {
+      field: 'user_email',
+      headerName: 'Email',
+      flex: 2,
+      minWidth: 220,
+      cellRenderer: (params: ICellRendererParams) => {
+        return params.value || <span className="text-muted-foreground">No email</span>;
+      }
+    },
+    {
+      field: 'team_ids',
+      headerName: 'Teams',
+      flex: 2,
+      minWidth: 240,
+      cellRenderer: (params: ICellRendererParams) => {
+        const teamIds = params.value as number[] | null | undefined;
+        if (!teamIds || teamIds.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
+        const invitationTeams = teamIds
+          .map((teamId: number) => {
+            const team = teams.find((t: Team) => t.id === teamId);
+            return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+          })
+          .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+        if (invitationTeams.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
+                  <div
+                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                  {team.name}
+                </Badge>
+              );
+            })}
+          </div>
+        );
+      }
+    },
+    {
+      field: 'invitation_link',
+      headerName: 'Invitation Link',
+      flex: 3,
+      minWidth: 300,
+      cellRenderer: (params: ICellRendererParams) => {
+        const invitation = params.data as Invitation;
+        if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
+        
+        // Generate invitation link
+        const subdomain = localStorage.getItem('whagons-subdomain') || '';
+        const tenantPrefix = subdomain.endsWith('.') ? subdomain.slice(0, -1) : subdomain;
+        const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+        const host = window.location.hostname;
+        const port = window.location.port ? `:${window.location.port}` : '';
+        
+        // Use tenant subdomain if available, otherwise use current host
+        const domain = tenantPrefix 
+          ? `${tenantPrefix}.${host.split('.').slice(1).join('.') || 'localhost'}${port}`
+          : `${host}${port}`;
+        
+        const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+        
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={invitationLink}
+              className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <CopyButton text={invitationLink} />
+          </div>
+        );
+      }
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      flex: 1.5,
+      minWidth: 150,
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return <span className="text-muted-foreground">-</span>;
+        const date = new Date(params.value);
+        return <span>{date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+      }
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      cellRenderer: createActionsCellRenderer({
+        onDelete: (invitation: Invitation) => {
+          setDeletingInvitation(invitation);
+          setIsDeleteInvitationDialogOpen(true);
+        }
+      }),
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right'
+    }
+  ]), [teams, dispatch]);
+
+  // Handle invitation deletion
+  const handleDeleteInvitation = async () => {
+    if (!deletingInvitation) return;
+    
+    try {
+      await dispatch((genericActions as any).invitations.removeAsync(deletingInvitation.id)).unwrap();
+      // Refresh invitations list from IndexedDB (will be updated by real-time listener or next validation)
+      dispatch((genericActions as any).invitations.getFromIndexedDB());
+      setIsDeleteInvitationDialogOpen(false);
+      setDeletingInvitation(null);
+    } catch (error: any) {
+      // If error is 404 or 500, the invitation might already be deleted
+      // Refresh from IndexedDB to sync state
+      if (error?.response?.status === 404 || error?.response?.status === 500) {
+        console.warn('Invitation may already be deleted, refreshing from cache');
+        dispatch((genericActions as any).invitations.getFromIndexedDB());
+      }
+      console.error('Failed to delete invitation:', error);
+      setIsDeleteInvitationDialogOpen(false);
+      setDeletingInvitation(null);
+    }
+  };
+
+  // Render invitation preview for delete dialog
+  const renderInvitationPreview = (invitation: Invitation) => {
+    const invitationTeams = (invitation.team_ids || [])
+      .map((teamId: number) => {
+        const team = teams.find((t: Team) => t.id === teamId);
+        return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+      })
+      .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+    // Generate invitation link
+    const subdomain = localStorage.getItem('whagons-subdomain') || '';
+    const tenantPrefix = subdomain.endsWith('.') ? subdomain.slice(0, -1) : subdomain;
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+    const host = window.location.hostname;
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const domain = tenantPrefix 
+      ? `${tenantPrefix}.${host.split('.').slice(1).join('.') || 'localhost'}${port}`
+      : `${host}${port}`;
+    const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+
+    return (
+      <div className="space-y-2">
+        {invitation.user_email && (
+          <div>
+            <div className="text-sm font-medium">Email</div>
+            <div className="text-sm text-muted-foreground">{invitation.user_email}</div>
+          </div>
+        )}
+        {invitationTeams.length > 0 && (
+          <div>
+            <div className="text-sm font-medium">Teams</div>
+            <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
+              {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+                const initial = (team.name || '').charAt(0).toUpperCase();
+                const hex = String(team.color || '').trim();
+                let bg = hex;
+                let fg = '#fff';
+                try {
+                  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                    const h = hex.length === 4
+                      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                      : hex;
+                    const r = parseInt(h.slice(1, 3), 16);
+                    const g = parseInt(h.slice(3, 5), 16);
+                    const b = parseInt(h.slice(5, 7), 16);
+                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                    fg = brightness > 180 ? '#111827' : '#ffffff';
+                  } else if (!hex) {
+                    bg = '';
+                  }
+                } catch { /* ignore */ }
+                return (
+                  <Badge key={team.id} variant="secondary" className="text-xs inline-flex items-center gap-1">
+                    <div
+                      className={`w-3 h-3 min-w-[0.75rem] rounded-full flex items-center justify-center text-[9px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                      style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                      title={team.name}
+                    >
+                      {initial || 'T'}
+                    </div>
+                    {team.name}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div>
+          <div className="text-sm font-medium">Invitation Link</div>
+          <div className="text-xs text-muted-foreground break-all mt-1">{invitationLink}</div>
+        </div>
+      </div>
+    );
+  };
+
   // Render entity preview for delete dialog
   const renderUserPreview = (user: UserData) => {
     // Get user-team relationships from reducer
@@ -326,9 +602,9 @@ function Users() {
     const userTeamObjects = userTeamRelationships
       .map((ut: UserTeam) => {
         const team = teams.find((t: Team) => t.id === ut.team_id);
-        return team ? { id: team.id, name: team.name, color: team.color } : null;
+        return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
       })
-      .filter((team): team is { id: number; name: string; color?: string | null } => team !== null);
+      .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
 
     return (
       <div className="flex items-center space-x-3">
@@ -339,7 +615,7 @@ function Users() {
           <div className="font-medium">{user.name}</div>
           <div className="text-sm text-muted-foreground">{user.email}</div>
           <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
-            {userTeamObjects.length > 0 && userTeamObjects.map((team: { id: number; name: string; color?: string | null }) => (
+            {userTeamObjects.length > 0 && userTeamObjects.map((team: { id: number; name: string; color: string | null }) => (
               <Badge key={team.id} variant="secondary" className="text-xs">
                 {team.name}
               </Badge>
@@ -361,26 +637,73 @@ function Users() {
 
   // Invitation dialog state
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [inviteFormData, setInviteFormData] = useState<{
-    team_id: string;
-    role_id: string;
-    job_position_id: string;
-  }>({
-    team_id: '',
-    role_id: '',
-    job_position_id: ''
-  });
+  const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>([]);
+  const [inviteEmail, setInviteEmail] = useState<string>('');
+  const [sendEmail, setSendEmail] = useState<boolean>(true);
+  const [invitationLink, setInvitationLink] = useState<string>('');
+  const [showInvitationLink, setShowInvitationLink] = useState(false);
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  const [copiedDialogLink, setCopiedDialogLink] = useState<boolean>(false);
+  const [isDeleteInvitationDialogOpen, setIsDeleteInvitationDialogOpen] = useState(false);
+  const [deletingInvitation, setDeletingInvitation] = useState<Invitation | null>(null);
+
+  // Reset invitation form when invitation dialog closes
+  useEffect(() => {
+    if (!isInviteDialogOpen) {
+      setInviteSelectedTeams([]);
+      setInviteEmail('');
+      setSendEmail(true); // Reset to checked by default
+      setInvitationLink('');
+      setShowInvitationLink(false);
+      setCopiedDialogLink(false); // Reset copied state
+    } else {
+      // When dialog opens, ensure checkbox is checked by default
+      setSendEmail(true);
+    }
+  }, [isInviteDialogOpen]);
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload: any = {
-      team_id: inviteFormData.team_id ? Number(inviteFormData.team_id) : null,
-      role_id: inviteFormData.role_id ? Number(inviteFormData.role_id) : null,
-      job_position_id: inviteFormData.job_position_id ? Number(inviteFormData.job_position_id) : null,
-    };
-    await dispatch((genericActions as any).invitations.addAsync(payload));
-    setIsInviteDialogOpen(false);
-    setInviteFormData({ team_id: '', role_id: '', job_position_id: '' });
+    setIsSendingInvitation(true);
+    setFormError(null);
+    
+    try {
+      const payload: any = {
+        team_ids: inviteSelectedTeams.length > 0 ? inviteSelectedTeams.map(id => Number(id)) : [],
+        user_email: inviteEmail || null,
+        send_email: sendEmail && !!inviteEmail,
+      };
+      
+          const result = await dispatch((genericActions as any).invitations.addAsync(payload)).unwrap();
+          
+          // Refresh invitations list
+          dispatch((genericActions as any).invitations.fetchFromAPI());
+          
+          // Show invitation link if available
+          if (result?.invitation_link) {
+            setInvitationLink(result.invitation_link);
+            setShowInvitationLink(true);
+          }
+          
+          // If email was sent, close dialog after a moment
+          if (sendEmail && inviteEmail) {
+            setTimeout(() => {
+              setIsInviteDialogOpen(false);
+            }, 2000);
+          } else {
+            // Keep dialog open to show link
+            setIsInviteDialogOpen(true);
+          }
+    } catch (error: any) {
+      const backendErrors = error?.response?.data?.errors;
+      const backendMessage = error?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || error?.message || 'Failed to create invitation');
+      setFormError(errorMessage);
+    } finally {
+      setIsSendingInvitation(false);
+    }
   };
 
   // Create submit handler
@@ -587,6 +910,26 @@ function Users() {
                 </Card>
               </div>
             )
+          },
+          {
+            value: "invitations",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faEnvelope} className="w-4 h-4" />
+                <span>Invitations</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={invitations}
+                    columnDefs={invitationColumnDefs}
+                    noRowsMessage="No invitations found"
+                  />
+                </div>
+              </div>
+            )
           }
         ]}
         defaultValue="users"
@@ -685,38 +1028,96 @@ function Users() {
         onOpenChange={setIsInviteDialogOpen}
         type="create"
         title="Create Invitation"
-        description="Send an invitation with predefined team, role, and job position."
-        onSubmit={handleInviteSubmit}
-        isSubmitting={isSubmitting}
+        description={showInvitationLink ? "Invitation created successfully!" : "Create an invitation link. Users who sign up will be automatically added to the selected teams."}
+        onSubmit={showInvitationLink ? undefined : handleInviteSubmit}
+        isSubmitting={isSendingInvitation}
         error={formError}
-        submitDisabled={isSubmitting}
+        submitDisabled={isSendingInvitation || showInvitationLink}
+        submitText={showInvitationLink ? undefined : "Create Invitation"}
       >
-        <div className="grid gap-4">
-          <SelectField
-            id="invite-team_id"
-            label="Team"
-            value={inviteFormData.team_id}
-            onChange={(value) => setInviteFormData(prev => ({ ...prev, team_id: value }))}
-            placeholder={teamsLoading && teams.length === 0 ? "Loading…" : "No Team"}
-            options={teams.map((team: Team) => ({ value: team.id.toString(), label: team.name }))}
-          />
-          <SelectField
-            id="invite-role_id"
-            label="Role"
-            value={inviteFormData.role_id}
-            onChange={(value) => setInviteFormData(prev => ({ ...prev, role_id: value }))}
-            placeholder={rolesLoading && roles.length === 0 ? "Loading…" : "No Role"}
-            options={roles.map((r: Role) => ({ value: r.id.toString(), label: r.name }))}
-          />
-          <SelectField
-            id="invite-job_position_id"
-            label="Job Position"
-            value={inviteFormData.job_position_id}
-            onChange={(value) => setInviteFormData(prev => ({ ...prev, job_position_id: value }))}
-            placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
-            options={jobPositions.map((jp: any) => ({ value: jp.id?.toString?.() ?? String(jp.id), label: jp.title }))}
-          />
-        </div>
+        {showInvitationLink ? (
+          <div className="grid gap-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <Label className="text-sm font-medium mb-2 block">Invitation Link</Label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={invitationLink}
+                  className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(invitationLink);
+                    setCopiedDialogLink(true);
+                    setTimeout(() => setCopiedDialogLink(false), 4000);
+                  }}
+                  className="min-w-[80px]"
+                >
+                  {copiedDialogLink ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="h-4 w-4 mr-1" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Share this link with the user. They will be added to the selected teams when they sign up.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setIsInviteDialogOpen(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            <TextField
+              id="invite-email"
+              label="Email (Optional)"
+              type="email"
+              value={inviteEmail}
+              onChange={(value) => setInviteEmail(value)}
+              placeholder="user@example.com"
+            />
+            <CheckboxField
+              id="invite-send-email"
+              label=""
+              checked={sendEmail}
+              onChange={(checked) => setSendEmail(checked)}
+              description="Send invitation email to the address above"
+              disabled={!inviteEmail}
+            />
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Teams</Label>
+              <div className="col-span-3">
+                <MultiSelect
+                  options={teams.map((team: Team) => ({
+                    value: team.id.toString(),
+                    label: team.name
+                  }))}
+                  onValueChange={setInviteSelectedTeams}
+                  defaultValue={inviteSelectedTeams}
+                  placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                  maxCount={10}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </SettingsDialog>
 
       {/* Edit User Dialog */}
@@ -823,6 +1224,28 @@ function Users() {
         entityName="user"
         entityData={deletingUser}
         renderEntityPreview={renderUserPreview}
+      />
+
+      {/* Delete Invitation Dialog */}
+      <SettingsDialog
+        open={isDeleteInvitationDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteInvitationDialogOpen(open);
+          if (!open) {
+            setDeletingInvitation(null);
+          }
+        }}
+        type="delete"
+        title="Delete Invitation"
+        description={
+          deletingInvitation
+            ? `Are you sure you want to delete this invitation${deletingInvitation.user_email ? ` for ${deletingInvitation.user_email}` : ''}? This action cannot be undone.`
+            : undefined
+        }
+        onConfirm={handleDeleteInvitation}
+        entityName="invitation"
+        entityData={deletingInvitation}
+        renderEntityPreview={renderInvitationPreview}
       />
     </SettingsLayout>
   );

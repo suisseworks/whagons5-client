@@ -51,6 +51,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
 
+    // Skip fetching user data if we're on an invitation page
+    // Invitation pages are for new signups, so we shouldn't try to fetch existing user data
+    // This prevents unnecessary 401 errors when Firebase is logged in but user doesn't exist in backend yet
+    // Use window.location.pathname since AuthProvider is outside Router context
+    const isInvitationPage = window.location.pathname.startsWith('/auth/invitation/');
+    if (isInvitationPage) {
+      console.log('Skipping user fetch on invitation page');
+      setUser(null);
+      setUserLoading(false);
+      return;
+    }
+
     setUserLoading(true);
     try {
       // Ensure auth is initialized for this user
@@ -147,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setFirebaseUser(currentUser);
 
       if (currentUser) {
-        // User logged in - fetch their data
+        // User logged in - fetch their data (will skip if on invitation page)
         await fetchUser(currentUser);
       } else {
         // User logged out - clear user data
@@ -167,7 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
 
   return (
     <AuthContext.Provider

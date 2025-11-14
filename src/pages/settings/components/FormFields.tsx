@@ -349,6 +349,7 @@ export interface CheckboxFieldProps {
   onChange?: (checked: boolean) => void;
   description?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function CheckboxField({
@@ -359,7 +360,8 @@ export function CheckboxField({
   defaultChecked,
   onChange,
   description,
-  className = ""
+  className = "",
+  disabled = false
 }: CheckboxFieldProps) {
   const isControlled = checked !== undefined && onChange !== undefined;
 
@@ -377,6 +379,7 @@ export function CheckboxField({
           id={id}
           checked={isControlled ? checked : uncontrolledChecked}
           onCheckedChange={isControlled ? onChange : handleUncontrolledChange}
+          disabled={disabled}
         />
         {/* Hidden input for form submission */}
         {name && (
@@ -388,12 +391,9 @@ export function CheckboxField({
             style={{ display: 'none' }}
           />
         )}
-        <Label htmlFor={id} className="text-sm">
-          {isControlled ? (checked ? 'Enabled' : 'Disabled') : 'Toggle'}
+        <Label htmlFor={id} className="text-sm font-normal cursor-pointer">
+          {description || label}
         </Label>
-        {description && (
-          <span className="text-xs text-muted-foreground ml-2">{description}</span>
-        )}
       </div>
     </FormField>
   );
