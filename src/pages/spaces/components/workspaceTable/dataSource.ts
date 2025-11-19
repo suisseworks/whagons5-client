@@ -1,7 +1,7 @@
 // Datasource and refresh helpers for WorkspaceTable
 
 export function buildGetRows(TasksCache: any, refs: any) {
-  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
+  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
   return async (params: any) => {
    // Default sortModel to created_at desc if not provided
     const sortModel = params.sortModel && params.sortModel.length > 0 
@@ -65,6 +65,8 @@ export function buildGetRows(TasksCache: any, refs: any) {
       queryParams.__priorityMap = priorityMapRef.current;
       queryParams.__spotMap = spotMapRef.current;
       queryParams.__userMap = userMapRef.current;
+      queryParams.__tagMap = tagMapRef.current;
+      queryParams.__taskTags = taskTagsRef.current;
 
       const result = await TasksCache.queryTasks(queryParams);
       const rows = result?.rows || [];
@@ -80,13 +82,15 @@ export function buildGetRows(TasksCache: any, refs: any) {
 }
 
 export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
-  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef } = params;
+  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef } = params;
   const baseParams: any = { search };
   if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
   baseParams.__statusMap = statusMapRef.current;
   baseParams.__priorityMap = priorityMapRef.current;
   baseParams.__spotMap = spotMapRef.current;
   baseParams.__userMap = userMapRef.current;
+  baseParams.__tagMap = tagMapRef.current;
+  baseParams.__taskTags = taskTagsRef.current;
 
   const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;

@@ -145,15 +145,15 @@ function Tags() {
 			minWidth: 200,
 			valueGetter: (params: any) => {
 				const catId = params.data?.category_id as number | null | undefined;
-				if (!catId) return "Unassigned";
+				if (!catId) return "Global";
 				const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
-				return cat?.name || "Unassigned";
+				return cat?.name || "Global";
 			},
 			cellRenderer: (params: ICellRendererParams) => {
 				const catId = params.data?.category_id as number | null | undefined;
-				if (!catId) return <span className="text-muted-foreground">Unassigned</span> as any;
+				if (!catId) return <span className="text-muted-foreground">Global</span> as any;
 				const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
-				if (!cat) return <span className="text-muted-foreground">Unassigned</span> as any;
+				if (!cat) return <span className="text-muted-foreground">Global</span> as any;
 				return (
 					<ColorIndicatorCellRenderer value={cat.name} name={cat.name} color={(cat as any).color || "#6b7280"} />
 				) as any;
@@ -301,7 +301,7 @@ function Tags() {
 						label="Category"
 						value={createFormData.category_id}
 						onChange={(v) => setCreateFormData(p => ({ ...p, category_id: v }))}
-						placeholder="Unassigned"
+						placeholder="Global"
 						options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
 					/>
 				</div>
@@ -329,7 +329,7 @@ function Tags() {
 							label="Category"
 							value={editFormData.category_id}
 							onChange={(v) => setEditFormData(p => ({ ...p, category_id: v }))}
-							placeholder="Unassigned"
+							placeholder="Global"
 							options={(categories as any[])?.map((c: any) => ({ value: c.id.toString(), label: c.name }))}
 						/>
 					</div>

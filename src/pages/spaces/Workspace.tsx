@@ -70,12 +70,24 @@ export const Workspace = () => {
       return saved == null ? true : saved === 'true';
     } catch { return true; }
   });
+  const [tagDisplayMode, setTagDisplayMode] = useState<'icon' | 'icon-text'>(() => {
+    try {
+      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      return (saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text';
+    } catch { return 'icon-text'; }
+  });
   useEffect(() => {
     // Update when workspace changes
     try {
       const key = `wh_workspace_show_kpis_${id || 'all'}`;
       const saved = localStorage.getItem(key);
       setShowHeaderKpis(saved == null ? true : saved === 'true');
+    } catch {}
+    try {
+      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      setTagDisplayMode((saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text');
     } catch {}
   }, [id]);
   useEffect(() => {
@@ -86,6 +98,8 @@ export const Workspace = () => {
       if (eventWorkspaceId === currentWorkspaceId) {
         const v = e?.detail?.showKpis;
         if (typeof v === 'boolean') setShowHeaderKpis(v);
+        const tagMode = e?.detail?.tagDisplayMode;
+        if (tagMode === 'icon' || tagMode === 'icon-text') setTagDisplayMode(tagMode);
       }
     };
     window.addEventListener('wh:displayOptionsChanged', handler as any);
@@ -444,6 +458,7 @@ export const Workspace = () => {
             rowHeight={computedRowHeight}
             groupBy={groupBy}
             collapseGroups={collapseGroups}
+            tagDisplayMode={tagDisplayMode}
           />
         </motion.div>
       )

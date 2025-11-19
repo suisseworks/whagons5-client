@@ -364,6 +364,27 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
             </div>
           </div>
           <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Tag display mode</div>
+                <div className="text-xs text-muted-foreground">Show tags as icon only or icon with text</div>
+              </div>
+              <ToggleGroup
+                type="single"
+                defaultValue={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_tag_display_mode_${workspaceId || 'all'}`) as any)) || 'icon-text'}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  const mode = v === 'icon' ? 'icon' : 'icon-text';
+                  try { localStorage.setItem(`wh_workspace_tag_display_mode_${workspaceId || 'all'}`, mode); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { tagDisplayMode: mode, workspaceId: workspaceId || 'all' } })); } catch {}
+                }}
+              >
+                <ToggleGroupItem value="icon" aria-label="Icon only" className="h-8 px-2 text-xs">Icon</ToggleGroupItem>
+                <ToggleGroupItem value="icon-text" aria-label="Icon and text" className="h-8 px-2 text-xs">Icon + Text</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
             <div className="flex items-center gap-3">
               <Label>Table density</Label>
               <ToggleGroup

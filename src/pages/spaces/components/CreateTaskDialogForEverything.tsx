@@ -319,7 +319,16 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent 
           side="right" 
-          className="w-full sm:w-[600px] max-w-[600px] p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => {
+            // Only allow closing via Cancel button or X button
+            if (!isSubmitting) {
+              onOpenChange(false);
+            } else {
+              e.preventDefault();
+            }
+          }}
+          className="w-full sm:w-[1120px] max-w-[1120px] p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
         >
           <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
             <SheetTitle className="text-xl sm:text-2xl font-semibold font-[600] text-foreground">Create New Task</SheetTitle>
@@ -341,7 +350,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                 >
                   <SelectTrigger 
                     id="category-select"
-                    className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                    className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                   >
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
@@ -389,7 +398,16 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="right" 
-        className="w-full sm:w-[600px] max-w-[600px] p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => {
+          // Only allow closing via Cancel button or X button
+          if (!isSubmitting) {
+            onOpenChange(false);
+          } else {
+            e.preventDefault();
+          }
+        }}
+        className="w-full sm:w-[800px] max-w-[800px] p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
       >
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
@@ -439,7 +457,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                   </Label>
                   <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
                       <SelectValue placeholder={
                         !currentWorkspace || currentWorkspace.type !== "DEFAULT"
@@ -515,7 +533,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                   <Label className="text-sm font-medium font-[500] text-foreground">
                     Location
                   </Label>
-                  <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                  <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                     <Combobox
                       options={workspaceSpots.map((s: any) => ({
                         value: String(s.id),
@@ -531,6 +549,29 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                   </div>
                 </div>
 
+                {/* Responsible */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Responsible
+                  </Label>
+                  <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                    <MultiSelectCombobox
+                      options={workspaceUsers.map((u: any) => ({
+                        value: String(u.id),
+                        label: u.name || u.email || `User ${u.id}`,
+                      }))}
+                      value={selectedUserIds.map((id) => String(id))}
+                      onValueChange={(values) => {
+                        setSelectedUserIds(values.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n)));
+                      }}
+                      placeholder="Select users..."
+                      searchPlaceholder="Search users..."
+                      emptyText="No users found."
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
                 {/* Priority */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium font-[500] text-foreground">
@@ -538,7 +579,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                   </Label>
                   <Select value={priorityId ? String(priorityId) : undefined} onValueChange={(v) => setPriorityId(parseInt(v, 10))}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
                       <div className="flex items-center gap-2 flex-1">
                         {priorityId && (() => {
@@ -573,29 +614,6 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Responsible */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-medium font-[500] text-foreground">
-                    Responsible
-                  </Label>
-                  <div className="[&_button]:h-auto [&_button]:min-h-[48px] [&_button]:px-4 [&_button]:py-2.5 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
-                    <MultiSelectCombobox
-                      options={workspaceUsers.map((u: any) => ({
-                        value: String(u.id),
-                        label: u.name || u.email || `User ${u.id}`,
-                      }))}
-                      value={selectedUserIds.map((id) => String(id))}
-                      onValueChange={(values) => {
-                        setSelectedUserIds(values.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n)));
-                      }}
-                      placeholder="Select users..."
-                      searchPlaceholder="Search users..."
-                      emptyText="No users found."
-                      className="w-full"
-                    />
-                  </div>
-                </div>
               </TabsContent>
 
               {/* Additional Info Tab */}
@@ -610,7 +628,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                     type="date" 
                     value={dueDate} 
                     onChange={(e) => setDueDate(e.target.value)} 
-                    className="h-12 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
+                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
                   />
                 </div>
 
@@ -621,7 +639,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                   </Label>
                   <Select value={slaId ? String(slaId) : undefined} onValueChange={(v) => setSlaId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
                       <SelectValue placeholder="Select SLA (optional)" />
                     </SelectTrigger>
@@ -644,7 +662,7 @@ export default function CreateTaskDialogForEverything({ open, onOpenChange }: Cr
                   </Label>
                   <Select value={approvalId ? String(approvalId) : undefined} onValueChange={(v) => setApprovalId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
                       <SelectValue placeholder="Select approval (optional)" />
                     </SelectTrigger>

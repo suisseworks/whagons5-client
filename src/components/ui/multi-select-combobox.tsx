@@ -63,40 +63,42 @@ export function MultiSelectCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full min-h-10 h-auto justify-between", className)}
+          className={cn("w-full h-10 justify-between px-3 py-1.5", className)}
         >
-          <div className="flex flex-wrap gap-1 flex-1">
+          <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
             {selectedOptions.length > 0 ? (
-              selectedOptions.map((option) => (
-                <Badge
-                  key={option.value}
-                  variant="secondary"
-                  className="mr-1 mb-1"
-                  onClick={(e) => handleRemove(option.value, e)}
-                >
-                  {option.label}
-                  <button
-                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleRemove(option.value, e)
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                    }}
+              <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+                {selectedOptions.map((option) => (
+                  <Badge
+                    key={option.value}
+                    variant="secondary"
+                    className="text-xs px-1.5 py-0.5 h-5 flex-shrink-0"
                     onClick={(e) => handleRemove(option.value, e)}
                   >
-                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                  </button>
-                </Badge>
-              ))
+                    <span className="truncate max-w-[100px]">{option.label}</span>
+                    <button
+                      className="ml-0.5 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleRemove(option.value, e)
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      onClick={(e) => handleRemove(option.value, e)}
+                    >
+                      <X className="h-2.5 w-2.5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="text-muted-foreground text-sm">{placeholder}</span>
             )}
           </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">

@@ -95,7 +95,11 @@ export function createTagMap(tags: any[]): Record<number, any> {
     const anyTag: any = tag as any;
     if (anyTag && typeof anyTag.id !== 'undefined') {
       const idNum = Number(anyTag.id);
-      m[idNum] = { name: anyTag.name || `Tag ${idNum}`, color: anyTag.color || '#6B7280' };
+      m[idNum] = { 
+        name: anyTag.name || `Tag ${idNum}`, 
+        color: anyTag.color || '#6B7280',
+        icon: anyTag.icon || null
+      };
     }
   }
   return m;

@@ -68,44 +68,46 @@ export function TagMultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full min-h-10 h-auto justify-between", className)}
+          className={cn("w-full h-10 justify-between px-3 py-1.5", className)}
         >
-          <div className="flex flex-wrap gap-1.5 flex-1">
+          <div className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
             {selectedTags.length > 0 ? (
-              selectedTags.map((tag) => (
-                <div
-                  key={tag.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-                  style={{
-                    backgroundColor: tag.color ? `${tag.color}20` : '#F3F4F6',
-                    color: tag.color || '#374151',
-                    border: `1px solid ${tag.color ? `${tag.color}40` : '#E5E7EB'}`,
-                  }}
-                  onClick={(e) => handleRemove(tag.id, e)}
-                >
-                  <span>{tag.name}</span>
-                  <button
-                    className="rounded-full outline-none focus:ring-2 focus:ring-offset-1 focus:ring-ring"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleRemove(tag.id, e)
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
+              <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+                {selectedTags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium transition-colors h-5 flex-shrink-0"
+                    style={{
+                      backgroundColor: tag.color ? `${tag.color}20` : '#F3F4F6',
+                      color: tag.color || '#374151',
+                      border: `1px solid ${tag.color ? `${tag.color}40` : '#E5E7EB'}`,
                     }}
                     onClick={(e) => handleRemove(tag.id, e)}
                   >
-                    <X className="h-3 w-3 opacity-70 hover:opacity-100" />
-                  </button>
-                </div>
-              ))
+                    <span className="truncate max-w-[100px]">{tag.name}</span>
+                    <button
+                      className="rounded-full outline-none focus:ring-2 focus:ring-offset-1 focus:ring-ring"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleRemove(tag.id, e)
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      onClick={(e) => handleRemove(tag.id, e)}
+                    >
+                      <X className="h-2.5 w-2.5 opacity-70 hover:opacity-100" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="text-muted-foreground text-sm">{placeholder}</span>
             )}
           </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">

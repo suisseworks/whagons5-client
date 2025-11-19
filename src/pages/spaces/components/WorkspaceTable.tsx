@@ -7,6 +7,7 @@ import { AppDispatch } from '@/store/store';
 import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 import { iconService } from '@/database/iconService';
 import { buildWorkspaceColumns } from './workspaceTable/columns';
+import { genericActions } from '@/store/genericSlices';
 
 // Import abstracted utilities
 import { loadAgGridModules, createDefaultColDef, createGridOptions } from './workspaceTable/agGridSetup';
@@ -90,6 +91,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   collapseGroups?: boolean;
   onReady?: () => void;
   onModeChange?: (info: { useClientSide: boolean; totalFiltered: number }) => void;
+  tagDisplayMode?: 'icon' | 'icon-text';
 }>(({
   rowCache,
   workspaceId,
@@ -102,6 +104,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   collapseGroups = true,
   onReady,
   onModeChange,
+  tagDisplayMode = 'icon-text',
 }, ref): React.ReactNode => {
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
@@ -242,6 +245,10 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => { spotMapRef.current = spotMap; }, [spotMap]);
   const userMapRef = useRef(userMap);
   useEffect(() => { userMapRef.current = userMap; }, [userMap]);
+  const tagMapRef = useRef(tagMap);
+  useEffect(() => { tagMapRef.current = tagMap; }, [tagMap]);
+  const taskTagsRef = useRef(taskTags);
+  useEffect(() => { taskTagsRef.current = taskTags; }, [taskTags]);
   const globalStatusesRef = useRef(globalStatuses);
   useEffect(() => { globalStatusesRef.current = globalStatuses; }, [globalStatuses]);
 
@@ -290,6 +297,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           if (!TasksCache.initialized) await TasksCache.init();
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          baseParams.__statusMap = statusMapRef.current;
+          baseParams.__priorityMap = priorityMapRef.current;
+          baseParams.__spotMap = spotMapRef.current;
+          baseParams.__userMap = userMapRef.current;
+          baseParams.__tagMap = tagMapRef.current;
+          baseParams.__taskTags = taskTagsRef.current;
           // Default sort by created_at desc
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
           const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
@@ -314,6 +327,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           // Build minimal params equivalent to the grid query
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          baseParams.__statusMap = statusMapRef.current;
+          baseParams.__priorityMap = priorityMapRef.current;
+          baseParams.__spotMap = spotMapRef.current;
+          baseParams.__userMap = userMapRef.current;
+          baseParams.__tagMap = tagMapRef.current;
+          baseParams.__taskTags = taskTagsRef.current;
           // Default sort by created_at desc
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
 
@@ -331,6 +350,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     runDecision();
   }, [workspaceId, searchText, decideMode, groupBy]);
 
+  // Load taskTags and tags on mount so they're available for tag display
+  useEffect(() => {
+    dispatch(genericActions.taskTags.getFromIndexedDB());
+    dispatch(genericActions.tags.getFromIndexedDB());
+    // Optionally fetch from API to ensure we have the latest data
+    dispatch(genericActions.taskTags.fetchFromAPI());
+    dispatch(genericActions.tags.fetchFromAPI());
+  }, [dispatch]);
 
   // Removed on-mount loads; AuthProvider hydrates core slices
 
@@ -340,6 +367,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       gridRef.current.api.refreshCells({ columns: ['status_id'], force: true, suppressFlash: true });
     }
   }, [statusMap]);
+
+  // Refresh name column when taskTags or tags load/update to show tags
+  useEffect(() => {
+    if (gridRef.current?.api && taskTags.length > 0) {
+      gridRef.current.api.refreshCells({ columns: ['name'], force: true, suppressFlash: true });
+    }
+  }, [taskTags, tagMap]);
 
   // Refresh other columns when their metadata resolves
   useEffect(() => {
@@ -390,12 +424,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskApprovalInstances: stableTaskApprovalInstances,
     tagMap,
     taskTags,
+    tagDisplayMode,
   } as any), [
     statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density,
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density, tagDisplayMode,
     approvalMap, stableTaskApprovalInstances
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
@@ -470,10 +505,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         priorityMapRef,
         spotMapRef,
         userMapRef,
+        tagMapRef,
+        taskTagsRef,
         externalFilterModelRef,
         normalizeFilterModelForQuery,
       }),
-    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef]
+    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]
   );
 
   // Function to refresh the grid
@@ -497,6 +534,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         baseParams.__priorityMap = priorityMapRef.current;
         baseParams.__spotMap = spotMapRef.current;
         baseParams.__userMap = userMapRef.current;
+        baseParams.__tagMap = tagMapRef.current;
+        baseParams.__taskTags = taskTagsRef.current;
         const activeFm = gridRef.current.api.getFilterModel?.() || {};
         // Clean grid filter model - remove set filters with empty values (means "show all")
         const cleanedActiveFm: any = {};
@@ -574,7 +613,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     setTimeout(() => {
       suppressPersistRef.current = false;
     }, 0);
-  }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef]);
+  }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {

@@ -83,6 +83,7 @@ export function buildWorkspaceColumns(opts: any) {
     showDescriptions,
     tagMap,
     taskTags,
+    tagDisplayMode = 'icon-text',
   } = opts;
 
   const CategoryIconSmall = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
@@ -121,6 +122,37 @@ export function buildWorkspaceColumns(opts: any) {
     );
   };
 
+  // Tag icon component for inline use in tag badges
+  const TagIconSmall = ({ iconClass, color }: { iconClass?: string | null; color?: string }) => {
+    const [icon, setIcon] = useState<any>(faTags);
+    
+    useEffect(() => {
+      const loadIcon = async () => {
+        if (!iconClass) {
+          setIcon(faTags);
+          return;
+        }
+        try {
+          const parts = iconClass.split(' ');
+          const last = parts[parts.length - 1];
+          const loadedIcon = await iconService.getIcon(last);
+          setIcon(loadedIcon || faTags);
+        } catch (error) {
+          setIcon(faTags);
+        }
+      };
+      loadIcon();
+    }, [iconClass]);
+    
+    return (
+      <FontAwesomeIcon 
+        icon={icon} 
+        className="w-3 h-3 flex-shrink-0"
+        style={{ color: color || '#ffffff' }}
+      />
+    );
+  };
+
   // Always render initials instead of profile pictures
   const UserInitial = ({ user }: { user: any }) => {
     const name: string = getUserDisplayName(user) || '';
@@ -130,6 +162,198 @@ export function buildWorkspaceColumns(opts: any) {
         {initial}
       </AvatarFallback>
     );
+  };
+
+  // Helper function to render approval/SLA badge
+  const renderApprovalOrSLA = (p: any) => {
+    const approvalId = p.data?.approval_id;
+    const approvalStatus = p.data?.approval_status;
+    const approvalTriggeredAt = p.data?.approval_triggered_at;
+    const approvalMap = (opts as any)?.approvalMap || {};
+    const taskApprovalInstances = (opts as any)?.taskApprovalInstances || [];
+    const categoryMap = (opts as any)?.categoryMap || {};
+    const categoryId = p.data?.category_id;
+    const category = categoryId ? categoryMap[Number(categoryId)] : null;
+    const slaId = category?.sla_id;
+    
+    const approval = approvalId ? approvalMap[approvalId] : null;
+    
+    // Calculate approval progress
+    let totalApprovers = 0;
+    let approvedCount = 0;
+    let rejectedCount = 0;
+    let pendingCount = 0;
+    let progressPercent = 0;
+    
+    if (approvalId && taskApprovalInstances.length > 0) {
+      const instances = taskApprovalInstances.filter((inst: any) => inst.task_id === p.data?.id);
+      totalApprovers = instances.length;
+      approvedCount = instances.filter((inst: any) => inst.status === 'approved').length;
+      rejectedCount = instances.filter((inst: any) => inst.status === 'rejected').length;
+      pendingCount = instances.filter((inst: any) => inst.status === 'pending').length;
+      progressPercent = totalApprovers > 0 ? Math.round((approvedCount / totalApprovers) * 100) : 0;
+    }
+    
+    const isApprovalActive = approval 
+      ? (approval.trigger_type === 'ON_CREATE' 
+          ? (approvalStatus === 'pending' || approvalStatus === null)
+          : !!approvalTriggeredAt && (approvalStatus === 'pending' || approvalStatus === null))
+      : false;
+    const hasApproval = !!approvalId;
+    
+    // Calculate deadline
+    let deadline: Date | null = null;
+    let deadlineDisplay: string | null = null;
+    
+    if (approval && approval.deadline_value) {
+      if (approval.deadline_type === 'hours') {
+        const triggerTime = approvalTriggeredAt 
+          ? approvalTriggeredAt 
+          : (approval.trigger_type === 'ON_CREATE' && p.data?.created_at ? p.data.created_at : null);
+        
+        if (triggerTime) {
+          const triggered = new Date(triggerTime);
+          const deadlineHours = Number(approval.deadline_value);
+          if (Number.isFinite(deadlineHours)) {
+            deadline = new Date(triggered.getTime() + deadlineHours * 60 * 60 * 1000);
+          }
+        } else {
+          deadlineDisplay = `${approval.deadline_value} hours`;
+        }
+      } else if (approval.deadline_type === 'date') {
+        deadline = new Date(approval.deadline_value);
+        deadlineDisplay = deadline.toLocaleDateString();
+      }
+    }
+    
+    const triggerTypeDisplay = approval?.trigger_type 
+      ? approval.trigger_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+      : null;
+
+    // Show approval if exists
+    if (hasApproval && approval) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10 flex-shrink-0" style={{
+                backgroundColor: isApprovalActive ? 'rgba(59, 130, 246, 0.1)' :
+                                approvalStatus === 'approved' ? 'rgba(34, 197, 94, 0.1)' :
+                                approvalStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' :
+                                'rgba(156, 163, 175, 0.1)'
+              }}>
+                {isApprovalActive ? (
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                ) : approvalStatus === 'approved' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                ) : approvalStatus === 'rejected' ? (
+                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                ) : (
+                  <Clock className="w-3.5 h-3.5 text-gray-500 opacity-50" />
+                )}
+                {isApprovalActive && totalApprovers > 0 && (
+                  <span className="text-[11px] font-medium" style={{
+                    color: approvalStatus === 'approved' ? '#22c55e' :
+                           approvalStatus === 'rejected' ? '#ef4444' :
+                           '#3b82f6'
+                  }}>
+                    {progressPercent}%
+                  </span>
+                )}
+                {!isApprovalActive && approval?.deadline_value && (
+                  <span className="text-[10px] text-gray-500">
+                    {approval.deadline_type === 'hours' ? `${approval.deadline_value}h` : 'Due'}
+                  </span>
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-[320px] p-3">
+              <div className="space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-semibold text-sm">
+                    {approval?.name || 'Approval Required'}
+                  </div>
+                </div>
+                {triggerTypeDisplay && (
+                  <div className="text-xs text-muted-foreground">
+                    Trigger: <span className="font-medium">{triggerTypeDisplay}</span>
+                  </div>
+                )}
+                {isApprovalActive && totalApprovers > 0 && (
+                  <>
+                    <div className="text-xs text-muted-foreground">
+                      Progress: {approvedCount} of {totalApprovers} approved
+                      {rejectedCount > 0 && `, ${rejectedCount} rejected`}
+                      {pendingCount > 0 && `, ${pendingCount} pending`}
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div 
+                        className="h-1.5 rounded-full transition-all"
+                        style={{
+                          width: `${progressPercent}%`,
+                          backgroundColor: approvalStatus === 'rejected' ? '#ef4444' :
+                                         approvalStatus === 'approved' ? '#22c55e' : '#3b82f6'
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+                {approval?.deadline_value && (
+                  <div className="text-xs text-muted-foreground border-t pt-2">
+                    {isApprovalActive && deadline ? (
+                      (() => {
+                        const now = new Date();
+                        const remaining = deadline.getTime() - now.getTime();
+                        if (remaining > 0) {
+                          const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+                          const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                          const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                          const timeRemaining = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                          return (
+                            <div>
+                              Time remaining: <span className="font-medium text-blue-600">{timeRemaining}</span>
+                              <div className="mt-0.5">Deadline: <span className="font-medium">{deadline.toLocaleString()}</span></div>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div>
+                              <span className="text-red-600 font-medium">⚠️ Time limit exceeded</span>
+                              <div className="mt-0.5">Deadline: <span className="font-medium">{deadline.toLocaleString()}</span></div>
+                            </div>
+                          );
+                        }
+                      })()
+                    ) : deadlineDisplay ? (
+                      <div>Deadline: <span className="font-medium">{deadlineDisplay}</span></div>
+                    ) : null}
+                  </div>
+                )}
+                {approvalStatus && (
+                  <div className="text-xs border-t pt-2">
+                    Status: <span className="font-medium capitalize">{approvalStatus}</span>
+                  </div>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    
+    // Show SLA if exists (and no approval)
+    if (slaId) {
+      return (
+        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10 flex-shrink-0" style={{
+          backgroundColor: 'rgba(139, 92, 246, 0.1)'
+        }}>
+          <Clock className="w-3.5 h-3.5 text-purple-600" />
+          <span className="text-[11px] font-medium text-purple-600">SLA</span>
+        </div>
+      );
+    }
+    
+    return null;
   };
 
   // groupByStatus can be toggled later if we add grouping by status
@@ -226,200 +450,49 @@ export function buildWorkspaceColumns(opts: any) {
         const remainingTagsCount = 0; // Removed limit - show all tags
 
         return (
-          <div className="flex flex-col gap-1 py-1.5">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex flex-col gap-1 py-1.5 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
-              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1">{name}</div>
-              {hasApproval && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10" style={{
-                        backgroundColor: isApprovalActive ? 'rgba(59, 130, 246, 0.1)' :
-                                        approvalStatus === 'approved' ? 'rgba(34, 197, 94, 0.1)' :
-                                        approvalStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' :
-                                        'rgba(156, 163, 175, 0.1)'
-                      }}>
-                        {isApprovalActive ? (
-                          <Clock className="w-3.5 h-3.5 text-blue-600" />
-                        ) : approvalStatus === 'approved' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                        ) : approvalStatus === 'rejected' ? (
-                          <XCircle className="w-3.5 h-3.5 text-red-600" />
-                        ) : (
-                          <Clock className="w-3.5 h-3.5 text-gray-500 opacity-50" />
-                        )}
-                        {isApprovalActive && totalApprovers > 0 && (
-                          <span className="text-[11px] font-medium" style={{
-                            color: approvalStatus === 'approved' ? '#22c55e' :
-                                   approvalStatus === 'rejected' ? '#ef4444' :
-                                   '#3b82f6'
-                          }}>
-                            {progressPercent}%
-                          </span>
-                        )}
-                        {!isApprovalActive && approval?.deadline_value && (
-                          <span className="text-[10px] text-gray-500">
-                            {approval.deadline_type === 'hours' ? `${approval.deadline_value}h` : 'Due'}
-                          </span>
+              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1 truncate">{name}</div>
+              {/* Tags - inline with name, wrap naturally if needed */}
+              {(taskTagsData && taskTagsData.length > 0) && (
+                <>
+                  {taskTagsData.map((tag: any, idx: number) => {
+                    if (!tag || !tag.name) return null;
+                    const bgColor = tag.color || '#6B7280';
+                    const textColor = getContrastTextColor(bgColor);
+                    return (
+                      <div
+                        key={tag.id || `tag-${idx}`}
+                        className={`inline-flex items-center ${tagDisplayMode === 'icon' ? 'gap-0 px-1.5' : 'gap-1.5 px-2'} py-1 rounded text-xs font-medium leading-none flex-shrink-0`}
+                        style={{
+                          backgroundColor: bgColor,
+                          color: textColor,
+                        }}
+                        title={tag.name}
+                      >
+                        <TagIconSmall iconClass={tag.icon} color={textColor} />
+                        {tagDisplayMode === 'icon-text' && (
+                          <span className="whitespace-nowrap">{tag.name}</span>
                         )}
                       </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-[320px] p-3">
-                      <div className="space-y-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="font-semibold text-sm">
-                            {approval?.name || 'Approval Required'}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {isApprovalAssigned && (
-                              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                                Assigned
-                              </span>
-                            )}
-                            {approvalTriggeredAt && approvalStatus !== 'pending' && approvalStatus !== null && (
-                              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                                {approvalStatus === 'approved' ? 'Completed' : approvalStatus === 'rejected' ? 'Rejected' : 'Cancelled'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {triggerTypeDisplay && (
-                          <div className="text-xs text-muted-foreground">
-                            Trigger: <span className="font-medium">{triggerTypeDisplay}</span>
-                          </div>
-                        )}
-                        
-                        {isApprovalActive && (
-                          <div className="text-xs text-muted-foreground">
-                            {approvalTriggeredAt ? (
-                              <>Triggered: <span className="font-medium">
-                                {new Date(approvalTriggeredAt).toLocaleString()}
-                              </span></>
-                            ) : approval?.trigger_type === 'ON_CREATE' && p.data?.created_at ? (
-                              <>Created: <span className="font-medium">
-                                {new Date(p.data.created_at).toLocaleString()}
-                              </span></>
-                            ) : null}
-                          </div>
-                        )}
-                        
-                        {isApprovalActive && totalApprovers > 0 && (
-                          <>
-                            <div className="text-xs text-muted-foreground">
-                              Progress: {approvedCount} of {totalApprovers} approved
-                              {rejectedCount > 0 && `, ${rejectedCount} rejected`}
-                              {pendingCount > 0 && `, ${pendingCount} pending`}
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="h-1.5 rounded-full transition-all"
-                                style={{
-                                  width: `${progressPercent}%`,
-                                  backgroundColor: approvalStatus === 'rejected' ? '#ef4444' :
-                                                 approvalStatus === 'approved' ? '#22c55e' : '#3b82f6'
-                                }}
-                              />
-                            </div>
-                          </>
-                        )}
-                        
-                        {approval?.deadline_value && (
-                          <div className="text-xs text-muted-foreground border-t pt-2">
-                            {isApprovalActive && deadline ? (
-                              (() => {
-                                // Calculate time remaining only when tooltip is shown (on hover)
-                                const now = new Date();
-                                const remaining = deadline.getTime() - now.getTime();
-                                if (remaining > 0) {
-                                  const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-                                  const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                  const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-                                  const timeRemaining = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-                                  return (
-                                    <div>
-                                      Time remaining: <span className="font-medium text-blue-600">{timeRemaining}</span>
-                                      <div className="mt-0.5">Deadline: <span className="font-medium">{deadline.toLocaleString()}</span></div>
-                                    </div>
-                                  );
-                                } else {
-                                  return (
-                                    <div>
-                                      <span className="text-red-600 font-medium">⚠️ Time limit exceeded</span>
-                                      <div className="mt-0.5">Deadline: <span className="font-medium">{deadline.toLocaleString()}</span></div>
-                                    </div>
-                                  );
-                                }
-                              })()
-                            ) : isApprovalActive ? (
-                              deadlineDisplay ? (
-                                <div>Deadline: <span className="font-medium">{deadlineDisplay}</span></div>
-                              ) : null
-                            ) : (
-                              <div>
-                                Deadline: <span className="font-medium">
-                                  {approval.deadline_type === 'hours' 
-                                    ? `${approval.deadline_value} hours after ${approval.trigger_type === 'ON_CREATE' ? 'creation' : 'trigger'}`
-                                    : deadlineDisplay || approval.deadline_value}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {approvalStatus && (
-                          <div className="text-xs border-t pt-2">
-                            Status: <span className="font-medium capitalize">{approvalStatus}</span>
-                          </div>
-                        )}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                    );
+                  })}
+                  {remainingTagsCount > 0 && (
+                    <div
+                      className="inline-flex items-center px-2 py-1 rounded text-xs font-medium text-muted-foreground flex-shrink-0"
+                      style={{
+                        backgroundColor: '#F3F4F6',
+                        border: '1px solid #E5E7EB',
+                      }}
+                      title={`${remainingTagsCount} more tag${remainingTagsCount !== 1 ? 's' : ''}`}
+                    >
+                      +{remainingTagsCount}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            {/* Tags - on separate row, can wrap to 2 lines */}
-            {(taskTagsData && taskTagsData.length > 0) && (
-              <div 
-                className="flex items-center gap-1 flex-wrap pl-8"
-                style={{
-                  maxHeight: '2.5rem', // Allow 2 lines max (each tag ~1.25rem height)
-                  overflow: 'hidden',
-                }}
-              >
-                {taskTagsData.map((tag: any, idx: number) => {
-                  if (!tag || !tag.name) return null;
-                  const bgColor = tag.color || '#6B7280';
-                  const textColor = getContrastTextColor(bgColor);
-                  return (
-                    <div
-                      key={tag.id || `tag-${idx}`}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none truncate max-w-[80px] flex-shrink-0"
-                      style={{
-                        backgroundColor: bgColor,
-                        color: textColor,
-                      }}
-                      title={tag.name}
-                    >
-                      {tag.name}
-                    </div>
-                  );
-                })}
-                {remainingTagsCount > 0 && (
-                  <div
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-muted-foreground flex-shrink-0"
-                    style={{
-                      backgroundColor: '#F3F4F6',
-                      border: '1px solid #E5E7EB',
-                    }}
-                    title={`${remainingTagsCount} more tag${remainingTagsCount > 1 ? 's' : ''}`}
-                  >
-                    +{remainingTagsCount}
-                  </div>
-                )}
-              </div>
-            )}
             {showDescriptions && description && (
               <TooltipProvider>
                 <Tooltip>
@@ -458,6 +531,30 @@ export function buildWorkspaceColumns(opts: any) {
         );
       },
       minWidth: 280,
+    },
+    {
+      colId: 'config',
+      headerName: 'Config',
+      width: 100,
+      minWidth: 80,
+      maxWidth: 120,
+      filter: false,
+      sortable: false,
+      cellRenderer: (p: any) => {
+        const config = renderApprovalOrSLA(p);
+        if (!config) {
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="text-[12px] text-muted-foreground">—</span>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center h-full py-1">
+            {config}
+          </div>
+        );
+      },
     },
     {
       field: 'status_id',
