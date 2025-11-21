@@ -1,9 +1,10 @@
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Users, Eye, Filter, SlidersHorizontal } from "lucide-react";
+import { Users, Eye, Filter, SlidersHorizontal, Columns3 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
@@ -74,6 +75,22 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   const [loading, setLoading] = useState(false);
   const [filtersLoading, setFiltersLoading] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string | null>(null);
+  const [columnPrefs, setColumnPrefs] = useState<string[]>(() => {
+    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    try {
+      const key = `wh_workspace_columns_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) return allDefault;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        // Always ensure name is present
+        return Array.from(new Set(['name', ...parsed]));
+      }
+    } catch {
+      // ignore
+    }
+    return allDefault;
+  });
 
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
@@ -293,6 +310,44 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     });
   }, [currentWorkspace]);
 
+  // Column visibility handling for workspace task grid
+  const allColumns = [
+    { id: 'name', label: 'Task name (always shown)', locked: true },
+    { id: 'config', label: 'Config / approvals', locked: false },
+    { id: 'status_id', label: 'Status', locked: false },
+    { id: 'priority_id', label: 'Priority', locked: false },
+    { id: 'user_ids', label: 'Owner', locked: false },
+    { id: 'due_date', label: 'Due date', locked: false },
+    { id: 'spot_id', label: 'Location', locked: false },
+    { id: 'created_at', label: 'Last modified', locked: false },
+  ] as const;
+
+  const handleToggleColumn = (id: string, locked: boolean) => {
+    if (locked) return; // name cannot be toggled off
+    setColumnPrefs(prev => {
+      const nextSet = new Set(prev);
+      if (nextSet.has(id)) {
+        nextSet.delete(id);
+      } else {
+        nextSet.add(id);
+      }
+      const next = Array.from(nextSet);
+      try {
+        const key = `wh_workspace_columns_${workspaceId || 'all'}`;
+        window.localStorage.setItem(key, JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent('wh:workspaceColumnsChanged', {
+          detail: {
+            workspaceId: workspaceId || 'all',
+            visibleColumns: next,
+          }
+        }));
+      } catch {
+        // ignore storage / event errors
+      }
+      return next;
+    });
+  };
+
   // Update workspace info in Redux store
   const handleUpdateWorkspace = useCallback((updates: Partial<WorkspaceInfo>) => {
     if (!currentWorkspace) return;
@@ -400,6 +455,41 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                 <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
                 <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
               </ToggleGroup>
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-start gap-3">
+              <div className="flex-1 space-y-1">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Columns3 className="w-4 h-4 text-muted-foreground" />
+                  <span>Workspace grid columns</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Choose which columns are visible in the workspace task grid. The task name column is always shown.
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {allColumns.map(col => (
+                <button
+                  key={col.id}
+                  type="button"
+                  disabled={col.locked}
+                  onClick={() => handleToggleColumn(col.id, col.locked)}
+                  className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left hover:bg-accent disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <Checkbox
+                    checked={col.locked || columnPrefs.includes(col.id)}
+                    disabled={col.locked}
+                    onCheckedChange={() => handleToggleColumn(col.id, col.locked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="text-xs">
+                    {col.label}
+                    {col.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">(Required)</span>}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </motion.div>
@@ -550,8 +640,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
         pathMap={{ display: '', overview: '/overview', users: '/users', filters: '/creation' }}
         className="w-full h-full flex flex-col"
         onValueChange={(value) => {
+          const typed = (value || 'display') as 'overview' | 'users' | 'filters' | 'display';
           setPrevActiveTab(activeTab);
-          setActiveTab(value);
+          setActiveTab(typed);
         }}
       />
     </div>

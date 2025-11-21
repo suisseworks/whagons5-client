@@ -399,6 +399,78 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     try { return (localStorage.getItem('wh_workspace_density') as any) || 'comfortable'; } catch { return 'comfortable'; }
   })();
 
+  // Column visibility preferences (per-workspace, persisted in localStorage)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    try {
+      const key = `wh_workspace_columns_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) return allDefault;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        // Always ensure "name" column stays visible
+        return Array.from(new Set(['name', ...parsed]));
+      }
+    } catch {
+      // ignore
+    }
+    return allDefault;
+  });
+
+  // Reload preferences when workspace changes
+  useEffect(() => {
+    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    try {
+      const key = `wh_workspace_columns_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) {
+        setVisibleColumns(allDefault);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        setVisibleColumns(Array.from(new Set(['name', ...parsed])));
+      } else {
+        setVisibleColumns(allDefault);
+      }
+    } catch {
+      setVisibleColumns(allDefault);
+    }
+  }, [workspaceId]);
+
+  // Listen for settings changes from the Workspace Settings "Display" tab
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<any>;
+      const detail = custom.detail || {};
+      if (!detail) return;
+      // If a specific workspaceId is provided, respect it; otherwise apply to "all"
+      const targetId = detail.workspaceId ?? 'all';
+      const currentId = workspaceRef.current || 'all';
+      if (String(targetId) !== String(currentId)) return;
+      if (Array.isArray(detail.visibleColumns)) {
+        const next = detail.visibleColumns.filter((x: any) => typeof x === 'string');
+        if (next.length > 0) {
+          setVisibleColumns(Array.from(new Set(['name', ...next])));
+        }
+      }
+    };
+
+    try {
+      window.addEventListener('wh:workspaceColumnsChanged' as any, handler as any);
+    } catch {
+      // no-op (SSR)
+    }
+
+    return () => {
+      try {
+        window.removeEventListener('wh:workspaceColumnsChanged' as any, handler as any);
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
     getUserInitials,
@@ -425,13 +497,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     tagMap,
     taskTags,
     tagDisplayMode,
+    visibleColumns,
   } as any), [
     statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
     filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density, tagDisplayMode,
-    approvalMap, stableTaskApprovalInstances
+    approvalMap, stableTaskApprovalInstances,
+    visibleColumns,
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 

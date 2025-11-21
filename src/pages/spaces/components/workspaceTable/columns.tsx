@@ -84,7 +84,20 @@ export function buildWorkspaceColumns(opts: any) {
     tagMap,
     taskTags,
     tagDisplayMode = 'icon-text',
+    visibleColumns,
   } = opts;
+
+  const visibilitySet: Set<string> | null = Array.isArray(visibleColumns)
+    ? new Set<string>(visibleColumns as string[])
+    : null;
+
+  const isVisible = (id: string | undefined): boolean => {
+    if (!visibilitySet) return true;
+    if (!id) return true;
+    // "name" is always visible as the primary column
+    if (id === 'name') return true;
+    return visibilitySet.has(id);
+  };
 
   const CategoryIconSmall = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
     const iconColor = color || '#6b7280';
@@ -561,7 +574,7 @@ export function buildWorkspaceColumns(opts: any) {
       headerName: 'Status',
       sortable: true,
       rowGroup: undefined,
-      hide: undefined,
+      hide: !isVisible('status_id'),
       filter: 'agSetColumnFilter',
       valueFormatter: (p: any) => {
         const meta: any = statusMap[p.value as number];
@@ -748,7 +761,7 @@ export function buildWorkspaceColumns(opts: any) {
       sortable: true,
       filter: 'agSetColumnFilter',
       rowGroup: groupField === 'spot_id' ? true : undefined,
-      hide: groupField === 'spot_id' ? true : undefined,
+      hide: groupField === 'spot_id' ? true : !isVisible('spot_id'),
       valueFormatter: (p: any) => {
         const meta: any = spotMap[p.value as number];
         return meta?.name || `#${p.value}`;
@@ -837,6 +850,17 @@ export function buildWorkspaceColumns(opts: any) {
   if (groupField === 'priority_id') {
     const c = cols.find((x: any) => x.field === 'priority_id');
     if (c) { c.rowGroup = true; c.hide = true; }
+  }
+
+  // Apply visibility to non-group columns that don't already have an explicit hide set
+  for (const col of cols as any[]) {
+    const id = (col.colId as string) || (col.field as string) || '';
+    if (id === 'name') continue;
+    // Skip if grouping logic already forced hide
+    if (col.rowGroup && col.hide === true) continue;
+    if (!isVisible(id)) {
+      col.hide = true;
+    }
   }
 
   return cols;

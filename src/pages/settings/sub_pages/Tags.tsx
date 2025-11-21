@@ -20,6 +20,7 @@ import {
 	TextField,
 	SelectField
 } from "../components";
+import ReactECharts from "echarts-for-react";
 
 // Name cell with dynamic icon and color
 const TagNameCellRenderer = (props: ICellRendererParams) => {
@@ -174,6 +175,43 @@ function Tags() {
 		}
 	], [categories, handleEdit, handleDelete]);
 
+	// Derived statistics for charts
+	const totalTags = tags.length;
+
+	const { globalTagsCount, categoryTagsCount } = useMemo(() => {
+		let globalCount = 0;
+		let scopedCount = 0;
+		(tags as Tag[]).forEach((tag: any) => {
+			if (!tag.category_id) {
+				globalCount += 1;
+			} else {
+				scopedCount += 1;
+			}
+		});
+		return { globalTagsCount: globalCount, categoryTagsCount: scopedCount };
+	}, [tags]);
+
+	const tagsByCategory = useMemo(() => {
+		const counts = new Map<number, number>();
+		(tags as Tag[]).forEach((tag: any) => {
+			const cid = tag.category_id as number | null | undefined;
+			if (!cid) return;
+			counts.set(cid, (counts.get(cid) || 0) + 1);
+		});
+
+		return Array.from(counts.entries())
+			.map(([categoryId, count]) => {
+				const category = (categories as any[])?.find(
+					(c: any) => c.id === Number(categoryId)
+				);
+				return category ? { category, count } : null;
+			})
+			.filter(
+				(item): item is { category: Category; count: number } => !!item
+			)
+			.sort((a, b) => b.count - a.count);
+	}, [tags, categories]);
+
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		const data = {
@@ -246,20 +284,184 @@ function Tags() {
 							</div>
 						),
 						content: (
-							<div className="flex-1 min-h-0 overflow-auto">
-								<Card>
-									<CardHeader className="py-1">
-										<CardTitle className="text-sm">Tag Statistics</CardTitle>
-									</CardHeader>
-									<CardContent className="py-2">
-										<div className="grid grid-cols-1 gap-2 md:grid-cols-1">
-											<div className="text-center">
-												<div className="text-base font-semibold leading-none">{tags.length}</div>
-												<div className="text-[11px] text-muted-foreground mt-1">Total Tags</div>
-											</div>
-										</div>
-									</CardContent>
-								</Card>
+							<div className="flex-1 min-h-0 overflow-auto p-4">
+								<div className="space-y-4">
+									{/* Summary cards */}
+									<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+										<Card>
+											<CardContent className="pt-6">
+												<div className="text-center">
+													<div className="text-2xl font-bold">{totalTags}</div>
+													<div className="text-xs text-muted-foreground mt-1">
+														Total Tags
+													</div>
+												</div>
+											</CardContent>
+										</Card>
+										<Card>
+											<CardContent className="pt-6">
+												<div className="text-center">
+													<div className="text-2xl font-bold text-blue-600">
+														{globalTagsCount}
+													</div>
+													<div className="text-xs text-muted-foreground mt-1">
+														Global Tags
+													</div>
+												</div>
+											</CardContent>
+										</Card>
+										<Card>
+											<CardContent className="pt-6">
+												<div className="text-center">
+													<div className="text-2xl font-bold text-emerald-600">
+														{categoryTagsCount}
+													</div>
+													<div className="text-xs text-muted-foreground mt-1">
+														Category Tags
+													</div>
+												</div>
+											</CardContent>
+										</Card>
+									</div>
+
+									{/* Charts row */}
+									<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+										<Card>
+											<CardHeader>
+												<CardTitle className="text-sm">
+													Tags by Scope
+												</CardTitle>
+												<CardDescription className="text-xs">
+													Global vs category-specific tags
+												</CardDescription>
+											</CardHeader>
+											<CardContent>
+												{totalTags > 0 ? (
+													<ReactECharts
+														option={{
+															tooltip: {
+																trigger: "item",
+																fmt: "{b}: {c} ({d}%)"
+															},
+															legend: {
+																orient: "vertical",
+																left: "left",
+																textStyle: { fontSize: 11 }
+															},
+															series: [
+																{
+																	name: "Tags",
+																	type: "pie",
+																	radius: ["40%", "70%"],
+																	avoidLabelOverlap: false,
+																	itemStyle: {
+																		borderRadius: 8,
+																		borderColor: "#fff",
+																		borderWidth: 2
+																	},
+																	label: {
+																		show: true,
+																		formatter: "{b}: {c}"
+																	},
+																	emphasis: {
+																		label: {
+																			show: true,
+																			fontSize: 14,
+																			fontWeight: "bold"
+																		}
+																	},
+																	data: [
+																		{
+																			value: globalTagsCount,
+																			name: "Global",
+																			itemStyle: { color: "#3b82f6" }
+																		},
+																		{
+																			value: categoryTagsCount,
+																			name: "Category",
+																			itemStyle: { color: "#10b981" }
+																		}
+																	]
+																}
+															]
+														}}
+														style={{ height: "300px" }}
+													/>
+												) : (
+													<div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+														No tag data available
+													</div>
+												)}
+											</CardContent>
+										</Card>
+
+										<Card>
+											<CardHeader>
+												<CardTitle className="text-sm">
+													Tags by Category
+												</CardTitle>
+												<CardDescription className="text-xs">
+													How tags are distributed across categories
+												</CardDescription>
+											</CardHeader>
+											<CardContent>
+												{tagsByCategory.length > 0 ? (
+													<ReactECharts
+														option={{
+															tooltip: {
+																trigger: "axis",
+																axisPointer: { type: "shadow" }
+															},
+															grid: {
+																left: "3%",
+																right: "4%",
+																bottom: "3%",
+																containLabel: true
+															},
+															xAxis: {
+																type: "value",
+																name: "Tags"
+															},
+															yAxis: {
+																type: "category",
+																data: tagsByCategory
+																	.map((item) => item.category.name)
+																	.reverse(),
+																axisLabel: {
+																	formatter: (value: string) =>
+																		value.length > 20
+																			? value.substring(0, 20) + "..."
+																			: value
+																}
+															},
+															series: [
+																{
+																	name: "Tags",
+																	type: "bar",
+																	data: tagsByCategory
+																		.map((item) => ({
+																			value: item.count,
+																			itemStyle: {
+																				color:
+																					(item.category as any)
+																						.color || "#a855f7"
+																			}
+																		}))
+																		.reverse()
+																}
+															]
+														}}
+														style={{ height: "300px" }}
+													/>
+												) : (
+													<div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+														No category data available
+													</div>
+												)}
+											</CardContent>
+										</Card>
+									</div>
+								</div>
 							</div>
 						)
 					}
