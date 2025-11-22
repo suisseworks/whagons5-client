@@ -205,6 +205,10 @@ function serializeTeam(t) {
     t.name || '',
     t.description || '',
     t.color || '',
+    t.icon || '',
+    (t.is_active ? '1' : '0'),
+    t.parent_team_id || 0,
+    t.team_lead_id || 0,
     new Date(t.updated_at).getTime()
   ].join('|');
 }

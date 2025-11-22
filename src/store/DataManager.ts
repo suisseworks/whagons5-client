@@ -18,9 +18,9 @@ const coreKeys = [
   'slas',
   'spots',
   'users',
+  'jobPositions',
   'forms',
   'formVersions',
-  'workflows',
 ] as const;
 
 export class DataManager {

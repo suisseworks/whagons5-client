@@ -518,6 +518,11 @@
   padding-block: 10px;
 }
 
+/* Make status cells stand out slightly */
+.wh-modern-grid .ag-center-cols-container .ag-row .ag-cell[col-id="status_id"] {
+  font-weight: 600;
+}
+
 /* Make drag handles and resize lines subtle */
 .wh-modern-grid .ag-header .ag-header-cell-resize {
   opacity: 0.25;

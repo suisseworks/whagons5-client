@@ -59,6 +59,8 @@ export function IconPicker({
           const iconName = value.replace('fas fa-', '');
           const icon = await iconService.getIcon(iconName);
           setCurrentIcon(icon);
+        } else {
+          setCurrentIcon(null);
         }
         
         // Load popular icons immediately
@@ -191,7 +193,7 @@ export function IconPicker({
     };
   }, [showDropdown]);
 
-  const iconName = value.replace('fas fa-', '');
+  const iconName = (value || '').replace('fas fa-', '');
 
   const fieldContent = (
     <div className="relative" ref={dropdownRef}>
@@ -200,12 +202,16 @@ export function IconPicker({
         onClick={() => setShowDropdown(!showDropdown)}
       >
         <div className="flex items-center space-x-2">
-          <FontAwesomeIcon 
-            icon={currentIcon} 
-            className="w-4 h-4" 
-            style={{ color }}
-          />
-          <span className="text-sm">{iconName}</span>
+          {currentIcon ? (
+            <FontAwesomeIcon 
+              icon={currentIcon} 
+              className="w-4 h-4" 
+              style={{ color }}
+            />
+          ) : (
+            <span className="inline-block w-4 h-4 rounded-full border" style={{ backgroundColor: color }} />
+          )}
+          <span className="text-sm">{iconName || 'none'}</span>
         </div>
         <ChevronDown className="w-4 h-4 text-muted-foreground" />
       </div>

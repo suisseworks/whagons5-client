@@ -117,7 +117,11 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
       await dispatch(actions.addAsync(data)).unwrap();
       setIsCreateDialogOpen(false);
     } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to create item';
+      const backendErrors = err?.response?.data?.errors;
+      const backendMessage = err?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || err?.message || 'Failed to create item');
       setFormError(errorMessage);
       onError?.(errorMessage);
       throw err;
@@ -136,7 +140,11 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
       setIsEditDialogOpen(false);
       setEditingItem(null);
     } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to update item';
+      const backendErrors = err?.response?.data?.errors;
+      const backendMessage = err?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || err?.message || 'Failed to update item');
       setFormError(errorMessage);
       onError?.(errorMessage);
       throw err;
