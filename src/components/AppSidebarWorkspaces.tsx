@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -21,6 +21,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarMenuButton,
   useSidebar
 } from '@/components/ui/sidebar';
 import {
@@ -94,6 +95,27 @@ interface SortableWorkspaceItemProps {
   getWorkspaceIcon: (iconName?: string) => any;
 }
 
+const WorkspaceIconBadge = ({
+  color,
+  size = 20,
+  children,
+}: {
+  color?: string;
+  size?: number;
+  children: ReactNode;
+}) => (
+  <div
+    className="flex items-center justify-center rounded-[6px] flex-shrink-0"
+    style={{
+      backgroundColor: color || '#3b82f6',
+      width: `${size}px`,
+      height: `${size}px`,
+    }}
+  >
+    {children}
+  </div>
+);
+
 function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon }: SortableWorkspaceItemProps) {
   const {
     attributes,
@@ -110,123 +132,74 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
     opacity: isDragging ? 0.5 : 1,
   };
 
-  if (collapsed) {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className="flex items-center justify-center mx-0 rounded-[12px]"
-      >
-        <div
-          {...listeners}
-          {...attributes}
-          className="w-full h-full cursor-grab active:cursor-grabbing"
-        >
-          <Link
-            to={`/workspace/${workspace.id}`}
-            data-workspace-id={String(workspace.id)}
-            onClick={(e) => {
-              if (isDragging) {
-                e.preventDefault();
-              }
-            }}
-            className={`group flex items-center justify-center w-full h-full rounded-[6px] ${
-              pathname === `/workspace/${workspace.id}`
-                ? 'bg-[var(--sidebar-selected-bg)]'
-                : 'hover:bg-[var(--sidebar-accent)]'
-            }`}
-            style={{
-              width: '32px',
-              height: '32px',
-              opacity: pathname === `/workspace/${workspace.id}` ? 1 : 0.7
-            }}
-          >
-            <div
-              className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-              style={{
-                backgroundColor: workspace.color || '#3b82f6',
-                width: '20px',
-                height: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <FontAwesomeIcon
-                icon={getWorkspaceIcon(workspace.icon)}
-                style={{ 
-                  color: '#ffffff', 
-                  fontSize: '16px',
-                  width: '16px',
-                  height: '16px',
-                }}
-              />
-            </div>
-            <span className="sr-only">{workspace.name}</span>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const isActive = pathname === `/workspace/${workspace.id}`;
+  const buttonClass = collapsed
+    ? `flex justify-center items-center ${isActive
+        ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+        : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+      }`
+    : `${isActive
+        ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+        : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+      }`;
 
   return (
     <div
       ref={setNodeRef}
-      style={{ ...style, marginBottom: '2px' }}
+      style={{ ...style, marginBottom: collapsed ? '4px' : '2px' }}
       {...listeners}
       {...attributes}
-      className="flex items-center rounded-[8px] relative cursor-grab active:cursor-grabbing"
+      className="flex items-center rounded-[8px] relative cursor-grab active:cursor-grabbing w-full"
     >
-      <Link
-        to={`/workspace/${workspace.id}`}
-        data-workspace-id={String(workspace.id)}
-        onClick={(e) => {
-          // Prevent navigation if dragging
-          if (isDragging) {
-            e.preventDefault();
-            e.stopPropagation();
-          }
-        }}
-        className={`group flex items-center rounded-[6px] flex-1 pointer-events-auto ${
-          pathname === `/workspace/${workspace.id}`
-            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-        }`}
-        style={{ 
-          pointerEvents: isDragging ? 'none' : 'auto',
+      <SidebarMenuButton
+        asChild
+        tooltip={collapsed ? workspace.name : undefined}
+        className={`rounded-[8px] relative transition-colors ${buttonClass} ${collapsed ? '!p-[6px]' : ''}`}
+        style={{
           height: '32px',
-          padding: '6px 8px',
+          padding: collapsed ? '6px' : '6px 10px',
           gap: '8px',
-          fontWeight: pathname === `/workspace/${workspace.id}` ? 500 : 400,
-          fontSize: '14px',
-          color: pathname === `/workspace/${workspace.id}` ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)'
+          fontWeight: isActive ? 600 : 500,
+          fontSize: '13px',
+          width: '100%',
         }}
       >
-        <span className="flex items-center justify-center flex-shrink-0" style={{ width: '20px', height: '20px' }}>
-          <div
-            className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-            style={{
-              backgroundColor: workspace.color || '#3b82f6',
-              width: '20px',
-              height: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+        <Link
+          to={`/workspace/${workspace.id}`}
+          data-workspace-id={String(workspace.id)}
+          onClick={(e) => {
+            if (isDragging) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+          className={`${collapsed
+            ? 'flex justify-center items-center w-full'
+            : 'flex items-center'
+          } group relative`}
+          style={{
+            pointerEvents: isDragging ? 'none' : 'auto',
+          }}
+        >
+          <WorkspaceIconBadge color={workspace.color || '#3b82f6'}>
             <FontAwesomeIcon
               icon={getWorkspaceIcon(workspace.icon)}
-              style={{ 
-                color: '#ffffff', 
-                fontSize: '16px',
-                width: '16px',
-                height: '16px',
+              style={{
+                color: '#ffffff',
+                fontSize: '14px',
+                width: '14px',
+                height: '14px',
+                display: 'block'
               }}
             />
-          </div>
-        </span>
-        <span className="truncate">{workspace.name}</span>
-      </Link>
+          </WorkspaceIconBadge>
+          {collapsed ? (
+            <span className="sr-only">{workspace.name}</span>
+          ) : (
+            <span className="truncate ml-1.5">{workspace.name}</span>
+          )}
+        </Link>
+      </SidebarMenuButton>
     </div>
   );
 }
@@ -362,8 +335,10 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
               fontSize: '15px'
             }}
           >
-            <span>
-              <Layers className="w-[18px] h-[18px]" style={{ color: pathname === `/workspace/all` ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)', opacity: pathname === `/workspace/all` ? 1 : 0.7 }} />
+            <span className="flex items-center justify-center flex-shrink-0">
+              <WorkspaceIconBadge color="var(--sidebar-primary)">
+                <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+              </WorkspaceIconBadge>
             </span>
             <span>Everything</span>
           </Link>
@@ -385,7 +360,10 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             }}
             title={'Everything'}
           >
-            <Layers className="w-4 h-4" style={{ color: 'var(--sidebar-primary)' }} />
+            <WorkspaceIconBadge color="var(--sidebar-primary)">
+              <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+            </WorkspaceIconBadge>
+            <span className="sr-only">Everything</span>
           </Link>
         </div>
       )}
@@ -602,7 +580,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 items={workspaceIds}
                 strategy={verticalListSortingStrategy}
               >
-                <div className={collapsed ? 'flex flex-col items-center space-y-0.5 px-1 py-0.5 rounded-md bg-sidebar-accent z-300' : 'space-y-0.5'}>
+        <div className={collapsed ? 'flex flex-col items-center space-y-1 py-0.5' : 'space-y-0.5'}>
                   {localWorkspaces.map((workspace) => (
                     <SortableWorkspaceItem
                       key={workspace.id}

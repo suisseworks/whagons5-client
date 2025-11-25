@@ -22,7 +22,6 @@ import { setupTaskEventHandlers } from './workspaceTable/eventHandlers';
 import {
   useGridReduxState,
   useDerivedGridState,
-  useGridModeDecision,
   useMetadataLoadedFlags
 } from './workspaceTable/gridState';
 import {
@@ -44,6 +43,23 @@ const sanitizeFilterModel = (model: any): any => {
     if (ALLOWED_FILTER_KEYS.has(key)) cleaned[key] = model[key];
   }
   return cleaned;
+};
+
+// Normalize a filter model for AG Grid's internal expectations (string keys for set filters)
+const normalizeFilterModelForGrid = (raw: any): any => {
+  if (!raw || typeof raw !== 'object') return {};
+  const fm = sanitizeFilterModel(raw);
+  for (const key of ['status_id', 'priority_id', 'spot_id']) {
+    if (fm[key]) {
+      const st = { ...fm[key] } as any;
+      if ((st as any).filterType === 'set') {
+        const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
+        st.values = rawValues.map((v) => String(v));
+        fm[key] = st;
+      }
+    }
+  }
+  return fm;
 };
 
 const normalizeFilterModelForQuery = (raw: any): any => {
@@ -139,8 +155,25 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
 
   // Extract state from abstracted hooks
-  const { statuses, priorities, spots, users, categories, statusTransitions, approvals, taskApprovalInstances, tags, taskTags } = reduxState;
-  const { defaultCategoryId } = derivedState;
+  const {
+    statuses,
+    priorities,
+    spots,
+    users,
+    categories,
+    statusTransitions,
+    approvals,
+    approvalApprovers,
+    taskApprovalInstances,
+    tags,
+    taskTags,
+    customFields,
+    categoryCustomFields,
+    taskCustomFieldValues,
+    taskNotes,
+    taskAttachments,
+  } = reduxState as any;
+  const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
 
   // Load default status icon
@@ -224,6 +257,57 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return m;
   }, [categories]);
 
+  // Workspace-scoped custom fields (category-based)
+  const workspaceCustomFields = useMemo(() => {
+    if (!categories || categories.length === 0 || !customFields || customFields.length === 0) return [] as any[];
+
+    const allowedCategoryIds = new Set<number>();
+    for (const c of categories as any[]) {
+      const cid = Number((c as any).id);
+      const wsId = Number((c as any).workspace_id);
+      if (!Number.isFinite(cid)) continue;
+      if (isAllWorkspaces || workspaceNumericId == null || wsId === workspaceNumericId) {
+        allowedCategoryIds.add(cid);
+      }
+    }
+
+    if (allowedCategoryIds.size === 0) return [] as any[];
+
+    const byId: Record<number, { field: any; categories: any[] }> = {};
+
+    for (const link of (categoryCustomFields || []) as any[]) {
+      const catId = Number((link as any).category_id);
+      const fieldId = Number((link as any).field_id);
+      if (!allowedCategoryIds.has(catId) || !Number.isFinite(fieldId)) continue;
+      const field = (customFields as any[]).find((f: any) => Number(f.id) === fieldId);
+      if (!field) continue;
+      const cat = categoryMap[catId];
+      if (!byId[fieldId]) {
+        byId[fieldId] = { field, categories: [] };
+      }
+      if (cat) byId[fieldId].categories.push(cat);
+    }
+
+    return Object.entries(byId).map(([fid, data]) => ({
+      fieldId: Number(fid),
+      field: (data as any).field,
+      categories: (data as any).categories,
+    }));
+  }, [categories, customFields, categoryCustomFields, categoryMap, workspaceNumericId, isAllWorkspaces]);
+
+  // Map of (task_id, field_id) -> custom field value for fast lookup
+  const taskCustomFieldValueMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const v of (taskCustomFieldValues || []) as any[]) {
+      const taskId = Number((v as any).task_id);
+      // Backend column is field_id; fallback to custom_field_id if present
+      const fieldId = Number((v as any).field_id ?? (v as any).custom_field_id);
+      if (!Number.isFinite(taskId) || !Number.isFinite(fieldId)) continue;
+      m.set(`${taskId}:${fieldId}`, v);
+    }
+    return m;
+  }, [taskCustomFieldValues]);
+
   const approvalMap = useMemo(() => {
     const m: Record<number, any> = {};
     for (const a of approvals || []) {
@@ -285,12 +369,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const [useClientSide, setUseClientSide] = useState(false);
   const [clientRows, setClientRows] = useState<any[]>([]);
 
-  // Use abstracted grid mode decision
-  const decideMode = useGridModeDecision(workspaceId, searchText);
-
   useEffect(() => {
-    const runDecision = async () => {
-      // Force client-side mode when grouping is enabled (row grouping unsupported in Infinite Row Model)
+    const run = async () => {
+      // When grouping is enabled we must use client-side row model
       if (groupBy && groupBy !== 'none') {
         setUseClientSide(true);
         try {
@@ -303,7 +384,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           baseParams.__userMap = userMapRef.current;
           baseParams.__tagMap = tagMapRef.current;
           baseParams.__taskTags = taskTagsRef.current;
-          // Default sort by created_at desc
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
           const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
           const totalFiltered = countResp?.rowCount ?? 0;
@@ -317,46 +397,29 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         return;
       }
 
-      const result = await decideMode();
-      setUseClientSide(result.useClientSide);
-      try { onModeChange?.(result); } catch {}
-      if (result.useClientSide && result.totalFiltered > 0) {
-        try {
-          if (!TasksCache.initialized) await TasksCache.init();
-
-          // Build minimal params equivalent to the grid query
-          const baseParams: any = { search: searchText };
-          if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
-          baseParams.__statusMap = statusMapRef.current;
-          baseParams.__priorityMap = priorityMapRef.current;
-          baseParams.__spotMap = spotMapRef.current;
-          baseParams.__userMap = userMapRef.current;
-          baseParams.__tagMap = tagMapRef.current;
-          baseParams.__taskTags = taskTagsRef.current;
-          // Default sort by created_at desc
-          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
-
-          const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: result.totalFiltered });
-          setClientRows(rowsResp?.rows || []);
-        } catch (e) {
-          console.warn('Failed to load client-side rows', e);
-          setClientRows([]);
-          setUseClientSide(false);
-        }
-      } else {
-        setClientRows([]);
-      }
+      // No grouping: always use infinite row model to avoid client-side filter quirks
+      setUseClientSide(false);
+      setClientRows([]);
+      try { onModeChange?.({ useClientSide: false, totalFiltered: 0 }); } catch {}
     };
-    runDecision();
-  }, [workspaceId, searchText, decideMode, groupBy]);
+    run();
+  }, [workspaceId, searchText, groupBy, onModeChange, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
-  // Load taskTags and tags on mount so they're available for tag display
+  // Load taskTags, tags, notes, attachments on mount so they're available for display
   useEffect(() => {
     dispatch(genericActions.taskTags.getFromIndexedDB());
     dispatch(genericActions.tags.getFromIndexedDB());
+    dispatch(genericActions.taskNotes.getFromIndexedDB());
+    dispatch(genericActions.taskAttachments.getFromIndexedDB());
+    dispatch(genericActions.approvalApprovers.getFromIndexedDB());
+    dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
     // Optionally fetch from API to ensure we have the latest data
     dispatch(genericActions.taskTags.fetchFromAPI());
     dispatch(genericActions.tags.fetchFromAPI());
+    dispatch(genericActions.taskNotes.fetchFromAPI());
+    dispatch(genericActions.taskAttachments.fetchFromAPI());
+    dispatch(genericActions.approvalApprovers.fetchFromAPI());
+    dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
   }, [dispatch]);
 
   // Removed on-mount loads; AuthProvider hydrates core slices
@@ -374,6 +437,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       gridRef.current.api.refreshCells({ columns: ['name'], force: true, suppressFlash: true });
     }
   }, [taskTags, tagMap]);
+
+  // Refresh config column (notes/attachments) when they change
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.refreshCells({ columns: ['config'], force: true, suppressFlash: true });
+    }
+  }, [taskNotes, taskAttachments]);
 
   // Refresh other columns when their metadata resolves
   useEffect(() => {
@@ -401,7 +471,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Column visibility preferences (per-workspace, persisted in localStorage)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
@@ -419,7 +489,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Reload preferences when workspace changes
   useEffect(() => {
-    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
@@ -498,14 +568,19 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskTags,
     tagDisplayMode,
     visibleColumns,
+    workspaceCustomFields,
+    taskCustomFieldValueMap,
+    taskNotes,
+    taskAttachments,
+    approvalApprovers,
   } as any), [
     statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
     filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density, tagDisplayMode,
-    approvalMap, stableTaskApprovalInstances,
-    visibleColumns,
+    approvalMap, approvalApprovers, stableTaskApprovalInstances,
+    visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, taskNotes, taskAttachments,
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 
@@ -610,72 +685,25 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         baseParams.__userMap = userMapRef.current;
         baseParams.__tagMap = tagMapRef.current;
         baseParams.__taskTags = taskTagsRef.current;
-        const activeFm = gridRef.current.api.getFilterModel?.() || {};
-        // Clean grid filter model - remove set filters with empty values (means "show all")
-        const cleanedActiveFm: any = {};
-        for (const [key, value] of Object.entries(activeFm)) {
-          if (value && typeof value === 'object' && (value as any).filterType === 'set') {
-            const values = (value as any).values || [];
-            if (values.length > 0) {
-              cleanedActiveFm[key] = value;
-            }
-          } else {
-            cleanedActiveFm[key] = value;
-          }
-        }
-        // Merge: external filter takes precedence over grid filter
-        const mergedFm = { ...cleanedActiveFm, ...(externalFilterModelRef.current || {}) };
-        const normalizedFm = normalizeFilterModelForQuery(mergedFm);
-        baseParams.filterModel = normalizedFm;
-        // Get sort model from grid and pass to query
+        // Let AG Grid handle column filters in client-side mode; only apply search/workspace here.
         const sortModel = gridRef.current.api.getSortModel?.() || [];
         if (sortModel.length > 0) {
           baseParams.sortModel = sortModel;
         } else {
-          // Default to created_at desc if no sort is set
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
         }
-        console.log('[WT Filters] refreshGrid client-side baseParams.filterModel:', JSON.stringify(normalizedFm, null, 2));
-        console.log('[WT Filters] refreshGrid client-side activeFm from grid:', JSON.stringify(activeFm, null, 2));
-        console.log('[WT Filters] refreshGrid client-side externalFm:', JSON.stringify(externalFilterModelRef.current, null, 2));
+
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
         const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
         const rows = rowsResp?.rows || [];
-        console.log('[WT Filters] refreshGrid - Setting', rows.length, 'filtered rows to grid (totalFiltered:', totalFiltered, ')');
-        
-        // IMPORTANT: Update grid's filter model to match what we're filtering, so AG Grid doesn't re-filter
-        // If we have an external filter, ensure the grid's filter model reflects it
-        // Set filter model BEFORE setting rowData so AG Grid knows what filter is active
-        // suppressPersistRef is already true from the start of refreshGrid
-        if (normalizedFm && Object.keys(normalizedFm).length > 0) {
-          console.log('[WT Filters] refreshGrid - Setting grid filter model to:', JSON.stringify(normalizedFm, null, 2));
-          gridRef.current.api.setFilterModel(normalizedFm);
-        } else {
-          // No filter - clear grid filter model
-          gridRef.current.api.setFilterModel(null);
+        if (debugFilters.current) {
+          console.log('[WT Filters] client-side refresh rows=', rows.length, 'totalFiltered=', totalFiltered);
         }
-        
-        // Wait a tick for filter events to settle
-        await new Promise(resolve => setTimeout(resolve, 10));
-        
+
         setClientRows(rows);
-        // Set rowData - this should display the filtered rows
         gridRef.current.api.setGridOption('rowData', rows);
-        // Force refresh of client-side row model to ensure grid updates
-        // Note: We don't call onFilterChanged here as it would trigger the event handler and cause a loop
         gridRef.current.api.refreshClientSideRowModel?.('everything');
-        // Verify the grid received the data
-        setTimeout(() => {
-          if (!gridRef.current?.api) return;
-          const displayedCount = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
-          console.log('[WT Filters] refreshGrid - Grid now displaying', displayedCount, 'rows');
-          if (displayedCount === 0 && rows.length > 0) {
-            console.warn('[WT Filters] refreshGrid - WARNING: Grid shows 0 rows but we set', rows.length, 'rows!');
-            console.warn('[WT Filters] refreshGrid - Current grid filter model:', JSON.stringify(gridRef.current.api.getFilterModel?.(), null, 2));
-          }
-        }, 100);
-        try { if (debugFilters.current) console.log('[WT Filters] client refresh rows=', rows.length, 'totalFiltered=', totalFiltered); } catch {}
       } catch (e) {
         console.warn('refreshGrid (client-side) failed', e);
       }
@@ -763,6 +791,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       gridRef.current.api.setFilterModel(null);
       externalFilterModelRef.current = {};
       onFiltersChanged?.(false);
+      // Also clear any persisted filters for this workspace so the
+      // datasource doesn't keep applying an invisible filter
+      try {
+        const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+        localStorage.removeItem(key);
+      } catch {}
       refreshGrid();
     },
     hasFilters: () => {
@@ -772,27 +806,39 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     },
     setFilterModel: (model: any) => {
       if (!gridRef.current?.api) return;
-      externalFilterModelRef.current = model || {};
+      // If model is null/undefined, this is a request to CLEAR all filters
+      if (!model) {
+        externalFilterModelRef.current = {};
+        try { if (debugFilters.current) console.log('[WT] setFilterModel CLEAR'); } catch {}
+
+        gridRef.current.api.setFilterModel(null);
+        onFiltersChanged?.(false);
+
+        // Clear persisted filters for this workspace
+        try {
+          const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+          localStorage.removeItem(key);
+        } catch {}
+
+        refreshGrid();
+        return;
+      }
+
+      // Non-empty model: replace existing filters with the provided model
+      externalFilterModelRef.current = model;
       try { if (debugFilters.current) console.log('[WT] setFilterModel external=', externalFilterModelRef.current); } catch {}
-      
-      // Merge external filter with current grid filter, but external takes precedence
-      const currentGridFm = gridRef.current.api.getFilterModel?.() || {};
-      const mergedForGrid = { ...currentGridFm, ...(model || {}) };
-      
-      // Set the merged filter model on the grid so it displays correctly
-      gridRef.current.api.setFilterModel(Object.keys(mergedForGrid).length > 0 ? mergedForGrid : null);
-      
+
+      // Apply a grid-normalized version (set-filter values as strings) to AG Grid
+      const gridModel = normalizeFilterModelForGrid(model);
+      gridRef.current.api.setFilterModel(Object.keys(gridModel).length > 0 ? gridModel : null);
+
       onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
       try {
         const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
-        const gm = gridRef.current.api.getFilterModel?.() || {};
-        const merged = { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
-        if (merged && Object.keys(merged).length > 0) {
-          localStorage.setItem(key, JSON.stringify(merged));
-        } else {
-          localStorage.removeItem(key);
-        }
-        if (debugFilters.current) console.log('[WT] persisted model=', merged);
+        // Persist exactly the external model so Workspace and datasource
+        // see the same canonical filter definition
+        localStorage.setItem(key, JSON.stringify(model));
+        if (debugFilters.current) console.log('[WT] persisted model=', model);
       } catch {}
       refreshGrid();
     },
@@ -814,7 +860,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   
 
   return createGridContainer(
-    <Suspense fallback={<div>Loading AgGridReact...</div>}>
+    <Suspense fallback={createLoadingSpinner()}>
       <AgGridReact
         key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
         ref={gridRef}

@@ -21,11 +21,12 @@ import {
   Plug,
   Users2,
   Globe,
+  FileText, // Add FileText icon
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { RootState } from '@/store';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +60,27 @@ export const subscribeToPinnedState = (callback: (pinned: boolean) => void) => {
     if (index > -1) pinnedStateCallbacks.splice(index, 1);
   };
 };
+
+const IconBadge = ({
+  children,
+  color,
+  size = 20,
+}: {
+  children: ReactNode;
+  color: string;
+  size?: number;
+}) => (
+  <div
+    className="flex items-center justify-center rounded-[6px] flex-shrink-0"
+    style={{
+      backgroundColor: color,
+      width: `${size}px`,
+      height: `${size}px`,
+    }}
+  >
+    {children}
+  </div>
+);
 
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   const [isPinned, setIsPinned] = useState(isPinnedGlobal);
@@ -305,7 +327,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar" style={{ paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <SidebarContent className="bg-sidebar" style={{ paddingLeft: isCollapsed && !isMobile ? '4px' : '20px', paddingRight: isCollapsed && !isMobile ? '4px' : '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Spaces section - scrollable */}
         <SidebarGroup style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -353,16 +375,9 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         : 'flex items-center'
                     } group relative overflow-hidden`}
                   >
-                    <div
-                      className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-                      style={{
-                        backgroundColor: '#8B5CF6',
-                        width: '20px',
-                        height: '20px',
-                      }}
-                    >
-                      <Users2 size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
-                    </div>
+                    <IconBadge color="#8B5CF6">
+                      <Users2 size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                    </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">TeamConnect</span>
                     ) : (
@@ -380,6 +395,48 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px' }}>
           <SidebarGroupContent className="py-0">
             <SidebarMenu className="space-y-0">
+              {/* Compliance Link */}
+              <SidebarMenuItem style={{ marginBottom: '1px' }}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Compliance' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname.startsWith('/compliance')
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                      : `${pathname.startsWith('/compliance')
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                  }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname.startsWith('/compliance') ? 600 : 500,
+                    fontSize: '13px'
+                  }}
+                >
+                  <Link
+                    to="/compliance/standards"
+                    className={`${isCollapsed && !isMobile
+                        ? 'flex justify-center items-center w-full'
+                        : 'flex items-center'
+                    } group relative overflow-hidden`}
+                    >
+                      <IconBadge color="#10B981">
+                        <FileText size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                      </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Compliance</span>
+                    ) : (
+                      <span className="ml-1.5">Compliance</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               <SidebarMenuItem style={{ marginBottom: '1px' }}>
                 <SidebarMenuButton
                   asChild
@@ -408,8 +465,10 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
                     } group relative overflow-hidden`}
-                  >
-                    <BarChart3 size={16} className="w-4 h-4" style={{ opacity: pathname === '/analytics' ? 1 : 0.7, strokeWidth: 2 }} />
+                    >
+                      <IconBadge color="#0EA5E9">
+                        <BarChart3 size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                      </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Analytics</span>
                     ) : (
@@ -450,8 +509,10 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
                     } group relative overflow-hidden`}
-                  >
-                    <Plug size={16} className="w-4 h-4" style={{ opacity: pathname === '/plugins' ? 1 : 0.7, strokeWidth: 2 }} />
+                    >
+                      <IconBadge color="#F59E0B">
+                        <Plug size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                      </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Plugins</span>
                     ) : (
@@ -498,17 +559,10 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
                     } group relative overflow-hidden`}
-                  >
-                    <div
-                      className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-                      style={{
-                        backgroundColor: '#64748B',
-                        width: '20px',
-                        height: '20px',
-                      }}
                     >
-                      <Settings size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
-                    </div>
+                      <IconBadge color="#64748B">
+                        <Settings size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                      </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Settings</span>
                     ) : (
@@ -545,17 +599,10 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         ? 'flex justify-center items-center w-full'
                         : 'flex items-center'
                     } group relative overflow-hidden`}
-                  >
-                    <div
-                      className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-                      style={{
-                        backgroundColor: '#64748B',
-                        width: '20px',
-                        height: '20px',
-                      }}
                     >
-                      <Globe size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
-                    </div>
+                      <IconBadge color="#64748B">
+                        <Globe size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                      </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Global Settings</span>
                     ) : (

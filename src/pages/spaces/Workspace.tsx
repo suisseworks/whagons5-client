@@ -27,6 +27,7 @@ import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, Sa
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 
 export const Workspace = () => {
   const location = useLocation();
@@ -386,19 +387,16 @@ export const Workspace = () => {
   }, [searchText]);
 
   // Restore saved filters for this workspace when grid is ready
-  const appliedInitialFilters = useRef(false);
-  useEffect(() => {
-    if (appliedInitialFilters.current) return;
+  const handleTableReady = () => {
     const key = `wh_workspace_filters_${id || 'all'}`;
     try {
       const saved = localStorage.getItem(key);
       if (saved && tableRef.current) {
         const model = JSON.parse(saved);
         tableRef.current.setFilterModel(model);
-        appliedInitialFilters.current = true;
       }
     } catch {}
-  }, [id]);
+  };
 
 
   if (invalidWorkspaceRoute) {
@@ -445,6 +443,7 @@ export const Workspace = () => {
           transition={activeTab === 'grid' ? TAB_ANIMATION.transition : { duration: 0 }}
         >
           <WorkspaceTable 
+            key={isAllWorkspaces ? 'all' : (id || 'root')}
             ref={tableRef}
             rowCache={rowCache} 
             workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
@@ -459,6 +458,7 @@ export const Workspace = () => {
             groupBy={groupBy}
             collapseGroups={collapseGroups}
             tagDisplayMode={tagDisplayMode}
+            onReady={handleTableReady}
           />
         </motion.div>
       )
@@ -687,6 +687,7 @@ export const Workspace = () => {
         <CreateTaskDialogForEverything open={openCreateTask} onOpenChange={setOpenCreateTask} />
       )}
       <EditTaskDialog open={openEditTask} onOpenChange={setOpenEditTask} task={selectedTask} />
+      <TaskNotesModal />
     </div>
 
   );

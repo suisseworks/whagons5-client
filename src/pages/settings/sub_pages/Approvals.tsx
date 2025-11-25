@@ -384,7 +384,9 @@ function Approvals() {
                 <TextField id="minimum_approvals" label="Minimum approvals" type="number" value={String(createFormData.minimum_approvals)} onChange={(v) => setCreateFormData(p => ({ ...p, minimum_approvals: v }))} />
               )}
               <SelectField id="trigger_type" label="Trigger Type" value={createFormData.trigger_type} onChange={(v) => setCreateFormData(p => ({ ...p, trigger_type: v as any }))} options={[{ value: 'ON_CREATE', label: 'On Create' }, { value: 'ON_STATUS_CHANGE', label: 'On Status Change' }, { value: 'MANUAL', label: 'Manual' }, { value: 'CONDITIONAL', label: 'Conditional' }]} />
-              <SelectField id="trigger_status_id" label="Trigger Status" value={createFormData.trigger_status_id} onChange={(v) => setCreateFormData(p => ({ ...p, trigger_status_id: (v as any) }))} options={[{ value: 'none', label: 'None' }, ...((statuses as unknown as Status[]) || []).map(s => ({ value: s.id, label: s.name }))]} />
+              {createFormData.trigger_type === 'ON_STATUS_CHANGE' && (
+                <SelectField id="trigger_status_id" label="Trigger Status" value={createFormData.trigger_status_id} onChange={(v) => setCreateFormData(p => ({ ...p, trigger_status_id: (v as any) }))} options={[{ value: 'none', label: 'None' }, ...((statuses as unknown as Status[]) || []).map(s => ({ value: s.id, label: s.name }))]} />
+              )}
               <CheckboxField id="require_rejection_comment" label="Require rejection comment" checked={!!createFormData.require_rejection_comment} onChange={(c) => setCreateFormData(p => ({ ...p, require_rejection_comment: c }))} />
               <CheckboxField id="block_editing_during_approval" label="Block editing during approval" checked={!!createFormData.block_editing_during_approval} onChange={(c) => setCreateFormData(p => ({ ...p, block_editing_during_approval: c }))} />
               <SelectField id="deadline_type" label="Deadline Type" value={createFormData.deadline_type} onChange={(v) => setCreateFormData(p => ({ ...p, deadline_type: v as any }))} options={[{ value: 'hours', label: 'Hours' }, { value: 'date', label: 'Date' }]} />
@@ -431,7 +433,9 @@ function Approvals() {
                 <TextField id="edit-minimum_approvals" label="Minimum approvals" type="number" value={String(editFormData.minimum_approvals)} onChange={(v) => setEditFormData(p => ({ ...p, minimum_approvals: v }))} />
               )}
               <SelectField id="edit-trigger_type" label="Trigger Type" value={editFormData.trigger_type} onChange={(v) => setEditFormData(p => ({ ...p, trigger_type: v as any }))} options={[{ value: 'ON_CREATE', label: 'On Create' }, { value: 'ON_STATUS_CHANGE', label: 'On Status Change' }, { value: 'MANUAL', label: 'Manual' }, { value: 'CONDITIONAL', label: 'Conditional' }]} />
-              <SelectField id="edit-trigger_status_id" label="Trigger Status" value={editFormData.trigger_status_id} onChange={(v) => setEditFormData(p => ({ ...p, trigger_status_id: (v as any) }))} options={[{ value: 'none', label: 'None' }, ...((statuses as unknown as Status[]) || []).map(s => ({ value: s.id, label: s.name }))]} />
+              {editFormData.trigger_type === 'ON_STATUS_CHANGE' && (
+                <SelectField id="edit-trigger_status_id" label="Trigger Status" value={editFormData.trigger_status_id} onChange={(v) => setEditFormData(p => ({ ...p, trigger_status_id: (v as any) }))} options={[{ value: 'none', label: 'None' }, ...((statuses as unknown as Status[]) || []).map(s => ({ value: s.id, label: s.name }))]} />
+              )}
               <CheckboxField id="edit-require_rejection_comment" label="Require rejection comment" checked={!!editFormData.require_rejection_comment} onChange={(c) => setEditFormData(p => ({ ...p, require_rejection_comment: c }))} />
               <CheckboxField id="edit-block_editing_during_approval" label="Block editing during approval" checked={!!editFormData.block_editing_during_approval} onChange={(c) => setEditFormData(p => ({ ...p, block_editing_during_approval: c }))} />
               <SelectField id="edit-deadline_type" label="Deadline Type" value={editFormData.deadline_type} onChange={(v) => setEditFormData(p => ({ ...p, deadline_type: v as any }))} options={[{ value: 'hours', label: 'Hours' }, { value: 'date', label: 'Date' }]} />

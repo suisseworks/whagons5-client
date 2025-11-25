@@ -18,8 +18,35 @@ export const GRID_CONSTANTS = {
 };
 
 export const createLoadingSpinner = () => (
-  <div className={GRID_STYLES.loadingSpinner}>
-    <i className="fas fa-spinner fa-pulse fa-2x"></i>
+  <div className="w-full h-full flex flex-col bg-background">
+    {/* Header */}
+    <div className="h-[44px] w-full border-b flex items-center px-6 gap-4 bg-muted/20">
+      <div className="h-4 w-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      <div className="ml-auto flex gap-4">
+        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </div>
+    </div>
+    {/* Body */}
+    <div className="flex-1 p-0 overflow-hidden">
+      {Array.from({ length: 15 }).map((_, i) => (
+        <div 
+            key={i} 
+            className="h-[64px] w-full border-b border-border/50 flex items-center px-6 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-backwards"
+            style={{ animationDelay: `${i * 50}ms` }}
+        >
+          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+          <div className="flex-1 flex flex-col gap-2">
+             <div className="h-4 w-[30%] bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+             <div className="h-3 w-[20%] bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
+          <div className="h-7 w-24 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+          <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+        </div>
+      ))}
+    </div>
   </div>
 );
 

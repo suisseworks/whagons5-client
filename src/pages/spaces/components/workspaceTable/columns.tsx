@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MapPin, Flag, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { MapPin, Flag, CheckCircle2, Clock, XCircle, MessageSquare } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { iconService } from '@/database/iconService';
@@ -85,6 +85,11 @@ export function buildWorkspaceColumns(opts: any) {
     taskTags,
     tagDisplayMode = 'icon-text',
     visibleColumns,
+    workspaceCustomFields,
+    taskCustomFieldValueMap,
+    taskNotes,
+    taskAttachments,
+    approvalApprovers,
   } = opts;
 
   const visibilitySet: Set<string> | null = Array.isArray(visibleColumns)
@@ -198,15 +203,87 @@ export function buildWorkspaceColumns(opts: any) {
     let pendingCount = 0;
     let progressPercent = 0;
     
-    if (approvalId && taskApprovalInstances.length > 0) {
-      const instances = taskApprovalInstances.filter((inst: any) => inst.task_id === p.data?.id);
-      totalApprovers = instances.length;
-      approvedCount = instances.filter((inst: any) => inst.status === 'approved').length;
-      rejectedCount = instances.filter((inst: any) => inst.status === 'rejected').length;
-      pendingCount = instances.filter((inst: any) => inst.status === 'pending').length;
-      progressPercent = totalApprovers > 0 ? Math.round((approvedCount / totalApprovers) * 100) : 0;
-    }
+    let approverDetails: Array<{
+      id: number | string;
+      name: string;
+      status: string;
+      statusColor: string;
+      isRequired: boolean;
+      step: number;
+      respondedAt?: string | null;
+    }> = [];
     
+    if (approvalId && taskApprovalInstances.length > 0) {
+      const taskRowId = Number(p.data?.id);
+      const instances = taskApprovalInstances
+        .filter((inst: any) => Number(inst.task_id) === taskRowId)
+        .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      totalApprovers = instances.length;
+      approvedCount = instances.filter((inst: any) => String(inst.status).toLowerCase() === 'approved').length;
+      rejectedCount = instances.filter((inst: any) => String(inst.status).toLowerCase() === 'rejected').length;
+      pendingCount = instances.filter((inst: any) => !inst.status || String(inst.status).toLowerCase() === 'pending').length;
+      progressPercent = totalApprovers > 0 ? Math.round((approvedCount / totalApprovers) * 100) : 0;
+      
+      approverDetails = instances.map((inst: any, idx: number) => {
+        const userRecord = inst.approver_user_id != null
+          ? ((userMap?.[Number(inst.approver_user_id)]) || (userMap?.[String(inst.approver_user_id)]) || null)
+          : null;
+        const displayName = userRecord
+          ? getUserDisplayName(userRecord)
+          : (inst.approver_name || `Approver ${idx + 1}`);
+        const normalizedStatus = (inst.status || 'pending').toString().toLowerCase();
+        const statusColor =
+          normalizedStatus === 'approved'
+            ? 'text-green-600'
+            : normalizedStatus === 'rejected'
+              ? 'text-red-600'
+              : normalizedStatus === 'skipped'
+                ? 'text-amber-600'
+                : 'text-blue-600';
+        return {
+          id: inst.id ?? `${inst.task_id}-${idx}`,
+          name: displayName,
+          status: normalizedStatus,
+          statusColor,
+          isRequired: inst.is_required !== false,
+          step: (inst.order_index ?? idx) + 1,
+          respondedAt: inst.responded_at,
+        };
+      });
+    }
+
+    if (approverDetails.length === 0 && approvalId && Array.isArray(approvalApprovers)) {
+      const configuredApprovers = approvalApprovers
+        .filter((ap: any) => Number(ap.approval_id) === Number(approvalId))
+        .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      if (configuredApprovers.length > 0) {
+        approverDetails = configuredApprovers.map((config: any, idx: number) => {
+          const userRecord = config.approver_type === 'user'
+            ? ((userMap?.[Number(config.approver_id)]) || (userMap?.[String(config.approver_id)]) || null)
+            : null;
+          const name = userRecord
+            ? getUserDisplayName(userRecord)
+            : (
+              config.approver_type === 'role'
+                ? `Role #${config.approver_id}`
+                : config.approver_label || `Approver ${idx + 1}`
+            );
+          const scopeLabel = config.scope && config.scope !== 'global'
+            ? ` • ${String(config.scope).replace(/_/g, ' ')}`
+            : '';
+          return {
+            id: config.id ?? `config-${idx}`,
+            name: `${name}${scopeLabel}`,
+            status: 'not started',
+            statusColor: 'text-muted-foreground',
+            isRequired: config.required !== false,
+            step: (config.order_index ?? idx) + 1,
+            respondedAt: null,
+          };
+        });
+      }
+    }
+
     const isApprovalActive = approval 
       ? (approval.trigger_type === 'ON_CREATE' 
           ? (approvalStatus === 'pending' || approvalStatus === null)
@@ -238,7 +315,6 @@ export function buildWorkspaceColumns(opts: any) {
         deadlineDisplay = deadline.toLocaleDateString();
       }
     }
-    
     const triggerTypeDisplay = approval?.trigger_type 
       ? approval.trigger_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
       : null;
@@ -249,38 +325,83 @@ export function buildWorkspaceColumns(opts: any) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10 flex-shrink-0" style={{
-                backgroundColor: isApprovalActive ? 'rgba(59, 130, 246, 0.1)' :
-                                approvalStatus === 'approved' ? 'rgba(34, 197, 94, 0.1)' :
-                                approvalStatus === 'rejected' ? 'rgba(239, 68, 68, 0.1)' :
-                                'rgba(156, 163, 175, 0.1)'
+              <div className="flex items-center gap-2 px-2 py-1 rounded-md border transition-all cursor-default group hover:shadow-sm" style={{
+                backgroundColor: isApprovalActive ? 'rgba(59, 130, 246, 0.04)' :
+                                approvalStatus === 'approved' ? 'rgba(34, 197, 94, 0.04)' :
+                                approvalStatus === 'rejected' ? 'rgba(239, 68, 68, 0.04)' :
+                                'rgba(249, 250, 251, 1)',
+                borderColor: isApprovalActive ? 'rgba(59, 130, 246, 0.2)' :
+                             approvalStatus === 'approved' ? 'rgba(34, 197, 94, 0.2)' :
+                             approvalStatus === 'rejected' ? 'rgba(239, 68, 68, 0.2)' :
+                             'rgba(229, 231, 235, 0.6)'
               }}>
-                {isApprovalActive ? (
-                  <Clock className="w-3.5 h-3.5 text-blue-600" />
-                ) : approvalStatus === 'approved' ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                ) : approvalStatus === 'rejected' ? (
-                  <XCircle className="w-3.5 h-3.5 text-red-600" />
-                ) : (
-                  <Clock className="w-3.5 h-3.5 text-gray-500 opacity-50" />
-                )}
-                {isApprovalActive && totalApprovers > 0 && (
-                  <span className="text-[11px] font-medium" style={{
-                    color: approvalStatus === 'approved' ? '#22c55e' :
-                           approvalStatus === 'rejected' ? '#ef4444' :
-                           '#3b82f6'
-                  }}>
-                    {progressPercent}%
-                  </span>
-                )}
-                {!isApprovalActive && approval?.deadline_value && (
-                  <span className="text-[10px] text-gray-500">
-                    {approval.deadline_type === 'hours' ? `${approval.deadline_value}h` : 'Due'}
-                  </span>
-                )}
+                {/* Status Icon Area */}
+                <div className="flex items-center justify-center shrink-0">
+                  {isApprovalActive ? (
+                    <div className="relative flex items-center justify-center w-4 h-4">
+                      <svg className="animate-spin w-3.5 h-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  ) : approvalStatus === 'approved' ? (
+                    <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center">
+                      <CheckCircle2 className="w-3 h-3 text-green-600" />
+                    </div>
+                  ) : approvalStatus === 'rejected' ? (
+                    <div className="w-4 h-4 rounded-full bg-red-100 flex items-center justify-center">
+                       <XCircle className="w-3 h-3 text-red-600" />
+                    </div>
+                  ) : (
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                  )}
+                </div>
+
+                {/* Text Info Area */}
+                <div className="flex flex-col leading-none justify-center gap-0.5 min-w-[60px]">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-[11px] font-semibold truncate" style={{
+                      color: isApprovalActive ? '#2563eb' :
+                             approvalStatus === 'approved' ? '#16a34a' :
+                             approvalStatus === 'rejected' ? '#dc2626' :
+                             '#4b5563'
+                    }}>
+                      {isApprovalActive ? 'Reviewing' :
+                       approvalStatus === 'approved' ? 'Approved' :
+                       approvalStatus === 'rejected' ? 'Rejected' :
+                       'Pending'}
+                    </span>
+                  </div>
+
+                  {/* Secondary Line: Progress or Time */}
+                  <div className="flex items-center gap-1.5">
+                    {(isApprovalActive || approvalStatus === 'pending') && totalApprovers > 0 && (
+                       <span className="text-[9px] text-muted-foreground font-medium bg-gray-100 px-1 rounded-sm">
+                         {approvedCount}/{totalApprovers}
+                       </span>
+                    )}
+                    
+                    {(isApprovalActive && deadline) ? (
+                       (() => {
+                         const now = new Date();
+                         const remaining = deadline.getTime() - now.getTime();
+                         const isLate = remaining < 0;
+                         
+                         if (isLate) return <span className="text-[9px] text-red-600 font-medium">Overdue</span>;
+                         
+                         const hours = Math.floor(remaining / (1000 * 60 * 60));
+                         const days = Math.floor(hours / 24);
+                         
+                         const timeText = days > 0 ? `${days}d left` : hours > 0 ? `${hours}h left` : `<1h left`;
+                         
+                         return <span className="text-[9px] text-amber-600 font-medium">{timeText}</span>;
+                       })()
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-[320px] p-3">
+            <TooltipContent side="right" className="min-w-[360px] max-w-[440px] p-4">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="font-semibold text-sm">
@@ -310,6 +431,34 @@ export function buildWorkspaceColumns(opts: any) {
                       />
                     </div>
                   </>
+                )}
+                {approverDetails.length > 0 && (
+                  <div className="text-xs border-t pt-3 space-y-2">
+                    <div className="uppercase tracking-wide text-[10px] text-muted-foreground">Approvers</div>
+                    <div className="space-y-1.5">
+                      {approverDetails.map((detail) => (
+                        <div
+                          key={detail.id}
+                          className="flex items-start justify-between gap-3 rounded border border-muted px-2 py-1.5 bg-background/80"
+                        >
+                          <div>
+                            <div className="text-[11px] font-semibold text-foreground">{detail.name}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Step {detail.step}{detail.isRequired ? ' • Required' : ' • Optional'}
+                            </div>
+                            {detail.respondedAt && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {dayjs(detail.respondedAt).format('MMM D, h:mm A')}
+                              </div>
+                            )}
+                          </div>
+                          <span className={`text-[11px] font-semibold capitalize ${detail.statusColor}`}>
+                            {detail.status || 'pending'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {approval?.deadline_value && (
                   <div className="text-xs text-muted-foreground border-t pt-2">
@@ -398,11 +547,14 @@ export function buildWorkspaceColumns(opts: any) {
         let progressPercent = 0;
         
         if (approvalId && taskApprovalInstances.length > 0) {
-          const instances = taskApprovalInstances.filter((inst: any) => inst.task_id === p.data?.id);
+          const taskRowId = Number(p.data?.id);
+          const instances = taskApprovalInstances
+            .filter((inst: any) => Number(inst.task_id) === taskRowId)
+            .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
           totalApprovers = instances.length;
-          approvedCount = instances.filter((inst: any) => inst.status === 'approved').length;
-          rejectedCount = instances.filter((inst: any) => inst.status === 'rejected').length;
-          pendingCount = instances.filter((inst: any) => inst.status === 'pending').length;
+          approvedCount = instances.filter((inst: any) => String(inst.status).toLowerCase() === 'approved').length;
+          rejectedCount = instances.filter((inst: any) => String(inst.status).toLowerCase() === 'rejected').length;
+          pendingCount = instances.filter((inst: any) => !inst.status || String(inst.status).toLowerCase() === 'pending').length;
           progressPercent = totalApprovers > 0 ? Math.round((approvedCount / totalApprovers) * 100) : 0;
         }
         
@@ -558,13 +710,50 @@ export function buildWorkspaceColumns(opts: any) {
         if (!config) {
           return (
             <div className="flex items-center h-full py-2">
-              <span className="text-[12px] text-muted-foreground">—</span>
             </div>
           );
         }
         return (
           <div className="flex items-center h-full py-1">
             {config}
+          </div>
+        );
+      },
+    },
+    {
+      colId: 'notes',
+      headerName: '',
+      width: 60,
+      minWidth: 60,
+      maxWidth: 60,
+      filter: false,
+      sortable: false,
+      cellRenderer: (p: any) => {
+        const taskId = p.data?.id;
+        if (!taskId) return null;
+        
+        const notesCount = (taskNotes || []).filter((n: any) => Number(n.task_id) === Number(taskId)).length;
+        const attachmentsCount = (taskAttachments || []).filter((a: any) => Number(a.task_id) === Number(taskId)).length;
+        const total = notesCount + attachmentsCount;
+        
+        // Always render placeholder to maintain alignment if desired, or only when content
+        // Matching the screenshot style (green badge)
+        return (
+          <div className="flex items-center justify-center h-full w-full">
+             <div 
+               className={`relative group cursor-pointer flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors ${total === 0 ? 'opacity-30 hover:opacity-100' : ''}`}
+               onClick={(e) => {
+                e.stopPropagation(); // Prevent row selection/click
+                const event = new CustomEvent('wh:openTaskNotes', { detail: { taskId, taskName: p.data?.name } });
+                window.dispatchEvent(event);
+             }}>
+              <MessageSquare className={`w-4 h-4 ${total > 0 ? 'text-green-600 fill-green-600/10' : 'text-muted-foreground'}`} />
+              {total > 0 && (
+                <div className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-green-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 border-2 border-background">
+                  {total}
+                </div>
+              )}
+            </div>
           </div>
         );
       },
@@ -841,6 +1030,75 @@ export function buildWorkspaceColumns(opts: any) {
       maxWidth: 160,
     },
   ]);
+
+  // Append dynamic custom-field columns (per-workspace)
+  const customFieldCols: any[] = [];
+  if (Array.isArray(workspaceCustomFields) && workspaceCustomFields.length > 0) {
+    for (const cf of workspaceCustomFields as any[]) {
+      const fieldId = Number((cf as any).fieldId);
+      const field = (cf as any).field || {};
+      const categoriesForField = (cf as any).categories || [];
+      if (!Number.isFinite(fieldId)) continue;
+
+      const colKey = `cf_${fieldId}`;
+      // Only render if this custom field is selected in visibleColumns
+      if (!isVisible(colKey)) continue;
+
+      const headerName = (() => {
+        const base = String(field.name || `Field #${fieldId}`);
+        if (!categoriesForField || categoriesForField.length === 0) return base;
+        const names = categoriesForField.map((c: any) => c?.name).filter(Boolean);
+        if (names.length === 0) return base;
+        if (names.length === 1) return `${base} (${names[0]})`;
+        return `${base} (${names[0]} +${names.length - 1})`;
+      })();
+
+      customFieldCols.push({
+        field: colKey,
+        colId: colKey,
+        headerName,
+        sortable: false,
+        filter: false,
+        wrapText: true,
+        autoHeight: true,
+        minWidth: 160,
+        flex: 2,
+        valueGetter: (p: any) => {
+          const taskId = Number(p.data?.id);
+          if (!Number.isFinite(taskId) || !taskCustomFieldValueMap) return null;
+          const key = `${taskId}:${fieldId}`;
+          const row = taskCustomFieldValueMap.get(key);
+          if (!row) return null;
+          // Prefer typed value based on field_type if present
+          const t = String(row.type || row.field_type || '').toLowerCase();
+          if (t === 'number' || t === 'numeric') return row.value_numeric ?? row.value;
+          if (t === 'date' || t === 'datetime') return row.value_date ?? row.value;
+          if (t === 'json') return row.value_json ?? row.value;
+          return row.value;
+        },
+        cellRenderer: (p: any) => {
+          const v = p.value;
+          if (v === null || v === undefined || v === '') {
+            return (
+              <div className="flex items-center h-full py-2">
+                <span className="text-[12px] text-muted-foreground">—</span>
+              </div>
+            );
+          }
+          // Simple text rendering for now
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="text-[12px] truncate max-w-full">{String(v)}</span>
+            </div>
+          );
+        },
+      });
+    }
+  }
+
+  if (customFieldCols.length > 0) {
+    (cols as any[]).push(...customFieldCols);
+  }
 
   // Apply grouping to status or priority when selected
   if (groupField === 'status_id') {
