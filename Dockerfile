@@ -1,5 +1,5 @@
-# Build stage - Use Bun for faster installs and builds
-FROM oven/bun:1.3.2 AS builder
+# Use Bun for building and serving
+FROM oven/bun:1.3.2
 
 WORKDIR /app
 
@@ -26,8 +26,15 @@ ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
 # Copy package files
 COPY package.json bun.lockb* package-lock.json* pnpm-lock.yaml* ./
 
-# Copy .npmrc if it exists (needed for FontAwesome auth)
-COPY .npmrc* ./
+# Create .npmrc with FontAwesome token (Docker doesn't substitute vars in COPY)
+# Use $FONTAWESOME_PACKAGE_TOKEN from ARG (available in RUN commands)
+RUN if [ -z "$FONTAWESOME_PACKAGE_TOKEN" ]; then \
+      echo "ERROR: FONTAWESOME_PACKAGE_TOKEN is not set!" && exit 1; \
+    fi && \
+    echo "@fortawesome:registry=https://npm.fontawesome.com/" > .npmrc && \
+    echo "@awesome.me:registry=https://npm.fontawesome.com/" >> .npmrc && \
+    echo "//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" >> .npmrc && \
+    echo "Created .npmrc with FontAwesome token"
 
 # Install dependencies (Bun reads package-lock.json or creates bun.lockb)
 # Bun respects .npmrc for registry authentication
@@ -39,18 +46,10 @@ COPY . .
 # Build the application
 RUN bun run build
 
-# Production stage - Use Caddy for serving static files
-FROM caddy:2.8-alpine
-
-# Copy built files from builder stage
-COPY --from=builder /app/dist /usr/share/caddy
-
-# Copy Caddyfile
-COPY Caddyfile /etc/caddy/Caddyfile
-
 # Expose port (Railway/Coolify will set PORT env var)
-EXPOSE 80
+EXPOSE 3000
 
-# Caddy automatically reads PORT env var
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+# Use serve (via bunx) to serve static files from dist directory
+# Listen on port 3000 (serve defaults to 0.0.0.0)
+CMD ["bunx", "serve", "dist", "-l", "3000"]
 
