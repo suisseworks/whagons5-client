@@ -107,6 +107,13 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     handleSearch(searchQuery);
   }, [items, searchQuery, handleSearch]);
   
+  // Ensure filteredItems is always synced with items if empty
+  useEffect(() => {
+    if (items.length > 0 && filteredItems.length === 0 && !searchQuery) {
+      setFilteredItems(items);
+    }
+  }, [items, filteredItems.length, searchQuery]);
+  
   // CRUD operations
   const createItem = useCallback(async (data: Omit<T, 'id' | 'created_at' | 'updated_at'>) => {
     try {

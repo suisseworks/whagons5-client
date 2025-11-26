@@ -21,6 +21,8 @@ import {
   ColorIndicatorCellRenderer
 } from "../components";
 import { UrlTabs } from "@/components/ui/url-tabs";
+import ReactECharts from "echarts-for-react";
+import dayjs from "dayjs";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -168,6 +170,74 @@ function Spots() {
   const getSpotTaskCount = (spotId: number) => {
     return tasks.filter((task: any) => task.spot_id === spotId).length;
   };
+
+  // Derived statistics for charts
+  const totalSpots = spots.length;
+  const totalTasks = tasks.length;
+
+  const rootSpotsCount = useMemo(
+    () => spots.filter((s) => !s.parent_id).length,
+    [spots]
+  );
+
+  const branchSpotsCount = useMemo(
+    () => spots.filter((s) => s.is_branch).length,
+    [spots]
+  );
+
+  const tasksBySpot = useMemo(() => {
+    const counts = new Map<number, number>();
+    tasks.forEach((task: any) => {
+      const sid = task.spot_id as number | null | undefined;
+      if (!sid) return;
+      counts.set(sid, (counts.get(sid) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([spotId, count]) => {
+        const spot = spots.find((s) => s.id === spotId);
+        return spot ? { spot, count } : null;
+      })
+      .filter(
+        (item): item is { spot: Spot; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [tasks, spots]);
+
+  const tasksBySpotType = useMemo(() => {
+    const counts = new Map<number, number>();
+    tasks.forEach((task: any) => {
+      const sid = task.spot_id as number | null | undefined;
+      if (!sid) return;
+      const spot = spots.find((s) => s.id === sid);
+      if (!spot || !spot.spot_type_id) return;
+      counts.set(spot.spot_type_id, (counts.get(spot.spot_type_id) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([typeId, count]) => {
+        const type = (spotTypes as any[]).find((t) => t.id === typeId);
+        return type ? { type, count } : null;
+      })
+      .filter(
+        (item): item is { type: any; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [tasks, spots, spotTypes]);
+
+  const tasksOverTime = useMemo(() => {
+    const map = new Map<string, number>();
+    tasks.forEach((task: any) => {
+      if (!task.created_at) return;
+      const date = dayjs(task.created_at).format("YYYY-MM-DD");
+      map.set(date, (map.get(date) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+  }, [tasks]);
 
   // Column definitions for AG Grid (tree data)
   const colDefs = useMemo<ColDef[]>(() => [
@@ -384,35 +454,267 @@ function Spots() {
         </div>
       ),
       content: (
-        <div className="flex-1 min-h-0 overflow-auto">
-          <Card>
-            <CardHeader className="py-1">
-              <CardTitle className="text-sm">Spot Statistics</CardTitle>
-              <CardDescription className="text-[11px] text-muted-foreground/70">
-                Overview of your hierarchical locations
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="py-2">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
-                <div className="text-center">
-                  <div className="text-base font-semibold leading-none">{spots.length}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">Total Spots</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-base font-semibold leading-none">{tasks.length}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">Total Tasks</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-base font-semibold leading-none">{spots.length > 0 ? Math.round((tasks.length / spots.length) * 10) / 10 : 0}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">Avg Tasks/Spot</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-base font-semibold leading-none">{spots.filter(s => !s.parent_id).length}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">Root Spots</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex-1 min-h-0 overflow-auto p-4">
+          <div className="space-y-4">
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{totalSpots}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Total Spots
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {totalTasks}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Total Tasks
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-emerald-600">
+                      {rootSpotsCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Root Spots
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-rose-600">
+                      {branchSpotsCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Branch Spots
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Tasks by Spot</CardTitle>
+                  <CardDescription className="text-xs">
+                    Distribution of tasks across spots
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {tasksBySpot.length > 0 ? (
+                    <ReactECharts
+                      option={{
+                        tooltip: {
+                          trigger: "item",
+                          formatter: "{b}: {c} ({d}%)"
+                        },
+                        legend: {
+                          orient: "vertical",
+                          left: "left",
+                          textStyle: { fontSize: 10 }
+                        },
+                        series: [
+                          {
+                            name: "Tasks",
+                            type: "pie",
+                            radius: ["45%", "75%"],
+                            center: ["60%", "55%"],
+                            avoidLabelOverlap: true,
+                            itemStyle: {
+                              borderRadius: 8,
+                              borderColor: "#fff",
+                              borderWidth: 2
+                            },
+                            // Hide always-on labels to keep chart clean; legend + tooltip carry the detail
+                            label: {
+                              show: false
+                            },
+                            labelLine: {
+                              show: false
+                            },
+                            emphasis: {
+                              label: {
+                                show: true,
+                                formatter: "{b}: {c}",
+                                fontSize: 12,
+                                fontWeight: "bold"
+                              }
+                            },
+                            data: tasksBySpot.map((item) => ({
+                              value: item.count,
+                              name: item.spot.name
+                            }))
+                          }
+                        ]
+                      }}
+                      style={{ height: "340px" }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                      No spot task data available
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Tasks by Spot Type</CardTitle>
+                  <CardDescription className="text-xs">
+                    Workload distribution across spot types
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {tasksBySpotType.length > 0 ? (
+                    <ReactECharts
+                      option={{
+                        tooltip: {
+                          trigger: "axis",
+                          axisPointer: { type: "shadow" }
+                        },
+                        grid: {
+                          left: "3%",
+                          right: "4%",
+                          bottom: "3%",
+                          containLabel: true
+                        },
+                        xAxis: {
+                          type: "value",
+                          name: "Tasks"
+                        },
+                        yAxis: {
+                          type: "category",
+                          data: tasksBySpotType
+                            .map((item) => item.type.name)
+                            .reverse(),
+                          axisLabel: {
+                            formatter: (value: string) =>
+                              value.length > 20
+                                ? value.substring(0, 20) + "..."
+                                : value
+                          }
+                        },
+                        series: [
+                          {
+                            name: "Tasks",
+                            type: "bar",
+                            data: tasksBySpotType
+                              .map((item) => ({
+                                value: item.count,
+                                itemStyle: {
+                                  color: item.type.color || "#10b981"
+                                }
+                              }))
+                              .reverse()
+                          }
+                        ]
+                      }}
+                      style={{ height: "300px" }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                      No spot type data available
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tasks over time */}
+            {tasksOverTime.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Tasks Over Time</CardTitle>
+                  <CardDescription className="text-xs">
+                    Last 30 days of task creation across all spots
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ReactECharts
+                    option={{
+                      tooltip: {
+                        trigger: "axis",
+                        formatter: (params: any) => {
+                          const param = params[0];
+                          return `${param.axisValue}<br/>${param.marker}${param.seriesName}: ${param.value}`;
+                        }
+                      },
+                      grid: {
+                        left: "3%",
+                        right: "4%",
+                        bottom: "3%",
+                        containLabel: true
+                      },
+                      xAxis: {
+                        type: "category",
+                        data: tasksOverTime.map((item) =>
+                          dayjs(item.date).format("MMM DD")
+                        ),
+                        axisLabel: {
+                          rotate: 45,
+                          fontSize: 10
+                        }
+                      },
+                      yAxis: {
+                        type: "value",
+                        name: "Tasks"
+                      },
+                      series: [
+                        {
+                          name: "Tasks Created",
+                          type: "line",
+                          smooth: true,
+                          data: tasksOverTime.map((item) => item.count),
+                          areaStyle: {
+                            color: {
+                              type: "linear",
+                              x: 0,
+                              y: 0,
+                              x2: 0,
+                              y2: 1,
+                              colorStops: [
+                                {
+                                  offset: 0,
+                                  color: "rgba(16, 185, 129, 0.3)"
+                                },
+                                {
+                                  offset: 1,
+                                  color: "rgba(16, 185, 129, 0.05)"
+                                }
+                              ]
+                            }
+                          },
+                          itemStyle: {
+                            color: "#10b981"
+                          },
+                          lineStyle: {
+                            color: "#10b981",
+                            width: 2
+                          }
+                        }
+                      ]
+                    }}
+                    style={{ height: "300px" }}
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )
     }

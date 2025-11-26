@@ -61,6 +61,7 @@ const genericSliceConfigs = [
 
     // File Management
     { name: 'taskAttachments', table: 'wh_task_attachments', endpoint: '/task-attachments', store: 'task_attachments', hashFields: ['id','uuid','task_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
+    { name: 'taskNotes', table: 'wh_task_notes', endpoint: '/task-notes', store: 'task_notes', hashFields: ['id','uuid','task_id','note','user_id','updated_at'] },
     { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','updated_at'] },
 
     // Error Tracking
@@ -76,7 +77,13 @@ const genericSliceConfigs = [
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
 
     // Job Positions
-    { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','reports_to_position_id','is_active','description','updated_at'] },
+    { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
+
+    // Compliance Module
+    { name: 'complianceStandards', table: 'wh_compliance_standards', endpoint: '/compliance-standards', store: 'compliance_standards', hashFields: ['id','name','code','version','description','authority','active','created_by','updated_at'] },
+    { name: 'complianceRequirements', table: 'wh_compliance_requirements', endpoint: '/compliance-requirements', store: 'compliance_requirements', hashFields: ['id','standard_id','clause_number','title','description','implementation_guidance','mandatory','parent_id','updated_at'] },
+    { name: 'complianceMappings', table: 'wh_compliance_mappings', endpoint: '/compliance-mappings', store: 'compliance_mappings', hashFields: ['id','requirement_id','mapped_entity_type','mapped_entity_id','justification','created_by','updated_at'] },
+    { name: 'complianceAudits', table: 'wh_compliance_audits', endpoint: '/compliance-audits', store: 'compliance_audits', hashFields: ['id','standard_id','name','type','status','scheduled_start_date','scheduled_end_date','actual_start_date','completed_date','auditor_id','external_auditor_name','scope','summary_findings','score','created_by','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -121,6 +128,7 @@ export const {
     sessionLogs,
     configLogs,
     taskAttachments,
+    taskNotes,
     taskRecurrences,
     exceptions,
     // Core entities (converted from custom)
@@ -132,6 +140,10 @@ export const {
     messages,
     workspaces,
     jobPositions,
+    complianceStandards,
+    complianceRequirements,
+    complianceMappings,
+    complianceAudits,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -182,6 +194,7 @@ export const genericEventNames = {
     sessionLogs: genericSlices.slices.sessionLogs.eventNames,
     configLogs: genericSlices.slices.configLogs.eventNames,
     taskAttachments: genericSlices.slices.taskAttachments.eventNames,
+    taskNotes: genericSlices.slices.taskNotes.eventNames,
     taskRecurrences: genericSlices.slices.taskRecurrences.eventNames,
     exceptions: genericSlices.slices.exceptions.eventNames,
     // Core entities (converted from custom)
@@ -193,6 +206,10 @@ export const genericEventNames = {
     messages: genericSlices.slices.messages.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
+    complianceStandards: genericSlices.slices.complianceStandards.eventNames,
+    complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
+    complianceMappings: genericSlices.slices.complianceMappings.eventNames,
+    complianceAudits: genericSlices.slices.complianceAudits.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -234,6 +251,7 @@ export const genericActions = {
     sessionLogs: genericSlices.slices.sessionLogs.actions,
     configLogs: genericSlices.slices.configLogs.actions,
     taskAttachments: genericSlices.slices.taskAttachments.actions,
+    taskNotes: genericSlices.slices.taskNotes.actions,
     taskRecurrences: genericSlices.slices.taskRecurrences.actions,
     exceptions: genericSlices.slices.exceptions.actions,
     // Core entities (converted from custom)
@@ -245,4 +263,8 @@ export const genericActions = {
     messages: genericSlices.slices.messages.actions,
     workspaces: genericSlices.slices.workspaces.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
+    complianceStandards: genericSlices.slices.complianceStandards.actions,
+    complianceRequirements: genericSlices.slices.complianceRequirements.actions,
+    complianceMappings: genericSlices.slices.complianceMappings.actions,
+    complianceAudits: genericSlices.slices.complianceAudits.actions,
 } as const;

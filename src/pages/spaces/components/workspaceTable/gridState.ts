@@ -22,7 +22,15 @@ export const useGridReduxState = () => {
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
   const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
   const approvals = useSelector((s: RootState) => (s as any).approvals?.value as any[] || []);
+  const approvalApprovers = useSelector((s: RootState) => (s as any).approvalApprovers?.value as any[] || []);
   const taskApprovalInstances = useSelector((s: RootState) => (s as any).taskApprovalInstances?.value as any[] || []);
+  const tags = useSelector((s: RootState) => (s as any).tags?.value as any[] || []);
+  const taskTags = useSelector((s: RootState) => (s as any).taskTags?.value as any[] || []);
+  const customFields = useSelector((s: RootState) => (s as any).customFields?.value as any[] || []);
+  const categoryCustomFields = useSelector((s: RootState) => (s as any).categoryCustomFields?.value as any[] || []);
+  const taskCustomFieldValues = useSelector((s: RootState) => (s as any).taskCustomFieldValues?.value as any[] || []);
+  const taskNotes = useSelector((s: RootState) => (s as any).taskNotes?.value as any[] || []);
+  const taskAttachments = useSelector((s: RootState) => (s as any).taskAttachments?.value as any[] || []);
 
   return {
     statuses,
@@ -33,7 +41,15 @@ export const useGridReduxState = () => {
     categories,
     statusTransitions,
     approvals,
+    approvalApprovers,
     taskApprovalInstances,
+    tags,
+    taskTags,
+    customFields,
+    categoryCustomFields,
+    taskCustomFieldValues,
+    taskNotes,
+    taskAttachments,
   };
 };
 

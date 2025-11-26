@@ -12,7 +12,7 @@ export interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   type: DialogType;
   title?: string;
-  description?: string;
+  description?: string | ReactNode;
   children?: ReactNode;
   onSubmit?: (e: React.FormEvent) => void;
   onConfirm?: () => void;

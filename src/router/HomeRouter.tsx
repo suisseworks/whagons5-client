@@ -31,6 +31,8 @@ import Home from '@/pages/home/Home';
 import TeamConnect from '@/pages/teamconnect/TeamConnect';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
+import { ComplianceStandards } from '@/pages/compliance/ComplianceStandards';
+import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardDetail';
 
 
 const pages = [
@@ -90,6 +92,10 @@ export const HomeRoutes = () => {
           <Route path="/settings/approvals" element={<Approvals />} />
           <Route path="/settings/global" element={<Global />} />
           <Route path="/settings/test" element={<TestPage />} />
+          
+          {/* Compliance Routes */}
+          <Route path="/compliance/standards" element={<ComplianceStandards />} />
+          <Route path="/compliance/standards/:id" element={<ComplianceStandardDetail />} />
         </Routes>
       </MainLayout>
     </>

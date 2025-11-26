@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faShieldAlt, faFilePdf, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Template, Task, Category, Approval } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -84,6 +84,8 @@ function Templates() {
   const { value: priorities } = useSelector((state: RootState) => state.priorities);
   const { value: slas } = useSelector((state: RootState) => state.slas);
   const { value: approvals } = useSelector((state: RootState) => (state as any).approvals || { value: [] });
+  const { value: requirements } = useSelector((state: RootState) => (state as any).complianceRequirements || { value: [] });
+  const { value: mappings } = useSelector((state: RootState) => (state as any).complianceMappings || { value: [] });
   const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
   // State for default users (using string IDs for MultiSelect)
@@ -166,6 +168,11 @@ function Templates() {
   });
 
   useEffect(() => {
+    dispatch(genericActions.complianceRequirements.fetchFromAPI());
+    dispatch(genericActions.complianceMappings.fetchFromAPI());
+  }, [dispatch]);
+
+  useEffect(() => {
     if (isEditDialogOpen && editingTemplate) {
       const ids = Array.isArray((editingTemplate as any).default_user_ids)
         ? (editingTemplate as any).default_user_ids.map((id: number) => String(id))
@@ -199,6 +206,68 @@ function Templates() {
       });
     }
   }, [isEditDialogOpen, editingTemplate, priorities]);
+
+  // Compliance Handlers
+  const [selectedRequirement, setSelectedRequirement] = useState('');
+
+  const templateMappings = useMemo(() => {
+    if (!editingTemplate) return [];
+    return mappings.filter((m: any) => 
+      m.mapped_entity_type === 'App\\Models\\Template\\Template' && 
+      Number(m.mapped_entity_id) === Number(editingTemplate.id)
+    );
+  }, [mappings, editingTemplate]);
+
+  const handleAddMapping = async () => {
+    if (!selectedRequirement || !editingTemplate) return;
+    try {
+      await dispatch(genericActions.complianceMappings.addAsync({
+        requirement_id: selectedRequirement,
+        entity_type: 'template',
+        entity_id: editingTemplate.id,
+        justification: 'Mapped via Template Settings'
+      }) as any);
+      setSelectedRequirement('');
+    } catch (error) {
+      console.error('Failed to add mapping:', error);
+    }
+  };
+
+  const handleRemoveMapping = async (mappingId: number) => {
+    try {
+      await dispatch(genericActions.complianceMappings.removeAsync(mappingId) as any);
+    } catch (error) {
+      console.error('Failed to remove mapping:', error);
+    }
+  };
+
+  const handleDownloadSOP = () => {
+    if (!editingTemplate) return;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    const token = localStorage.getItem('token'); // Assuming token is stored here
+    
+    // Construct URL with auth token if needed, or handle via a fetch with blob
+    // For simplicity, assuming browser handles download with a direct link if auth allows or via signed URL
+    // Since API is protected, we might need to fetch blob.
+    
+    fetch(`${baseUrl}/compliance/documents/sop/${editingTemplate.id}/download`, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/pdf'
+        }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SOP-${editingTemplate.name.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    })
+    .catch(err => console.error('SOP Download failed', err));
+  };
 
   // Helper functions
   const minutesToHHMM = (totalMinutes: number | null | undefined) => {
@@ -394,6 +463,48 @@ function Templates() {
     (spots as any[]).forEach((s: any) => map.set(Number(s.id), s));
     return map;
   }, [spots]);
+
+  const renderSlaSummary = (slaId: string | number | null) => {
+    const id = Number(slaId);
+    if (!id || isNaN(id)) return null;
+    const sla = slaById.get(id);
+    if (!sla) return null;
+
+    return (
+      <div className="bg-muted/30 rounded-md p-3 text-sm space-y-2 border">
+        <div className="font-medium flex items-center gap-2 text-primary">
+          <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
+          <span>SLA Configuration</span>
+        </div>
+        {sla.description && <div className="text-muted-foreground text-xs">{sla.description}</div>}
+        <div className="flex flex-wrap gap-2 mt-2">
+           <Badge variant="secondary" className="text-xs">Target: {minutesToHHMM(sla.target_duration)}</Badge>
+        </div>
+      </div>
+    );
+  };
+
+  const renderApprovalSummary = (approvalId: string | number | null) => {
+    const id = Number(approvalId);
+    if (!id || isNaN(id)) return null;
+    const approval = approvalById.get(id);
+    if (!approval) return null;
+
+    return (
+      <div className="bg-muted/30 rounded-md p-3 text-sm space-y-2 border">
+        <div className="font-medium flex items-center gap-2 text-primary">
+          <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3" />
+          <span>Approval Process</span>
+        </div>
+        {approval.description && <div className="text-muted-foreground text-xs">{approval.description}</div>}
+        <div className="flex flex-wrap gap-2 mt-2">
+           <Badge variant="secondary" className="text-xs">{approval.approval_type === 'SEQUENTIAL' ? 'Sequential' : 'Parallel'}</Badge>
+           <Badge variant="secondary" className="text-xs">Trigger: {approval.trigger_type?.replace(/_/g, ' ').toLowerCase()}</Badge>
+           {approval.require_all && <Badge variant="outline" className="text-xs">Requires All</Badge>}
+        </div>
+      </div>
+    );
+  };
 
 
 
@@ -1128,6 +1239,7 @@ function Templates() {
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="defaults">Defaults</TabsTrigger>
+            <TabsTrigger value="rules">Rules</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
         <div className="grid gap-4 min-h-[480px]">
@@ -1135,9 +1247,13 @@ function Templates() {
             <Label htmlFor="name" className="text-right">Name *</Label>
             <Input id="name" name="name" className="col-span-3" required />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">Description</Label>
-            <Input id="description" name="description" className="col-span-3" />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="description" className="text-right pt-2">Description</Label>
+            <textarea 
+              id="description" 
+              name="description" 
+              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]" 
+            />
           </div>
           <SelectField
             id="category"
@@ -1193,39 +1309,41 @@ function Templates() {
               }))
             ]}
           />
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="sla" className="text-right">SLA</Label>
-            <select
-              id="sla"
-              name="sla_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              defaultValue=""
-            >
-              <option value="">None</option>
-              {Array.from(slaById.entries()).map(([id, sla]) => (
-                <option key={id} value={String(id)}>
-                  {sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="approval" className="text-right">Approval</Label>
-            <select
-              id="approval"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              value={createFormData.approval_id}
-              onChange={(e) => setCreateFormData(prev => ({ ...prev, approval_id: e.target.value }))}
-            >
-              <option value="">None</option>
-              {Array.from((approvals as any[])).map((a: any) => (
-                <option key={a.id} value={String(a.id)}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
+          </TabsContent>
+          <TabsContent value="rules">
+            <div className="grid gap-4 min-h-[480px]">
+              <SelectField
+                id="sla"
+                label="SLA"
+                value={createFormData.sla_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
+                placeholder="None"
+                options={[
+                  { value: 'none', label: 'None' },
+                  ...Array.from(slaById.entries()).map(([id, sla]) => ({
+                    value: String(id),
+                    label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`
+                  }))
+                ]}
+              />
+              {renderSlaSummary(createFormData.sla_id)}
+              <SelectField
+                id="approval"
+                label="Approval"
+                value={createFormData.approval_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+                placeholder="None"
+                options={[
+                  { value: 'none', label: 'None' },
+                  ...((approvals as any[]) || []).map((a: any) => ({
+                    value: String(a.id),
+                    label: a.name
+                  }))
+                ]}
+              />
+              {renderApprovalSummary(createFormData.approval_id)}
+            </div>
           </TabsContent>
           <TabsContent value="defaults">
             <div className="grid gap-4 min-h-[480px]">
@@ -1304,7 +1422,11 @@ function Templates() {
         }}
         type="edit"
         title="Edit Template"
-        description="Update the template information."
+        description={editingTemplate ? (
+          <span>
+            Editing: <span className="font-medium text-foreground">{editingTemplate.name}</span>
+          </span>
+        ) : "Update the template information."}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -1315,6 +1437,8 @@ function Templates() {
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="defaults">Defaults</TabsTrigger>
+            <TabsTrigger value="rules">Rules</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
           </TabsList>
             <TabsContent value="general">
           <div className="grid gap-4 min-h-[480px]">
@@ -1328,25 +1452,13 @@ function Templates() {
                 required
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">Description</Label>
-              <Input
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="edit-description" className="text-right pt-2">Description</Label>
+              <textarea
                 id="edit-description"
                 name="description"
                 defaultValue={(editingTemplate as any).description || ''}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-expected_duration" className="text-right">Expected Duration (min)</Label>
-              <Input
-                id="edit-expected_duration"
-                name="expected_duration"
-              type="number"
-              min="0"
-              step="1"
-              defaultValue={(editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : ''}
-                className="col-span-3"
+                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
               />
             </div>
             <SelectField
@@ -1404,23 +1516,103 @@ function Templates() {
                 }))
               ]}
             />
-            <SelectField
-              id="edit-sla"
-              label="SLA"
-              value={editFormData.sla_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-              placeholder="None"
-              options={[{ value: 'none', label: 'None' }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
-            />
-            <SelectField
-              id="edit-approval"
-              label="Approval"
-              value={editFormData.approval_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-              placeholder="None"
-              options={[{ value: 'none', label: 'None' }, ...((approvals as Approval[]) || []).map((a: Approval) => ({ value: a.id.toString(), label: a.name }))]}
-            />
           </div>
+            </TabsContent>
+            <TabsContent value="rules">
+              <div className="grid gap-4 min-h-[480px]">
+                <SelectField
+                  id="edit-sla"
+                  label="SLA"
+                  value={editFormData.sla_id}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
+                  placeholder="None"
+                  options={[{ value: 'none', label: 'None' }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
+                />
+                {renderSlaSummary(editFormData.sla_id)}
+                <SelectField
+                  id="edit-approval"
+                  label="Approval"
+                  value={editFormData.approval_id}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+                  placeholder="None"
+                  options={[{ value: 'none', label: 'None' }, ...((approvals as Approval[]) || []).map((a: Approval) => ({ value: a.id.toString(), label: a.name }))]}
+                />
+                {renderApprovalSummary(editFormData.approval_id)}
+              </div>
+            </TabsContent>
+            <TabsContent value="compliance">
+              <div className="grid gap-4 min-h-[480px] content-start">
+                <div className="flex justify-between items-center pb-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faShieldAlt} className="text-blue-600" />
+                    <h3 className="font-medium">Compliance & ISO</h3>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={handleDownloadSOP}>
+                    <FontAwesomeIcon icon={faFilePdf} className="mr-2 text-red-500" />
+                    Generate SOP
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label>Link Requirement</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <SelectField
+                          id="requirement-select"
+                          label="" // No label needed inside flex
+                          value={selectedRequirement}
+                          onChange={setSelectedRequirement}
+                          placeholder="Select ISO Requirement..."
+                          options={requirements.map((r: any) => ({
+                            value: String(r.id),
+                            label: `${r.clause_number} ${r.title}`
+                          }))}
+                        />
+                      </div>
+                      <Button type="button" onClick={handleAddMapping} disabled={!selectedRequirement}>
+                        Link
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Linked Requirements</Label>
+                    {templateMappings.length === 0 ? (
+                      <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
+                        No requirements linked to this template.
+                      </div>
+                    ) : (
+                      <div className="border rounded-md divide-y">
+                        {templateMappings.map((m: any) => {
+                          const req = requirements.find((r: any) => r.id === m.requirement_id);
+                          return (
+                            <div key={m.id} className="p-3 flex justify-between items-center hover:bg-accent/50">
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {req ? `${req.clause_number} ${req.title}` : `Requirement ${m.requirement_id}`}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {req?.description}
+                                </div>
+                              </div>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleRemoveMapping(m.id)}
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </TabsContent>
             <TabsContent value="defaults">
               <div className="grid gap-4 min-h-[480px]">

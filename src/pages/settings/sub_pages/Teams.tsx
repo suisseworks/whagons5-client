@@ -16,12 +16,13 @@ import {
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  ColorIndicatorCellRenderer,
   TextField,
   SelectField,
   CheckboxField,
   IconPicker
 } from "../components";
+import ReactECharts from "echarts-for-react";
+import dayjs from "dayjs";
 
 // Custom cell renderer: show color avatar, name, and description stacked
 const TeamNameCellRenderer = (props: ICellRendererParams) => {
@@ -391,36 +392,11 @@ function Teams() {
               </div>
             ),
             content: (
-              <div className="flex-1 min-h-0 overflow-auto">
-                <Card>
-                  <CardHeader className="py-1">
-                    <CardTitle className="text-sm">Team Statistics</CardTitle>
-                    <CardDescription className="text-[11px] text-muted-foreground/70">
-                      Overview of your teams and their usage
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{teams.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Total Teams</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{categories.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Total Categories</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{tasks.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Total Tasks</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{teams.length > 0 ? Math.round(categories.length / teams.length * 10) / 10 : 0}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Avg Categories/Team</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <TeamStatistics
+                teams={teams}
+                categories={categories}
+                tasks={tasks}
+              />
             )
           }
         ]}
@@ -612,6 +588,413 @@ function Teams() {
         renderEntityPreview={renderTeamPreview}
       />
     </SettingsLayout>
+  );
+}
+
+interface TeamStatisticsProps {
+  teams: Team[];
+  categories: Category[];
+  tasks: Task[];
+}
+
+function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
+  const totalTeams = teams.length;
+  const totalCategories = categories.length;
+  const totalTasks = tasks.length;
+
+  const activeTeams = useMemo(
+    () => teams.filter((t: any) => t.is_active !== false).length,
+    [teams]
+  );
+
+  const inactiveTeams = totalTeams - activeTeams;
+
+  const tasksByTeam = useMemo(() => {
+    const counts = new Map<number, number>();
+    tasks.forEach((task: Task) => {
+      const tid = task.team_id as number | null | undefined;
+      if (!tid) return;
+      counts.set(tid, (counts.get(tid) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([teamId, count]) => {
+        const team = teams.find((t: Team) => t.id === teamId);
+        return team ? { team, count } : null;
+      })
+      .filter((item): item is { team: Team; count: number } => !!item)
+      .sort((a, b) => b.count - a.count);
+  }, [tasks, teams]);
+
+  const categoriesByTeam = useMemo(() => {
+    const counts = new Map<number, number>();
+    categories.forEach((cat: any) => {
+      const tid = cat.team_id as number | null | undefined;
+      if (!tid) return;
+      counts.set(tid, (counts.get(tid) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([teamId, count]) => {
+        const team = teams.find((t: Team) => t.id === teamId);
+        return team ? { team, count } : null;
+      })
+      .filter((item): item is { team: Team; count: number } => !!item)
+      .sort((a, b) => b.count - a.count);
+  }, [categories, teams]);
+
+  const tasksOverTime = useMemo(() => {
+    const map = new Map<string, number>();
+    tasks.forEach((task: Task) => {
+      if (!task.created_at) return;
+      const date = dayjs(task.created_at).format("YYYY-MM-DD");
+      map.set(date, (map.get(date) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+  }, [tasks]);
+
+  const avgCategoriesPerTeam =
+    totalTeams > 0 ? Math.round((totalCategories / totalTeams) * 10) / 10 : 0;
+
+  return (
+    <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="space-y-4">
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{totalTeams}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Total Teams
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-600">
+                  {activeTeams}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Active Teams
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {inactiveTeams}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Inactive Teams
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{avgCategoriesPerTeam}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Avg Categories / Team
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Donut chart: teams by status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Teams by Status</CardTitle>
+            <CardDescription className="text-xs">
+              Active vs inactive teams
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {totalTeams > 0 ? (
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: "item",
+                    formatter: "{b}: {c} ({d}%)"
+                  },
+                  legend: {
+                    orient: "vertical",
+                    left: "left",
+                    textStyle: { fontSize: 11 }
+                  },
+                  series: [
+                    {
+                      name: "Teams",
+                      type: "pie",
+                      radius: ["40%", "70%"],
+                      avoidLabelOverlap: true,
+                      itemStyle: {
+                        borderRadius: 8,
+                        borderColor: "#fff",
+                        borderWidth: 2
+                      },
+                      label: {
+                        show: true,
+                        position: "inside",
+                        formatter: "{b}",
+                        fontSize: 11
+                      },
+                      labelLine: {
+                        show: false
+                      },
+                      labelLayout: {
+                        hideOverlap: true
+                      },
+                      emphasis: {
+                        label: {
+                          show: true,
+                          fontSize: 12,
+                          fontWeight: "bold"
+                        }
+                      },
+                      data: [
+                        {
+                          value: activeTeams,
+                          name: "Active",
+                          itemStyle: { color: "#22c55e" }
+                        },
+                        {
+                          value: inactiveTeams,
+                          name: "Inactive",
+                          itemStyle: { color: "#9ca3af" }
+                        }
+                      ]
+                    }
+                  ]
+                }}
+                style={{ height: "260px" }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[260px] text-muted-foreground text-sm">
+                No team data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Tasks by Team</CardTitle>
+              <CardDescription className="text-xs">
+                Top teams by assigned tasks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tasksByTeam.length > 0 ? (
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: "axis",
+                      axisPointer: { type: "shadow" }
+                    },
+                    grid: {
+                      left: "3%",
+                      right: "4%",
+                      bottom: "3%",
+                      containLabel: true
+                    },
+                    xAxis: {
+                      type: "value",
+                      name: "Tasks"
+                    },
+                    yAxis: {
+                      type: "category",
+                      data: tasksByTeam
+                        .map((item) => item.team.name)
+                        .reverse(),
+                      axisLabel: {
+                        formatter: (value: string) =>
+                          value.length > 20
+                            ? value.substring(0, 20) + "..."
+                            : value
+                      }
+                    },
+                    series: [
+                      {
+                        name: "Tasks",
+                        type: "bar",
+                        data: tasksByTeam
+                          .map((item) => ({
+                            value: item.count,
+                            itemStyle: {
+                              color: item.team.color || "#3b82f6"
+                            }
+                          }))
+                          .reverse()
+                      }
+                    ]
+                  }}
+                  style={{ height: "300px" }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                  No task data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Categories by Team</CardTitle>
+              <CardDescription className="text-xs">
+                Distribution of categories across teams
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {categoriesByTeam.length > 0 ? (
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: "axis",
+                      axisPointer: { type: "shadow" }
+                    },
+                    grid: {
+                      left: "3%",
+                      right: "4%",
+                      bottom: "3%",
+                      containLabel: true
+                    },
+                    xAxis: {
+                      type: "value",
+                      name: "Categories"
+                    },
+                    yAxis: {
+                      type: "category",
+                      data: categoriesByTeam
+                        .map((item) => item.team.name)
+                        .reverse(),
+                      axisLabel: {
+                        formatter: (value: string) =>
+                          value.length > 20
+                            ? value.substring(0, 20) + "..."
+                            : value
+                      }
+                    },
+                    series: [
+                      {
+                        name: "Categories",
+                        type: "bar",
+                        data: categoriesByTeam
+                          .map((item) => ({
+                            value: item.count,
+                            itemStyle: {
+                              color: item.team.color || "#8b5cf6"
+                            }
+                          }))
+                          .reverse()
+                      }
+                    ]
+                  }}
+                  style={{ height: "300px" }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                  No category data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tasks over time */}
+        {tasksOverTime.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Tasks Over Time</CardTitle>
+              <CardDescription className="text-xs">
+                Last 30 days of task creation across all teams
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: "axis",
+                    formatter: (params: any) => {
+                      const param = params[0];
+                      return `${param.axisValue}<br/>${param.marker}${param.seriesName}: ${param.value}`;
+                    }
+                  },
+                  grid: {
+                    left: "3%",
+                    right: "4%",
+                    bottom: "3%",
+                    containLabel: true
+                  },
+                  xAxis: {
+                    type: "category",
+                    data: tasksOverTime.map((item) =>
+                      dayjs(item.date).format("MMM DD")
+                    ),
+                    axisLabel: {
+                      rotate: 45,
+                      fontSize: 10
+                    }
+                  },
+                  yAxis: {
+                    type: "value",
+                    name: "Tasks"
+                  },
+                  series: [
+                    {
+                      name: "Tasks Created",
+                      type: "line",
+                      smooth: true,
+                      data: tasksOverTime.map((item) => item.count),
+                      areaStyle: {
+                        color: {
+                          type: "linear",
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            {
+                              offset: 0,
+                              color: "rgba(139, 92, 246, 0.3)"
+                            },
+                            {
+                              offset: 1,
+                              color: "rgba(139, 92, 246, 0.05)"
+                            }
+                          ]
+                        }
+                      },
+                      itemStyle: {
+                        color: "#8b5cf6"
+                      },
+                      lineStyle: {
+                        color: "#8b5cf6",
+                        width: 2
+                      }
+                    }
+                  ]
+                }}
+                style={{ height: "300px" }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   );
 }
 

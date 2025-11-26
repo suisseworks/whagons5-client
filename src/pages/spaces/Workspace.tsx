@@ -27,6 +27,7 @@ import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, Sa
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 
 export const Workspace = () => {
   const location = useLocation();
@@ -70,12 +71,24 @@ export const Workspace = () => {
       return saved == null ? true : saved === 'true';
     } catch { return true; }
   });
+  const [tagDisplayMode, setTagDisplayMode] = useState<'icon' | 'icon-text'>(() => {
+    try {
+      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      return (saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text';
+    } catch { return 'icon-text'; }
+  });
   useEffect(() => {
     // Update when workspace changes
     try {
       const key = `wh_workspace_show_kpis_${id || 'all'}`;
       const saved = localStorage.getItem(key);
       setShowHeaderKpis(saved == null ? true : saved === 'true');
+    } catch {}
+    try {
+      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      setTagDisplayMode((saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text');
     } catch {}
   }, [id]);
   useEffect(() => {
@@ -86,6 +99,8 @@ export const Workspace = () => {
       if (eventWorkspaceId === currentWorkspaceId) {
         const v = e?.detail?.showKpis;
         if (typeof v === 'boolean') setShowHeaderKpis(v);
+        const tagMode = e?.detail?.tagDisplayMode;
+        if (tagMode === 'icon' || tagMode === 'icon-text') setTagDisplayMode(tagMode);
       }
     };
     window.addEventListener('wh:displayOptionsChanged', handler as any);
@@ -372,19 +387,16 @@ export const Workspace = () => {
   }, [searchText]);
 
   // Restore saved filters for this workspace when grid is ready
-  const appliedInitialFilters = useRef(false);
-  useEffect(() => {
-    if (appliedInitialFilters.current) return;
+  const handleTableReady = () => {
     const key = `wh_workspace_filters_${id || 'all'}`;
     try {
       const saved = localStorage.getItem(key);
       if (saved && tableRef.current) {
         const model = JSON.parse(saved);
         tableRef.current.setFilterModel(model);
-        appliedInitialFilters.current = true;
       }
     } catch {}
-  }, [id]);
+  };
 
 
   if (invalidWorkspaceRoute) {
@@ -431,19 +443,22 @@ export const Workspace = () => {
           transition={activeTab === 'grid' ? TAB_ANIMATION.transition : { duration: 0 }}
         >
           <WorkspaceTable 
+            key={isAllWorkspaces ? 'all' : (id || 'root')}
             ref={tableRef}
             rowCache={rowCache} 
             workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
             searchText={searchText}
             onFiltersChanged={(active) => setShowClearFilters(!!active)}
             onSelectionChanged={setSelectedIds}
-            onRowClicked={(task) => {
+            onRowDoubleClicked={(task) => {
               setSelectedTask(task);
               setOpenEditTask(true);
             }}
             rowHeight={computedRowHeight}
             groupBy={groupBy}
             collapseGroups={collapseGroups}
+            tagDisplayMode={tagDisplayMode}
+            onReady={handleTableReady}
           />
         </motion.div>
       )
@@ -672,6 +687,7 @@ export const Workspace = () => {
         <CreateTaskDialogForEverything open={openCreateTask} onOpenChange={setOpenCreateTask} />
       )}
       <EditTaskDialog open={openEditTask} onOpenChange={setOpenEditTask} task={selectedTask} />
+      <TaskNotesModal />
     </div>
 
   );

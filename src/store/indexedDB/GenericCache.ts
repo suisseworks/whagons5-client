@@ -167,7 +167,26 @@ export class GenericCache {
 	async fetchAll(params: Record<string, any> = {}): Promise<boolean> {
 		try {
 			const resp = await api.get(this.endpoint, { params });
+			console.log(`[GenericCache:${this.store}] fetchAll response:`, {
+				endpoint: this.endpoint,
+				status: resp.status,
+				dataKeys: Object.keys(resp.data || {}),
+				hasRows: !!resp.data?.rows,
+				hasData: !!resp.data?.data,
+				rowsLength: Array.isArray(resp.data?.rows) ? resp.data.rows.length : 'not array',
+				dataLength: Array.isArray(resp.data?.data) ? resp.data.data.length : 'not array',
+				rawData: resp.data
+			});
+			
 			const rows = (resp.data?.rows ?? resp.data?.data ?? resp.data) as any[];
+			
+			if (!Array.isArray(rows)) {
+				console.error(`[GenericCache:${this.store}] Response is not an array:`, typeof rows, rows);
+				return false;
+			}
+			
+			console.log(`[GenericCache:${this.store}] Parsed ${rows.length} rows, storing in IndexedDB...`);
+			
 			if (!DB.inited) await DB.init();
 			// Signal hydration start/end to coordinate readers
 			const end = (DB as any).startHydration?.(this.store) || (() => {});
@@ -188,12 +207,13 @@ export class GenericCache {
 					}
 				}
 				await DB.bulkPut(this.store, rows);
+				console.log(`[GenericCache:${this.store}] Successfully stored ${rows.length} rows in IndexedDB`);
 			} finally {
 				end();
 			}
 			return true;
 		} catch (e) {
-			console.error("GenericCache.fetchAll", this.endpoint, e);
+			console.error(`[GenericCache:${this.store}] fetchAll error:`, this.endpoint, e);
 			return false;
 		}
 	}
@@ -204,6 +224,30 @@ export class GenericCache {
 			if (this.validating) { this.dlog('validate: already running'); return true; }
 			this.validating = true;
 			const t0 = performance.now();
+			
+			// First check if integrity hashing is set up for this table
+			// If not, skip validation entirely to avoid clearing the store
+			try {
+				const testResp = await api.get('/integrity/global', { params: { table: this.table } });
+				const responseData = testResp.data?.data;
+				// If response data is null or doesn't have global_hash, integrity hashing isn't set up
+				if (!responseData || responseData === null || !responseData.global_hash) {
+					console.log(`[GenericCache:${this.store}] Integrity hashing not set up for table; skipping validation`, { table: this.table, responseData });
+					this.validating = false;
+					return true; // Skip validation, keep existing data
+				}
+				// If we get here with valid data and global_hash, integrity hashing is set up - continue with validation
+			} catch (e: any) {
+				// If integrity endpoint returns 404 or 400, table doesn't have integrity hashing
+				if (e?.response?.status === 404 || (e?.response?.status >= 400 && e?.response?.status < 500)) {
+					console.log(`[GenericCache:${this.store}] Integrity endpoint not available; skipping validation (table may not have integrity hashing)`, { table: this.table, status: e?.response?.status });
+					this.validating = false;
+					return true; // Skip validation, keep existing data
+				}
+				// For other errors (network, 500, etc), continue with validation
+				console.warn(`[GenericCache:${this.store}] Integrity check failed but continuing validation`, { table: this.table, error: e });
+			}
+			
 			// If no local rows, fetch once then exit
 			const preRows = await this.getAll();
 			if (preRows.length === 0) {
@@ -221,7 +265,7 @@ export class GenericCache {
 				const sample = preRows.slice(0, Math.min(10, preRows.length));
 				const invalid = sample.filter((r) => !this.rowLooksLikeThisStore(r)).length;
 				if (invalid > sample.length / 2) {
-					this.dlog('detected mismatched rows; clearing store and refetching', { store: this.store, sampleSize: sample.length, invalid });
+					console.warn(`[GenericCache:${this.store}] detected mismatched rows; clearing store and refetching`, { store: this.store, sampleSize: sample.length, invalid, sample: sample[0] });
 					if (!DB.inited) await DB.init();
 					await DB.clear(this.store as any);
 					await this.fetchAll();
@@ -234,8 +278,10 @@ export class GenericCache {
 			const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
 			const localGlobalHash = await this.sha256Hex(localGlobalConcat);
 			let serverGlobal: string | undefined | null = null;
+			let hasIntegrityHashing = false;
 			try {
 				const globalResp = await api.get('/integrity/global', { params: { table: this.table } });
+				hasIntegrityHashing = true; // If we got a response, integrity hashing is set up
 				serverGlobal = (globalResp.data?.data?.global_hash ?? globalResp.data?.global_hash) as string | undefined | null;
 				const rawBlockCount = (globalResp.data?.data?.block_count ?? globalResp.data?.block_count ?? null) as number | string | null;
 				const serverBlockCount = rawBlockCount === null ? null : Number(rawBlockCount);
@@ -249,15 +295,35 @@ export class GenericCache {
 				if (serverGlobal && serverGlobal !== localGlobalHash) {
 					this.dlog('validate: global hash mismatch', { table: this.table });
 				}
-			} catch (e) {
+			} catch (e: any) {
+				// If integrity endpoint returns 404 or error, table might not have integrity hashing set up
+				if (e?.response?.status === 404 || e?.response?.status >= 400) {
+					this.dlog('integrity endpoint not available for table; skipping validation (table may not have integrity hashing)', { table: this.table, status: e?.response?.status });
+					this.validating = false;
+					return true; // Skip validation, keep existing data
+				}
 				this.dlog('validate: global compare failed', e);
 			}
 
 			// Server blocks; rebuild if empty
-			let serverBlocksResp = await api.get('/integrity/blocks', { params: { table: this.table } });
-			let serverBlocks: Array<{ block_id: number; block_hash: string; row_count: number }> = serverBlocksResp.data.data || [];
+			let serverBlocksResp;
+			let serverBlocks: Array<{ block_id: number; block_hash: string; row_count: number }> = [];
+			try {
+				serverBlocksResp = await api.get('/integrity/blocks', { params: { table: this.table } });
+				serverBlocks = serverBlocksResp.data.data || [];
+			} catch (e: any) {
+				// If integrity endpoint returns 404 or error, table might not have integrity hashing set up
+				// In this case, skip validation rather than clearing the store
+				if (e?.response?.status === 404 || e?.response?.status >= 400) {
+					this.dlog('integrity endpoint not available for table; skipping validation (table may not have integrity hashing)', { table: this.table, status: e?.response?.status });
+					this.validating = false;
+					return true; // Skip validation, keep existing data
+				}
+				throw e;
+			}
 			
 			// If blocks are empty and global hash is null, backend table is empty - clear IndexedDB
+			// BUT: Only if we successfully got a response (not a 404/error), meaning integrity is set up
 			if (serverBlocks.length === 0 && (!serverGlobal || serverGlobal === null) && localBlocks.length > 0) {
 				this.dlog('server blocks empty and global hash is null; clearing local store (backend table is empty)', { table: this.table });
 				if (!DB.inited) await DB.init();

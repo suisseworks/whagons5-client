@@ -13,7 +13,7 @@ import { getCurrentTenant } from '@/api/whagonsApi';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.10';
+const CURRENT_DB_VERSION = '1.9.11';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -815,6 +815,7 @@ export class DB {
   }
 
   public static async clear(storeName: string): Promise<void> {
+    console.warn(`[DB] Clearing IndexedDB store: ${storeName}`, new Error().stack);
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
