@@ -116,16 +116,16 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const createAndAssignTenant = async (organizationName: string, tenantDomainPrefix: string) => {
     setLoading(true);
     try {
-          // In development, use organization name with VITE_DOMAIN
-    // In production, use the tenant prefix with domain suffix
-    const domain = import.meta.env.VITE_DEVELOPMENT === 'true' 
-      ? `${organizationName.toLowerCase()}.${import.meta.env.VITE_DOMAIN}`
-      : `${tenantDomainPrefix}.${import.meta.env.VITE_DOMAIN}`;
+      const safeTenant = tenantDomainPrefix.toLowerCase();
+
+      // Always use the generated tenant identifier as the subdomain prefix
+      const domain = `${safeTenant}.${import.meta.env.VITE_API_URL}`;
       
       const response = await api.post('/users/me/create-and-assign-tenant', {
         name: organizationName,
         domain: domain,
-        database: organizationName.toLowerCase() // name and database are usually the same
+        // Use the generated tenant identifier as the database name as well
+        database: safeTenant
       });
       
       if (response.status === 200) {
