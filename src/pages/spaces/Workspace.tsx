@@ -36,9 +36,31 @@ export const Workspace = () => {
   };
 
   const id = getWorkspaceIdFromPath(location.pathname);
-  // State to store the fetched data
-  const [activeTab, setActiveTab] = useState('grid');
-  const [prevActiveTab, setPrevActiveTab] = useState('grid');
+  
+  // Helper function to get current tab from URL (matches UrlTabs logic)
+  const getCurrentTabFromUrl = (): string => {
+    const pathMap = { grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' };
+    const normalizedBase = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
+    if (location.pathname.startsWith(normalizedBase)) {
+      const rest = location.pathname.slice(normalizedBase.length) || '';
+      const entries = Object.entries(pathMap).map(([k, v]) => [k, (v || '') as string]) as Array<[string,string]>;
+      entries.sort((a, b) => (b[1].length || 0) - (a[1].length || 0));
+      for (const [key, value] of entries) {
+        const val = value || '';
+        if (val === '' && (rest === '' || rest === '/')) {
+          return key;
+        } else if (rest === val || rest.replace(/\/$/, '') === val.replace(/\/$/, '') || rest.startsWith(val.endsWith('/') ? val : `${val}/`)) {
+          return key;
+        }
+      }
+    }
+    return 'grid';
+  };
+
+  // Initialize tab state from URL to prevent incorrect animation on mount
+  const initialTab = getCurrentTabFromUrl();
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [prevActiveTab, setPrevActiveTab] = useState(initialTab);
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
@@ -309,6 +331,18 @@ export const Workspace = () => {
 
 
 
+
+  // Sync tab state when URL changes (e.g., navigating from settings to workspace)
+  useEffect(() => {
+    const currentTabFromUrl = getCurrentTabFromUrl();
+    if (currentTabFromUrl !== activeTab) {
+      // When URL changes (e.g., navigating from settings), sync both states
+      // to the same value to prevent incorrect animation on mount
+      // This ensures prevActiveTab matches activeTab so initial position is correct
+      setPrevActiveTab(currentTabFromUrl);
+      setActiveTab(currentTabFromUrl);
+    }
+  }, [location.pathname, id]);
 
   //
   // Clear cache when workspace ID changes

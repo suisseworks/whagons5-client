@@ -92,9 +92,9 @@ function Header() {
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
-        // Supports /workspace/:id and /workspace/all
+        // Supports /workspace/:id and /workspace/all (and sub-paths like /workspace/all/calendar)
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
-        const allMatch = /\/workspace\/all$/.test(location.pathname);
+        const allMatch = /^\/workspace\/all/.test(location.pathname);
         if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
         if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
         const wid = parseInt(numMatch![1], 10);
