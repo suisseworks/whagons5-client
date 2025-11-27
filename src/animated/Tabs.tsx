@@ -23,12 +23,13 @@ const TabsList = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => {
   const [indicatorStyle, setIndicatorStyle] = useState({
-    left: 0,
-    top: 0,
+    transform: 'translateX(0px)',
     width: 0,
+    top: 0,
     height: 2,
   });
   const tabsListRef = useRef<HTMLDivElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const updateIndicator = React.useCallback(() => {
     if (!tabsListRef.current) return;
@@ -41,21 +42,51 @@ const TabsList = React.forwardRef<
     const activeRect = activeTab.getBoundingClientRect();
     const tabsRect = tabsListRef.current.getBoundingClientRect();
 
-    requestAnimationFrame(() => {
-      const left = activeRect.left - tabsRect.left;
-      const width = activeRect.width;
-      const top = activeRect.bottom - tabsRect.top - 2; // underline position
-      setIndicatorStyle({ left, top, width, height: 2 });
+    const left = activeRect.left - tabsRect.left;
+    const width = activeRect.width;
+    const top = activeRect.bottom - tabsRect.top - 2; // underline position
+    setIndicatorStyle({ 
+      transform: `translateX(${left}px)`, 
+      width, 
+      top, 
+      height: 2 
     });
   }, []);
+
+  const updateIndicatorContinuously = React.useCallback(() => {
+    // Cancel any existing animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    const startTime = Date.now();
+    const duration = 300; // Match transition duration
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      
+      // Update indicator position on every frame
+      updateIndicator();
+
+      if (elapsed < duration) {
+        // Continue animating
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        animationFrameRef.current = null;
+      }
+    };
+
+    // Start the animation loop
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [updateIndicator]);
 
   useEffect(() => {
     // Initial update
     const timeoutId = setTimeout(updateIndicator, 0);
 
     // Event listeners
-    window.addEventListener("resize", updateIndicator);
-    const observer = new MutationObserver(updateIndicator);
+    window.addEventListener("resize", updateIndicatorContinuously);
+    const observer = new MutationObserver(updateIndicatorContinuously);
 
     if (tabsListRef.current) {
       observer.observe(tabsListRef.current, {
@@ -67,10 +98,13 @@ const TabsList = React.forwardRef<
 
     return () => {
       clearTimeout(timeoutId);
-      window.removeEventListener("resize", updateIndicator);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      window.removeEventListener("resize", updateIndicatorContinuously);
       observer.disconnect();
     };
-  }, [updateIndicator]);
+  }, [updateIndicator, updateIndicatorContinuously]);
 
   return (
     <div className="relative" ref={tabsListRef}>
@@ -84,7 +118,7 @@ const TabsList = React.forwardRef<
         {...props}
       />
       <div
-        className="absolute h-[2px] rounded-full bg-foreground/80 transition-all duration-300 ease-in-out pointer-events-none"
+        className="absolute left-0 h-[2px] rounded-full bg-foreground/80 transition-[transform,width] duration-300 ease-in-out pointer-events-none will-change-[transform,width]"
         style={indicatorStyle}
       />
     </div>
@@ -99,12 +133,16 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     data-slot="tabs-trigger"
-    className={cn(
-      "text-foreground/55 data-[state=active]:text-foreground data-[state=active]:font-semibold inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-ring focus-visible:outline-1 focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[state=inactive]:[&_.tab-label-text]:hidden data-[state=inactive]:[&_svg]:opacity-40",
-      className
-    )}
+      className={cn(
+        "text-foreground/55 data-[state=active]:text-foreground data-[state=active]:font-semibold inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-ring focus-visible:outline-1 focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
     {...props}
-  />
+  >
+    <span className="inline-flex items-center gap-1.5 transition-[width,gap] duration-300 ease-in-out will-change-[width] [&_.tab-label-text]:transition-[max-width,opacity,width] [&_.tab-label-text]:duration-300 [&_.tab-label-text]:ease-in-out [&_.tab-label-text]:inline-block [&_.tab-label-text]:overflow-hidden data-[state=inactive]:[&_.tab-label-text]:max-w-0 data-[state=inactive]:[&_.tab-label-text]:opacity-0 data-[state=inactive]:[&_.tab-label-text]:w-0 data-[state=active]:[&_.tab-label-text]:max-w-full data-[state=active]:[&_.tab-label-text]:opacity-100 data-[state=active]:[&_.tab-label-text]:w-auto">
+      {props.children}
+    </span>
+  </TabsPrimitive.Trigger>
 ));
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
