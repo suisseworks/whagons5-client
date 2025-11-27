@@ -592,7 +592,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           </div>
         </SidebarGroupLabel>
 
-        <CollapsibleContent keepRendered>
+        <CollapsibleContent keepRendered forceVisible={collapsed}>
           <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
               sensors={sensors}

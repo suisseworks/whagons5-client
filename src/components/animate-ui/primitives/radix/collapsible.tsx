@@ -51,14 +51,20 @@ type CollapsibleContentProps = Omit<
 > &
   HTMLMotionProps<'div'> & {
     keepRendered?: boolean;
+    forceVisible?: boolean;
   };
 
 function CollapsibleContent({
   keepRendered = false,
+  forceVisible = false,
   transition = { type: 'spring', stiffness: 150, damping: 22 },
   ...props
 }: CollapsibleContentProps) {
   const { isOpen } = useCollapsible();
+  const visible = forceVisible || isOpen;
+
+  const openState = { opacity: 1, height: 'auto', overflow: 'hidden' as const };
+  const closedState = { opacity: 0, height: 0, overflow: 'hidden' as const };
 
   return (
     <AnimatePresence>
@@ -68,26 +74,22 @@ function CollapsibleContent({
             key="collapsible-content"
             data-slot="collapsible-content"
             layout
-            initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
-            animate={
-              isOpen
-                ? { opacity: 1, height: 'auto', overflow: 'hidden' }
-                : { opacity: 0, height: 0, overflow: 'hidden' }
-            }
+            initial={forceVisible ? openState : closedState}
+            animate={visible ? openState : closedState}
             transition={transition}
             {...props}
           />
         </CollapsiblePrimitive.Content>
       ) : (
-        isOpen && (
+        visible && (
           <CollapsiblePrimitive.Content asChild forceMount>
             <motion.div
               key="collapsible-content"
               data-slot="collapsible-content"
               layout
-              initial={{ opacity: 0, height: 0, overflow: 'hidden' }}
-              animate={{ opacity: 1, height: 'auto', overflow: 'hidden' }}
-              exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+              initial={closedState}
+              animate={openState}
+              exit={closedState}
               transition={transition}
               {...props}
             />

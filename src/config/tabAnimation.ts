@@ -36,7 +36,7 @@ export const SETTINGS_TAB_ANIMATION: TabAnimationConfig<SettingsTabKey> = {
 };
 
 export const WORKSPACE_SETTINGS_TAB_ANIMATION: TabAnimationConfig<WorkspaceSettingsTabKey> = {
-  order: ['overview', 'users', 'filters', 'display'],
+  order: ['display', 'overview', 'users', 'filters'],
   distance: '80vw',
   transition: {
     duration: 0.05,
