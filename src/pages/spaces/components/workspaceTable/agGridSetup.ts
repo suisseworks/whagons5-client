@@ -72,7 +72,7 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     cacheOverflowSize: 30,
     infiniteInitialRowCount: 500,
     maxConcurrentDatasourceRequests: 4,
-    maxBlocksInCache: 200,
+    maxBlocksInCache: 70,
     getRowId: (params: any) => String(params.data.id),
   }),
   // Default sort by created_at descending (newest first)

@@ -29,18 +29,13 @@ import { RootState } from '@/store';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@/components/animate-ui/primitives/radix/collapsible';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
-import AppSidebarDummy from './AppSidebarDummy';
+import { genericCaches } from '@/store/genericSlices';
 
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
@@ -144,12 +139,36 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   );
   const { value: workspaces = [] } = workspacesState || {};
 
+  // Local-first: read workspaces directly from IndexedDB to render immediately, then let Redux take over
+  const [initialWorkspaces, setInitialWorkspaces] = useState<Workspace[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const loadLocal = async () => {
+      try {
+        const cache = (genericCaches as any)?.workspaces;
+        if (cache && typeof cache.getAll === 'function') {
+          const rows = await cache.getAll();
+          if (!cancelled) setInitialWorkspaces(rows || []);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadLocal();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Prefer Redux once it has data; otherwise show local IndexedDB rows
+  const displayWorkspaces: Workspace[] = (workspaces && workspaces.length > 0)
+    ? workspaces as any
+    : (initialWorkspaces || []);
+
   // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
   const uniqueWorkspaces = useMemo(() => {
     const map = new Map<string, Workspace>();
-    for (const w of workspaces) map.set(String(w.id), w);
+    for (const w of displayWorkspaces) map.set(String(w.id), w);
     return Array.from(map.values());
-  }, [workspaces]);
+  }, [displayWorkspaces]);
 
   // Debug logging for workspaces state changes (only in development)
   useEffect(() => {
@@ -190,7 +209,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Load workspace icons when workspaces change
   useEffect(() => {
     const loadWorkspaceIcons = async () => {
-      const iconNames = workspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
+      const iconNames = uniqueWorkspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
       if (iconNames.length > 0) {
         try {
           const icons = await iconService.loadIcons(iconNames);
@@ -202,7 +221,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     };
 
     loadWorkspaceIcons();
-  }, [workspaces]);
+  }, [uniqueWorkspaces]);
 
   // Preload common icons on component mount
   useEffect(() => {

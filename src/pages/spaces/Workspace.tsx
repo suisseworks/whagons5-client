@@ -13,9 +13,6 @@ import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import CreateTaskDialogForEverything from '@/pages/spaces/components/CreateTaskDialogForEverything';
@@ -536,7 +533,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <WorkspaceStatistics workspaceId={id} />
         </motion.div>
       )
@@ -549,7 +546,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SettingsComponent workspaceId={id} />
         </motion.div>
       )
