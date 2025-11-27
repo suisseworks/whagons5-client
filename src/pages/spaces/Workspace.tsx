@@ -142,7 +142,7 @@ export const Workspace = () => {
       return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
     } catch { return 'compact'; }
   });
-  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 46 : 64;
+  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 52 : 110;
   useEffect(() => {
     try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
   }, [rowDensity]);

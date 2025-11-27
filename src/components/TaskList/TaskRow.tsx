@@ -35,6 +35,7 @@ export function TaskRow({
   onDelete,
   onDuplicate,
   onMarkComplete,
+  density = 'comfortable',
 }: {
   task: any;
   statusMap: Record<number, StatusMeta>;
@@ -47,6 +48,7 @@ export function TaskRow({
   onDelete?: () => void;
   onDuplicate?: () => void;
   onMarkComplete?: () => void;
+  density?: 'compact' | 'comfortable' | 'spacious';
 }) {
   // Priority color indicator removed per design feedback
   const CategoryIcon = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
@@ -110,7 +112,7 @@ export function TaskRow({
               className="text-[13px] text-muted-foreground mb-2"
               style={{
                 display: '-webkit-box',
-                WebkitLineClamp: 1,
+                WebkitLineClamp: density === 'spacious' ? 3 : 1,
                 WebkitBoxOrient: 'vertical' as any,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',

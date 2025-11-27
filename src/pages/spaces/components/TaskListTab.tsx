@@ -44,6 +44,21 @@ export default function TaskListTab({
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Get row density from localStorage and listen for changes
+  const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
+    try { return (localStorage.getItem('wh_workspace_density') as 'compact' | 'comfortable' | 'spacious') || 'comfortable'; } 
+    catch { return 'comfortable'; }
+  });
+  
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e?.detail as any;
+      if (v === 'compact' || v === 'comfortable' || v === 'spacious') setDensity(v);
+    };
+    window.addEventListener('wh:rowDensityChanged', handler);
+    return () => window.removeEventListener('wh:rowDensityChanged', handler);
+  }, []);
 
   const statusMap = useMemo(() => createStatusMap(statuses || []), [statuses]);
   const priorityMap = useMemo(() => createPriorityMap(priorities || []), [priorities]);
@@ -114,6 +129,7 @@ export default function TaskListTab({
           spotMap={spotMap}
           categoryMap={categoryMap}
           getStatusIcon={getStatusIcon}
+          density={density}
         />
       ))}
     </motion.div>

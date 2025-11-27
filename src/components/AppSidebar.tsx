@@ -71,11 +71,13 @@ const IconBadge = ({
   size?: number;
 }) => (
   <div
-    className="flex items-center justify-center rounded-[6px] flex-shrink-0"
+    className="grid place-items-center rounded-[6px] flex-shrink-0"
     style={{
       backgroundColor: color,
       width: `${size}px`,
       height: `${size}px`,
+      lineHeight: 0,
+      position: 'relative'
     }}
   >
     {children}
@@ -289,8 +291,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   return (
     <Sidebar
       collapsible="icon"
-      className={`bg-sidebar transition-all duration-300 text-sidebar-foreground font-montserrat text-[1rem]`}
-      style={{ borderRight: '1px solid var(--sidebar-border)' }}
+      className={`bg-sidebar text-sidebar-foreground font-montserrat text-[1rem]`}
       overlayExpanded={overlayOnExpand && !getPinnedState()}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -310,7 +311,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <WhagonsCheck
               width={showExpandedContent ? 40 : 28}
               height={showExpandedContent ? 18 : 14}
-              style={{ color: 'var(--sidebar-primary)' }}
+              color={'var(--sidebar-primary)'}
             />
             {showExpandedContent && (
               <div
@@ -330,7 +331,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       <SidebarContent className="bg-sidebar" style={{ paddingLeft: isCollapsed && !isMobile ? '4px' : '20px', paddingRight: isCollapsed && !isMobile ? '4px' : '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Spaces section - scrollable */}
         <SidebarGroup style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div className="scrollbar-hide" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingBottom: isCollapsed ? '80px' : '16px' }}>
             <AppSidebarWorkspaces
               workspaces={uniqueWorkspaces}
               pathname={pathname}
@@ -352,7 +353,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/teamconnect'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            ? 'text-[var(--sidebar-primary)]'
                             : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/teamconnect'
@@ -365,18 +366,21 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/teamconnect' ? 600 : 500,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    boxShadow: pathname === '/teamconnect' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/teamconnect' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/teamconnect' ? '4px' : undefined
                   }}
                 >
                   <Link
                     to="/teamconnect"
                     className={`${isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden`}
+                    } group relative`}
                   >
                     <IconBadge color="#8B5CF6">
-                      <Users2 size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                      <Users2 size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                     </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">TeamConnect</span>
@@ -402,7 +406,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Compliance' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname.startsWith('/compliance')
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            ? 'text-[var(--sidebar-primary)]'
                             : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname.startsWith('/compliance')
@@ -415,18 +419,21 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname.startsWith('/compliance') ? 600 : 500,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    boxShadow: pathname.startsWith('/compliance') ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname.startsWith('/compliance') ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname.startsWith('/compliance') ? '4px' : undefined
                   }}
                 >
                   <Link
                     to="/compliance/standards"
                     className={`${isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden`}
+                    } group relative`}
                     >
                       <IconBadge color="#10B981">
-                        <FileText size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                        <FileText size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                       </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Compliance</span>
@@ -443,7 +450,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/analytics'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            ? 'text-[var(--sidebar-primary)]'
                             : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/analytics'
@@ -456,18 +463,21 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/analytics' ? 600 : 500,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    boxShadow: pathname === '/analytics' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/analytics' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/analytics' ? '4px' : undefined
                   }}
                 >
                   <Link
                     to="/analytics"
                     className={`${isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden`}
+                    } group relative`}
                     >
                       <IconBadge color="#0EA5E9">
-                        <BarChart3 size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                        <BarChart3 size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                       </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Analytics</span>
@@ -485,7 +495,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     isCollapsed && !isMobile
                       ? `flex justify-center items-center ${
                           pathname === '/plugins'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            ? 'text-[var(--sidebar-primary)]'
                             : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${
@@ -499,19 +509,22 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/plugins' ? 600 : 500,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    boxShadow: pathname === '/plugins' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/plugins' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/plugins' ? '4px' : undefined
                   }}
                 >
                   <Link
                     to="/plugins"
                     className={`${
                       isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden`}
+                    } group relative`}
                     >
                       <IconBadge color="#F59E0B">
-                        <Plug size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                        <Plug size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                       </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Plugins</span>
@@ -537,7 +550,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/settings'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            ? 'text-[var(--sidebar-primary)]'
                             : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/settings'
@@ -550,18 +563,21 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/settings' ? 600 : 500,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    boxShadow: pathname === '/settings' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/settings' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/settings' ? '4px' : undefined
                   }}
                 >
                   <Link
                     to="/settings"
                     className={`${isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden`}
+                    } group relative`}
                     >
                       <IconBadge color="#64748B">
-                        <Settings size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                        <Settings size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                       </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Settings</span>
@@ -577,7 +593,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
                   className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
                       ? `flex justify-center items-center ${pathname === '/settings/global'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                            ? 'text-[var(--sidebar-primary)]'
                             : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                       : `${pathname === '/settings/global'
@@ -590,18 +606,21 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
                     gap: '8px',
                     fontWeight: pathname === '/settings/global' ? 600 : 500,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    boxShadow: pathname === '/settings/global' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/settings/global' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/settings/global' ? '4px' : undefined
                   }}
                 >
                   <Link
                     to="/settings/global"
                     className={`${isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden`}
+                    } group relative`}
                     >
                       <IconBadge color="#64748B">
-                        <Globe size={14} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+                        <Globe size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                       </IconBadge>
                     {isCollapsed && !isMobile ? (
                       <span className="sr-only">Global Settings</span>

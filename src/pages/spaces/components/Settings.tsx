@@ -506,9 +506,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
                 }}
               >
-                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-2 text-xs">C</ToggleGroupItem>
-                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
-                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
+                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-3 text-xs">Compact</ToggleGroupItem>
+                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-3 text-xs">Comfortable</ToggleGroupItem>
+                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-3 text-xs">Spacious</ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
