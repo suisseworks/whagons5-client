@@ -134,12 +134,12 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     data-slot="tabs-trigger"
       className={cn(
-        "text-foreground/55 data-[state=active]:text-foreground data-[state=active]:font-semibold inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-ring focus-visible:outline-1 focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "text-foreground/55 data-[state=active]:text-foreground data-[state=active]:font-semibold inline-flex h-[calc(100%-2px)] flex-1 items-center justify-center px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-ring focus-visible:outline-1 focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[state=inactive]:[&_.tab-label-text]:max-w-0 data-[state=inactive]:[&_.tab-label-text]:opacity-0 data-[state=inactive]:[&_.tab-label-text]:w-0 data-[state=active]:[&_.tab-label-text]:max-w-full data-[state=active]:[&_.tab-label-text]:opacity-100 data-[state=active]:[&_.tab-label-text]:w-auto",
         className
       )}
     {...props}
   >
-    <span className="inline-flex items-center gap-1.5 transition-[width,gap] duration-300 ease-in-out will-change-[width] [&_.tab-label-text]:transition-[max-width,opacity,width] [&_.tab-label-text]:duration-300 [&_.tab-label-text]:ease-in-out [&_.tab-label-text]:inline-block [&_.tab-label-text]:overflow-hidden data-[state=inactive]:[&_.tab-label-text]:max-w-0 data-[state=inactive]:[&_.tab-label-text]:opacity-0 data-[state=inactive]:[&_.tab-label-text]:w-0 data-[state=active]:[&_.tab-label-text]:max-w-full data-[state=active]:[&_.tab-label-text]:opacity-100 data-[state=active]:[&_.tab-label-text]:w-auto">
+    <span className="inline-flex items-center gap-1.5 transition-[width,gap] duration-300 ease-in-out will-change-[width] [&_.tab-label-text]:transition-[max-width,opacity,width] [&_.tab-label-text]:duration-300 [&_.tab-label-text]:ease-in-out [&_.tab-label-text]:inline-block [&_.tab-label-text]:overflow-hidden">
       {props.children}
     </span>
   </TabsPrimitive.Trigger>
