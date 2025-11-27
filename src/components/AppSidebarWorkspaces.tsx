@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -232,9 +232,15 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const [workspaceType, setWorkspaceType] = useState('standard');
 
   const [orderKey, setOrderKey] = useState(0);
+  // Keep previous workspaces to prevent disappearing during transitions
+  const stableWorkspacesRef = useRef<Workspace[]>([]);
 
   const localWorkspaces = useMemo(() => {
-    const normalized = workspaces.map((w) => ({ ...w, id: String(w.id) }));
+    // If workspaces prop is empty but we have stable workspaces, use stable workspaces
+    // This prevents workspaces from disappearing during animation transitions
+    const sourceWorkspaces = workspaces.length > 0 ? workspaces : stableWorkspacesRef.current;
+    
+    const normalized = sourceWorkspaces.map((w) => ({ ...w, id: String(w.id) }));
     const savedOrder = loadWorkspaceOrder();
     const currentIds = normalized.map((w) => w.id as string);
     const mergedIds = mergeOrder(savedOrder, currentIds);
@@ -245,6 +251,12 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       const workspace = byId.get(id);
       if (workspace) ordered.push(workspace as unknown as Workspace);
     });
+    
+    // Update stable workspaces when we have valid data
+    if (ordered.length > 0) {
+      stableWorkspacesRef.current = ordered;
+    }
+    
     return ordered;
   }, [workspaces, orderKey]);
 
@@ -338,8 +350,11 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     }
   };
 
+  // Always keep collapsible open - never allow it to close and hide workspaces
+  const isCollapsibleOpen = collapsed ? true : collapsibleOpen;
+
   return (
-    <Collapsible open={collapsed ? true : collapsibleOpen} onOpenChange={handleCollapsibleChange} className="group/collapsible">
+    <Collapsible open={isCollapsibleOpen} onOpenChange={handleCollapsibleChange} className="group/collapsible">
       {/* Everything workspace - aligned above Spaces section */}
       {showEverythingButton && !collapsed && (
         <div style={{ marginBottom: '8px' }}>
@@ -592,7 +607,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           </div>
         </SidebarGroupLabel>
 
-        <CollapsibleContent keepRendered forceVisible={collapsed}>
+        <CollapsibleContent keepRendered forceVisible={true}>
           <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
               sensors={sensors}
