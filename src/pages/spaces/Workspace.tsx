@@ -14,9 +14,7 @@ import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { Button } from '@/components/ui/button';
-import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
-import CreateTaskDialogForEverything from '@/pages/spaces/components/CreateTaskDialogForEverything';
-import EditTaskDialog from '@/pages/spaces/components/EditTaskDialog';
+import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { motion } from 'motion/react';
 import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
@@ -723,14 +721,28 @@ export const Workspace = () => {
       />
 
 
-      {/* Create Task Dialogs */}
+      {/* Task Dialog - Unified component for create/edit */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (
-        <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
+        <TaskDialog 
+          open={openCreateTask} 
+          onOpenChange={setOpenCreateTask} 
+          mode="create" 
+          workspaceId={parseInt(id!, 10)} 
+        />
       )}
       {isAllWorkspaces && (
-        <CreateTaskDialogForEverything open={openCreateTask} onOpenChange={setOpenCreateTask} />
+        <TaskDialog 
+          open={openCreateTask} 
+          onOpenChange={setOpenCreateTask} 
+          mode="create-all" 
+        />
       )}
-      <EditTaskDialog open={openEditTask} onOpenChange={setOpenEditTask} task={selectedTask} />
+      <TaskDialog 
+        open={openEditTask} 
+        onOpenChange={setOpenEditTask} 
+        mode="edit" 
+        task={selectedTask} 
+      />
       <TaskNotesModal />
     </div>
 
