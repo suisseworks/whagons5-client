@@ -312,7 +312,7 @@ export class TasksCache {
         }
     }
 
-    public static async validateTasks() {
+    public static async validateTasks(serverGlobalHash?: string | null, serverBlockCount?: number | null) {
         try {
             if (this.validating) {
                 this.dlog('validateTasks: already running, skipping re-entry');
@@ -320,23 +320,57 @@ export class TasksCache {
             }
             this.validating = true;
             const t0 = performance.now();
-            // 0) Quick global-hash short-circuit
+            
+            // Bootstrap: If cache is empty, fetch tasks once before integrity validation
+            const existingTasks = await this.getTasks();
+            console.log(`[TasksCache] validateTasks: existingTasks count=${existingTasks.length}`);
+            
+            if (existingTasks.length === 0) {
+                this.dlog('validateTasks: cache empty, bootstrap fetching tasks');
+                try {
+                    const fetchSuccess = await this.fetchTasks();
+                    if (fetchSuccess) {
+                        this.dlog('validateTasks: bootstrap fetch completed');
+                        // After bootstrap, continue with integrity validation to verify
+                        // (or return early if you prefer to skip validation on first sync)
+                    } else {
+                        this.dlog('validateTasks: bootstrap fetch failed, continuing with validation');
+                    }
+                } catch (e) {
+                    console.warn('TasksCache: bootstrap fetch error', e);
+                    // Continue with validation even if bootstrap fails
+                }
+            } else {
+                console.log('[TasksCache] validateTasks: cache not empty, skipping bootstrap fetch');
+            }
+            
+            // 0) Quick global-hash short-circuit (use batch result if provided, otherwise fetch)
             const localBlocks = await this.computeLocalTaskBlockHashes();
             const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
             const localGlobalHash = sha256(localGlobalConcat).toString(encHex);
-            try {
-                const globalResp = await api.get('/integrity/global', { params: { table: 'wh_tasks' } });
-                const serverGlobal = globalResp.data?.data?.global_hash;
-                const serverBlockCount = globalResp.data?.data?.block_count ?? null;
-                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash });
-                if (serverGlobal && serverGlobal === localGlobalHash && (serverBlockCount === null || serverBlockCount === localBlocks.length)) {
+            
+            let serverGlobal: string | undefined = serverGlobalHash ?? undefined;
+            let serverBlockCountFromServer: number | null = serverBlockCount ?? null;
+            
+            // Only make API call if batch result wasn't provided
+            if (serverGlobalHash === undefined) {
+                try {
+                    const globalResp = await api.get('/integrity/global', { params: { table: 'wh_tasks' } });
+                    serverGlobal = globalResp.data?.data?.global_hash;
+                    serverBlockCountFromServer = globalResp.data?.data?.block_count ?? null;
+                } catch (_) {
+                    // ignore and continue with block-level comparison
+                }
+            }
+            
+            if (serverGlobal) {
+                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount: serverBlockCountFromServer, equal: serverGlobal === localGlobalHash });
+                if (serverGlobal === localGlobalHash && (serverBlockCountFromServer === null || serverBlockCountFromServer === localBlocks.length)) {
                     this.dlog('global hash match; skipping block compare');
                     this.validating = false;
                     // Perfect match – nothing to do
                     return true;
                 }
-            } catch (_) {
-                // ignore and continue with block-level comparison
             }
 
             // 1) Integrity blocks comparison (cheap): compare local block hashes vs server

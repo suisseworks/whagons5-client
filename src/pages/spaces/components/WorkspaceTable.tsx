@@ -795,6 +795,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
   }, [searchText, modulesLoaded, refreshGrid]);
 
+  // When reference data (statuses, priorities, spots, users, tags, categories, customFields) changes, refresh the grid
+  // This ensures that when someone updates a status/priority/etc in settings, the grid shows the updated data
+  useEffect(() => {
+    if (gridRef.current?.api && modulesLoaded) {
+      // Refresh the grid to pick up changes in reference data
+      refreshGrid();
+    }
+  }, [statuses, priorities, spots, users, tags, categories, customFields, categoryCustomFields, modulesLoaded, refreshGrid]);
+
   // Set up task event handlers using abstracted utility
   useEffect(() => {
     const cleanup = setupTaskEventHandlers({ refreshGrid, workspaceId });

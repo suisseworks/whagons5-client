@@ -678,8 +678,8 @@ function Users() {
       
           const result = await dispatch((genericActions as any).invitations.addAsync(payload)).unwrap();
           
-          // Refresh invitations list
-          dispatch((genericActions as any).invitations.fetchFromAPI());
+          // Refresh invitations list from IndexedDB (real-time listener will update cache automatically)
+          dispatch((genericActions as any).invitations.getFromIndexedDB());
           
           // Show invitation link if available
           if (result?.invitation_link) {
