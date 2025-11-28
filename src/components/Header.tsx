@@ -537,17 +537,12 @@ function Header() {
                 <div className="flex items-center gap-2">
                     {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === 'Everything') && (
                         <button
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-[#FF6B6B] hover:bg-[#FF5555] text-white transition-all duration-200 hover:scale-105 active:scale-95"
+                            className="group inline-flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97]"
                             onClick={() => setOpenCreateTask(true)}
                             title="Create Task"
-                            style={{
-                                boxShadow: '0 4px 12px 0 rgba(255, 107, 107, 0.4), 0 2px 6px 0 rgba(255, 107, 107, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2)',
-                            }}
                         >
-                            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                                <Plus className="h-4 w-4 text-[#FF6B6B]" strokeWidth={3} />
-                            </div>
-                            <span className="font-semibold text-xs whitespace-nowrap">Create Task</span>
+                            <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" strokeWidth={2.5} />
+                            <span>New Task</span>
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
