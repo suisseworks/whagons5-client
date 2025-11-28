@@ -19,18 +19,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
         await TasksCache.init();
       }
       const normalized: any = { ...params };
-      // Read persisted model as a fallback (ensures we filter even when grid omits params.filterModel)
-      let persisted: any = {};
-      try {
-        const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
-        const raw = localStorage.getItem(key);
-        if (raw) persisted = JSON.parse(raw) || {};
-      } catch {}
-      // Merge filters with clear precedence (no uncontrolled stacking of old filters):
-      // 1) External model set from Workspace / presets (highest priority)
-      // 2) Grid-side filters (column menus)
-      // 3) Persisted fallback from last session
-      // Also ignore grid set-filters with empty values (means "show all").
+
       const gridFm = params?.filterModel || {};
       const cleanedGridFm: any = {};
       for (const [key, value] of Object.entries(gridFm)) {
@@ -46,17 +35,17 @@ export function buildGetRows(TasksCache: any, refs: any) {
         }
       }
 
-      const hasExternal = !!(externalFilterModelRef?.current && Object.keys(externalFilterModelRef.current || {}).length > 0);
+      const externalFm = (externalFilterModelRef?.current as any) || {};
+      const hasExternal = externalFm && Object.keys(externalFm).length > 0;
       const hasGrid = Object.keys(cleanedGridFm).length > 0;
-      const hasPersisted = !!(persisted && Object.keys(persisted).length > 0);
 
+      // Prefer the grid's current model when present; fall back to the last
+      // external model (e.g. from presets) when gridFm is empty.
       let mergedFm: any = {};
-      if (hasExternal) {
-        mergedFm = externalFilterModelRef.current;
-      } else if (hasGrid) {
+      if (hasGrid) {
         mergedFm = cleanedGridFm;
-      } else if (hasPersisted) {
-        mergedFm = persisted;
+      } else if (hasExternal) {
+        mergedFm = externalFm;
       }
 
       normalized.filterModel = Object.keys(mergedFm).length > 0 ? normalizeFilterModelForQuery(mergedFm) : undefined;

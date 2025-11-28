@@ -129,6 +129,22 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => {
     try { debugFilters.current = localStorage.getItem('wh-debug-filters') === 'true'; } catch { debugFilters.current = false; }
   }, []);
+  // Preload any saved filter model so effects that reset columnDefs can reapply it
+  // even before onGridReady/onReady run.
+  useEffect(() => {
+    try {
+      const key = `wh_workspace_filters_${(workspaceId || 'all')}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        externalFilterModelRef.current = normalizeFilterModelForGrid(parsed);
+      } else {
+        externalFilterModelRef.current = {};
+      }
+    } catch {
+      externalFilterModelRef.current = {};
+    }
+  }, [workspaceId]);
   // Refs to avoid stale closures so we can refresh cache without rebinding datasource
   const searchRef = useRef<string>(searchText);
   useEffect(() => { searchRef.current = searchText; }, [searchText]);
@@ -424,12 +440,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     dispatch(genericActions.approvalApprovers.getFromIndexedDB());
     dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
     // Optionally fetch from API to ensure we have the latest data
-    dispatch(genericActions.taskTags.fetchFromAPI());
-    dispatch(genericActions.tags.fetchFromAPI());
-    dispatch(genericActions.taskNotes.fetchFromAPI());
-    dispatch(genericActions.taskAttachments.fetchFromAPI());
-    dispatch(genericActions.approvalApprovers.fetchFromAPI());
-    dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
+    // dispatch(genericActions.taskTags.fetchFromAPI());
+    // dispatch(genericActions.tags.fetchFromAPI());
+    // dispatch(genericActions.taskNotes.fetchFromAPI());
+    // dispatch(genericActions.taskAttachments.fetchFromAPI());
+    // dispatch(genericActions.approvalApprovers.fetchFromAPI());
+    // dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
   }, [dispatch]);
 
   // Removed on-mount loads; AuthProvider hydrates core slices
@@ -622,11 +638,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return undefined;
   }, []);
 
-  // Re-apply or clear grouping when controls change
   useEffect(() => {
     const api = gridRef.current?.api;
     const colApi = gridRef.current?.columnApi;
     if (!api) return;
+
+    const currentFilterModel = api.getFilterModel?.() || {};
 
     // In infinite mode, ensure grouping is cleared visually
     if (!useClientSide) {
@@ -634,6 +651,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         api.setGridOption('autoGroupColumnDef', undefined as any);
         colApi?.setRowGroupColumns([]);
         api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        // If grid lost filters, re-apply from saved external model
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
       } catch {}
       return;
     }
@@ -648,6 +674,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         colApi?.setColumnVisible('status_id', true);
         colApi?.setColumnVisible('priority_id', true);
         api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
         api.refreshClientSideRowModel?.('everything');
       } else {
         api.setGridOption('autoGroupColumnDef', autoGroupColumnDef);
@@ -660,6 +694,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         colApi?.setColumnVisible('status_id', field !== 'status_id');
         colApi?.setColumnVisible('priority_id', field !== 'priority_id');
         api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
         api.refreshClientSideRowModel?.('everything');
       }
     } catch {}
@@ -763,9 +805,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     onFiltersChanged?.(!!params.api.isAnyFilterPresent?.());
 
     suppressPersistRef.current = true;
-
-    // Set default sort by created_at descending if no sort is already applied
-    // This must be done BEFORE setting datasource for infinite mode to ensure it's included in the first query
     try {
       const currentSort = params.api.getSortModel?.() || [];
       if (currentSort.length === 0) {
@@ -845,12 +884,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         return;
       }
 
-      // Non-empty model: replace existing filters with the provided model
-      externalFilterModelRef.current = model;
+   
+      const gridModel = normalizeFilterModelForGrid(model);
+      // Keep external model in sync with what AG Grid actually sees
+      externalFilterModelRef.current = gridModel;
       try { if (debugFilters.current) console.log('[WT] setFilterModel external=', externalFilterModelRef.current); } catch {}
 
-      // Apply a grid-normalized version (set-filter values as strings) to AG Grid
-      const gridModel = normalizeFilterModelForGrid(model);
       gridRef.current.api.setFilterModel(Object.keys(gridModel).length > 0 ? gridModel : null);
 
       onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
@@ -865,8 +904,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     },
     getFilterModel: () => {
       try {
-        const gm = gridRef.current?.api?.getFilterModel?.() || {};
-        return { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
+        // AG Grid's filter model is the single source of truth for the UI & modal
+        return gridRef.current?.api?.getFilterModel?.() || {};
       } catch { return {}; }
     }
   }), [refreshGrid, onFiltersChanged]);
@@ -910,13 +949,16 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           try {
             const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
             const gm = e.api.getFilterModel?.() || {};
-            const merged = { ...(gm || {}), ...(externalFilterModelRef.current || {}) };
-            console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
-            console.log('[WT Filters] onFilterChanged - merged filterModel:', JSON.stringify(merged, null, 2));
-            if (merged && Object.keys(merged).length > 0) {
-              localStorage.setItem(key, JSON.stringify(merged));
-            } else {
-              localStorage.removeItem(key);
+            // Keep externalFilterModelRef in sync with AG Grid so datasource
+            // and modal both see the same canonical model.
+            externalFilterModelRef.current = gm;
+            if (debugFilters.current) {
+              console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+            }
+            // Persist only when there is an active model; do not remove the saved
+            // filter on incidental empty events (those can happen during grid resets).
+            if (gm && Object.keys(gm).length > 0) {
+              localStorage.setItem(key, JSON.stringify(gm));
             }
           } catch {}
           // Only refresh if not in client-side mode (client-side mode handles filtering internally)

@@ -28,12 +28,12 @@ export function PriorityBadge({
 
   const inner = (
     <span
-      className={"inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none " + (className || "")}
+      className={"inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none whitespace-nowrap " + (className || "")}
       style={{ background: palette.bg, color: palette.text }}
       aria-label={`Priority: ${meta.name}`}
     >
-      <Flag className="h-3.5 w-3.5" style={{ color: palette.text, opacity: 0.9 }} />
-      <span className="truncate max-w-[120px]">{meta.name}</span>
+      <Flag className="h-3.5 w-3.5 flex-shrink-0" style={{ color: palette.text, opacity: 0.9 }} />
+      <span>{meta.name}</span>
     </span>
   );
 

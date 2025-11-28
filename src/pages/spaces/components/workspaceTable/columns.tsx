@@ -801,6 +801,15 @@ export function buildWorkspaceColumns(opts: any) {
       headerName: 'Priority',
       sortable: true,
       filter: 'agSetColumnFilter',
+      suppressHeaderMenuButton: true,
+      suppressMenuIcon: true,
+      suppressHeaderFilterButton: true,
+      // Allow the priority pill to render without AG Grid's default ellipsis clipping
+      cellStyle: {
+        overflow: 'visible',
+        textOverflow: 'clip',
+        whiteSpace: 'nowrap',
+      },
       valueFormatter: (p: any) => {
         const meta: any = priorityMap[p.value as number];
         return meta?.name || `#${p.value}`;
@@ -835,11 +844,11 @@ export function buildWorkspaceColumns(opts: any) {
         const pill = (
           <div className="inline-flex items-center h-full py-1.5">
             <span
-              className="inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none truncate max-w-[160px]"
+              className="inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none whitespace-nowrap"
               style={{ background: palette.bg, color: palette.text }}
             >
-              <Flag className="h-3.5 w-3.5" style={{ color: palette.text, opacity: 0.9 }} />
-              {name}
+              <Flag className="h-3.5 w-3.5 flex-shrink-0" style={{ color: palette.text, opacity: 0.9 }} />
+              <span>{name}</span>
             </span>
           </div>
         );

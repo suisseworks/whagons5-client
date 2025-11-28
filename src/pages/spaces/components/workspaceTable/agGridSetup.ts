@@ -54,6 +54,9 @@ export const createDefaultColDef = () => ({
   filter: false,
   resizable: true,
   floatingFilter: false,
+  // Disable menu icon (ellipsis) on columns to prevent it appearing next to priority tags
+  suppressMenuIcon: true,
+  suppressHeaderMenuButton: true,
 });
 
 export const createGridOptions = (useClientSide: boolean, clientRows: any[] = [], collapseGroups: boolean = true) => ({
@@ -82,5 +85,8 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   suppressNoRowsOverlay: false,
   loading: false,
   suppressScrollOnNewData: true, // Prevent scroll jumps
-  debounceVerticalScrollbar: false, 
+  debounceVerticalScrollbar: false,
+  // Disable context menu and menu icons to prevent ellipsis appearing next to priority tags
+  suppressContextMenu: true,
+  suppressMenuHide: true,
 });

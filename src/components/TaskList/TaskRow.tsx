@@ -91,7 +91,6 @@ export function TaskRow({
         transformOrigin: "center",
       }}
     >
-
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -137,15 +136,16 @@ export function TaskRow({
             )}
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-1">
-          <TaskRowActions
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onDuplicate={onDuplicate}
-            onMarkComplete={onMarkComplete}
-          />
-        </div>
+      {/* Position actions in the top-right corner so they aren't visually attached to the priority pill */}
+      <div className="absolute top-4 right-4">
+        <TaskRowActions
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onMarkComplete={onMarkComplete}
+        />
       </div>
     </motion.div>
   );
