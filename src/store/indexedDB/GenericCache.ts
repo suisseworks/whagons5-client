@@ -228,7 +228,7 @@ export class GenericCache {
 	}
 
 	// --- Integrity validation ---
-	async validate(): Promise<boolean> {
+	async validate(serverGlobalHash?: string | null, serverBlockCount?: number | null): Promise<boolean> {
 		try {
 			if (this.validating) { this.dlog('validate: already running'); return true; }
 			this.validating = true;
@@ -286,7 +286,7 @@ export class GenericCache {
 			// Global short-circuit
 			const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
 			const localGlobalHash = await this.sha256Hex(localGlobalConcat);
-			let serverGlobal: string | undefined | null = null;
+			let serverGlobal: string | undefined | null = serverGlobalHash ?? null;
 			let hasIntegrityHashing = false;
 			try {
 				const globalResp = await api.get('/integrity/global', { params: { table: this.table } });
@@ -490,19 +490,31 @@ export class GenericCache {
 
 	// Batch validation: accept multiple caches, request one global batch from server,
 	// and short-circuit those with matching global hashes. Falls back to per-cache validate otherwise.
-	static async validateMultiple(caches: GenericCache[]): Promise<Record<string, boolean>> {
-		if (!caches.length) return {};
+	// Optionally accepts additional table names to include in batch call (e.g., 'wh_tasks')
+	static async validateMultiple(caches: GenericCache[], additionalTables: string[] = []): Promise<{ results: Record<string, boolean>; serverMap: Record<string, { global_hash?: string; block_count?: number } | null> }> {
+		if (!caches.length && !additionalTables.length) return { results: {}, serverMap: {} };
 		// Compute local global hashes SEQUENTIALLY to avoid cross-store races
 		const locals: Array<{ cache: GenericCache; table: string; localGlobal: string; blockCount: number }> = [];
 		for (const c of caches) {
-			const blocks = await c.computeLocalBlockHashes();
-			const concat = blocks.map(b => b.block_hash).join('');
-			const global = await c.sha256Hex(concat);
-			locals.push({ cache: c, table: c.getTableName(), localGlobal: global, blockCount: blocks.length });
+			try {
+				const blocks = await c.computeLocalBlockHashes();
+				const concat = blocks.map(b => b.block_hash).join('');
+				const global = await c.sha256Hex(concat);
+				locals.push({ cache: c, table: c.getTableName(), localGlobal: global, blockCount: blocks.length });
+			} catch (e: any) {
+				// Handle transient DB errors - skip this cache but continue with others
+				if (e?.name === 'InvalidStateError' || e?.message?.includes('connection is closing')) {
+					console.warn(`GenericCache.validateMultiple: DB error for ${c.getTableName()}, skipping`, e);
+					// Don't add to locals, so it won't be validated
+					continue;
+				}
+				// Re-throw other errors
+				throw e;
+			}
 		}
 
-		
-		const tables = locals.map(l => l.table);
+		// Include additional tables (like wh_tasks) in batch call
+		const tables = [...locals.map(l => l.table), ...additionalTables];
 		let serverMap: Record<string, { global_hash?: string; block_count?: number } | null> = {};
 		try {
 			const resp = await api.get('/integrity/global/batch', { params: { tables: tables.join(',') } });
@@ -512,17 +524,25 @@ export class GenericCache {
 		}
 
 		const results: Record<string, boolean> = {};
-		for (const l of locals) {
-			const s = serverMap[l.table] || null;
+		
+		// Execute validations in parallel to avoid slow sequential startup
+		await Promise.all(locals.map(async (l) => {
+			const s = serverMap[l.table] ?? null;
+			// If server returns null, table doesn't have integrity hashing - skip validation
+			if (s === null) {
+				results[l.table] = true; // Skip validation, keep existing data
+				return;
+			}
 			// Strict short-circuit: use ONLY global hash equality to skip per-table calls
 			if (s && s.global_hash && s.global_hash === l.localGlobal) {
 				results[l.table] = true;
 			} else {
-				// Run full validate when mismatch or server data missing (sequential)
+				// Run full validate when mismatch (parallel)
 				results[l.table] = await l.cache.validate();
 			}
-		}
-		return results;
+		}));
+		
+		return { results, serverMap };
 	}
 
 	private async hashRow(row: any): Promise<string> {

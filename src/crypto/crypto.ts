@@ -5,6 +5,7 @@ let worker: Worker | null = null;
 let workerListenerAttached = false;
 let nextRid = 1;
 const pending: Map<number, { resolve: (v: any) => void; reject: (e: any) => void; timeout: any } > = new Map();
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 
 
@@ -47,9 +48,20 @@ export class CryptoHandler {
   static expIso: string | null = null;
   static initPromise: Promise<void> | null = null;
 
+  public static reset(): void {
+    CryptoHandler.inited = false;
+    CryptoHandler.kid = null;
+    CryptoHandler.expIso = null;
+  }
+
   public static async init(){
     // If already initialized, return immediately
-    if (CryptoHandler.inited) return;
+    if (CryptoHandler.inited) {
+      const kekPresent = await hasKEK().catch(() => false);
+      if (kekPresent) return;
+      console.warn('[CryptoHandler] Worker KEK missing despite init flag; resetting state');
+      CryptoHandler.reset();
+    }
 
     // If initialization is in progress, wait for it to complete
     if (CryptoHandler.initPromise) {
@@ -82,6 +94,7 @@ export class CryptoHandler {
         const expIso = kekResp.data?.data?.expiresAt;
 
         await provisionWrappedKEK(envelope);
+        await CryptoHandler.waitForWorkerKek('provision');
 
         // Persist identifiers and KEK metadata
         const metaW = DB.getStoreWrite('crypto_meta' as any);
@@ -106,6 +119,27 @@ export class CryptoHandler {
     })();
 
     return CryptoHandler.initPromise;
+  }
+
+  private static async waitForWorkerKek(label: string, timeoutMs = 20000): Promise<void> {
+    const start = performance.now();
+    let attempt = 0;
+    while (performance.now() - start < timeoutMs) {
+      attempt += 1;
+      const has = await hasKEK().catch(() => false);
+      if (has) {
+        if (attempt > 1) {
+          console.info(`[CryptoHandler] ${label} KEK ready after ${attempt} checks (${Math.round(performance.now() - start)}ms)`);
+        }
+        return;
+      }
+      const elapsed = Math.round(performance.now() - start);
+      if (attempt === 1 || attempt % 4 === 0) {
+        console.debug(`[CryptoHandler] waiting for worker KEK (attempt ${attempt}, elapsed ${elapsed}ms, ${label})`);
+      }
+      await sleep(Math.min(600, 150 + attempt * 75));
+    }
+    throw new Error(`[CryptoHandler] KEK not ready after ${Math.round(performance.now() - start)}ms (${label})`);
   }
 }
 function sendRequest<T = any>(op: string, payload: Record<string, any>, timeoutMs: number = 15000): Promise<T> {
@@ -213,10 +247,13 @@ export function ensureCEK(store: string, wrappedCEK?: { iv: string, ct: string }
 
 export function zeroizeKeys(): Promise<boolean> {
   const w = getWorker();
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     const onMsg = (ev: MessageEvent) => { w.removeEventListener('message', onMsg); resolve(!!ev.data?.ok); };
     w.addEventListener('message', onMsg);
     w.postMessage({ t: 'ZEROIZE' });
+  }).then((ok) => {
+    CryptoHandler.reset();
+    return ok;
   });
 }
 

@@ -30,12 +30,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
-    const { firebaseUser, user, userLoading, hydrating } = useAuth();
+    const { firebaseUser, user, userLoading, hydrating, hydrationError } = useAuth();
+    const [apiLoading, setApiLoading] = useState<boolean>(false);
     const { isMobile } = useSidebar();
     const navigate = useNavigate();
     const location = useLocation();
@@ -291,11 +293,29 @@ function Header() {
         return { backgroundImage: `linear-gradient(180deg, ${grayTop} 0%, var(--color-card) 70%)` } as React.CSSProperties;
     }, [currentWorkspaceName, isDarkTheme]);
 
-    // Hydration status badge: processing while hydrating, success briefly when done, hidden otherwise
+    // Track API GET requests for syncing indicator (debounced to prevent flickering)
+    useEffect(() => {
+        const unsubscribe = ApiLoadingTracker.on(
+            ApiLoadingTracker.EVENTS.LOADING_CHANGED,
+            (isLoading) => {
+                setApiLoading(isLoading);
+            }
+        );
+        return unsubscribe;
+    }, []);
+
+    // Hydration status badge: processing while hydrating or API loading, success briefly when done, hidden otherwise
     const [hydrationState, setHydrationState] = useState<"start" | "processing" | "success" | "error" | "custom">("custom");
     const prevHydrating = useRef(false);
+    const isSyncing = hydrating || apiLoading;
+    
     useEffect(() => {
-        if (hydrating) {
+        if (hydrationError) {
+            setHydrationState("error");
+            prevHydrating.current = false;
+            return;
+        }
+        if (isSyncing) {
             setHydrationState("processing");
         } else {
             if (prevHydrating.current) {
@@ -306,20 +326,35 @@ function Header() {
                 setHydrationState("custom");
             }
         }
-        prevHydrating.current = hydrating;
-    }, [hydrating]);
+        prevHydrating.current = isSyncing;
+    }, [hydrationError, isSyncing]);
 
     const hydrationBadge = useMemo(() => {
         if (hydrationState === "custom") return null;
-        const label = hydrationState === "processing" ? "Syncing" : (hydrationState === "success" ? "Synced" : undefined);
-        return (
+        const label =
+            hydrationState === "processing"
+                ? "Syncing"
+                : hydrationState === "success"
+                ? "Synced"
+                : hydrationState === "error"
+                ? "Sync failed"
+                : undefined;
+        const badge = (
             <MultiStateBadge
                 state={hydrationState}
                 label={label}
                 className="h-6 px-2 py-1 text-xs"
             />
         );
-    }, [hydrationState]);
+        if (hydrationState === "error" && hydrationError) {
+            return (
+                <span title={hydrationError}>
+                    {badge}
+                </span>
+            );
+        }
+        return badge;
+    }, [hydrationError, hydrationState]);
 
 
 
