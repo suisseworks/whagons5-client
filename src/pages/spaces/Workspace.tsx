@@ -269,7 +269,8 @@ export const Workspace = () => {
   const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
 
   // Derived status groupings for stats
-  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
+  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
+    ?? (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
     ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
   const workingStatusIds: number[] = (statuses || [])
     .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
@@ -278,11 +279,15 @@ export const Workspace = () => {
 
   // Header stats
   const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; loading: boolean }>({ total: 0, inProgress: 0, completedToday: 0, loading: true });
+  const isInitialLoadRef = useRef(true);
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        setStats((s) => ({ ...s, loading: true }));
+        // Only set loading state on initial load, preserve values during updates
+        if (isInitialLoadRef.current) {
+          setStats((s) => ({ ...s, loading: true }));
+        }
         if (!TasksCache.initialized) await TasksCache.init();
         const base: any = {};
         const ws = isAllWorkspaces ? undefined : id;
@@ -307,11 +312,19 @@ export const Workspace = () => {
           completedToday = r?.rowCount ?? 0;
         }
 
-        if (!cancelled) setStats({ total, inProgress, completedToday, loading: false });
+        if (!cancelled) {
+          setStats({ total, inProgress, completedToday, loading: false });
+          isInitialLoadRef.current = false;
+        }
       } catch {
-        if (!cancelled) setStats({ total: 0, inProgress: 0, completedToday: 0, loading: false });
+        if (!cancelled) {
+          setStats((prev) => ({ ...prev, loading: false }));
+          isInitialLoadRef.current = false;
+        }
       }
     };
+    // Reset initial load flag when workspace changes
+    isInitialLoadRef.current = true;
     load();
     const unsubs = [
       TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, load),
@@ -616,17 +629,17 @@ export const Workspace = () => {
           <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
             <ClipboardList className="h-[18px] w-[18px] text-cyan-600" />
             <span className="text-[12px] text-muted-foreground">Total</span>
-            <span className="text-base font-semibold">{stats.loading ? '—' : stats.total.toLocaleString()}</span>
+            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.total.toLocaleString()}</span>
           </div>
           <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
             <Clock className="h-[18px] w-[18px] text-amber-600" />
             <span className="text-[12px] text-muted-foreground">In progress</span>
-            <span className="text-base font-semibold">{stats.loading ? '—' : stats.inProgress.toLocaleString()}</span>
+            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.inProgress.toLocaleString()}</span>
           </div>
           <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
             <CheckCircle2 className="h-[18px] w-[18px] text-emerald-600" />
             <span className="text-[12px] text-muted-foreground">Completed today</span>
-            <span className="text-base font-semibold">{stats.loading ? '—' : stats.completedToday.toLocaleString()}</span>
+            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.completedToday.toLocaleString()}</span>
           </div>
         </div>
       )}
