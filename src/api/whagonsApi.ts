@@ -306,19 +306,28 @@ api.interceptors.response.use(
     console.log('error interceptor triggered:', error.response?.status, error.config?.url);
     const originalRequest = error.config;
 
-    // Handle "User not found" error on login endpoint by clearing subdomain and retrying
-    if (error.response?.data?.error === "User not found. Please register first." && 
-        originalRequest.url === '/login' && 
-        !originalRequest._retryWithoutSubdomain) {
-      console.log('User not found error detected on login, clearing subdomain and retrying login');
+    // Handle tenant-related 404s on login (either tenant missing or user missing in tenant)
+    const tenantErrorMessages = [
+      'Tenant not found for this domain.',
+      'User not found. Please register first.'
+    ];
+    const tenantError = tenantErrorMessages.includes(error.response?.data?.error);
+    if (tenantError) {
       setSubdomain('');
-      console.log('Subdomain cleared from localStorage, retrying login with empty subdomain');
-      
-      // Mark this request as retried to prevent infinite loops
-      originalRequest._retryWithoutSubdomain = true;
-      
-      // Retry the original request - the request interceptor will use the new empty subdomain
-      return api(originalRequest);
+      deleteCookie('auth_token');
+      clearAuth();
+
+      if (
+        originalRequest.url === '/login' &&
+        !originalRequest._retryWithoutSubdomain
+      ) {
+        originalRequest._retryWithoutSubdomain = true;
+        return api(originalRequest);
+      }
+
+      // Force re-login on landlord for any other failing endpoint by rejecting
+      // so callers can handle the 404 and re-init auth flow.
+      return Promise.reject(error);
     }
 
     if (

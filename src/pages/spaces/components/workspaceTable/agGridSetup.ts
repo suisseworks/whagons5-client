@@ -54,6 +54,9 @@ export const createDefaultColDef = () => ({
   filter: false,
   resizable: true,
   floatingFilter: false,
+  // Disable menu icon (ellipsis) on columns to prevent it appearing next to priority tags
+  suppressMenuIcon: true,
+  suppressHeaderMenuButton: true,
 });
 
 export const createGridOptions = (useClientSide: boolean, clientRows: any[] = [], collapseGroups: boolean = true) => ({
@@ -63,23 +66,27 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     getRowId: (params: any) => String(params.data.id),
     groupDisplayType: 'groupRows',
     groupDefaultExpanded: collapseGroups ? 0 : 1,
-    // IMPORTANT: We're doing our own filtering in TasksCache, so disable AG Grid's client-side filtering
-    // This prevents AG Grid from re-filtering already-filtered data
-    suppressClientSideFiltering: true,
+    // Allow AG Grid to handle client-side filtering when rowData is fully loaded
+    suppressClientSideFiltering: false,
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,
-    cacheBlockSize: 500,
-    maxConcurrentDatasourceRequests: 1,
-    maxBlocksInCache: 10,
+    cacheBlockSize: 50,
+    cacheOverflowSize: 30,
+    infiniteInitialRowCount: 500,
+    maxConcurrentDatasourceRequests: 4,
+    maxBlocksInCache: 70,
     getRowId: (params: any) => String(params.data.id),
   }),
   // Default sort by created_at descending (newest first)
   sortModel: [{ colId: 'created_at', sort: 'desc' }],
   animateRows: false, // Disabled for scroll performance
-  suppressColumnVirtualisation: true,
+  suppressColumnVirtualisation: false,
   suppressNoRowsOverlay: false,
   loading: false,
   suppressScrollOnNewData: true, // Prevent scroll jumps
-  debounceVerticalScrollbar: true, // Debounce scrollbar updates
+  debounceVerticalScrollbar: false,
+  // Disable context menu and menu icons to prevent ellipsis appearing next to priority tags
+  suppressContextMenu: true,
+  suppressMenuHide: true,
 });

@@ -1,7 +1,7 @@
 // Datasource and refresh helpers for WorkspaceTable
 
 export function buildGetRows(TasksCache: any, refs: any) {
-  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
+  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
   return async (params: any) => {
    // Default sortModel to created_at desc if not provided
     const sortModel = params.sortModel && params.sortModel.length > 0 
@@ -19,15 +19,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
         await TasksCache.init();
       }
       const normalized: any = { ...params };
-      // Read persisted model as a fallback (ensures we filter even when grid omits params.filterModel)
-      let persisted: any = {};
-      try {
-        const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
-        const raw = localStorage.getItem(key);
-        if (raw) persisted = JSON.parse(raw) || {};
-      } catch {}
-      // Merge filters: persisted -> external -> grid (but ignore grid filters with empty values)
-      // AG Grid returns empty values array for set filters when "show all" is selected
+
       const gridFm = params?.filterModel || {};
       const cleanedGridFm: any = {};
       for (const [key, value] of Object.entries(gridFm)) {
@@ -42,9 +34,20 @@ export function buildGetRows(TasksCache: any, refs: any) {
           cleanedGridFm[key] = value;
         }
       }
-      
-      // Merge: persisted -> external -> cleaned grid (grid overrides only if it has actual filter values)
-      const mergedFm = { ...(persisted || {}), ...(externalFilterModelRef?.current || {}), ...cleanedGridFm };
+
+      const externalFm = (externalFilterModelRef?.current as any) || {};
+      const hasExternal = externalFm && Object.keys(externalFm).length > 0;
+      const hasGrid = Object.keys(cleanedGridFm).length > 0;
+
+      // Prefer the grid's current model when present; fall back to the last
+      // external model (e.g. from presets) when gridFm is empty.
+      let mergedFm: any = {};
+      if (hasGrid) {
+        mergedFm = cleanedGridFm;
+      } else if (hasExternal) {
+        mergedFm = externalFm;
+      }
+
       normalized.filterModel = Object.keys(mergedFm).length > 0 ? normalizeFilterModelForQuery(mergedFm) : undefined;
       try {
         if (localStorage.getItem('wh-debug-filters') === 'true') {
@@ -65,6 +68,8 @@ export function buildGetRows(TasksCache: any, refs: any) {
       queryParams.__priorityMap = priorityMapRef.current;
       queryParams.__spotMap = spotMapRef.current;
       queryParams.__userMap = userMapRef.current;
+      queryParams.__tagMap = tagMapRef.current;
+      queryParams.__taskTags = taskTagsRef.current;
 
       const result = await TasksCache.queryTasks(queryParams);
       const rows = result?.rows || [];
@@ -80,13 +85,15 @@ export function buildGetRows(TasksCache: any, refs: any) {
 }
 
 export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
-  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef } = params;
+  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef } = params;
   const baseParams: any = { search };
   if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
   baseParams.__statusMap = statusMapRef.current;
   baseParams.__priorityMap = priorityMapRef.current;
   baseParams.__spotMap = spotMapRef.current;
   baseParams.__userMap = userMapRef.current;
+  baseParams.__tagMap = tagMapRef.current;
+  baseParams.__taskTags = taskTagsRef.current;
 
   const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;

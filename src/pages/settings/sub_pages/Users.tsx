@@ -47,6 +47,8 @@ import {
   SelectField,
   CheckboxField
 } from "../components";
+import ReactECharts from "echarts-for-react";
+import dayjs from "dayjs";
 
 function Users() {
   const dispatch = useDispatch<AppDispatch>();
@@ -883,32 +885,13 @@ function Users() {
               </div>
             ),
             content: (
-              <div className="flex-1 min-h-0 overflow-auto">
-                <Card>
-                  <CardHeader className="py-1">
-                    <CardTitle className="text-sm">User Statistics</CardTitle>
-                    <CardDescription className="text-[11px] text-muted-foreground/70">
-                      Overview of users across your teams
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{users.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Total Users</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{users.filter((user: UserData) => user.is_admin).length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Admins</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{users.length > 0 ? `${Math.round((users.filter((user: UserData) => user.has_active_subscription).length / users.length) * 100)}%` : "0%"}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Active Subscriptions</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <UserStatistics
+                users={users}
+                teams={teams}
+                userTeams={userTeams}
+                jobPositions={jobPositions}
+                invitations={invitations}
+              />
             )
           },
           {
@@ -1248,6 +1231,338 @@ function Users() {
         renderEntityPreview={renderInvitationPreview}
       />
     </SettingsLayout>
+  );
+}
+
+interface UserStatisticsProps {
+  users: UserData[];
+  teams: Team[];
+  userTeams: UserTeam[];
+  jobPositions: any[];
+  invitations: Invitation[];
+}
+
+function UserStatistics({
+  users,
+  teams,
+  userTeams,
+  jobPositions,
+  invitations
+}: UserStatisticsProps) {
+  const totalUsers = users.length;
+  const adminCount = users.filter((u) => u.is_admin).length;
+  const activeSubCount = users.filter((u) => u.has_active_subscription).length;
+  const activeSubPercent =
+    totalUsers > 0 ? Math.round((activeSubCount / totalUsers) * 100) : 0;
+
+  const usersByTeam = useMemo(() => {
+    const counts = new Map<number, number>();
+    userTeams.forEach((ut) => {
+      counts.set(ut.team_id, (counts.get(ut.team_id) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([teamId, count]) => {
+        const team = teams.find((t) => t.id === teamId);
+        return team ? { team, count } : null;
+      })
+      .filter(
+        (item): item is { team: Team; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [userTeams, teams]);
+
+  const usersByJobPosition = useMemo(() => {
+    const counts = new Map<number, number>();
+    users.forEach((u) => {
+      const jpId = u.job_position_id as number | null | undefined;
+      if (!jpId) return;
+      counts.set(jpId, (counts.get(jpId) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([jobPositionId, count]) => {
+        const jp = jobPositions.find(
+          (p: any) => Number(p.id) === Number(jobPositionId)
+        );
+        return jp ? { jobPosition: jp, count } : null;
+      })
+      .filter(
+        (item): item is { jobPosition: any; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [users, jobPositions]);
+
+  const invitationsOverTime = useMemo(() => {
+    const map = new Map<string, number>();
+    invitations.forEach((inv) => {
+      if (!inv.created_at) return;
+      const date = dayjs(inv.created_at as any).format("YYYY-MM-DD");
+      map.set(date, (map.get(date) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+  }, [invitations]);
+
+  return (
+    <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="space-y-4">
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{totalUsers}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Total Users
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-600">
+                  {adminCount}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Admins</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-600">
+                  {activeSubPercent}%
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Active Subscriptions
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-sky-600">
+                  {invitations.length}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Pending Invitations
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Users per Team</CardTitle>
+              <CardDescription className="text-xs">
+                Distribution of users across teams
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersByTeam.length > 0 ? (
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: "axis",
+                      axisPointer: { type: "shadow" }
+                    },
+                    grid: {
+                      left: "3%",
+                      right: "4%",
+                      bottom: "3%",
+                      containLabel: true
+                    },
+                    xAxis: {
+                      type: "value",
+                      name: "Users"
+                    },
+                    yAxis: {
+                      type: "category",
+                      data: usersByTeam
+                        .map((item) => item.team.name)
+                        .reverse(),
+                      axisLabel: {
+                        formatter: (value: string) =>
+                          value.length > 20
+                            ? value.substring(0, 20) + "..."
+                            : value
+                      }
+                    },
+                    series: [
+                      {
+                        name: "Users",
+                        type: "bar",
+                        data: usersByTeam
+                          .map((item) => ({
+                            value: item.count,
+                            itemStyle: {
+                              color: item.team.color || "#6366f1"
+                            }
+                          }))
+                          .reverse()
+                      }
+                    ]
+                  }}
+                  style={{ height: "300px" }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                  No team assignment data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Users by Job Position</CardTitle>
+              <CardDescription className="text-xs">
+                Distribution across job positions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersByJobPosition.length > 0 ? (
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: "item",
+                      formatter: "{b}: {c} ({d}%)"
+                    },
+                    legend: {
+                      orient: "vertical",
+                      left: "left",
+                      textStyle: { fontSize: 10 }
+                    },
+                    series: [
+                      {
+                        name: "Users",
+                        type: "pie",
+                        radius: ["40%", "70%"],
+                        avoidLabelOverlap: false,
+                        itemStyle: {
+                          borderRadius: 8,
+                          borderColor: "#fff",
+                          borderWidth: 2
+                        },
+                        label: {
+                          show: true,
+                          formatter: "{b}: {c}"
+                        },
+                        emphasis: {
+                          label: {
+                            show: true,
+                            fontSize: 12,
+                            fontWeight: "bold"
+                          }
+                        },
+                        data: usersByJobPosition.map((item) => ({
+                          value: item.count,
+                          name: item.jobPosition.title
+                        }))
+                      }
+                    ]
+                  }}
+                  style={{ height: "300px" }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                  No job position data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Invitations over time */}
+        {invitationsOverTime.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Invitations Over Time</CardTitle>
+              <CardDescription className="text-xs">
+                Last 30 days of invitation creation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: "axis",
+                    formatter: (params: any) => {
+                      const param = params[0];
+                      return `${param.axisValue}<br/>${param.marker}${param.seriesName}: ${param.value}`;
+                    }
+                  },
+                  grid: {
+                    left: "3%",
+                    right: "4%",
+                    bottom: "3%",
+                    containLabel: true
+                  },
+                  xAxis: {
+                    type: "category",
+                    data: invitationsOverTime.map((item) =>
+                      dayjs(item.date).format("MMM DD")
+                    ),
+                    axisLabel: {
+                      rotate: 45,
+                      fontSize: 10
+                    }
+                  },
+                  yAxis: {
+                    type: "value",
+                    name: "Invitations"
+                  },
+                  series: [
+                    {
+                      name: "Invitations",
+                      type: "line",
+                      smooth: true,
+                      data: invitationsOverTime.map((item) => item.count),
+                      areaStyle: {
+                        color: {
+                          type: "linear",
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            {
+                              offset: 0,
+                              color: "rgba(99, 102, 241, 0.3)"
+                            },
+                            {
+                              offset: 1,
+                              color: "rgba(99, 102, 241, 0.05)"
+                            }
+                          ]
+                        }
+                      },
+                      itemStyle: {
+                        color: "#6366f1"
+                      },
+                      lineStyle: {
+                        color: "#6366f1",
+                        width: 2
+                      }
+                    }
+                  ]
+                }}
+                style={{ height: "300px" }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   );
 }
 

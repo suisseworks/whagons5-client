@@ -25,37 +25,37 @@
   --card-foreground: oklch(0.1 0.02 25);
   --popover: #ffffff;
   --popover-foreground: oklch(0.1 0.02 25);
-  --primary: oklch(0.72 0.12 195); /* Teal primary */
+  --primary: oklch(0.59 0.13 175); /* Rich jade teal */
   --primary-foreground: oklch(1 0 0); /* White text on primary */
-  --secondary: oklch(0.93 0.02 195); /* Softer teal-tinted background */
-  --secondary-foreground: oklch(0.15 0.02 195); /* Darker secondary text */
-  --muted: oklch(0.93 0.01 230); /* Softer neutral with cool tint */
-  --muted-foreground: oklch(0.28 0.02 230); /* Darker muted text */
-  --accent: oklch(0.68 0.12 195); /* Teal accent */
+  --secondary: oklch(0.96 0.015 175); /* Soft jade-tinted background */
+  --secondary-foreground: oklch(0.20 0.02 175); /* Darker secondary text */
+  --muted: oklch(0.95 0.008 200); /* Soft neutral */
+  --muted-foreground: oklch(0.45 0.015 200); /* Muted text */
+  --accent: oklch(0.55 0.11 175); /* Deep jade accent */
   --accent-foreground: oklch(1 0 0); /* White text on accent */
   --destructive: oklch(0.6 0.2 25); /* Keep red destructive */
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.82 0.02 45); /* Slightly darker border for better contrast */
-  --input: oklch(0.95 0.01 45); /* Softer input background */
-  --ring: oklch(0.72 0.12 195 / 0.35); /* Teal focus ring */
-  --chart-1: oklch(0.72 0.12 195); /* Teal */
-  --chart-2: oklch(0.66 0.12 230); /* Blue */
-  --chart-3: oklch(0.62 0.1 260); /* Indigo */
-  --chart-4: oklch(0.68 0.12 170); /* Green-teal */
-  --chart-5: oklch(0.74 0.14 210); /* Cyan */
+  --border: oklch(0.88 0.008 200); /* Subtle neutral border */
+  --input: oklch(0.97 0.005 200); /* Soft input background */
+  --ring: oklch(0.59 0.13 175 / 0.4); /* Jade focus ring */
+  --chart-1: oklch(0.59 0.13 175); /* Jade */
+  --chart-2: oklch(0.55 0.11 200); /* Cyan */
+  --chart-3: oklch(0.52 0.09 230); /* Blue */
+  --chart-4: oklch(0.62 0.12 155); /* Sea green */
+  --chart-5: oklch(0.57 0.10 190); /* Teal */
   --radius: 0.625rem;
   
   /* Global sidebar theme (applies to both light and dark for brand consistency) */
   --sidebar: #FAFBFC; /* Slightly cooler, less yellow */
   --sidebar-foreground: #1A2332; /* Darker for better contrast */
-  --sidebar-primary: #00BFA5; /* More vibrant teal */
-  --sidebar-primary-hover: #00D4B5; /* Hover state */
+  --sidebar-primary: oklch(0.59 0.13 175); /* Rich jade */
+  --sidebar-primary-hover: oklch(0.65 0.13 175); /* Hover state */
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-selected-bg: #E8F5F3; /* Lighter, more modern selected background */
+  --sidebar-selected-bg: oklch(0.97 0.02 175); /* Light jade selected */
   --sidebar-accent: #F1F3F5; /* Slightly darker than sidebar for hover */
   --sidebar-accent-foreground: #1A2332; /* Dark text on hover */
   --sidebar-border: #E2E8F0; /* Updated border color */
-  --sidebar-ring: rgba(0, 191, 165, 0.5); /* Teal focus in sidebar */
+  --sidebar-ring: oklch(0.59 0.13 175 / 0.5); /* Jade focus ring */
   /* Sidebar header is pure white for logo clarity */
   --sidebar-header: #ffffff;
   
@@ -66,15 +66,15 @@
   
   /* Icon colors for categories */
   --icon-cleaning: #FF6B93;
-  --icon-maintenance: #00BFA5;
+  --icon-maintenance: oklch(0.59 0.13 175);
   --icon-gardening: #4ADE80;
   --icon-approvals: #8B5CF6;
   --icon-memo: #F59E0B;
   
-  /* Gradient definitions for teal theme */
-  --gradient-primary: linear-gradient(135deg, oklch(0.72 0.12 195) 0%, oklch(0.74 0.14 210) 100%);
-  --gradient-secondary: linear-gradient(135deg, oklch(0.95 0.008 200) 0%, oklch(0.93 0.01 220) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.68 0.12 195) 0%, oklch(0.66 0.12 230) 100%);
+  /* Gradient definitions for jade theme */
+  --gradient-primary: linear-gradient(135deg, oklch(0.59 0.13 175) 0%, oklch(0.52 0.14 190) 100%);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.98 0.008 175) 0%, oklch(0.96 0.012 190) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.55 0.11 175) 0%, oklch(0.48 0.12 190) 100%);
 }
 
 .dark {
@@ -85,37 +85,37 @@
   --card-foreground: #ffffff;
   --popover: var(--bg-secondary);
   --popover-foreground: #ffffff;
-  --primary: oklch(0.78 0.2 280);
+  --primary: oklch(0.70 0.13 175); /* Jade for dark mode */
   --primary-foreground: oklch(1 0 0);
   --secondary: var(--bg-hover);
   --secondary-foreground: #e5e7eb;
   --muted: #1f1f1f;
   --muted-foreground: var(--text-secondary);
-  --accent: oklch(0.76 0.16 210);
+  --accent: oklch(0.65 0.11 175); /* Jade accent */
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.65 0.22 25);
   --destructive-foreground: oklch(1 0 0);
   --border: var(--border-subtle);
   --input: var(--bg-secondary);
-  --ring: oklch(0.8 0.17 205 / 0.5);
-  --chart-1: oklch(0.8 0.17 205);
-  --chart-2: oklch(0.76 0.16 210);
-  --chart-3: oklch(0.72 0.14 230);
-  --chart-4: oklch(0.74 0.13 170);
-  --chart-5: oklch(0.78 0.15 260);
+  --ring: oklch(0.70 0.13 175 / 0.5); /* Jade ring */
+  --chart-1: oklch(0.70 0.13 175); /* Jade */
+  --chart-2: oklch(0.65 0.11 195); /* Cyan */
+  --chart-3: oklch(0.60 0.09 215); /* Blue */
+  --chart-4: oklch(0.72 0.12 155); /* Sea green */
+  --chart-5: oklch(0.67 0.10 185); /* Teal */
   --radius: 0.625rem;
 
   /* Dark sidebar palette */
   --sidebar: #0a0a0a;
   --sidebar-foreground: #f3f4f6; /* Brighter for better contrast, especially at 70% opacity */
-  --sidebar-primary: oklch(0.78 0.2 280);
-  --sidebar-primary-hover: oklch(0.8 0.2 280);
+  --sidebar-primary: oklch(0.70 0.13 175); /* Jade */
+  --sidebar-primary-hover: oklch(0.75 0.13 175); /* Jade hover */
   --sidebar-primary-foreground: #ffffff;
   --sidebar-selected-bg: #1a1a1a;
   --sidebar-accent: #1a1a1a;
   --sidebar-accent-foreground: #f3f4f6; /* Match sidebar-foreground for consistency */
   --sidebar-border: rgba(255,255,255,0.08);
-  --sidebar-ring: oklch(0.8 0.17 205 / 0.5);
+  --sidebar-ring: oklch(0.70 0.13 175 / 0.5); /* Jade ring */
   --sidebar-header: #0f0f0f;
   
   /* Sidebar text colors */
@@ -124,9 +124,9 @@
   --sidebar-text-tertiary: #9ca3af; /* Brighter tertiary text */
 
   /* Dark mode gradients */
-  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.2 280) 0%, oklch(0.76 0.16 260) 100%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.70 0.13 175) 0%, oklch(0.60 0.14 190) 100%);
   --gradient-secondary: linear-gradient(135deg, #1f2530 0%, #1a1f28 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.76 0.16 210) 0%, oklch(0.72 0.14 230) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.65 0.11 175) 0%, oklch(0.55 0.12 190) 100%);
 
   /* Dark mode design tokens (for incremental adoption) */
   --bg-primary: #0F0F0F;
@@ -546,6 +546,15 @@
 
   .dark ::-webkit-scrollbar-track {
     background: oklch(0.18 0.04 177.71);
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
   }
 }
 

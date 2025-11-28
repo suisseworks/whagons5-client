@@ -109,6 +109,8 @@ export function UrlTabs({
     const currentTabFromUrl = getCurrentTabFromUrl();
     if (currentTabFromUrl !== activeTab) {
       setActiveTab(currentTabFromUrl);
+      // Propagate to parent so external animation/state stays in sync with URL-derived tab
+      onValueChange?.(currentTabFromUrl);
     }
   }, [location.search, location.pathname]);
 
@@ -117,7 +119,9 @@ export function UrlTabs({
     const values = new Set(tabs.map(t => t.value));
     if (!values.has(activeTab)) {
       const currentTabFromUrl = getCurrentTabFromUrl();
-      setActiveTab(currentTabFromUrl || defaultValue || tabs[0]?.value || '');
+      const next = currentTabFromUrl || defaultValue || tabs[0]?.value || '';
+      setActiveTab(next);
+      onValueChange?.(next);
     }
   }, [tabs, activeTab]);
 

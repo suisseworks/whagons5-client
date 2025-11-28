@@ -214,6 +214,20 @@ export interface Permission {
     deleted_at?: string | null;
 }
 
+export type JobPositionLevel = 'executive' | 'director' | 'manager' | 'senior' | 'junior';
+
+export interface JobPosition {
+    id: number;
+    code: string;
+    title: string;
+    level: JobPositionLevel;
+    is_leadership: boolean;
+    is_active: boolean;
+    description?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
 // Relations & Assignments
 export interface UserTeam {
     id: number;

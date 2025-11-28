@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSpinner, faExclamationTriangle, faCheckCircle, faTasks } from "@fortawesome/free-solid-svg-icons";
+import { faExclamationTriangle, faCheckCircle, faTasks } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Task, Category, Team, Workspace } from "@/store/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,25 @@ import { TasksCache } from "@/store/indexedDB/TasksCache";
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;
 }
+
+type WorkspaceStats = {
+  totalTasks: number;
+  totalCategories: number;
+  totalTeams: number;
+  urgentTasksCount: number;
+  tasksWithApprovalsCount: number;
+  overdueTasksCount: number;
+  completedTasksCount: number;
+  latestTasks: Task[];
+  tasksByStatus: Array<{ status: string; statusId: number; count: number; color?: string }>;
+  tasksByPriority: Array<{ priority: string; priorityId: number; count: number; color?: string }>;
+  tasksOverTime: Array<{ date: string; count: number }>;
+  tasksByCategory: Array<{ category: Category; count: number }>;
+  recentTaskTypes: Array<{ category: Category; count: number }>;
+  mostActiveUsers: Array<{ userId: number; userName: string; taskCount: number }>;
+  mostUsedTemplates: Array<{ templateId: number; templateName: string; count: number }>;
+  tasksBySpot: Array<{ spotId: number; spotName: string; count: number }>;
+};
 
 function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   // Debug: Log props
@@ -32,24 +51,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   
   // Statistics state
   const [statsLoading, setStatsLoading] = useState(false);
-  const [statistics, setStatistics] = useState<{
-    totalTasks: number;
-    totalCategories: number;
-    totalTeams: number;
-    urgentTasksCount: number;
-    tasksWithApprovalsCount: number;
-    overdueTasksCount: number;
-    completedTasksCount: number;
-    latestTasks: Task[];
-    tasksByStatus: Array<{ status: string; statusId: number; count: number; color?: string }>;
-    tasksByPriority: Array<{ priority: string; priorityId: number; count: number; color?: string }>;
-    tasksOverTime: Array<{ date: string; count: number }>;
-    tasksByCategory: Array<{ category: Category; count: number }>;
-    recentTaskTypes: Array<{ category: Category; count: number }>;
-    mostActiveUsers: Array<{ userId: number; userName: string; taskCount: number }>;
-    mostUsedTemplates: Array<{ templateId: number; templateName: string; count: number }>;
-    tasksBySpot: Array<{ spotId: number; spotName: string; count: number }>;
-  } | null>(null);
+  const [statistics, setStatistics] = useState<WorkspaceStats | null>(null);
 
   const isCalculatingRef = useRef(false);
   const lastCalculatedWorkspaceRef = useRef<string | undefined>(undefined);
@@ -414,23 +416,105 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     console.log('WorkspaceStatistics - Triggering calculation with', workspaceTasks.length, 'tasks');
     lastCalculatedWorkspaceRef.current = workspaceId;
     calculateStatistics();
-  }, [workspaceId, workspaceTasks, calculateStatistics]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [workspaceId, workspaceTasks, calculateStatistics]); // eslint-disable-line react-hooks-exhaustive-deps
 
-  if (statsLoading) {
+  const renderStatCard = (
+    title: string,
+    value: React.ReactNode,
+    icon: any,
+    accentClass?: string
+  ) => (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="text-center">
+          <div className={`text-2xl font-bold ${accentClass || ''}`}>{value}</div>
+          <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+            <FontAwesomeIcon icon={icon} className="w-3 h-3" />
+            {title}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderSkeletonLayout = () => {
+    const SkeletonStatCard = (key: string) => (
+      <Card key={key}>
+        <CardContent className="pt-6">
+          <div className="text-center animate-pulse space-y-2">
+            <div className="h-6 w-16 mx-auto bg-muted rounded" />
+            <div className="h-3 w-20 mx-auto bg-muted rounded" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+    const SkeletonChartCard = (key: string) => (
+      <Card key={key}>
+        <CardHeader>
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 w-28 bg-muted rounded" />
+            <div className="h-3 w-40 bg-muted rounded" />
+          </div>
+        </CardHeader>
+        <CardContent className="h-64">
+          <div className="h-full w-full bg-muted/60 rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+
+    const SkeletonListCard = (key: string) => (
+      <Card key={key}>
+        <CardHeader>
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 w-32 bg-muted rounded" />
+            <div className="h-3 w-48 bg-muted rounded" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <div key={`${key}-item-${idx}`} className="animate-pulse flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-muted" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-3/4 bg-muted rounded" />
+                <div className="h-3 w-1/2 bg-muted rounded" />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-        <FontAwesomeIcon icon={faSpinner} className="w-8 h-8 text-muted-foreground animate-spin mb-4" />
-        <p className="text-sm text-muted-foreground">Calculating statistics...</p>
+      <div className="flex-1 min-h-0 overflow-auto p-4">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, idx) => SkeletonStatCard(`stat-skeleton-${idx}`))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, idx) => SkeletonChartCard(`chart-skeleton-${idx}`))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {Array.from({ length: 2 }).map((_, idx) => SkeletonListCard(`list-skeleton-${idx}`))}
+          </div>
+        </div>
       </div>
     );
-  }
+  };
 
-  if (!statistics) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-        <p className="text-sm text-muted-foreground">Loading statistics...</p>
-      </div>
-    );
+  const [showRealContent, setShowRealContent] = useState(false);
+
+  useEffect(() => {
+    if (!statistics) {
+      setShowRealContent(false);
+      return;
+    }
+    const timeout = setTimeout(() => setShowRealContent(true), 220);
+    return () => clearTimeout(timeout);
+  }, [statistics]);
+
+  if (!statistics || !showRealContent) {
+    return renderSkeletonLayout();
   }
 
   return (
@@ -438,50 +522,10 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       <div className="space-y-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{statistics.totalTasks}</div>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                  <FontAwesomeIcon icon={faTasks} className="w-3 h-3" />
-                  Total Tasks
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{statistics.completedTasksCount}</div>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                  <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3" />
-                  Completed
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{statistics.urgentTasksCount}</div>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                  <FontAwesomeIcon icon={faExclamationTriangle} className="w-3 h-3" />
-                  Urgent Tasks
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{statistics.overdueTasksCount}</div>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                  <FontAwesomeIcon icon={faExclamationTriangle} className="w-3 h-3" />
-                  Overdue
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {renderStatCard('Total Tasks', statistics.totalTasks, faTasks)}
+          {renderStatCard('Completed', statistics.completedTasksCount, faCheckCircle, 'text-green-600')}
+          {renderStatCard('Urgent Tasks', statistics.urgentTasksCount, faExclamationTriangle, 'text-orange-600')}
+          {renderStatCard('Overdue Tasks', statistics.overdueTasksCount, faExclamationTriangle, 'text-red-600')}
         </div>
 
         {/* Charts Row - Pie Charts */}

@@ -18,6 +18,7 @@ import {
   TextField,
   SelectField
 } from "../components";
+import ReactECharts from "echarts-for-react";
 
 const PriorityNameCellRenderer = (props: ICellRendererParams) => {
   const name = props.data?.name as string;
@@ -109,6 +110,27 @@ function Priorities() {
   const categoryPriorities = useMemo(() => {
     return (priorities as any[]).filter((p: any) => p.category_id !== null && p.category_id !== undefined);
   }, [priorities]);
+
+  const prioritiesByCategory = useMemo(() => {
+    const counts = new Map<number, number>();
+    (priorities as any[]).forEach((p: any) => {
+      const cid = p.category_id as number | null | undefined;
+      if (!cid) return;
+      counts.set(cid, (counts.get(cid) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([categoryId, count]) => {
+        const cat = (categories as any[])?.find(
+          (c: any) => c.id === Number(categoryId)
+        );
+        return cat ? { category: cat, count } : null;
+      })
+      .filter(
+        (item): item is { category: any; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [priorities, categories]);
 
   const globalColumns = useMemo<ColDef[]>(() => [
     {
@@ -313,28 +335,185 @@ function Priorities() {
               </div>
             ),
             content: (
-              <div className="flex-1 min-h-0 overflow-auto">
-                <Card>
-                  <CardHeader className="py-1">
-                    <CardTitle className="text-sm">Priority Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="py-2">
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-2">
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{globalPriorities.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Global Priorities</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base font-semibold leading-none">{categoryPriorities.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Category Priorities</div>
-                      </div>
-                      <div className="text-center col-span-2">
-                        <div className="text-base font-semibold leading-none">{priorities.length}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Total Priorities</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="flex-1 min-h-0 overflow-auto p-4">
+                <div className="space-y-4">
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold">
+                            {globalPriorities.length}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Global Priorities
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-emerald-600">
+                            {categoryPriorities.length}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Category Priorities
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold">
+                            {priorities.length}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Total Priorities
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Charts row */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">
+                          Global vs Category Priorities
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Distribution of priority types
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {priorities.length > 0 ? (
+                          <ReactECharts
+                            option={{
+                              tooltip: {
+                                trigger: "item",
+                                formatter: "{b}: {c} ({d}%)"
+                              },
+                              legend: {
+                                orient: "vertical",
+                                left: "left",
+                                textStyle: { fontSize: 11 }
+                              },
+                              series: [
+                                {
+                                  name: "Priorities",
+                                  type: "pie",
+                                  radius: ["40%", "70%"],
+                                  avoidLabelOverlap: false,
+                                  itemStyle: {
+                                    borderRadius: 8,
+                                    borderColor: "#fff",
+                                    borderWidth: 2
+                                  },
+                                  label: {
+                                    show: true,
+                                    formatter: "{b}: {c}"
+                                  },
+                                  emphasis: {
+                                    label: {
+                                      show: true,
+                                      fontSize: 14,
+                                      fontWeight: "bold"
+                                    }
+                                  },
+                                  data: [
+                                    {
+                                      value: globalPriorities.length,
+                                      name: "Global",
+                                      itemStyle: { color: "#ef4444" }
+                                    },
+                                    {
+                                      value: categoryPriorities.length,
+                                      name: "Category",
+                                      itemStyle: { color: "#3b82f6" }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }}
+                            style={{ height: "300px" }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                            No priority data available
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">
+                          Priorities per Category
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          How many priorities each category defines
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {prioritiesByCategory.length > 0 ? (
+                          <ReactECharts
+                            option={{
+                              tooltip: {
+                                trigger: "axis",
+                                axisPointer: { type: "shadow" }
+                              },
+                              grid: {
+                                left: "3%",
+                                right: "4%",
+                                bottom: "3%",
+                                containLabel: true
+                              },
+                              xAxis: {
+                                type: "value",
+                                name: "Priorities"
+                              },
+                              yAxis: {
+                                type: "category",
+                                data: prioritiesByCategory
+                                  .map((item) => item.category.name)
+                                  .reverse(),
+                                axisLabel: {
+                                  formatter: (value: string) =>
+                                    value.length > 20
+                                      ? value.substring(0, 20) + "..."
+                                      : value
+                                }
+                              },
+                              series: [
+                                {
+                                  name: "Priorities",
+                                  type: "bar",
+                                  data: prioritiesByCategory
+                                    .map((item) => ({
+                                      value: item.count,
+                                      itemStyle: {
+                                        color:
+                                          item.category.color || "#6b7280"
+                                      }
+                                    }))
+                                    .reverse()
+                                }
+                              ]
+                            }}
+                            style={{ height: "300px" }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                            No category data available
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </div>
             )
           }

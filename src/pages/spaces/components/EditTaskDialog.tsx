@@ -12,7 +12,10 @@ import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { ChevronUp, Plus } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
+import { genericActions } from '@/store/genericSlices';
 
 interface EditTaskDialogProps {
   open: boolean;
@@ -33,6 +36,11 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
   const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
   const { value: approvals = [] } = useSelector((s: RootState) => (s as any).approvals || { value: [] });
+  const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
+  const { value: tags = [] } = useSelector((s: RootState) => (s as any).tags || { value: [] });
+  const { value: taskTags = [] } = useSelector((s: RootState) => (s as any).taskTags || { value: [] });
+  
+  const { user } = useAuth();
 
   const workspaceId = task?.workspace_id ? Number(task.workspace_id) : null;
   const currentWorkspace = workspaces.find((w: any) => w.id === workspaceId);
@@ -48,6 +56,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
   const [priorityId, setPriorityId] = useState<number | null>(null);
   const [spotId, setSpotId] = useState<number | null>(null);
   const [statusId, setStatusId] = useState<number | null>(null);
+  const [templateId, setTemplateId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState<string>('');
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +65,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
   const [approvalId, setApprovalId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
   const [showDescription, setShowDescription] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 
   const derivedTeamId = useMemo(() => {
     if (!categoryId) return null;
@@ -85,9 +95,59 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
   }, [currentCategory?.icon]);
 
   const categoryPriorities = useMemo(() => {
-    if (!categoryId) return [] as any[];
-    return priorities.filter((p: any) => p.category_id === categoryId);
+    if (!categoryId) {
+      // If no category selected, return global priorities (category_id is null)
+      return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
+    }
+    
+    // First, try to get category-specific priorities
+    const categorySpecific = priorities.filter((p: any) => p.category_id === categoryId);
+    
+    // If category has priorities, use them; otherwise fall back to global priorities
+    if (categorySpecific.length > 0) {
+      return categorySpecific;
+    }
+    
+    // Fall back to global priorities (category_id is null)
+    return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
   }, [priorities, categoryId]);
+
+  const workspaceTemplates = useMemo(() => {
+    // Only show templates for workspaces of type "DEFAULT"
+    if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
+      return [];
+    }
+
+    // Templates are matched to workspace by category_id
+    return templates.filter((template: any) => {
+      if (template?.enabled === false) return false;
+      return template.category_id === currentWorkspace.category_id;
+    });
+  }, [templates, currentWorkspace]);
+
+  const selectedTemplate = useMemo(() => {
+    if (!templateId) return null;
+    // Handle both string and number ID comparisons
+    const found = workspaceTemplates.find((t: any) => 
+      t.id === templateId || 
+      Number(t.id) === Number(templateId) ||
+      String(t.id) === String(templateId)
+    );
+    return found || null;
+  }, [templateId, workspaceTemplates]);
+
+  const spotsApplicable = useMemo(() => {
+    if (!selectedTemplate) return true; // Default to showing location if no template selected
+    // Explicitly convert to boolean to handle various formats from API
+    // Handle: true, "true", 1, "1" as truthy values
+    const spotsNotApplicableValue = selectedTemplate.spots_not_applicable;
+    const spotsNotApplicable = 
+      spotsNotApplicableValue === true || 
+      spotsNotApplicableValue === 'true' || 
+      spotsNotApplicableValue === 1 || 
+      spotsNotApplicableValue === '1';
+    return !spotsNotApplicable;
+  }, [selectedTemplate]);
 
   const workspaceUsers = useMemo(() => {
     if (!workspaceId) return [];
@@ -112,6 +172,22 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
     });
   }, [statuses, categoryId]);
 
+  // Get tags for this task
+  const taskTagIds = useMemo(() => {
+    if (!task?.id) return [];
+    return taskTags
+      .filter((tt: any) => tt.task_id === Number(task.id))
+      .map((tt: any) => Number(tt.tag_id));
+  }, [taskTags, task?.id]);
+
+  // Load tags and taskTags from IndexedDB when dialog opens
+  useEffect(() => {
+    if (open) {
+      dispatch(genericActions.tags.getFromIndexedDB());
+      dispatch(genericActions.taskTags.getFromIndexedDB());
+    }
+  }, [open, dispatch]);
+
   // Load task data when dialog opens or task changes
   useEffect(() => {
     if (open && task) {
@@ -121,6 +197,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
       setPriorityId(task.priority_id ? Number(task.priority_id) : null);
       setSpotId(task.spot_id ? Number(task.spot_id) : null);
       setStatusId(task.status_id ? Number(task.status_id) : null);
+      setTemplateId(task.template_id ? Number(task.template_id) : null);
       setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
       setSelectedUserIds(Array.isArray(task.user_ids) ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n)) : []);
       setSlaId(task.sla_id ? Number(task.sla_id) : null);
@@ -128,8 +205,13 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
       setIsSubmitting(false);
       setActiveTab('basic');
       setShowDescription(!!task.description);
+      // Load existing tags for this task
+      const currentTaskTagIds = taskTags
+        .filter((tt: any) => tt.task_id === Number(task.id))
+        .map((tt: any) => Number(tt.tag_id));
+      setSelectedTagIds(currentTaskTagIds);
     }
-  }, [open, task]);
+  }, [open, task?.id, taskTags]);
 
   const canSubmit = useMemo(() => {
     return Boolean(
@@ -144,7 +226,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
   }, [name, workspaceId, categoryId, derivedTeamId, statusId, priorityId, categoryPriorities.length, task?.id]);
 
   const handleSubmit = async () => {
-    if (!canSubmit || !categoryId || !derivedTeamId || !statusId || !task?.id) return;
+    if (!canSubmit || !categoryId || !derivedTeamId || !statusId || !task?.id || !user?.id) return;
     try {
       setIsSubmitting(true);
       const updates: any = {
@@ -152,9 +234,9 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
         description: description.trim() || null,
         category_id: categoryId,
         team_id: derivedTeamId,
-        spot_id: spotId,
-        status_id: statusId,
+        // status_id is not included - status should only be changed from the grid status column
         priority_id: priorityId ?? 0,
+        template_id: templateId,
         sla_id: slaId,
         approval_id: approvalId,
         due_date: dueDate || null,
@@ -162,8 +244,42 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
           ? selectedUserIds.map((id) => parseInt(String(id), 10)).filter((n) => Number.isFinite(n))
           : [],
       };
+      
+      // Only include spot_id if spots are applicable for this template
+      if (spotsApplicable) {
+        updates.spot_id = spotId;
+      }
 
       await dispatch(updateTaskAsync({ id: Number(task.id), updates })).unwrap();
+      
+      // Handle tag assignments
+      const currentTagIds = new Set(taskTagIds);
+      const newTagIds = new Set(selectedTagIds);
+      
+      // Find tags to add
+      const tagsToAdd = selectedTagIds.filter(tagId => !currentTagIds.has(tagId));
+      // Find tags to remove
+      const tagsToRemove = taskTagIds.filter(tagId => !newTagIds.has(tagId));
+      
+      // Create new task tags
+      for (const tagId of tagsToAdd) {
+        await dispatch(genericActions.taskTags.addAsync({
+          task_id: Number(task.id),
+          tag_id: tagId,
+          user_id: user.id,
+        })).unwrap();
+      }
+      
+      // Remove task tags
+      for (const tagId of tagsToRemove) {
+        const taskTag = taskTags.find((tt: any) => 
+          tt.task_id === Number(task.id) && tt.tag_id === tagId
+        );
+        if (taskTag) {
+          await dispatch(genericActions.taskTags.removeAsync(taskTag.id)).unwrap();
+        }
+      }
+      
       onOpenChange(false);
     } catch (e) {
       // Error is handled by slice; keep dialog open for correction
@@ -178,7 +294,16 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="right" 
-        className="w-full sm:w-[600px] max-w-[600px] p-0 m-0 sm:m-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => {
+          // Only allow closing via Cancel button or X button
+          if (!isSubmitting) {
+            onOpenChange(false);
+          } else {
+            e.preventDefault();
+          }
+        }}
+        className="w-full sm:w-[1120px] max-w-[1120px] p-0 m-0 sm:m-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full"
       >
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
@@ -224,12 +349,37 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
               
               {/* Basic Details Tab */}
               <TabsContent value="basic" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
-                {/* Task Name */}
+                {/* Template Selection */}
                 <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-medium font-[500] text-foreground">Task Name</Label>
-                  <div className="text-sm py-3 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-foreground">
-                    {name || 'N/A'}
-                  </div>
+                  <Label htmlFor="template" className="text-sm font-medium font-[500] text-foreground">
+                    Template
+                  </Label>
+                  <Select value={templateId ? String(templateId) : undefined} onValueChange={(v) => setTemplateId(parseInt(v, 10))}>
+                    <SelectTrigger 
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                    >
+                      <SelectValue placeholder={
+                        !currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                          ? 'Templates only available for default workspaces'
+                          : workspaceTemplates.length
+                            ? 'Select template'
+                            : 'No templates available'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workspaceTemplates.map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!workspaceTemplates.length && (
+                    <p className="text-xs text-[#6B7280] mt-1">
+                      {!currentWorkspace || currentWorkspace.type !== "DEFAULT"
+                        ? 'Templates are only available for default workspaces.'
+                        : 'No templates available in this workspace. Enable or create templates first.'
+                      }
+                    </p>
+                  )}
                 </div>
 
                 {/* Description - Collapsible */}
@@ -278,75 +428,50 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
                 )}
 
                 {/* Location */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-medium font-[500] text-foreground">
-                    Location
-                  </Label>
-                  <div className="[&_button]:h-12 [&_button]:px-4 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
-                    <Combobox
-                      options={workspaceSpots.map((s: any) => ({
-                        value: String(s.id),
-                        label: s.name,
-                      }))}
-                      value={spotId ? String(spotId) : undefined}
-                      onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
-                      placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
-                      searchPlaceholder="Search locations..."
-                      emptyText="No locations found."
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                {/* Priority */}
-                <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-medium font-[500] text-foreground">
-                    Priority
-                  </Label>
-                  <Select value={priorityId ? String(priorityId) : undefined} onValueChange={(v) => setPriorityId(parseInt(v, 10))}>
-                    <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
-                    >
-                      <div className="flex items-center gap-2 flex-1">
-                        {priorityId && (() => {
-                          const selectedPriority = categoryPriorities.find((p: any) => p.id === priorityId);
-                          if (selectedPriority) {
-                            return (
-                              <>
-                                <span 
-                                  className="w-2 h-2 rounded-full flex-shrink-0" 
-                                  style={{ backgroundColor: selectedPriority.color }}
-                                />
-                                <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
-                              </>
-                            );
-                          }
-                          return <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />;
-                        })()}
+                {(() => {
+                  // Double-check: if spotsApplicable is false, definitely hide
+                  if (!spotsApplicable) return null;
+                  
+                  // Additional safety check: verify template directly
+                  if (selectedTemplate) {
+                    const spotsNotApplicableValue = selectedTemplate.spots_not_applicable;
+                    const isNotApplicable = 
+                      spotsNotApplicableValue === true || 
+                      spotsNotApplicableValue === 'true' || 
+                      spotsNotApplicableValue === 1 || 
+                      spotsNotApplicableValue === '1';
+                    if (isNotApplicable) return null;
+                  }
+                  
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm font-medium font-[500] text-foreground">
+                        Location
+                      </Label>
+                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                        <Combobox
+                          options={workspaceSpots.map((s: any) => ({
+                            value: String(s.id),
+                            label: s.name,
+                          }))}
+                          value={spotId ? String(spotId) : undefined}
+                          onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
+                          placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
+                          searchPlaceholder="Search locations..."
+                          emptyText="No locations found."
+                          className="w-full"
+                        />
                       </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoryPriorities.map((p: any) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          <div className="flex items-center gap-2">
-                            <span 
-                              className="w-2 h-2 rounded-full flex-shrink-0" 
-                              style={{ backgroundColor: p.color }}
-                            />
-                            <span>{p.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Responsible */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium font-[500] text-foreground">
                     Responsible
                   </Label>
-                  <div className="[&_button]:h-auto [&_button]:min-h-[48px] [&_button]:px-4 [&_button]:py-2.5 [&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                  <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                     <MultiSelectCombobox
                       options={workspaceUsers.map((u: any) => ({
                         value: String(u.id),
@@ -364,23 +489,51 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
                   </div>
                 </div>
 
-                {/* Status */}
+                {/* Priority */}
                 <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-medium font-[500] text-foreground">Status *</Label>
-                  <Select value={statusId ? String(statusId) : undefined} onValueChange={(v) => setStatusId(parseInt(v, 10))}>
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Priority
+                  </Label>
+                  <Select value={priorityId ? String(priorityId) : undefined} onValueChange={(v) => setPriorityId(parseInt(v, 10))}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
-                      <SelectValue placeholder="Select status" />
+                      <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableStatuses.map((s: any) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.name}
+                      {categoryPriorities.map((p: any) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="w-2 h-2 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: p.color }}
+                            />
+                            <span>{p.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    Tags
+                  </Label>
+                  <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                    <TagMultiSelect
+                      tags={tags}
+                      value={selectedTagIds}
+                      onValueChange={(values) => {
+                        setSelectedTagIds(values);
+                      }}
+                      placeholder="Select tags..."
+                      searchPlaceholder="Search tags..."
+                      emptyText="No tags found."
+                      className="w-full"
+                    />
+                  </div>
                 </div>
               </TabsContent>
 
@@ -396,7 +549,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
                     type="date" 
                     value={dueDate} 
                     onChange={(e) => setDueDate(e.target.value)} 
-                    className="h-12 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
+                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
                   />
                 </div>
 
@@ -407,7 +560,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
                   </Label>
                   <Select value={slaId ? String(slaId) : undefined} onValueChange={(v) => setSlaId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
                       <SelectValue placeholder="Select SLA (optional)" />
                     </SelectTrigger>
@@ -428,7 +581,7 @@ export default function EditTaskDialog({ open, onOpenChange, task }: EditTaskDia
                   <Label className="text-sm font-medium font-[500] text-foreground">Approval</Label>
                   <Select value={approvalId ? String(approvalId) : undefined} onValueChange={(v) => setApprovalId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-12 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
                       <SelectValue placeholder="Select approval (optional)" />
                     </SelectTrigger>

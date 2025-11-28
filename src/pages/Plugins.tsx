@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock } from '@fortawesome/free-solid-svg-icons';
 
 function Plugins() {
 	const navigate = useNavigate();
@@ -51,6 +51,20 @@ function Plugins() {
 						<div className="space-y-1.5">
 							<CardTitle className="text-xl">TeamConnect</CardTitle>
 							<CardDescription>Team collaboration and directory integration</CardDescription>
+						</div>
+					</CardHeader>
+				</Card>
+
+				<Card className="cursor-pointer transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[160px] overflow-hidden">
+					<CardHeader className="space-y-3">
+						<div className="flex items-center justify-between">
+							<div className="text-4xl text-indigo-500 group-hover:scale-110 transition-transform duration-200">
+								<FontAwesomeIcon icon={faClock} />
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<CardTitle className="text-xl">Clock-In</CardTitle>
+							<CardDescription>Time tracking, shift planning and attendance insights</CardDescription>
 						</div>
 					</CardHeader>
 				</Card>

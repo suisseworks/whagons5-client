@@ -582,7 +582,7 @@ export class TasksCache {
                 tasks = tasks.filter(task => task.category_id === parseInt(params.category_id));
             }
 
-            // Apply search filter: includes ID, status/priority/spot names and responsible user names
+            // Apply search filter: includes ID, status/priority/spot names, responsible user names, and tags
             if (params.search) {
                 const searchTerm = String(params.search).toLowerCase();
 
@@ -591,6 +591,19 @@ export class TasksCache {
                 const priorityMap: Record<number, { name?: string }> = params.__priorityMap || {};
                 const spotMap: Record<number, { name?: string }> = params.__spotMap || {};
                 const userMap: Record<number, { name?: string; email?: string }> = params.__userMap || {};
+                const tagMap: Record<number, { name?: string }> = params.__tagMap || {};
+                const taskTags: Array<{ task_id: number; tag_id: number }> = params.__taskTags || [];
+
+                // Build a map of task_id -> tag_ids for efficient lookup
+                const taskTagMap: Record<number, number[]> = {};
+                for (const tt of taskTags) {
+                    const taskId = Number(tt.task_id);
+                    const tagId = Number(tt.tag_id);
+                    if (!taskTagMap[taskId]) {
+                        taskTagMap[taskId] = [];
+                    }
+                    taskTagMap[taskId].push(tagId);
+                }
 
                 const matches = (t: Task): boolean => {
                     // ID
@@ -620,6 +633,15 @@ export class TasksCache {
                             const u = userMap[uid];
                             const uname = u?.name || u?.email;
                             if (uname && uname.toLowerCase().includes(searchTerm)) return true;
+                        }
+                    }
+
+                    // Tags
+                    const tagIds = taskTagMap[t.id];
+                    if (tagIds && tagIds.length > 0) {
+                        for (const tagId of tagIds) {
+                            const tag = tagMap[tagId];
+                            if (tag?.name && tag.name.toLowerCase().includes(searchTerm)) return true;
                         }
                     }
 
