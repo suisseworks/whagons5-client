@@ -12,7 +12,6 @@ import { genericActions } from '@/store/genericSlices';
 // Import abstracted utilities
 import { loadAgGridModules, createDefaultColDef, createGridOptions } from './workspaceTable/agGridSetup';
 import {
-  getUserInitials,
   getUserDisplayName,
   getUsersFromIds,
   formatDueDate
@@ -248,6 +247,17 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const userMap = useMemo(() => createUserMap(users), [users]);
   const filteredPriorities = useMemo(() => createFilteredPriorities(priorities, defaultCategoryId), [priorities, defaultCategoryId]);
   const tagMap = useMemo(() => createTagMap(tags), [tags]);
+  const taskTagsMap = useMemo(() => {
+    const m = new Map<number, number[]>();
+    for (const tt of taskTags || []) {
+      const ttid = Number((tt as any).task_id);
+      const tagId = Number((tt as any).tag_id);
+      if (!Number.isFinite(ttid) || !Number.isFinite(tagId)) continue;
+      const arr = m.get(ttid);
+      if (arr) arr.push(tagId); else m.set(ttid, [tagId]);
+    }
+    return m;
+  }, [taskTags]);
   const categoryMap = useMemo(() => {
     const m: Record<number, any> = {};
     for (const c of categories || []) {
@@ -465,9 +475,19 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   }, [spotMap]);
 
   // Determine current density to decide whether to show row descriptions
-  const density = (() => {
+  const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
     try { return (localStorage.getItem('wh_workspace_density') as any) || 'comfortable'; } catch { return 'comfortable'; }
-  })();
+  });
+
+  // Listen for density changes
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e?.detail as any;
+      if (v === 'compact' || v === 'comfortable' || v === 'spacious') setRowDensity(v);
+    };
+    window.addEventListener('wh:rowDensityChanged', handler);
+    return () => window.removeEventListener('wh:rowDensityChanged', handler);
+  }, []);
 
   // Column visibility preferences (per-workspace, persisted in localStorage)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
@@ -543,7 +563,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
-    getUserInitials,
     getStatusIcon,
     getAllowedNextStatuses,
     handleChangeStatus,
@@ -561,11 +580,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     getDoneStatusId,
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
     categoryMap,
-    showDescriptions: density !== 'compact',
+    showDescriptions: rowDensity !== 'compact',
+    density: rowDensity,
     approvalMap,
     taskApprovalInstances: stableTaskApprovalInstances,
     tagMap,
     taskTags,
+    taskTagsMap,
     tagDisplayMode,
     visibleColumns,
     workspaceCustomFields,
@@ -578,7 +599,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, density, tagDisplayMode,
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
     approvalMap, approvalApprovers, stableTaskApprovalInstances,
     visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, taskNotes, taskAttachments,
   ]);
@@ -945,7 +966,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           // Prevent multiple calls for the same row (onCellDoubleClicked fires for each cell)
           const rowId = e?.data?.id;
           const now = Date.now();
-          if (lastDoubleClickRef.current?.rowId === rowId && now - lastDoubleClickRef.current.timestamp < 100) {
+          if (lastDoubleClickRef.current && lastDoubleClickRef.current.rowId === rowId && now - lastDoubleClickRef.current.timestamp < 100) {
             return; // Already handled this row's double-click
           }
           lastDoubleClickRef.current = { rowId, timestamp: now };
@@ -954,12 +975,12 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             onRowDoubleClicked(e.data);
           }
         }}
-        onRowClicked={(e: any) => {
+        onRowClicked={(_e: any) => {
           // Prevent single click from doing anything (we only want double click)
           // But still allow row selection
         }}
         animateRows={false}
-        suppressColumnVirtualisation={true}
+        suppressColumnVirtualisation={false}
         suppressNoRowsOverlay={false}
         loading={false}
         suppressScrollOnNewData={true}

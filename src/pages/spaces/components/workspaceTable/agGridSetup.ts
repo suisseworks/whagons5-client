@@ -68,17 +68,19 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,
-    cacheBlockSize: 500,
-    maxConcurrentDatasourceRequests: 1,
-    maxBlocksInCache: 10,
+    cacheBlockSize: 50,
+    cacheOverflowSize: 30,
+    infiniteInitialRowCount: 500,
+    maxConcurrentDatasourceRequests: 4,
+    maxBlocksInCache: 70,
     getRowId: (params: any) => String(params.data.id),
   }),
   // Default sort by created_at descending (newest first)
   sortModel: [{ colId: 'created_at', sort: 'desc' }],
   animateRows: false, // Disabled for scroll performance
-  suppressColumnVirtualisation: true,
+  suppressColumnVirtualisation: false,
   suppressNoRowsOverlay: false,
   loading: false,
   suppressScrollOnNewData: true, // Prevent scroll jumps
-  debounceVerticalScrollbar: true, // Debounce scrollbar updates
+  debounceVerticalScrollbar: false, 
 });

@@ -1,0 +1,30 @@
+# Global options
+{
+    admin off
+    auto_https off
+    log {
+        format json
+    }
+}
+
+# Listen on PORT environment variable (defaults to 80)
+:{$PORT:80} {
+    # Logging
+    log {
+        format json
+    }
+
+    # Health check endpoint
+    respond /health 200
+
+    # Serve static files from dist directory
+    root * /usr/share/caddy
+    file_server
+
+    # Enable gzip compression
+    encode gzip
+
+    # SPA routing - serve index.html for all non-file requests
+    try_files {path} /index.html
+}
+

@@ -47,6 +47,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -105,11 +107,12 @@ const WorkspaceIconBadge = ({
   children: ReactNode;
 }) => (
   <div
-    className="flex items-center justify-center rounded-[6px] flex-shrink-0"
+    className="grid place-items-center rounded-[6px] flex-shrink-0"
     style={{
       backgroundColor: color || '#3b82f6',
       width: `${size}px`,
       height: `${size}px`,
+      position: 'relative',
     }}
   >
     {children}
@@ -129,13 +132,15 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    // Hide the original item while dragging; DragOverlay renders the preview
+    opacity: isDragging ? 0 : 1,
+    zIndex: 'auto',
   };
 
   const isActive = pathname === `/workspace/${workspace.id}`;
   const buttonClass = collapsed
     ? `flex justify-center items-center ${isActive
-        ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+        ? 'text-[var(--sidebar-primary)]'
         : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
       }`
     : `${isActive
@@ -174,13 +179,19 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
             }
           }}
           className={`${collapsed
-            ? 'flex justify-center items-center w-full'
+            ? 'grid place-items-center w-8 h-8 p-0'
             : 'flex items-center'
           } group relative`}
           style={{
             pointerEvents: isDragging ? 'none' : 'auto',
           }}
         >
+          {isActive && (
+            <span
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-[var(--sidebar-primary)] rounded-full"
+              style={{ width: '2px', height: collapsed ? '80%' : '85%' }}
+            />
+          )}
           <WorkspaceIconBadge color={workspace.color || '#3b82f6'}>
             <FontAwesomeIcon
               icon={getWorkspaceIcon(workspace.icon)}
@@ -189,7 +200,11 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
                 fontSize: '14px',
                 width: '14px',
                 height: '14px',
-                display: 'block'
+                display: 'block',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%,-50%)'
               }}
             />
           </WorkspaceIconBadge>
@@ -255,10 +270,17 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     })
   );
 
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
+      setActiveId(null);
       return;
     }
 
@@ -271,6 +293,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       saveWorkspaceOrder(orderedIds);
       setOrderKey((prev) => prev + 1); // Force re-render to update order
     }
+    setActiveId(null);
   };
 
 
@@ -323,7 +346,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           <Link
             to={`/workspace/all`}
             className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/workspace/all`
-                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
                 : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
             }`}
             style={{
@@ -350,7 +373,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           <Link
             to={`/workspace/all`}
             className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/workspace/all`
-                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)] border border-[var(--sidebar-ring)]'
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
                 : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
             }`}
             style={{
@@ -569,12 +592,14 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           </div>
         </SidebarGroupLabel>
 
-        <CollapsibleContent keepRendered>
+        <CollapsibleContent keepRendered forceVisible={collapsed}>
           <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragCancel={() => setActiveId(null)}
             >
               <SortableContext
                 items={workspaceIds}
@@ -592,6 +617,39 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                   ))}
                 </div>
               </SortableContext>
+              <DragOverlay zIndex={10000}>
+                {activeId ? (() => {
+                  const w = localWorkspaces.find((x) => String(x.id) === String(activeId));
+                  if (!w) return null;
+                  const isActive = pathname === `/workspace/${w.id}`;
+                  return (
+                    <div
+                      className="rounded-[8px] shadow-lg"
+                      style={{
+                        height: '32px',
+                        padding: collapsed ? '6px' : '6px 10px',
+                        gap: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: collapsed ? 'center' : 'flex-start',
+                        background: isActive ? 'var(--sidebar-selected-bg)' : 'var(--sidebar)',
+                        color: isActive ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)',
+                        fontWeight: isActive ? 600 : 500,
+                        fontSize: '13px',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <WorkspaceIconBadge color={w.color || '#3b82f6'}>
+                        <FontAwesomeIcon
+                          icon={getWorkspaceIcon(w.icon)}
+                          style={{ color: '#ffffff', fontSize: '14px', width: '14px', height: '14px', display: 'block' }}
+                        />
+                      </WorkspaceIconBadge>
+                      {!collapsed && <span className="truncate ml-1.5">{w.name}</span>}
+                    </div>
+                  );
+                })() : null}
+              </DragOverlay>
             </DndContext>
           </SidebarGroupContent>
         </CollapsibleContent>

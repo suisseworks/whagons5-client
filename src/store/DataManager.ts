@@ -33,7 +33,6 @@ export class DataManager {
   constructor(private dispatch: AppDispatch) {}
 
   async loadCoreFromIndexedDB() {
-    await this.dispatch(getTasksFromIndexedDB());
     await Promise.allSettled(
       coreKeys.map(async (key) => {
         const actions = (genericActions as any)[key];
@@ -45,6 +44,7 @@ export class DataManager {
         }
       })
     );
+    await this.dispatch(getTasksFromIndexedDB());
   }
 
   async validateAndRefresh() {

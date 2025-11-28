@@ -13,9 +13,6 @@ import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
 import CreateTaskDialogForEverything from '@/pages/spaces/components/CreateTaskDialogForEverything';
@@ -39,9 +36,31 @@ export const Workspace = () => {
   };
 
   const id = getWorkspaceIdFromPath(location.pathname);
-  // State to store the fetched data
-  const [activeTab, setActiveTab] = useState('grid');
-  const [prevActiveTab, setPrevActiveTab] = useState('grid');
+  
+  // Helper function to get current tab from URL (matches UrlTabs logic)
+  const getCurrentTabFromUrl = (): string => {
+    const pathMap = { grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' };
+    const normalizedBase = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
+    if (location.pathname.startsWith(normalizedBase)) {
+      const rest = location.pathname.slice(normalizedBase.length) || '';
+      const entries = Object.entries(pathMap).map(([k, v]) => [k, (v || '') as string]) as Array<[string,string]>;
+      entries.sort((a, b) => (b[1].length || 0) - (a[1].length || 0));
+      for (const [key, value] of entries) {
+        const val = value || '';
+        if (val === '' && (rest === '' || rest === '/')) {
+          return key;
+        } else if (rest === val || rest.replace(/\/$/, '') === val.replace(/\/$/, '') || rest.startsWith(val.endsWith('/') ? val : `${val}/`)) {
+          return key;
+        }
+      }
+    }
+    return 'grid';
+  };
+
+  // Initialize tab state from URL to prevent incorrect animation on mount
+  const initialTab = getCurrentTabFromUrl();
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [prevActiveTab, setPrevActiveTab] = useState(initialTab);
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
@@ -142,7 +161,7 @@ export const Workspace = () => {
       return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
     } catch { return 'compact'; }
   });
-  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 46 : 64;
+  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 52 : 110;
   useEffect(() => {
     try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
   }, [rowDensity]);
@@ -312,6 +331,18 @@ export const Workspace = () => {
 
 
 
+
+  // Sync tab state when URL changes (e.g., navigating from settings to workspace)
+  useEffect(() => {
+    const currentTabFromUrl = getCurrentTabFromUrl();
+    if (currentTabFromUrl !== activeTab) {
+      // When URL changes (e.g., navigating from settings), sync both states
+      // to the same value to prevent incorrect animation on mount
+      // This ensures prevActiveTab matches activeTab so initial position is correct
+      setPrevActiveTab(currentTabFromUrl);
+      setActiveTab(currentTabFromUrl);
+    }
+  }, [location.pathname, id]);
 
   //
   // Clear cache when workspace ID changes
@@ -536,7 +567,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <WorkspaceStatistics workspaceId={id} />
         </motion.div>
       )
@@ -549,7 +580,7 @@ export const Workspace = () => {
         </div>
       ),
       content: (
-        <motion.div key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full' key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SettingsComponent workspaceId={id} />
         </motion.div>
       )

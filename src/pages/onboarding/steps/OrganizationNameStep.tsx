@@ -2,6 +2,19 @@ import React, { useState } from 'react';
 import { OnboardingData } from '@/types/user';
 import { checkTenantExists, createTenantName } from '@/lib/tenant';
 
+// Normalize an organization name into a safe tenant slug:
+// - lowercase
+// - only a-z, 0-9 and hyphens
+// - collapse multiple non-alphanumerics into a single hyphen
+// - trim leading/trailing hyphens
+const slugifyOrganizationName = (value: string): string => {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
 interface OrganizationNameStepProps {
   data: OnboardingData;
   onUpdate: (data: Partial<OnboardingData>) => void;
@@ -47,8 +60,13 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
       return;
     }
 
-    // Clean the organization name by replacing spaces with hyphens
-    const cleanedOrgName = organizationName.trim().replace(/\s+/g, '-').toLowerCase();
+    // Clean the organization name into a safe slug
+    const cleanedOrgName = slugifyOrganizationName(organizationName);
+
+    if (!cleanedOrgName) {
+      setError('Organization name must contain letters or numbers.');
+      return;
+    }
 
     // Check if tenant exists (placeholder function)
     const tenantExists = await checkTenantExists(cleanedOrgName);
@@ -84,8 +102,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     
     // Preview the tenant name as user types
     if (value.trim()) {
-      // Replace spaces with hyphens and convert to lowercase
-      const cleanedValue = value.trim().replace(/\s+/g, '-').toLowerCase();
+      const cleanedValue = slugifyOrganizationName(value);
       const previewTenant = createTenantName(cleanedValue, hasActiveSubscription);
       setFinalTenantName(previewTenant);
     } else {

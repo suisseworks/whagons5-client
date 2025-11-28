@@ -506,9 +506,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
                 }}
               >
-                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-2 text-xs">C</ToggleGroupItem>
-                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-2 text-xs">M</ToggleGroupItem>
-                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-2 text-xs">L</ToggleGroupItem>
+                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-3 text-xs">Compact</ToggleGroupItem>
+                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-3 text-xs">Comfortable</ToggleGroupItem>
+                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-3 text-xs">Spacious</ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
@@ -526,24 +526,39 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
             </div>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {allColumns.map(col => (
-                <button
+                <div
                   key={col.id}
-                  type="button"
-                  disabled={col.locked}
-                  onClick={() => handleToggleColumn(col.id, col.locked)}
-                  className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left hover:bg-accent disabled:opacity-70 disabled:cursor-not-allowed"
+                  role="button"
+                  tabIndex={col.locked ? -1 : 0}
+                  aria-disabled={col.locked}
+                  aria-pressed={columnPrefs.includes(col.id)}
+                  onClick={() => !col.locked && handleToggleColumn(col.id, col.locked)}
+                  onKeyDown={(event) => {
+                    if (col.locked) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleToggleColumn(col.id, col.locked);
+                    }
+                  }}
+                  className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left ${
+                    col.locked
+                      ? 'opacity-70 cursor-not-allowed'
+                      : 'hover:bg-accent cursor-pointer'
+                  }`}
                 >
                   <Checkbox
                     checked={col.locked || columnPrefs.includes(col.id)}
                     disabled={col.locked}
                     onCheckedChange={() => handleToggleColumn(col.id, col.locked)}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
                     className="h-3.5 w-3.5"
                   />
                   <span className="text-xs">
                     {col.label}
                     {col.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">(Required)</span>}
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           </div>

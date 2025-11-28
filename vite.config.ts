@@ -99,6 +99,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      // Enable build caching for faster rebuilds
+      cacheDir: 'node_modules/.vite',
+      // Optimize chunk size warnings
+      chunkSizeWarningLimit: 1000,
+      // Use esbuild for faster minification (faster than terser)
+      minify: 'esbuild',
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -119,8 +125,6 @@ export default defineConfig(({ mode }) => {
             if (id.includes('/node_modules/@reduxjs/toolkit')) return 'redux';
             if (id.includes('/node_modules/react-redux')) return 'redux';
             if (id.includes('/node_modules/redux-persist')) return 'redux';
-
-            if (id.includes('/node_modules/firebase/auth') || id.includes('/node_modules/@firebase/auth')) return 'firebase';
 
             const uiPkgs = ['@radix-ui/react-avatar','@radix-ui/react-collapsible','@radix-ui/react-dialog','@radix-ui/react-dropdown-menu','@radix-ui/react-label','@radix-ui/react-separator','@radix-ui/react-slot','@radix-ui/react-tabs','@radix-ui/react-tooltip','lucide-react','class-variance-authority'];
             if (uiPkgs.some(p => id.includes(`/node_modules/${p}/`))) return 'ui';
