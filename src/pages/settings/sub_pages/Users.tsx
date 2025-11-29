@@ -16,6 +16,7 @@ import { Invitation } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
+import { getEnvVariables } from "@/lib/getEnvVariables";
 
 // Extended User type based on actual API data structure
 interface UserData {
@@ -443,17 +444,16 @@ function Users() {
         const invitation = params.data as Invitation;
         if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
         
-        // Generate invitation link
-        const subdomain = localStorage.getItem('whagons-subdomain') || '';
-        const tenantPrefix = subdomain.endsWith('.') ? subdomain.slice(0, -1) : subdomain;
+        // Generate invitation link using VITE_DOMAIN
+        const { VITE_DOMAIN } = getEnvVariables();
+        const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
+        const tenantPrefix = invitation.tenant_domain_prefix || '';
         const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-        const host = window.location.hostname;
-        const port = window.location.port ? `:${window.location.port}` : '';
         
-        // Use tenant subdomain if available, otherwise use current host
+        // Build domain: {tenant_prefix}.{base_domain}
         const domain = tenantPrefix 
-          ? `${tenantPrefix}.${host.split('.').slice(1).join('.') || 'localhost'}${port}`
-          : `${host}${port}`;
+          ? `${tenantPrefix}.${baseDomain}`
+          : baseDomain;
         
         const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
         
@@ -531,15 +531,17 @@ function Users() {
       })
       .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
 
-    // Generate invitation link
-    const subdomain = localStorage.getItem('whagons-subdomain') || '';
-    const tenantPrefix = subdomain.endsWith('.') ? subdomain.slice(0, -1) : subdomain;
+    // Generate invitation link using VITE_DOMAIN
+    const { VITE_DOMAIN } = getEnvVariables();
+    const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
+    const tenantPrefix = invitation.tenant_domain_prefix || '';
     const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-    const host = window.location.hostname;
-    const port = window.location.port ? `:${window.location.port}` : '';
+    
+    // Build domain: {tenant_prefix}.{base_domain}
     const domain = tenantPrefix 
-      ? `${tenantPrefix}.${host.split('.').slice(1).join('.') || 'localhost'}${port}`
-      : `${host}${port}`;
+      ? `${tenantPrefix}.${baseDomain}`
+      : baseDomain;
+    
     const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
 
     return (
