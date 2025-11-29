@@ -73,14 +73,16 @@ export function MultiSelectCombobox({
                     key={option.value}
                     variant="secondary"
                     className="text-xs px-1.5 py-0.5 h-5 flex-shrink-0"
-                    onClick={(e) => handleRemove(option.value, e)}
                   >
                     <span className="truncate max-w-[100px]">{option.label}</span>
-                    <button
-                      className="ml-0.5 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="ml-0.5 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleRemove(option.value, e)
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          handleRemove(option.value, e as any)
                         }
                       }}
                       onMouseDown={(e) => {
@@ -90,7 +92,7 @@ export function MultiSelectCombobox({
                       onClick={(e) => handleRemove(option.value, e)}
                     >
                       <X className="h-2.5 w-2.5 text-muted-foreground hover:text-foreground" />
-                    </button>
+                    </span>
                   </Badge>
                 ))}
               </div>
@@ -109,10 +111,12 @@ export function MultiSelectCombobox({
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedValues.includes(option.value)
+                // Use a unique search value that combines label and value to prevent duplicate highlights
+                const searchValue = `${option.label} ${option.value}`
                 return (
                   <CommandItem
                     key={option.value}
-                    value={option.label}
+                    value={searchValue}
                     onSelect={() => handleSelect(option.value)}
                   >
                     <Check

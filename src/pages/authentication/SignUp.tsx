@@ -5,6 +5,7 @@ import { signUpWithEmail, signInWithGoogle, logout } from './auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { api, updateAuthToken } from '@/api/whagonsApi';
 import { InitializationStage } from '@/types/user';
+import { useAuth } from '@/providers/AuthProvider';
 
 const SignUp: React.FC = () => {
   const [email, setEmail] = useState<string>('');
@@ -12,6 +13,7 @@ const SignUp: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
 
   const navigate = useNavigate();
+  const { refetchUser } = useAuth();
 
   async function checkPassword() {
     //make sure password meets requirements and confirm password matches
@@ -46,15 +48,9 @@ const SignUp: React.FC = () => {
         console.log('Successfully logged in and sent idToken to backend');
         updateAuthToken(response.data.token);
         
-        // Check initialization stage and redirect accordingly
-        const user = response.data.user;
-        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
-          navigate('/onboarding');
-          console.log('redirecting to onboarding');
-        } else {
-          console.log('redirecting to home', user, user.initialization_stage);
-          navigate('/');
-        }
+        // Refetch user data after login - PublicRoute will handle redirect once user data is loaded
+        await refetchUser();
+        
         return true;
       } else {
         console.error('Login failed');
