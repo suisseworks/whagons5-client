@@ -20,7 +20,7 @@ import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
 import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { TasksCache } from '@/store/database/TasksCache';
+import { DuckTaskCache } from '@/store/database/DuckTaskCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 
@@ -286,18 +286,18 @@ export const Workspace = () => {
         if (isInitialLoadRef.current) {
           setStats((s) => ({ ...s, loading: true }));
         }
-        if (!TasksCache.initialized) await TasksCache.init();
+        await DuckTaskCache.init();
         const base: any = {};
         const ws = isAllWorkspaces ? undefined : id;
         if (ws) base.workspace_id = ws;
 
-        const totalResp = await TasksCache.queryTasks({ ...base, startRow: 0, endRow: 0 });
+        const totalResp = await DuckTaskCache.queryForAgGrid({ ...base, startRow: 0, endRow: 0 });
         const total = totalResp?.rowCount ?? 0;
 
         let inProgress = 0;
         if (workingStatusIds.length > 0) {
           for (const sid of workingStatusIds) {
-            const r = await TasksCache.queryTasks({ ...base, status_id: sid, startRow: 0, endRow: 0 });
+            const r = await DuckTaskCache.queryForAgGrid({ ...base, status_id: sid, startRow: 0, endRow: 0 });
             inProgress += r?.rowCount ?? 0;
           }
         }
@@ -306,7 +306,7 @@ export const Workspace = () => {
         if (doneStatusId != null) {
           const midnight = new Date();
           midnight.setHours(0, 0, 0, 0);
-          const r = await TasksCache.queryTasks({ ...base, status_id: Number(doneStatusId), updated_after: midnight.toISOString(), startRow: 0, endRow: 0 });
+          const r = await DuckTaskCache.queryForAgGrid({ ...base, status_id: Number(doneStatusId), updated_after: midnight.toISOString(), startRow: 0, endRow: 0 });
           completedToday = r?.rowCount ?? 0;
         }
 

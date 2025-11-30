@@ -1,9 +1,9 @@
-"use client";
+
 
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { TasksCache } from "@/store/database/TasksCache";
+import { DuckTaskCache } from "@/store/database/DuckTaskCache";
 import { TaskRow } from "@/components/TaskList/TaskRow";
 import { motion } from "motion/react";
 
@@ -71,13 +71,13 @@ export default function TaskListTab({
       try {
         setError(null);
         setRows(null);
-        if (!TasksCache.initialized) await TasksCache.init();
+        await DuckTaskCache.init();
         const baseParams: any = { search: searchText };
         const ws = workspaceId && workspaceId !== "all" ? workspaceId : undefined;
         if (ws) baseParams.workspace_id = ws;
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const countResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: 0 });
         const total = countResp?.rowCount ?? 0;
-        const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
+        const rowsResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
         if (!cancelled) setRows(rowsResp?.rows || []);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load tasks");

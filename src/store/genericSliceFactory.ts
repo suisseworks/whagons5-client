@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction, Slice } from "@reduxjs/toolkit";
 import type { SliceCaseReducers, SliceSelectors } from "@reduxjs/toolkit";
-import { GenericCache } from "./database/GenericCache";
+import { DuckGenericCache } from "./database/DuckGenericCache";
 
 // Generic event emitter for all tables (replaces TaskEvents for generic slices)
 export class GenericEvents {
@@ -55,14 +55,14 @@ export interface GenericSliceConfig {
     endpoint: string;
     store: string;
     hashFields?: string[];
-    cache?: GenericCache;
+    cache?: DuckGenericCache<any>;
 }
 
 // Return type interface for createGenericSlice
 export interface GenericSliceResult<T = any> {
     slice: Slice<GenericSliceState<T>>;
     actions: Record<string, any>;
-    cache: GenericCache;
+    cache: DuckGenericCache<any>;
     events: typeof GenericEvents;
     eventNames: {
         CREATED: string;
@@ -79,8 +79,33 @@ export interface GenericSliceResult<T = any> {
 export function createGenericSlice<T = any>(config: GenericSliceConfig): GenericSliceResult<T> {
     const { name, table, endpoint, store, cache, hashFields } = config;
 
-    // Create cache instance if not provided
-    const cacheInstance = cache || new GenericCache({ table, endpoint, store, hashFields });
+    // Create DuckDB-backed cache instance if not provided.
+    // For now, we derive a simple column set: numeric id + TEXT columns for hashFields.
+    const cacheInstance: DuckGenericCache<any> =
+        cache ||
+        new DuckGenericCache<any>({
+            name,
+            table: `duck_${store}`,
+            serverTable: table,
+            endpoint,
+            columns: (() => {
+                const cols: { name: string; type: any; primaryKey?: boolean }[] = [
+                    { name: 'id', type: 'BIGINT', primaryKey: true },
+                ];
+                const extraFields = (hashFields || [])
+                    .map((f) => String(f))
+                    .filter((f) => f !== 'id');
+                for (const f of extraFields) {
+                    // Avoid duplicates
+                    if (!cols.find((c) => c.name === f)) {
+                        cols.push({ name: f, type: 'TEXT' });
+                    }
+                }
+                return cols as any;
+            })(),
+            idField: 'id' as any,
+            hashFields: hashFields as any,
+        });
 
     // Get event names for this table
     const events = GenericEvents.getEvents(table);
@@ -92,13 +117,13 @@ let inflightLoad: Promise<T[]> | null = null;
     const getFromIndexedDB = createAsyncThunk<T[], { force?: boolean } | undefined, { state: any }>(
         `${name}/loadFromIndexedDB`,
         async (_arg, { getState: _getState }) => {
-            // Always fetch fresh data from IndexedDB
+            // Always fetch fresh data from DuckDB-backed cache
             if (inflightLoad) {
                 return inflightLoad;
             }
 
             inflightLoad = (async () => {
-                const rows = await cacheInstance.getAll() as T[];
+                const rows = (await cacheInstance.getAll()) as T[];
                 inflightLoad = null;
                 return rows;
             })();
@@ -338,7 +363,7 @@ let inflightLoad: Promise<T[]> | null = null;
 export function createGenericSlices(configs: GenericSliceConfig[]) {
     const slices: Record<string, GenericSliceResult<any>> = {};
     const reducers: Record<string, any> = {};
-    const caches: Record<string, GenericCache> = {};
+    const caches: Record<string, DuckGenericCache<any>> = {};
 
     configs.forEach(config => {
         const result = createGenericSlice(config);

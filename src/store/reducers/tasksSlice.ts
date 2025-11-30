@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { Task } from "../types";
-import { TasksCache } from "../database/TasksCache";
+import { DuckTaskCache } from "../database/DuckTaskCache";
 import api from "@/api/whagonsApi";
 
 // Helper function to ensure task has all required properties
@@ -12,7 +12,7 @@ const ensureTaskDefaults = (task: any): Task => {
 };
 
 export const getTasksFromIndexedDB = createAsyncThunk('loadTasks', async () => {
-    const tasks = await TasksCache.getTasks();
+    const tasks = await DuckTaskCache.getAllTasks();
     return tasks;
 });
 
@@ -31,8 +31,8 @@ export const addTaskAsync = createAsyncThunk(
                 updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
             });
             
-            // Update IndexedDB on success
-            await TasksCache.addTask(newTask);
+            // Update DuckDB cache on success
+            await DuckTaskCache.upsertTask(newTask as any);
             
             return newTask;
         } catch (error: any) {
@@ -57,8 +57,8 @@ export const updateTaskAsync = createAsyncThunk(
                 updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
             });
             
-            // Update IndexedDB on success
-            await TasksCache.updateTask(id.toString(), updatedTask);
+            // Update DuckDB cache on success
+            await DuckTaskCache.upsertTask(updatedTask as any);
             
             return updatedTask;
         } catch (error: any) {
@@ -76,8 +76,8 @@ export const removeTaskAsync = createAsyncThunk(
             // Call API to delete task
             await api.delete(`/tasks/${taskId}`);
             
-            // Remove from IndexedDB on success
-            await TasksCache.deleteTask(taskId.toString());
+            // Remove from DuckDB cache on success
+            await DuckTaskCache.deleteTask(taskId.toString());
             
             return taskId;
         } catch (error: any) {

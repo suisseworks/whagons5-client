@@ -120,6 +120,10 @@ export default defineConfig(({ mode }) => {
             // Split cache/IndexedDB code into its own chunk
             if (id.includes('/src/store/indexedDB/')) return 'cache-sec';
 
+            // Put DuckDB WASM + bindings into their own heavy chunk so we can
+            // cache them aggressively and avoid bloating the main bundle.
+            if (id.includes('/node_modules/@duckdb/duckdb-wasm')) return 'duckdb';
+
             // Preserve existing groupings
             if (id.includes('/node_modules/react')) return 'vendor';
             if (id.includes('/node_modules/react-dom')) return 'vendor';

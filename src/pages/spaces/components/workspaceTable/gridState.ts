@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import type { User } from '@/store/types';
-import { TasksCache } from '@/store/database/TasksCache';
+import { DuckTaskCache } from '@/store/database/DuckTaskCache';
 import { GRID_CONSTANTS } from './gridConfig';
 
 export interface GridStateOptions {
@@ -80,14 +80,14 @@ export const useGridModeDecision = (workspaceId: string, searchText: string) => 
   return useMemo(() => {
     const decideMode = async () => {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
+        await DuckTaskCache.init();
 
         // Build minimal params equivalent to the grid query
         const baseParams: any = { search: searchText };
         if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
 
         // Get filtered count only
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const countResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
 
         return {

@@ -1,37 +1,40 @@
 /**
  * Encryption Configuration
  *
- * This file allows you to easily control which IndexedDB stores should NOT be encrypted.
- * Simply add the store name to the DISABLED_ENCRYPTION_STORES array below.
+ * This file allows you to easily control which IndexedDB stores SHOULD be encrypted.
+ * By default, no stores are encrypted unless they are listed in ENCRYPTED_STORES
+ * or toggled at runtime via DB.setEncryptionForStore.
  *
- * Note: This only affects stores that would normally be encrypted based on the global
- * encryption setting. Stores listed here will always use plaintext storage.
+ * This gives you "plaintext by default, opt‑in encryption for sensitive data".
  */
 
 export interface EncryptionConfig {
-  /** Array of store names that should NOT be encrypted */
-  DISABLED_ENCRYPTION_STORES: string[];
+  /** Array of store names that SHOULD be encrypted */
+  ENCRYPTED_STORES: string[];
 }
 
 /**
- * Add store names to this array to disable encryption for those specific stores.
+ * Add store names to this array to enable encryption for those specific stores.
  * The store names must match the exact names used in the DB class.
  *
  * Examples of common store names:
- * - 'tasks' - Task records
- * - 'categories' - Category definitions
- * - 'workspaces' - Workspace information
- * - 'teams' - Team data
  * - 'users' - User information
- * - 'statuses' - Status definitions
- * - 'priorities' - Priority levels
- * - 'spots' - Spot/location data
- * - 'tags' - Tag definitions
- * - 'custom_fields' - Custom field definitions
+ * - 'session_logs' - Session/activity logs
+ * - 'config_logs' - Config changes
+ * - 'exceptions' - Error payloads
+ * - 'task_attachments' - Attachment metadata
  */
-export const DISABLED_ENCRYPTION_STORES: string[] = [
-  // Only disable encryption for tasks (legacy requirement for TasksCache)
-  'tasks',
+export const ENCRYPTED_STORES: string[] = [
+  // Define sensitive stores here, e.g.:
+  'users',
+  'user_teams',
+  'user_permissions',
+  'crypto_meta',
+  'invitations',
+  'cache_keys',
+  // 'session_logs',
+  // 'config_logs',
+  // 'exceptions',
 ];
 
 /**
@@ -41,9 +44,9 @@ export const DISABLED_ENCRYPTION_STORES: string[] = [
 export function applyEncryptionConfig(): void {
   // Import DB here to avoid circular dependencies
   import('../store/database/DB').then(({ DB }) => {
-    DISABLED_ENCRYPTION_STORES.forEach(storeName => {
-      DB.setEncryptionForStore(storeName, false);
-      console.log(`[EncryptionConfig] Disabled encryption for store: ${storeName}`);
+    ENCRYPTED_STORES.forEach(storeName => {
+      DB.setEncryptionForStore(storeName, true);
+      console.log(`[EncryptionConfig] Enabled encryption for store: ${storeName}`);
     });
   }).catch(error => {
     console.error('[EncryptionConfig] Failed to apply encryption config:', error);
@@ -54,7 +57,7 @@ export function applyEncryptionConfig(): void {
  * Check if a store should be encrypted based on configuration
  */
 export function shouldEncryptStore(storeName: string): boolean {
-  return !DISABLED_ENCRYPTION_STORES.includes(storeName);
+  return ENCRYPTED_STORES.includes(storeName);
 }
 
 /**
@@ -63,9 +66,10 @@ export function shouldEncryptStore(storeName: string): boolean {
 export function getEncryptionConfig(): Record<string, boolean> {
   const config: Record<string, boolean> = {};
 
-  // You could expand this to include all known stores from DB
-  DISABLED_ENCRYPTION_STORES.forEach(storeName => {
-    config[storeName] = false;
+  // You could expand this to include all known stores from DB.
+  // For now we only expose explicitly encrypted ones.
+  ENCRYPTED_STORES.forEach(storeName => {
+    config[storeName] = true;
   });
 
   return config;

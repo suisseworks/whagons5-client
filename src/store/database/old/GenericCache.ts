@@ -1,4 +1,4 @@
-import { DB } from "./DB";
+import { DB } from "../DB";
 import api from "@/api/whagonsApi";
 
 type IdType = number | string;

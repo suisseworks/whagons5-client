@@ -9,7 +9,7 @@ import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep'
 import OptionalStep from '@/pages/onboarding/steps/OptionalStep';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 // Using generic caches instead of custom caches
-import { TasksCache } from '@/store/database/TasksCache';
+import { DuckTaskCache } from '@/store/database/DuckTaskCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
@@ -61,8 +61,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   ], []);
 
   const syncCachesAndStore = async () => {
-    // Ensure tasks cache is ready only; core slices are hydrated by AuthProvider
-    await TasksCache.init();
+    // Ensure DuckDB-backed tasks cache is ready; core slices are hydrated by AuthProvider
+    await DuckTaskCache.init();
   };
 
   // Determine starting step based on user's current state

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
-import { TasksCache } from "@/store/database/TasksCache";
+import { DuckTaskCache } from "@/store/database/DuckTaskCache";
 
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;
@@ -63,14 +63,9 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       try {
         console.log('WorkspaceStatistics - ===== LOADING TASKS =====');
         console.log('WorkspaceStatistics - workspaceId:', workspaceId, 'type:', typeof workspaceId);
-        console.log('WorkspaceStatistics - TasksCache.initialized:', TasksCache.initialized);
         
-        // Initialize cache if needed
-        if (!TasksCache.initialized) {
-          console.log('WorkspaceStatistics - Initializing TasksCache...');
-          await TasksCache.init();
-          console.log('WorkspaceStatistics - TasksCache initialized');
-        }
+        // Initialize DuckDB-backed task cache
+        await DuckTaskCache.init();
         
         // Build query filter
         const query: any = { startRow: 0, endRow: 10000 }; // Get all tasks
@@ -89,7 +84,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         console.log('WorkspaceStatistics - Query:', JSON.stringify(query));
         
         // Query tasks from cache
-        const result = await TasksCache.queryTasks(query);
+        const result = await DuckTaskCache.queryForAgGrid(query);
         console.log('WorkspaceStatistics - Query result:', result);
         console.log('WorkspaceStatistics - Result rows:', result?.rows?.length);
         console.log('WorkspaceStatistics - Result rowCount:', result?.rowCount);

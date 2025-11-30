@@ -1,6 +1,6 @@
 import { auth } from "@/firebase/firebaseConfig";
-import { Task } from "../types";
-import { DB } from "./DB";
+import { Task } from "../../types";
+import { DB } from "../DB";
 import api from "@/api/whagonsApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import sha256 from "crypto-js/sha256";

@@ -1,6 +1,8 @@
 // Datasource and refresh helpers for WorkspaceTable
 
-export function buildGetRows(TasksCache: any, refs: any) {
+import { DuckTaskCache } from '@/store/database/DuckTaskCache';
+
+export function buildGetRows(refs: any) {
   const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, apiRef } = refs;
   // Lightweight adaptive tuner: adjusts cacheBlockSize based on recent getRows durations
   let recentDurations: number[] = [];
@@ -51,6 +53,14 @@ export function buildGetRows(TasksCache: any, refs: any) {
       // ignore tuner errors
     }
   };
+
+  const shouldUseDuckDBTasks = (): boolean => {
+    try {
+      return localStorage.getItem('wh-use-duckdb-tasks') === 'true';
+    } catch {
+      return false;
+    }
+  };
   return async (params: any) => {
    // Default sortModel to created_at desc if not provided
     const sortModel = params.sortModel && params.sortModel.length > 0 
@@ -65,9 +75,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
     }
     try {
       const t0 = performance.now();
-      if (!TasksCache.initialized) {
-        await TasksCache.init();
-      }
+      await DuckTaskCache.init();
       const normalized: any = { ...params };
 
       const gridFm = params?.filterModel || {};
@@ -121,9 +129,16 @@ export function buildGetRows(TasksCache: any, refs: any) {
       queryParams.__tagMap = tagMapRef.current;
       queryParams.__taskTags = taskTagsRef.current;
 
-      const result = await TasksCache.queryTasks(queryParams);
-      const rows = result?.rows || [];
-      const total = result?.rowCount || 0;
+      const duckParams = {
+        workspace_id: workspaceRef.current !== 'all' ? workspaceRef.current : undefined,
+        search: searchRef.current,
+        startRow: normalized.startRow,
+        endRow: normalized.endRow,
+        sortModel,
+      };
+      const duckResult = await DuckTaskCache.queryForAgGrid(duckParams);
+      const rows: any[] = duckResult.rows || [];
+      const total: number = duckResult.rowCount || 0;
       try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
       params.successCallback(rows, total);
@@ -136,7 +151,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
   };
 }
 
-export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
+export async function refreshClientSideGrid(gridApi: any, _unused: any, params: any) {
   const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef } = params;
   const baseParams: any = { search };
   if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
@@ -147,9 +162,10 @@ export async function refreshClientSideGrid(gridApi: any, TasksCache: any, param
   baseParams.__tagMap = tagMapRef.current;
   baseParams.__taskTags = taskTagsRef.current;
 
-  const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+  await DuckTaskCache.init();
+  const countResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;
-  const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+  const rowsResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: totalFiltered });
   const rows = rowsResp?.rows || [];
   gridApi.setGridOption('rowData', rows);
   return rows;

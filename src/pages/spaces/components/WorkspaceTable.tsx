@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense, forwardRef, useImperativeHandle } from 'react';
-import { TasksCache } from '@/store/database/TasksCache';
+import { DuckTaskCache } from '@/store/database/DuckTaskCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { updateTaskAsync } from '@/store/reducers/tasksSlice';
@@ -401,7 +401,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       if (groupBy && groupBy !== 'none') {
         setUseClientSide(true);
         try {
-          if (!TasksCache.initialized) await TasksCache.init();
+          await DuckTaskCache.init();
           const baseParams: any = { search: searchText };
           if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
           baseParams.__statusMap = statusMapRef.current;
@@ -411,9 +411,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           baseParams.__tagMap = tagMapRef.current;
           baseParams.__taskTags = taskTagsRef.current;
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
-          const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+          const countResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: 0 });
           const totalFiltered = countResp?.rowCount ?? 0;
-          const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+          const rowsResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: totalFiltered });
           setClientRows(rowsResp?.rows || []);
           try { onModeChange?.({ useClientSide: true, totalFiltered }); } catch {}
         } catch (e) {
@@ -709,7 +709,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   const getRows = useMemo(
     () =>
-      buildGetRows(TasksCache, {
+      buildGetRows({
         rowCache,
         workspaceRef,
         searchRef,
@@ -740,7 +740,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
     if (useClientSide) {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
+        await DuckTaskCache.init();
         const baseParams: any = { search: searchRef.current };
         if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
         baseParams.__statusMap = statusMapRef.current;
@@ -757,9 +757,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
         }
 
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const countResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
-        const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+        const rowsResp = await DuckTaskCache.queryForAgGrid({ ...baseParams, startRow: 0, endRow: totalFiltered });
         const rows = rowsResp?.rows || [];
         if (debugFilters.current) {
           console.log('[WT Filters] client-side refresh rows=', rows.length, 'totalFiltered=', totalFiltered);

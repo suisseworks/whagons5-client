@@ -10,7 +10,7 @@ import {
   hasKEK,
 } from '@/crypto/crypto';
 import { getCurrentTenant } from '@/api/whagonsApi';
-import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
+import { ENCRYPTED_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
@@ -47,7 +47,10 @@ export class DB {
   public static getEncryptionForStore(storeName: string): boolean {
     const override = DB.storeEncryptionOverrides.get(storeName);
     if (override !== undefined) return override;
-    return DB.ENCRYPTION_ENABLED;
+    // Reflect static config as the source of truth for whether a store
+    // should be encrypted by default. Global flag is intentionally ignored
+    // here so encryption is opt-in per store.
+    return ENCRYPTED_STORES.includes(storeName);
   }
 
   private static isEncryptionEnabledForStore(storeName: string): boolean {
@@ -56,11 +59,14 @@ export class DB {
     if (override !== undefined) return override;
     
     // Then check static config from encryptionConfig.ts (synchronous fallback)
-    if (DISABLED_ENCRYPTION_STORES.includes(storeName)) {
-      return false;
+    if (ENCRYPTED_STORES.includes(storeName)) {
+      return true;
     }
     
-    return DB.ENCRYPTION_ENABLED;
+    // No override and not in ENCRYPTED_STORES: encryption is disabled.
+    // We intentionally DO NOT fall back to the global flag so that rows
+    // are plaintext by default unless a store is explicitly marked sensitive.
+    return false;
   }
 
   static async init(uid?: string): Promise<boolean> {
@@ -560,11 +566,15 @@ export class DB {
   // --- Encryption-aware convenience facade ---
 
   private static get ENCRYPTION_ENABLED(): boolean {
-    // Allow explicit toggle via VITE_CACHE_ENCRYPTION, otherwise disable in development
+    // Allow explicit toggle via VITE_CACHE_ENCRYPTION, otherwise default to OFF.
+    // This means rows are plaintext by default unless explicitly opted-in
+    // via per-store overrides or ENCRYPTED_STORES config.
     const explicit = (import.meta as any).env?.VITE_CACHE_ENCRYPTION;
     if (explicit === 'true') return true;
     if (explicit === 'false') return false;
-    return (import.meta as any).env?.VITE_DEVELOPMENT !== 'true';
+    // Default: no encryption globally; only stores explicitly configured
+    // (ENCRYPTED_STORES or runtime overrides) will be encrypted.
+    return false;
   }
 
   private static toKey(key: number | string): number | string {

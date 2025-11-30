@@ -1,4 +1,4 @@
-import { TasksCache } from "./TasksCache";
+import { DuckTaskCache } from "./DuckTaskCache";
 
 // Import generic caches (handles all CRUD tables except tasks)
 import { genericCaches } from "../genericSlices";
@@ -17,10 +17,10 @@ type CacheHandler = {
 const cacheByTable: Record<string, CacheHandler> = {
 	// Only custom cache with advanced features (tasks)
 	wh_tasks: {
-		add: (row) => TasksCache.addTask(row),
-		update: (id, row) => TasksCache.updateTask(String(id), row),
-		remove: (id) => TasksCache.deleteTask(String(id)),
-		getAll: () => TasksCache.getTasks(),
+		add: async (row) => { await DuckTaskCache.upsertTask(row); },
+		update: async (_id, row) => { await DuckTaskCache.upsertTask(row); },
+		remove: (id) => DuckTaskCache.deleteTask(String(id)),
+		getAll: () => DuckTaskCache.getAllTasks(),
 	},
 
 	// All other tables (30+ tables) handled by generic caches
