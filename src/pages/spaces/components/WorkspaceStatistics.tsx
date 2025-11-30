@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { TasksCache } from "@/store/database/TasksCache";
 
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;

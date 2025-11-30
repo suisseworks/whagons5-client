@@ -1,3 +1,4 @@
+import MillionLint from '@million/lint';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -5,6 +6,7 @@ import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import JavaScriptObfuscator from 'javascript-obfuscator';
 import { VitePWA } from 'vite-plugin-pwa';
+import million from 'million/compiler';
 
 // https://vitejs.dev/config/
 // Custom selective obfuscation plugin: only obfuscate chunks that include files under src/store/indexedDB
@@ -29,9 +31,16 @@ function cacheObfuscator(options: any) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const isDevFlag = env.VITE_DEVELOPMENT === 'true';
+  const enableMillionLint = env.VITE_MILLION_LINT === 'true';
 
   return {
     plugins: [
+      // Enable Million compiler for block/For optimizations
+      // Auto mode disabled temporarily due to SVG component optimization issues
+      // Use manual block() calls for components that need optimization
+      million.vite({ auto: false }) as any,
+      // Enable Million Lint only when explicitly requested to avoid dev-server/runtime conflicts
+      enableMillionLint ? (MillionLint.vite({ enabled: true }) as any) : null,
       react(), 
       tailwindcss(),
       visualizer({

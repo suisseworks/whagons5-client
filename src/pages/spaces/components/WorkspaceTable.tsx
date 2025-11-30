@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense, forwardRef, useImperativeHandle } from 'react';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TasksCache } from '@/store/database/TasksCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { updateTaskAsync } from '@/store/reducers/tasksSlice';
@@ -721,6 +721,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         taskTagsRef,
         externalFilterModelRef,
         normalizeFilterModelForQuery,
+        apiRef: gridRef,
       }),
     [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]
   );
@@ -815,6 +816,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
     suppressPersistRef.current = true;
     try {
+      // Apply tuned cache block size (if any) on init only; do not change during active scroll
+      try {
+        const v = parseInt(localStorage.getItem('wh-cacheBlockSize') || '');
+        if (Number.isFinite(v) && v >= 20 && v <= 200) {
+          params.api.setGridOption('cacheBlockSize', v);
+          params.api.setGridOption('cacheOverflowSize', Math.max(10, Math.floor(v * 0.5)));
+        }
+      } catch {}
       const currentSort = params.api.getSortModel?.() || [];
       if (currentSort.length === 0) {
         params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);

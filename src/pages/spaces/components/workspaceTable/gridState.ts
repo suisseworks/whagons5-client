@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import type { User } from '@/store/types';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TasksCache } from '@/store/database/TasksCache';
 import { GRID_CONSTANTS } from './gridConfig';
 
 export interface GridStateOptions {

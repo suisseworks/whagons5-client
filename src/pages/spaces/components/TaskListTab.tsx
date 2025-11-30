@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { TasksCache } from "@/store/database/TasksCache";
 import { TaskRow } from "@/components/TaskList/TaskRow";
 import { motion } from "motion/react";
 

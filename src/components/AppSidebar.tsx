@@ -327,6 +327,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             className={`flex items-center h-full transition-all duration-300 ${isCollapsed ? 'justify-center' : 'justify-center'
             }`}
           >
+            {/* @million ignore */}
             <WhagonsCheck
               width={showExpandedContent ? 40 : 28}
               height={showExpandedContent ? 18 : 14}

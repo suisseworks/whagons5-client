@@ -40,7 +40,7 @@ export const DISABLED_ENCRYPTION_STORES: string[] = [
  */
 export function applyEncryptionConfig(): void {
   // Import DB here to avoid circular dependencies
-  import('../store/indexedDB/DB').then(({ DB }) => {
+  import('../store/database/DB').then(({ DB }) => {
     DISABLED_ENCRYPTION_STORES.forEach(storeName => {
       DB.setEncryptionForStore(storeName, false);
       console.log(`[EncryptionConfig] Disabled encryption for store: ${storeName}`);
@@ -76,7 +76,7 @@ export function getEncryptionConfig(): Record<string, boolean> {
  * Note: This only affects runtime, you'll need to update the array above for persistence
  */
 export function disableEncryptionForStore(storeName: string): void {
-  import('../store/indexedDB/DB').then(({ DB }) => {
+  import('../store/database/DB').then(({ DB }) => {
     DB.setEncryptionForStore(storeName, false);
     console.log(`[EncryptionConfig] Disabled encryption for store: ${storeName}`);
   });
@@ -87,7 +87,7 @@ export function disableEncryptionForStore(storeName: string): void {
  * Note: This only affects runtime, you'll need to remove from the array above for persistence
  */
 export function enableEncryptionForStore(storeName: string): void {
-  import('../store/indexedDB/DB').then(({ DB }) => {
+  import('../store/database/DB').then(({ DB }) => {
     DB.setEncryptionForStore(storeName, true);
     console.log(`[EncryptionConfig] Enabled encryption for store: ${storeName}`);
   });

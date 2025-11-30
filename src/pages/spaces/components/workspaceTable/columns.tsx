@@ -7,6 +7,7 @@ import { Flag, CheckCircle2, Clock, XCircle, MessageSquare } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
+import { block, For } from 'million/react';
 
 // ---------------------------------------------------------------------------
 type MetricAgg = { count: number; total: number; max: number };
@@ -22,6 +23,7 @@ declare global {
   interface Window {
     whRowMetricsDump?: () => void;
     whRowMetricsReset?: () => void;
+    whRowPerfReset?: () => void;
   }
 }
 if (typeof window !== 'undefined') {
@@ -36,6 +38,20 @@ if (typeof window !== 'undefined') {
     console.table(rows);
   };
   (window as any).whRowMetricsReset = () => rowMetricTotals.clear();
+}
+
+// Batch row render timing (averaged every 20 rows)
+const rowRenderStartTimes: Map<number, number> = new Map();
+let rowPerfBatchCount = 0;
+let rowPerfBatchTotal = 0;
+let rowPerfBatchMax = 0;
+if (typeof window !== 'undefined') {
+  (window as any).whRowPerfReset = () => {
+    rowRenderStartTimes.clear();
+    rowPerfBatchCount = 0;
+    rowPerfBatchTotal = 0;
+    rowPerfBatchMax = 0;
+  };
 }
 
 // Calculate text color based on background color luminance
@@ -158,6 +174,10 @@ export function buildWorkspaceColumns(opts: any) {
     return name;
   };
 
+  const taskTagsDisplayCache = new Map<number, Array<{ id: number | string; name: string; color?: string }>>();
+
+  // No per-cell date caches; render first-scroll deterministically without memo layers
+
   const visibilitySet: Set<string> | null = Array.isArray(visibleColumns)
     ? new Set<string>(visibleColumns as string[])
     : null;
@@ -196,6 +216,55 @@ export function buildWorkspaceColumns(opts: any) {
       />
     );
   };
+
+  type NameHeaderProps = {
+    name: string;
+    tags: Array<{ id: number | string; name: string; color?: string }>;
+    tagDisplayMode: 'icon' | 'icon-text';
+  };
+
+  const NameHeader = block((props: NameHeaderProps) => {
+    const {
+      name,
+      tags,
+      tagDisplayMode,
+    } = props;
+    return (
+      <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+        <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1 truncate">{name}</div>
+        {(tags && tags.length > 0) && (
+          <>
+            <For each={tags}>
+              {(tag: any) => {
+                if (!tag || !tag.name) return null as any;
+                const bgColor = tag.color || '#6B7280';
+                const textColor = getContrastTextColor(bgColor);
+                return (
+                  <div
+                    key={tag.id}
+                    className={`inline-flex items-center ${tagDisplayMode === 'icon' ? 'gap-0 px-1.5' : 'gap-1.5 px-2'} py-1 rounded text-xs font-medium leading-none flex-shrink-0`}
+                    style={{
+                      backgroundColor: bgColor,
+                      color: textColor,
+                    }}
+                    title={tag.name}
+                  >
+                    <span
+                      className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: textColor }}
+                    />
+                    {tagDisplayMode === 'icon-text' && (
+                      <span className="whitespace-nowrap">{tag.name}</span>
+                    )}
+                  </div>
+                );
+              }}
+            </For>
+          </>
+        )}
+      </div>
+    );
+  });
 
   // Always render initials instead of profile pictures
   const UserInitial = ({ user }: { user: any }) => {
@@ -568,6 +637,12 @@ export function buildWorkspaceColumns(opts: any) {
         const dbg = isRowDebugEnabled();
         let t0 = 0;
         if (dbg) t0 = performance.now();
+        if (dbg) {
+          const rid = Number(p.data?.id);
+          if (Number.isFinite(rid) && !rowRenderStartTimes.has(rid)) {
+            rowRenderStartTimes.set(rid, performance.now());
+          }
+        }
         const name = p.data?.name || '';
         const description = p.data?.description || '';
         const cat = (opts as any)?.categoryMap?.[Number(p.data?.category_id)];
@@ -581,48 +656,27 @@ export function buildWorkspaceColumns(opts: any) {
         const taskTagIds = (taskTagsMap && taskTagsMap.get(taskId)) || [];
         if (dbg) recordMetric('name:taskTagIds', Number((performance.now() - ttStart).toFixed(2)));
         const mapStart = dbg ? performance.now() : 0;
-        const taskTagsData = (taskTagIds || [])
-          .map((tagId: number) => {
-            const tag = tagMap?.[tagId];
-            return tag && tag.name ? { ...tag, id: tagId } : null;
-          })
-          .filter((tag: any) => tag !== null);
+        let taskTagsData = taskTagsDisplayCache.get(taskId);
+        if (!taskTagsData || taskTagsData.length !== (taskTagIds?.length || 0)) {
+          taskTagsData = (taskTagIds || [])
+            .map((tagId: number) => {
+              const tag = tagMap?.[tagId];
+              return tag && tag.name ? { id: tagId, name: tag.name, color: tag.color } : null;
+            })
+            .filter((tag: any) => tag !== null) as Array<{ id: number | string; name: string; color?: string }>;
+          taskTagsDisplayCache.set(taskId, taskTagsData);
+        }
         if (dbg) recordMetric('name:mapTags', Number((performance.now() - mapStart).toFixed(2)));
         // Show all tags (they will wrap naturally; limit display work)
-
-        const jsxStart = dbg ? performance.now() : 0;
-        const node = (
+        return (
           <div className="flex flex-col gap-1 py-1.5 min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
-              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1 truncate">{name}</div>
-              {/* Tags - inline with name, wrap naturally if needed */}
-              {(taskTagsData && taskTagsData.length > 0) && (
-                <>
-                  {taskTagsData.map((tag: any, idx: number) => {
-                    if (!tag || !tag.name) return null;
-                    const bgColor = tag.color || '#6B7280';
-                    const textColor = getContrastTextColor(bgColor);
-                    return (
-                      <div
-                        key={tag.id || `tag-${idx}`}
-                        className={`inline-flex items-center ${tagDisplayMode === 'icon' ? 'gap-0 px-1.5' : 'gap-1.5 px-2'} py-1 rounded text-xs font-medium leading-none flex-shrink-0`}
-                        style={{
-                          backgroundColor: bgColor,
-                          color: textColor,
-                        }}
-                        title={tag.name}
-                      >
-                        <TagIconSmall iconClass={tag.icon} color={textColor} />
-                        {tagDisplayMode === 'icon-text' && (
-                          <span className="whitespace-nowrap">{tag.name}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                  
-                </>
-              )}
+              <CategoryIconSmall color={cat?.color} />
+              <NameHeader
+                name={name}
+                tags={taskTagsData as Array<{ id: number | string; name: string; color?: string }>}
+                tagDisplayMode={tagDisplayMode}
+              />
             </div>
             {showDescriptions && description && (
               <TooltipProvider>
@@ -648,9 +702,9 @@ export function buildWorkspaceColumns(opts: any) {
                     sideOffset={8}
                     collisionPadding={{ left: 300, right: 16, top: 16, bottom: 16 }}
                     avoidCollisions={true}
-                    className="max-w-[520px] whitespace-pre-wrap text-base leading-relaxed z-[100]"
+                    className="max-w=[520px] whitespace-pre-wrap text-base leading-relaxed z-[100]"
                     style={{ 
-                      maxWidth: 'min(520px, calc(100vw - 340px))' // Account for sidebar width (~280px) + padding
+                      maxWidth: 'min(520px, calc(100vw - 340px))'
                     }}
                   >
                     {description}
@@ -660,11 +714,6 @@ export function buildWorkspaceColumns(opts: any) {
             )}
           </div>
         );
-        if (dbg) {
-          recordMetric('name:buildJSX', Number((performance.now() - jsxStart).toFixed(2)));
-          recordMetric('name:total', Number((performance.now() - t0).toFixed(2)));
-        }
-        return node;
       },
       minWidth: 280,
     },
@@ -921,48 +970,29 @@ export function buildWorkspaceColumns(opts: any) {
       field: 'due_date',
       headerName: 'Due',
       filter: false,
-      cellRenderer: (p: any) => {
-        if (!p.data) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
-            </div>
-          );
+      valueFormatter: (p: any) => {
+        if (!p || !p.value) return '—';
+        const dueMs = new Date(p.value).getTime();
+        if (!Number.isFinite(dueMs)) return '—';
+        const nowMs = Date.now();
+        const diff = dueMs - nowMs;
+        const dayMs = 24 * 60 * 60 * 1000;
+        const days = Math.floor(Math.abs(diff) / dayMs);
+        const isOverdue = diff < 0;
+        if (isOverdue) {
+          return days >= 1 ? `${days}d ago` : '<1d ago';
+        } else {
+          return days >= 1 ? `in ${days}d` : '<1d';
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
-        const dueDate = p.data?.due_date;
-        if (!dueDate) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="text-[12px] text-muted-foreground">—</span>
-            </div>
-          );
+      },
+      tooltipValueGetter: (p: any) => {
+        if (!p || !p.value) return '';
+        try {
+          const d = new Date(p.value);
+          return `${d.toLocaleDateString()} • ${d.toLocaleString()}`;
+        } catch {
+          return String(p.value);
         }
-        const d = dayjs(dueDate);
-        const now = dayjs();
-        const isOverdue = d.isBefore(now, 'day');
-        const daysDiff = d.diff(now, 'day');
-        const urgent = !isOverdue && daysDiff <= 2;
-        const colorCls = isOverdue ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-muted-foreground';
-        const inner = (
-          <div className="flex items-center h-full py-2">
-            <span className={`inline-flex items-center ${colorCls}`}>
-              <span className="text-[12px]">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
-            </span>
-          </div>
-        );
-        const node = (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>{inner}</TooltipTrigger>
-              <TooltipContent side="top">{d.format('MMM D, YYYY')} • {d.fromNow()}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-        if (dbg) recordMetric('due_date:total', Number((performance.now() - t0).toFixed(2)));
-        return node;
       },
       width: 120,
       minWidth: 100,
@@ -1036,43 +1066,29 @@ export function buildWorkspaceColumns(opts: any) {
         // Return negative if dateA is newer (for descending sort, newer should come first)
         return dateA - dateB;
       },
-      cellRenderer: (p: any) => {
-        if (!p.data) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <div className="h-3 w-20 bg-muted animate-pulse rounded" />
-            </div>
-          );
+      valueFormatter: (p: any) => {
+        if (!p || !p.value) return '—';
+        const t = new Date(p.value).getTime();
+        if (!Number.isFinite(t)) return '—';
+        const diffMs = Date.now() - t;
+        if (diffMs < 0) return 'just now';
+        const sec = Math.floor(diffMs / 1000);
+        if (sec < 60) return 'just now';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min}m ago`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr}h ago`;
+        const d = Math.floor(hr / 24);
+        return `${d}d ago`;
+      },
+      tooltipValueGetter: (p: any) => {
+        if (!p || !p.value) return '';
+        try {
+          const d = new Date(p.value);
+          return `${d.toLocaleDateString()} • ${d.toLocaleString()}`;
+        } catch {
+          return String(p.value);
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
-        const createdAt = p.data?.created_at;
-        if (!createdAt) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="text-[12px] text-muted-foreground">—</span>
-            </div>
-          );
-        }
-        const d = dayjs(createdAt);
-        const inner = (
-          <div className="flex items-center h-full py-2">
-            <span className="inline-flex items-center text-muted-foreground">
-              <span className="text-[12px]">{d.fromNow()}</span>
-            </span>
-          </div>
-        );
-        const node = (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>{inner}</TooltipTrigger>
-              <TooltipContent side="top">{d.format('MMM D, YYYY, h:mm A')} • {d.fromNow()}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-        if (dbg) recordMetric('created_at:total', Number((performance.now() - t0).toFixed(2)));
-        return node;
       },
       width: 120,
       minWidth: 100,

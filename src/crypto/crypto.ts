@@ -1,4 +1,4 @@
-import { DB } from "@/store/indexedDB/DB";
+import { DB } from "@/store/database/DB";
 import { api as apiClient } from '../api/whagonsApi';
 
 let worker: Worker | null = null;

@@ -9,7 +9,7 @@ import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep'
 import OptionalStep from '@/pages/onboarding/steps/OptionalStep';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 // Using generic caches instead of custom caches
-import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TasksCache } from '@/store/database/TasksCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';

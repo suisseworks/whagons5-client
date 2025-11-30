@@ -18,7 +18,7 @@ import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
-import { AvatarCache } from '@/store/indexedDB/AvatarCache';
+import { AvatarCache } from '@/store/database/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
 import AssistantWidget from '@/components/AssistantWidget';

@@ -1,7 +1,56 @@
 // Datasource and refresh helpers for WorkspaceTable
 
 export function buildGetRows(TasksCache: any, refs: any) {
-  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
+  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, apiRef } = refs;
+  // Lightweight adaptive tuner: adjusts cacheBlockSize based on recent getRows durations
+  let recentDurations: number[] = [];
+  let lastAdjustTs = 0;
+  let currentBlockSize: number | null = null;
+  const MIN_BLOCK = 20;
+  const MAX_BLOCK = 200;
+  const TARGET_MS = 16; // aim for <= 16ms work per getRows
+  const SAMPLE_COUNT = 10;
+
+  const maybeTune = (dtMs: number, params: any) => {
+    try {
+      recentDurations.push(dtMs);
+      if (recentDurations.length < SAMPLE_COUNT) return;
+      const now = performance.now();
+      if (now - lastAdjustTs < 3000) {
+        // throttle adjustments to at most once per 3s
+        recentDurations = [];
+        return;
+      }
+      const avg = recentDurations.reduce((a, b) => a + b, 0) / recentDurations.length;
+      recentDurations = [];
+      // Initialize current block size from first request size if unknown
+      if (currentBlockSize == null) {
+        const size = Math.max(1, parseInt(params.endRow) - parseInt(params.startRow));
+        currentBlockSize = Number.isFinite(size) ? size : MIN_BLOCK;
+      }
+      let next = currentBlockSize;
+      if (avg > TARGET_MS && currentBlockSize > MIN_BLOCK) {
+        // Too slow: shrink by 25%
+        next = Math.max(MIN_BLOCK, Math.floor(currentBlockSize * 0.75));
+      } else if (avg < TARGET_MS * 0.5 && currentBlockSize < MAX_BLOCK) {
+        // Plenty fast: grow by 50%
+        next = Math.min(MAX_BLOCK, Math.max(currentBlockSize + 10, Math.floor(currentBlockSize * 1.5)));
+      }
+      if (next !== currentBlockSize) {
+        currentBlockSize = next;
+        // Persist suggested size; applied on next init/refresh, not during active scroll
+        try {
+          localStorage.setItem('wh-cacheBlockSize', String(currentBlockSize));
+          if (localStorage.getItem('wh-debug-filters') === 'true') {
+            console.log('[WT getRows] tuner suggested cacheBlockSize=', currentBlockSize);
+          }
+        } catch {}
+        lastAdjustTs = now;
+      }
+    } catch {
+      // ignore tuner errors
+    }
+  };
   return async (params: any) => {
    // Default sortModel to created_at desc if not provided
     const sortModel = params.sortModel && params.sortModel.length > 0 
@@ -15,6 +64,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
       return;
     }
     try {
+      const t0 = performance.now();
       if (!TasksCache.initialized) {
         await TasksCache.init();
       }
@@ -77,6 +127,8 @@ export function buildGetRows(TasksCache: any, refs: any) {
       try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
       params.successCallback(rows, total);
+      const dt = performance.now() - t0;
+      maybeTune(dt, params);
     } catch (error) {
       console.error('Error querying local tasks cache:', error);
       params.failCallback();

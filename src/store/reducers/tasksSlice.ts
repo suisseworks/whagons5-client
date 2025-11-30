@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { Task } from "../types";
-import { TasksCache } from "../indexedDB/TasksCache";
+import { TasksCache } from "../database/TasksCache";
 import api from "@/api/whagonsApi";
 
 // Helper function to ensure task has all required properties

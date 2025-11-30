@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction, Slice } from "@reduxjs/toolkit";
 import type { SliceCaseReducers, SliceSelectors } from "@reduxjs/toolkit";
-import { GenericCache } from "./indexedDB/GenericCache";
+import { GenericCache } from "./database/GenericCache";
 
 // Generic event emitter for all tables (replaces TaskEvents for generic slices)
 export class GenericEvents {

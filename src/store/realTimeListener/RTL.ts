@@ -2,8 +2,8 @@ import { getTokenForUser } from "@/api/whagonsApi";
 import { auth } from "@/firebase/firebaseConfig";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 // Removed direct TasksCache usage; routed through CacheRegistry
-import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
-import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
+import { getCacheForTable } from "@/store/database/CacheRegistry";
+import { syncReduxForTable } from "@/store/database/CacheRegistry";
 import SockJS from 'sockjs-client';
 
 interface RTLMessage {

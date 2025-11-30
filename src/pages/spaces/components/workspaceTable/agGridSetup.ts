@@ -71,8 +71,20 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,
-    cacheBlockSize: 50,
-    cacheOverflowSize: 30,
+    cacheBlockSize: (() => {
+      try {
+        const v = parseInt(localStorage.getItem('wh-cacheBlockSize') || '');
+        if (Number.isFinite(v) && v >= 20 && v <= 200) return v;
+      } catch {}
+      return 20;
+    })(),
+    cacheOverflowSize: (() => {
+      try {
+        const v = parseInt(localStorage.getItem('wh-cacheBlockSize') || '');
+        if (Number.isFinite(v) && v >= 20 && v <= 200) return Math.max(10, Math.floor(v * 0.5));
+      } catch {}
+      return 10;
+    })(),
     infiniteInitialRowCount: 500,
     maxConcurrentDatasourceRequests: 4,
     maxBlocksInCache: 70,

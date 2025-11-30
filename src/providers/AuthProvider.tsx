@@ -18,7 +18,7 @@ import {
   hasKEK,
   zeroizeKeys,
 } from '@/crypto/crypto';
-import { DB } from '@/store/indexedDB/DB';
+import { DB } from '@/store/database/DB';
 import { DataManager } from '@/store/DataManager';
 
 // Define context types

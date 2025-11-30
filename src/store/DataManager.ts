@@ -1,9 +1,9 @@
 import { AppDispatch } from './store';
 import { genericActions, genericCaches } from './genericSlices';
 import { getTasksFromIndexedDB } from './reducers/tasksSlice';
-import { TasksCache } from './indexedDB/TasksCache';
-import { GenericCache } from './indexedDB/GenericCache';
-import { DB } from './indexedDB/DB';
+import { TasksCache } from './database/TasksCache';
+import { GenericCache } from './database/GenericCache';
+import { DB } from './database/DB';
 import apiClient from '../api/whagonsApi';
 import { verifyManifest } from '../lib/manifestVerify';
 

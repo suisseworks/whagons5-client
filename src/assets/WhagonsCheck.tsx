@@ -1,9 +1,8 @@
 
+import { memo } from 'react';
 
-
-
-
-function WhagonsCheck(props: { width: number; height: number; color?: string } = { width: 55, height: 21, color: "#27C1A7" }) {
+// Prevent Million.js from optimizing this SVG component
+const WhagonsCheck = memo(function WhagonsCheck(props: { width: number; height: number; color?: string } = { width: 55, height: 21, color: "#27C1A7" }) {
   return (
     <svg
       width={props.width}
@@ -19,6 +18,8 @@ function WhagonsCheck(props: { width: number; height: number; color?: string } =
       />
     </svg>
   );
-}
+});
+
+WhagonsCheck.displayName = 'WhagonsCheck';
 
 export default WhagonsCheck;
