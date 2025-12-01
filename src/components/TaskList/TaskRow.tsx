@@ -103,9 +103,7 @@ export function TaskRow({
             >
               {task.description}
             </div>
-          ) : (
-            <div className="mb-2" aria-hidden="true" />
-          )}
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <StatusBadge statusId={task?.status_id} statusMap={statusMap} getStatusIcon={getStatusIcon} />

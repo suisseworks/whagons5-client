@@ -102,6 +102,15 @@ export const logout = async (): Promise<void> => {
         await DB.deleteDatabase(uid);
       }
 
+      // Reset DuckDB: drop all tables and delete OPFS file
+      try {
+        const { DuckDB } = await import('@/store/database/DuckDB');
+        await DuckDB.reset();
+      } catch (error) {
+        console.warn('Failed to reset DuckDB on logout:', error);
+        // Non-critical, continue with logout
+      }
+
       await signOut(auth);
       
       //delete subdomain from local storage

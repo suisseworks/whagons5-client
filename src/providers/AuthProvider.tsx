@@ -19,6 +19,7 @@ import {
   zeroizeKeys,
 } from '@/crypto/crypto';
 import { DB } from '@/store/database/DB';
+import { DuckDB } from '@/store/database/DuckDB';
 import { DataManager } from '@/store/DataManager';
 
 // Define context types
@@ -233,6 +234,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return;
               }
 
+              try {
+                await DuckDB.init();
+                await DuckDB.logStateSnapshot('auth-mount', true);
+              } catch (duckErr) {
+                console.warn('AuthProvider: DuckDB state snapshot failed', duckErr);
+              }
+
               const cryptoStatus = await ensureCoreCryptoReady();
               if (!cryptoStatus.ok) {
                 const friendlyMessage =
@@ -267,6 +275,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   const { DuckTaskCache } = await import('@/store/database/DuckTaskCache');
                   await DuckTaskCache.debugCompareIntegrity();
                   await DuckTaskCache.debugCompareSingleTaskHash();
+
+                  try {
+                    const { genericCaches } = await import('@/store/genericSlices');
+                    const tablesRaw =
+                      localStorage.getItem('wh-debug-integrity-tables') ??
+                      'workspaces,teams,categories,templates,statuses';
+                    const rowIdRaw = localStorage.getItem('wh-debug-integrity-row-id');
+                    const debugRowId = (() => {
+                      const parsed = rowIdRaw ? Number(rowIdRaw) : NaN;
+                      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+                    })();
+                    const blockIdRaw = localStorage.getItem('wh-debug-integrity-block-id');
+                    const debugBlockId = (() => {
+                      if (!blockIdRaw) return null;
+                      const parsed = Number(blockIdRaw);
+                      return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+                    })();
+                    const shouldDebugGlobal =
+                      localStorage.getItem('wh-debug-integrity-global') === 'true';
+
+                    const tables = tablesRaw
+                      .split(',')
+                      .map((t) => t.trim())
+                      .filter((t) => t.length > 0);
+
+                    for (const tableName of tables) {
+                      const cache = (genericCaches as any)?.[tableName];
+                      if (!cache?.debugCompareSingleRowHash) {
+                        console.warn(`AuthProvider: No cache found for ${tableName} when running hash debug`);
+                        continue;
+                      }
+                      try {
+                        await cache.debugCompareSingleRowHash(debugRowId);
+                        if (debugBlockId !== null && cache.debugCompareBlockHash) {
+                          await cache.debugCompareBlockHash(debugBlockId);
+                        }
+                        if (shouldDebugGlobal && cache.debugCompareGlobalHash) {
+                          await cache.debugCompareGlobalHash();
+                        }
+                      } catch (cacheErr) {
+                        console.warn(`AuthProvider: Hash debug failed for ${tableName}`, cacheErr);
+                      }
+                    }
+                  } catch (tableDebugErr) {
+                    console.warn('AuthProvider: generic hash debug failed', tableDebugErr);
+                  }
                 }
               } catch (e) {
                 console.warn('AuthProvider: task hash debug failed', e);

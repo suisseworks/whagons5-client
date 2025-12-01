@@ -2,6 +2,7 @@ import { AppDispatch } from './store';
 import { genericActions, genericCaches } from './genericSlices';
 import { DuckTaskCache } from './database/DuckTaskCache';
 import { DuckGenericCache } from './database/DuckGenericCache';
+import { DuckDB } from './database/DuckDB';
 import apiClient from '../api/whagonsApi';
 
 type IntegrityGlobalEntry = {
@@ -84,6 +85,8 @@ export class DataManager {
       console.log('[DataManager] Starting parallel validation...');
       const start = performance.now();
 
+      await DuckDB.flush('before-validation').catch(() => {});
+
       await Promise.all([
         // 1. Generic caches (each does its own lightweight global-hash check)
         Promise.all(
@@ -118,6 +121,10 @@ export class DataManager {
           0
         )}ms. Starting Redux refresh...`
       );
+
+      await DuckDB.flush('after-validation').catch((flushErr) => {
+        console.warn('DataManager: DuckDB flush after validation failed', flushErr);
+      });
 
       // Refresh all entities from Duck-backed caches via generic slices
         await Promise.allSettled(

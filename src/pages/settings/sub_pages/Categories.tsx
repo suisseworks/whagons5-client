@@ -109,10 +109,10 @@ const EnabledCellRenderer = (props: ICellRendererParams) => {
 
 function Categories() {
   const dispatch = useDispatch();
-  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
-  const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
-  const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: any[] };
-  const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
+  const { value: teams = [] } = useSelector((state: RootState) => state.teams) as { value?: Team[] };
+  const { value: tasks = [] } = useSelector((state: RootState) => state.tasks) as { value?: Task[] };
+  const { value: categoryCustomFields = [] } = useSelector((state: RootState) => state.categoryCustomFields) as { value?: any[] };
+  const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups?.value ?? []) as StatusTransitionGroup[];
   const slasState = useSelector((state: RootState) => (state as any).slas) as { value?: Sla[] } | undefined;
   const slas: Sla[] = slasState?.value ?? [];
   const approvalsState = useSelector((state: RootState) => (state as any).approvals) as { value?: Approval[] } | undefined;
@@ -210,7 +210,8 @@ function Categories() {
 
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};
-    (categoryCustomFields as any[]).forEach((a) => {
+    if (!categoryCustomFields || !Array.isArray(categoryCustomFields)) return map;
+    categoryCustomFields.forEach((a) => {
       const cid = Number((a as any)?.category_id ?? (a as any)?.categoryId);
       if (!Number.isFinite(cid)) return;
       map[cid] = (map[cid] || 0) + 1;
@@ -230,6 +231,7 @@ function Categories() {
 
   // Get task count for a category
   const getCategoryTaskCount = (categoryId: number) => {
+    if (!tasks || !Array.isArray(tasks)) return 0;
     return tasks.filter((task: Task) => task.category_id === categoryId).length;
   };
 
@@ -247,18 +249,20 @@ function Categories() {
 
   // Derived statistics for charts
   const enabledCategoriesCount = useMemo(
-    () => categories.filter((cat: Category) => cat.enabled).length,
+    () => (categories && Array.isArray(categories) ? categories.filter((cat: Category) => cat.enabled).length : 0),
     [categories]
   );
 
   const disabledCategoriesCount = useMemo(
-    () => categories.filter((cat: Category) => !cat.enabled).length,
+    () => (categories && Array.isArray(categories) ? categories.filter((cat: Category) => !cat.enabled).length : 0),
     [categories]
   );
 
   const tasksByCategory = useMemo(() => {
     const counts = new Map<number, number>();
-    (tasks as Task[]).forEach((task: Task) => {
+    if (!tasks || !Array.isArray(tasks)) return [];
+    if (!categories || !Array.isArray(categories)) return [];
+    tasks.forEach((task: Task) => {
       const cid = task.category_id;
       if (!cid) return;
       counts.set(cid, (counts.get(cid) || 0) + 1);
@@ -277,6 +281,8 @@ function Categories() {
 
   const categoriesByTeam = useMemo(() => {
     const counts = new Map<number, number>();
+    if (!categories || !Array.isArray(categories)) return [];
+    if (!teams || !Array.isArray(teams)) return [];
     categories.forEach((cat: Category) => {
       const tid = (cat as any).team_id as number | null | undefined;
       if (!tid) return;
@@ -296,7 +302,8 @@ function Categories() {
 
   const tasksOverTime = useMemo(() => {
     const map = new Map<string, number>();
-    (tasks as Task[]).forEach((task: Task) => {
+    if (!tasks || !Array.isArray(tasks)) return [];
+    tasks.forEach((task: Task) => {
       if (!task.created_at) return;
       const date = dayjs(task.created_at).format("YYYY-MM-DD");
       map.set(date, (map.get(date) || 0) + 1);
