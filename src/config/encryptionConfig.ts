@@ -13,17 +13,8 @@ export interface EncryptionConfig {
   ENCRYPTED_STORES: string[];
 }
 
-/**
- * Add store names to this array to enable encryption for those specific stores.
- * The store names must match the exact names used in the DB class.
- *
- * Examples of common store names:
- * - 'users' - User information
- * - 'session_logs' - Session/activity logs
- * - 'config_logs' - Config changes
- * - 'exceptions' - Error payloads
- * - 'task_attachments' - Attachment metadata
- */
+
+ 
 export const ENCRYPTED_STORES: string[] = [
   // Define sensitive stores here, e.g.:
   'users',
@@ -46,7 +37,6 @@ export function applyEncryptionConfig(): void {
   import('../store/database/DB').then(({ DB }) => {
     ENCRYPTED_STORES.forEach(storeName => {
       DB.setEncryptionForStore(storeName, true);
-      console.log(`[EncryptionConfig] Enabled encryption for store: ${storeName}`);
     });
   }).catch(error => {
     console.error('[EncryptionConfig] Failed to apply encryption config:', error);
@@ -93,6 +83,5 @@ export function disableEncryptionForStore(storeName: string): void {
 export function enableEncryptionForStore(storeName: string): void {
   import('../store/database/DB').then(({ DB }) => {
     DB.setEncryptionForStore(storeName, true);
-    console.log(`[EncryptionConfig] Enabled encryption for store: ${storeName}`);
   });
 }

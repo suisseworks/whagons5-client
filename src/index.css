@@ -607,6 +607,9 @@
   -webkit-overflow-scrolling: touch;
   /* Prevent border rendering issues during scroll */
   contain: layout style paint;
+  /* Enable horizontal scrolling */
+  overflow-x: auto !important;
+  overflow-y: auto !important;
 }
 
 .wh-modern-grid .ag-center-cols-container {
@@ -614,6 +617,8 @@
   transform: translateZ(0);
   /* Optimize rendering */
   contain: layout style;
+  /* Allow grid to expand horizontally beyond viewport */
+  min-width: 100%;
 }
 
 /* Row as card: rounded, subtle elevation, divider-less */

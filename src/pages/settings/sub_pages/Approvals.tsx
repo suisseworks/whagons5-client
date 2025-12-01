@@ -340,7 +340,7 @@ function Approvals() {
               rowData={filteredItems}
               columnDefs={colDefs}
               noRowsMessage="No approvals found"
-              rowSelection="single"
+              rowSelection={{ mode: 'singleRow' }}
               onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
             />
           </div>

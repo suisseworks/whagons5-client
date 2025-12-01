@@ -73,7 +73,10 @@ export class DuckDB {
 
         // Create the worker from the selected bundle's worker URL.
         const worker = new Worker(bundle.mainWorker);
-        const logger = new duckdb.ConsoleLogger();
+        const useDebug = (() => {
+          try { return localStorage.getItem('wh-debug-duckdb') === 'true'; } catch { return false; }
+        })();
+        const logger: any = useDebug ? new duckdb.ConsoleLogger() : { log: (_lvl: number, _origin: number, _code: number, _msg: string) => {} };
         const db = new duckdb.AsyncDuckDB(logger, worker);
 
         await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
@@ -88,11 +91,13 @@ export class DuckDB {
             path: targetPath,
             accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
           });
-          console.log(
-            '[DuckDB] Opened database',
-            targetPath,
-            opfs ? '(OPFS persistent)' : '(in‑memory)'
-          );
+          if (useDebug) {
+            console.log(
+              '[DuckDB] Opened database',
+              targetPath,
+              opfs ? '(OPFS persistent)' : '(in‑memory)'
+            );
+          }
         } catch (openErr) {
           console.warn(
             '[DuckDB] Failed to open OPFS database, falling back to in‑memory',
@@ -105,7 +110,9 @@ export class DuckDB {
         this.db = db;
         this.conn = conn;
 
-        console.log('[DuckDB] Initialized AsyncDuckDB + connection');
+        if (useDebug) {
+          console.log('[DuckDB] Initialized AsyncDuckDB + connection');
+        }
         return true;
       } catch (e) {
         console.error('[DuckDB] init failed', e);
@@ -150,13 +157,15 @@ export class DuckDB {
   /**
    * Execute a statement that doesn't need a result set (DDL/DML).
    */
-  public static async exec(sql: string): Promise<void> {
+  public static async exec(sql: string, opts?: { suppressErrorLog?: boolean }): Promise<void> {
     const conn = await this.ensureConnection();
     if (!conn) return;
     try {
       await conn.query(sql);
     } catch (e) {
-      console.error('[DuckDB] exec failed', { sql, error: e });
+      if (!opts?.suppressErrorLog) {
+        console.error('[DuckDB] exec failed', { sql, error: e });
+      }
       throw e;
     }
   }
@@ -178,5 +187,9 @@ export class DuckDB {
   }
 }
 
-
-
+// Expose DuckDB static API on window/globalThis for console debugging
+try {
+  (globalThis as any).DuckDB = DuckDB;
+} catch {
+  // ignore
+}

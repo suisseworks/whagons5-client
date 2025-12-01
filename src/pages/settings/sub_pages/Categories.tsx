@@ -607,7 +607,7 @@ function Categories() {
                     rowData={filteredItems}
                     columnDefs={colDefs}
                     noRowsMessage="No categories found"
-                    rowSelection="single"
+                    rowSelection={{ mode: 'singleRow' }}
                     onRowDoubleClicked={(row: any) => handleEdit(row)}
                     gridOptions={{
                       getRowStyle: (params: any) => {

@@ -54,7 +54,23 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        onInteractOutside={(e) => {
+          // Prevent dialog from closing when clicking inside popover
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest('[data-slot="dialog-content"]')) {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          // Prevent dialog from intercepting clicks inside popover
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest('[data-slot="dialog-content"]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -70,6 +86,16 @@ export function Combobox({
                       // Always set the value, don't toggle - let the parent handle deselection if needed
                       onValueChange?.(option.value)
                       setOpen(false)
+                    }}
+                    className="cursor-pointer pointer-events-auto"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onValueChange?.(option.value);
+                      setOpen(false);
                     }}
                   >
                     <Check

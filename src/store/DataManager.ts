@@ -3,7 +3,12 @@ import { genericActions, genericCaches } from './genericSlices';
 import { DuckTaskCache } from './database/DuckTaskCache';
 import { DuckGenericCache } from './database/DuckGenericCache';
 import apiClient from '../api/whagonsApi';
-import { verifyManifest } from '../lib/manifestVerify';
+
+type IntegrityGlobalEntry = {
+  global_hash?: string;
+  block_count?: number;
+  [key: string]: unknown;
+} | null;
 
 const coreKeys = [
   'workspaces',
@@ -48,9 +53,32 @@ export class DataManager {
   async validateAndRefresh() {
     // Validate all DuckDB-backed caches (generic + tasks) and then refresh Redux.
     try {
+			// Debug gate: allow disabling all network validation/fetches to test persisted data only
+			const disableFetch = (() => {
+				try { return localStorage.getItem('wh-disable-fetch') === 'true'; } catch { return false; }
+			})();
+			if (disableFetch) {
+				console.log('[DataManager] Network disabled via wh-disable-fetch; loading from local caches only');
+				await Promise.allSettled(
+					coreKeys.map(async (key) => {
+						const actions = (genericActions as any)[key];
+						if (actions?.getFromDuckDB) {
+							return this.dispatch(actions.getFromDuckDB());
+						}
+						return Promise.resolve();
+					})
+				);
+				// Skip tasks; task UIs pull directly from DuckTaskCache without forcing validate()
+				return;
+			}
+
       const caches: DuckGenericCache<any>[] = coreKeys
         .map((k) => (genericCaches as any)[k])
         .filter((c: any): c is DuckGenericCache<any> => !!c);
+
+      const tableNames = caches.map((cache) => cache.getTableName());
+      const batchTables = Array.from(new Set([...tableNames, 'wh_tasks']));
+      const serverGlobals = await this.fetchIntegrityGlobals(batchTables);
 
       // Run generic caches and tasks validation in parallel to avoid blocking
       console.log('[DataManager] Starting parallel validation...');
@@ -61,7 +89,10 @@ export class DataManager {
         Promise.all(
           caches.map(async (cache) => {
             try {
-              await cache.validate();
+              const table = cache.getTableName();
+              const serverEntry = serverGlobals?.[table];
+              const serverGlobal = this.extractServerGlobal(serverEntry);
+              await cache.validate({ serverGlobal });
             } catch (e) {
               console.warn('DataManager: generic cache validate failed', cache.getTableName(), e);
             }
@@ -72,7 +103,9 @@ export class DataManager {
         (async () => {
           try {
             await DuckTaskCache.init();
-            await DuckTaskCache.validate();
+            const taskServerEntry = serverGlobals?.wh_tasks;
+            const serverGlobal = this.extractServerGlobal(taskServerEntry);
+            await DuckTaskCache.validate({ serverGlobal });
             console.log('[DataManager] Tasks validation finished');
           } catch (e) {
             console.warn('DataManager: tasks cache validate failed', e);
@@ -87,11 +120,11 @@ export class DataManager {
       );
 
       // Refresh all entities from Duck-backed caches via generic slices
-      await Promise.allSettled(
+        await Promise.allSettled(
         coreKeys.map(async (key) => {
           const actions = (genericActions as any)[key];
-          if (actions?.getFromIndexedDB) {
-            return this.dispatch(actions.getFromIndexedDB());
+            if (actions?.getFromDuckDB) {
+              return this.dispatch(actions.getFromDuckDB());
           } else {
             return Promise.resolve();
           }
@@ -106,18 +139,30 @@ export class DataManager {
     }
   }
 
-  async verifyManifest() {
-    try {
-      const manifestResp = await apiClient.get('/sync/manifest');
-      if (manifestResp.status === 200) {
-        const m = manifestResp.data?.data || manifestResp.data;
-        const ok = await verifyManifest(m);
-        if (!ok) {
-          console.warn('DataManager: Manifest signature invalid');
-        }
-      }
-    } catch (e) {
-      console.warn('DataManager: Manifest fetch/verify failed (continuing):', e);
+  private async fetchIntegrityGlobals(
+    tables: string[]
+  ): Promise<Record<string, IntegrityGlobalEntry>> {
+    if (!tables.length) {
+      return {};
     }
+    try {
+      const resp = await apiClient.get('/integrity/global/batch', {
+        params: { tables: tables.join(',') },
+      });
+      const data = resp.data?.data ?? resp.data ?? {};
+      return data as Record<string, IntegrityGlobalEntry>;
+    } catch (error) {
+      console.warn('DataManager: integrity batch fetch failed, falling back to per-table', error);
+      return {};
+    }
+  }
+
+  private extractServerGlobal(entry: IntegrityGlobalEntry | undefined): string | null | undefined {
+    if (typeof entry === 'undefined') return undefined;
+    if (entry === null) return null;
+    if (entry && typeof entry === 'object') {
+      return (entry.global_hash ?? (entry as any).globalHash ?? null) as string | null;
+    }
+    return undefined;
   }
 }

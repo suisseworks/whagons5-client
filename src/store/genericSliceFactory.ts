@@ -110,12 +110,53 @@ export function createGenericSlice<T = any>(config: GenericSliceConfig): Generic
     // Get event names for this table
     const events = GenericEvents.getEvents(table);
 
-    // Single-flight guard for IndexedDB hydration
+    // Single-flight guard for DuckDB hydration
 let inflightLoad: Promise<T[]> | null = null;
 
+    // Helper function to normalize all ID fields to numbers
+    const normalizeIds = (data: any): any => {
+      if (!data || typeof data !== 'object') return data;
+      if (Array.isArray(data)) {
+        return data.map(normalizeIds);
+      }
+      const normalized = { ...data };
+      for (const key in normalized) {
+        if (Object.prototype.hasOwnProperty.call(normalized, key)) {
+          const value = normalized[key];
+          // Normalize ID fields (ending with _id or exactly 'id')
+          if (key === 'id' || (typeof key === 'string' && key.endsWith('_id'))) {
+            if (value != null && value !== '') {
+              if (typeof value === 'bigint') {
+                normalized[key] = Number(value);
+              } else if (typeof value === 'string' && /^\d+$/.test(value)) {
+                const num = Number(value);
+                if (Number.isFinite(num)) normalized[key] = num;
+              }
+            }
+          }
+          // Handle arrays of IDs (like user_ids)
+          else if (key === 'user_ids' && Array.isArray(value)) {
+            normalized[key] = value.map((v: any) => {
+              if (typeof v === 'bigint') return Number(v);
+              if (typeof v === 'string' && /^\d+$/.test(v)) {
+                const num = Number(v);
+                return Number.isFinite(num) ? num : v;
+              }
+              return typeof v === 'number' && Number.isFinite(v) ? v : v;
+            });
+          }
+          // Recursively normalize nested objects
+          else if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+            normalized[key] = normalizeIds(value);
+          }
+        }
+      }
+      return normalized;
+    };
+
     // Async thunks
-    const getFromIndexedDB = createAsyncThunk<T[], { force?: boolean } | undefined, { state: any }>(
-        `${name}/loadFromIndexedDB`,
+    const getFromDuckDB = createAsyncThunk<T[], { force?: boolean } | undefined, { state: any }>(
+        `${name}/loadFromDuckDB`,
         async (_arg, { getState: _getState }) => {
             // Always fetch fresh data from DuckDB-backed cache
             if (inflightLoad) {
@@ -124,8 +165,10 @@ let inflightLoad: Promise<T[]> | null = null;
 
             inflightLoad = (async () => {
                 const rows = (await cacheInstance.getAll()) as T[];
+                // Normalize all IDs to numbers before storing in Redux
+                const normalized = normalizeIds(rows) as T[];
                 inflightLoad = null;
-                return rows;
+                return normalized;
             })();
             return inflightLoad;
         }
@@ -136,7 +179,9 @@ let inflightLoad: Promise<T[]> | null = null;
         async (params?: any) => {
             const success = await cacheInstance.fetchAll(params);
             if (success) {
-                return await cacheInstance.getAll() as T[];
+                const data = await cacheInstance.getAll() as T[];
+                // Normalize all IDs to numbers before storing in Redux
+                return normalizeIds(data) as T[];
             }
             throw new Error(`Failed to fetch ${name}`);
         }
@@ -161,11 +206,14 @@ let inflightLoad: Promise<T[]> | null = null;
                 // Remote update
                 const saved = await cacheInstance.updateRemote(id as any, updates as any);
 
-                // Update IndexedDB with server response
+                // Persist into DuckDB cache with server response
                 await cacheInstance.update(id as any, saved);
 
+                // Normalize IDs before updating Redux
+                const normalizedSaved = normalizeIds(saved);
+
                 // Update Redux with server truth
-                dispatch((slice.actions as any).updateItem(saved));
+                dispatch((slice.actions as any).updateItem(normalizedSaved));
                 GenericEvents.emit(events.UPDATED, saved);
 
                 return { id, updates };
@@ -196,12 +244,15 @@ let inflightLoad: Promise<T[]> | null = null;
                 // Create on server
                 const saved = await cacheInstance.createRemote(item as any);
 
-                // Update IndexedDB with real data from server
+                // Persist into DuckDB cache with real data from server
                 await cacheInstance.add(saved);
+
+                // Normalize IDs before updating Redux
+                const normalizedSaved = normalizeIds(saved);
 
                 // Replace optimistic item with real data in Redux
                 dispatch((slice.actions as any).removeItem(tempId));
-                dispatch((slice.actions as any).addItem(saved));
+                dispatch((slice.actions as any).addItem(normalizedSaved));
                 GenericEvents.emit(events.CREATED, saved);
 
                 return saved as T;
@@ -238,16 +289,16 @@ let inflightLoad: Promise<T[]> | null = null;
                     }
                 }
 
-                // Remove from IndexedDB (idempotent - safe if already deleted)
+                // Remove from DuckDB cache (idempotent - safe if already deleted)
                 try {
                     await cacheInstance.remove(id);
                 } catch (error: any) {
-                    // Ignore errors if item doesn't exist in IndexedDB
-                    console.warn(`${name}/removeAsync: Failed to remove from IndexedDB (may already be deleted)`, error);
+                    // Ignore errors if item doesn't exist in DuckDB cache
+                    console.warn(`${name}/removeAsync: Failed to remove from DuckDB cache (may already be deleted)`, error);
                 }
 
-                // Always refresh Redux from IndexedDB to ensure sync
-                dispatch(getFromIndexedDB());
+                // Always refresh Redux from DuckDB cache to ensure sync
+                dispatch(getFromDuckDB());
 
                 return id;
             } catch (error: any) {
@@ -309,18 +360,18 @@ let inflightLoad: Promise<T[]> | null = null;
             },
         },
         extraReducers: (builder) => {
-            // Handle getFromIndexedDB
+            // Handle getFromDuckDB
             builder
-                .addCase(getFromIndexedDB.pending, (state) => {
+                .addCase(getFromDuckDB.pending, (state) => {
                     state.loading = true;
                     state.error = null;
                 })
-                .addCase(getFromIndexedDB.fulfilled, (state, action: PayloadAction<T[]>) => {
+                .addCase(getFromDuckDB.fulfilled, (state, action: PayloadAction<T[]>) => {
                     state.loading = false;
                     state.value = action.payload as unknown as typeof state.value;
                     state.error = null;
                 })
-                .addCase(getFromIndexedDB.rejected, (state, action) => {
+                .addCase(getFromDuckDB.rejected, (state, action) => {
                     state.loading = false;
                     state.error = action.error.message || null;
                 });
@@ -347,7 +398,9 @@ let inflightLoad: Promise<T[]> | null = null;
         slice,
         actions: {
             ...slice.actions,
-            getFromIndexedDB,
+            getFromDuckDB,
+            // Legacy alias for callers not yet migrated
+            getFromIndexedDB: getFromDuckDB,
             fetchFromAPI,
             updateAsync,
             addAsync,

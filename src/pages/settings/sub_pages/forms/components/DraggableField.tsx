@@ -145,7 +145,7 @@ export function DraggableField({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2" />
               <Select
-                value={field.type}
+                value={field.type || ''}
                 onValueChange={(value) => onUpdate({ type: value as BuilderSchemaField['type'] })}
               >
                 <SelectTrigger className="w-[180px]" size="sm">

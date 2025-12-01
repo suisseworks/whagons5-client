@@ -163,6 +163,21 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
   }, [priorities, categoryId, mode]);
 
+
+  // Ensure the current task's priority appears in the dropdown in edit mode,
+  // even if it doesn't match the current category filter.
+  const effectiveCategoryPriorities = useMemo(() => {
+    const list = [...categoryPriorities];
+    if (mode === 'edit' && task?.priority_id != null) {
+      const pid = Number(task.priority_id);
+      if (!list.some((p: any) => Number(p.id) === pid)) {
+        const extra = priorities.find((p: any) => Number(p.id) === pid);
+        if (extra) list.push(extra);
+      }
+    }
+    return list;
+  }, [mode, task?.priority_id, categoryPriorities, priorities]);
+
   // For create-all mode: show all templates from all DEFAULT workspaces
   // For other modes: show templates filtered by current workspace
   const workspaceTemplates = useMemo(() => {
@@ -269,78 +284,82 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     if (formInitializedRef.current) return;
     formInitializedRef.current = true;
 
-    if (mode === 'edit' && task) {
-      // Edit mode: load from task
-      setName(task.name || '');
-      setDescription(task.description || '');
-      setCategoryId(task.category_id ? Number(task.category_id) : null);
-      setPriorityId(task.priority_id ? Number(task.priority_id) : null);
-      setSpotId(task.spot_id ? Number(task.spot_id) : null);
-      setStatusId(task.status_id ? Number(task.status_id) : null);
-      setTemplateId(task.template_id ? Number(task.template_id) : null);
-      setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
-      setSelectedUserIds(Array.isArray(task.user_ids) ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n)) : []);
-      setSlaId(task.sla_id ? Number(task.sla_id) : null);
-      setApprovalId(task.approval_id ? Number(task.approval_id) : null);
-      setIsSubmitting(false);
-      setActiveTab('basic');
-      setShowDescription(!!task.description);
-      const currentTaskTagIds = taskTags
-        .filter((tt: any) => tt.task_id === Number(task.id))
-        .map((tt: any) => Number(tt.tag_id));
-      setSelectedTagIds(currentTaskTagIds);
-    } else if (mode === 'create') {
-      // Create mode: reset form and prefill defaults
-      setDescription('');
-      setSpotId(null);
-      setSelectedUserIds([]);
-      setDueDate('');
-      setIsSubmitting(false);
-      setSlaId(null);
-      setApprovalId(null);
-      setActiveTab('basic');
-      setShowDescription(false);
-      setSelectedTagIds([]);
-      
-      // Prefill defaults
-      const firstTemplate = workspaceTemplates[0];
-      if (firstTemplate) {
-        setTemplateId(firstTemplate.id);
-        setCategoryId(firstTemplate.category_id || null);
-        setPriorityId(firstTemplate.default_priority || null);
-        setName(firstTemplate.name || '');
-        setSlaId(firstTemplate.sla_id || null);
-        setApprovalId(firstTemplate.approval_id || null);
-        const spotsNotApplicable = firstTemplate.spots_not_applicable === true || firstTemplate.spots_not_applicable === 'true';
-        if (spotsNotApplicable) {
-          setSpotId(null);
-        } else if (firstTemplate.default_spot_id) {
-          setSpotId(firstTemplate.default_spot_id);
+    // Defer form initialization to next frame to avoid forced reflow during Sheet animation
+    requestAnimationFrame(() => {
+      if (mode === 'edit' && task) {
+        // Edit mode: load from task
+        setName(task.name || '');
+        setDescription(task.description || '');
+        setCategoryId(task.category_id != null ? Number(task.category_id) : null);
+        setPriorityId(task.priority_id != null ? Number(task.priority_id) : null);
+        setSpotId(task.spot_id != null ? Number(task.spot_id) : null);
+        // Use != null to allow 0 as a valid status_id
+        setStatusId(task.status_id != null ? Number(task.status_id) : null);
+        setTemplateId(task.template_id != null ? Number(task.template_id) : null);
+        setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
+        setSelectedUserIds(Array.isArray(task.user_ids) ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n)) : []);
+        setSlaId(task.sla_id != null ? Number(task.sla_id) : null);
+        setApprovalId(task.approval_id != null ? Number(task.approval_id) : null);
+        setIsSubmitting(false);
+        setActiveTab('basic');
+        setShowDescription(!!task.description);
+        const currentTaskTagIds = taskTags
+          .filter((tt: any) => tt.task_id === Number(task.id))
+          .map((tt: any) => Number(tt.tag_id));
+        setSelectedTagIds(currentTaskTagIds);
+      } else if (mode === 'create') {
+        // Create mode: reset form and prefill defaults
+        setDescription('');
+        setSpotId(null);
+        setSelectedUserIds([]);
+        setDueDate('');
+        setIsSubmitting(false);
+        setSlaId(null);
+        setApprovalId(null);
+        setActiveTab('basic');
+        setShowDescription(false);
+        setSelectedTagIds([]);
+        
+        // Prefill defaults
+        const firstTemplate = workspaceTemplates[0];
+        if (firstTemplate) {
+          setTemplateId(firstTemplate.id);
+          setCategoryId(firstTemplate.category_id || null);
+          setPriorityId(firstTemplate.default_priority || null);
+          setName(firstTemplate.name || '');
+          setSlaId(firstTemplate.sla_id || null);
+          setApprovalId(firstTemplate.approval_id || null);
+          const spotsNotApplicable = firstTemplate.spots_not_applicable === true || firstTemplate.spots_not_applicable === 'true';
+          if (spotsNotApplicable) {
+            setSpotId(null);
+          } else if (firstTemplate.default_spot_id) {
+            setSpotId(firstTemplate.default_spot_id);
+          }
+        } else {
+          setTemplateId(null);
+          setName('');
+          const defaultCategory = workspaceCategories[0];
+          setCategoryId(defaultCategory ? defaultCategory.id : null);
+          setPriorityId(null);
         }
-      } else {
-        setTemplateId(null);
+      } else if (mode === 'create-all') {
+        // Create-all mode: reset form only on initial open
+        setDescription('');
+        setSpotId(null);
+        setSelectedUserIds([]);
+        setDueDate('');
+        setIsSubmitting(false);
+        setSlaId(null);
+        setApprovalId(null);
+        setActiveTab('basic');
+        setShowDescription(false);
+        setSelectedTagIds([]);
+        setCategoryId(null);
         setName('');
-        const defaultCategory = workspaceCategories[0];
-        setCategoryId(defaultCategory ? defaultCategory.id : null);
+        setTemplateId(null);
         setPriorityId(null);
       }
-    } else if (mode === 'create-all') {
-      // Create-all mode: reset form only on initial open
-      setDescription('');
-      setSpotId(null);
-      setSelectedUserIds([]);
-      setDueDate('');
-      setIsSubmitting(false);
-      setSlaId(null);
-      setApprovalId(null);
-      setActiveTab('basic');
-      setShowDescription(false);
-      setSelectedTagIds([]);
-      setCategoryId(null);
-      setName('');
-      setTemplateId(null);
-      setPriorityId(null);
-    }
+    });
   }, [open, mode, task?.id, taskTags]);
   
   // Separate effect for create mode to prefill defaults when workspaceTemplates/workspaceCategories become available
@@ -432,8 +451,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         workspaceId &&
         categoryId &&
         derivedTeamId &&
-        statusId &&
-        (priorityId || categoryPriorities.length === 0) &&
+        statusId != null && // Use != null to allow 0 as valid statusId
+        (priorityId != null || categoryPriorities.length === 0) &&
         task?.id
       );
     } else {
@@ -442,8 +461,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         workspaceId &&
         categoryId &&
         derivedTeamId &&
-        categoryInitialStatusId &&
-        (priorityId || categoryPriorities.length === 0)
+        categoryInitialStatusId != null && // Use != null to allow 0 as valid statusId
+        (priorityId != null || categoryPriorities.length === 0)
       );
     }
   }, [name, workspaceId, categoryId, derivedTeamId, statusId, categoryInitialStatusId, priorityId, categoryPriorities.length, task?.id, mode]);
@@ -577,7 +596,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             e.preventDefault();
           }
         }}
-        className={`w-full ${mode === 'create-all' ? 'sm:w-[800px] max-w-[800px]' : 'sm:w-[1120px] max-w-[1120px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
+        className={`w-full ${mode === 'create-all' ? 'sm:w-[800px] max-w-[800px]' : 'sm:w-[1120px] max-w-[1120px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full will-change-transform`}
       >
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
@@ -638,7 +657,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={[]}
-                          value={undefined}
+                          value=""
                           onValueChange={() => {}}
                           placeholder="No templates available"
                           searchPlaceholder="Search templates..."
@@ -677,7 +696,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={[]}
-                          value={undefined}
+                          value=""
                           onValueChange={() => {}}
                           placeholder="Templates only available for default workspaces"
                           searchPlaceholder="Search templates..."
@@ -689,7 +708,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={[]}
-                          value={undefined}
+                          value=""
                           onValueChange={() => {}}
                           placeholder="No templates available"
                           searchPlaceholder="Search templates..."
@@ -704,7 +723,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                             value: String(t.id),
                             label: t.name,
                           }))}
-                          value={templateId ? String(templateId) : undefined}
+                          value={templateId ? String(templateId) : ""}
                           onValueChange={(v) => {
                             // Always set the template, don't allow deselection by clicking the same item
                             if (v) {
@@ -800,7 +819,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                             value: String(s.id),
                             label: s.name,
                           }))}
-                          value={spotId ? String(spotId) : undefined}
+                          value={spotId ? String(spotId) : ""}
                           onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
                           placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
                           searchPlaceholder="Search locations..."
@@ -840,14 +859,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   <Label className="text-sm font-medium font-[500] text-foreground">
                     Priority
                   </Label>
-                  <Select value={priorityId ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
+                  <Select value={priorityId != null ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
                       className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
                     >
-                      <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
+                      <SelectValue placeholder={effectiveCategoryPriorities.length ? 'Select priority' : 'No priorities'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {categoryPriorities.map((p: any) => (
+                      {effectiveCategoryPriorities.map((p: any) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                           <div className="flex items-center gap-2">
                             <span 

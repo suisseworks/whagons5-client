@@ -1,5 +1,4 @@
 "use client";
-import { motion } from "motion/react";
 import StatusBadge from "./StatusBadge";
 import PriorityBadge from "./PriorityBadge";
 import DueDateCell from "./DueDateCell";
@@ -13,15 +12,6 @@ import { useEffect, useState } from "react";
 type StatusMeta = { id: number; name: string; color?: string; icon?: string };
 type PriorityMeta = { id: number; name: string; color?: string };
 type SpotMeta = { id: number; name: string };
-
-export const taskVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.3 },
-  },
-};
 
 export function TaskRow({
   task,
@@ -81,15 +71,9 @@ export function TaskRow({
   };
 
   return (
-    <motion.div
-      variants={taskVariants}
-      initial="hidden"
-      animate="visible"
+    <div
       className="group relative overflow-hidden border border-[#E5E7EB] bg-card rounded-xl px-6 py-5 hover:shadow-lg transition-all duration-200 cursor-pointer"
       onClick={onClick}
-      style={{
-        transformOrigin: "center",
-      }}
     >
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
@@ -119,7 +103,9 @@ export function TaskRow({
             >
               {task.description}
             </div>
-          ) : null}
+          ) : (
+            <div className="mb-2" aria-hidden="true" />
+          )}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <StatusBadge statusId={task?.status_id} statusMap={statusMap} getStatusIcon={getStatusIcon} />
@@ -147,7 +133,7 @@ export function TaskRow({
           onMarkComplete={onMarkComplete}
         />
       </div>
-    </motion.div>
+    </div>
   );
 }
 

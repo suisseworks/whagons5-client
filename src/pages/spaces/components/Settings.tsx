@@ -76,15 +76,20 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   const [filtersLoading, setFiltersLoading] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string | null>(null);
   const [columnPrefs, setColumnPrefs] = useState<string[]>(() => {
-    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'updated_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
       if (!raw) return allDefault;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        // Always ensure name is present
-        return Array.from(new Set(['name', ...parsed]));
+        // Migrate legacy 'created_at' to 'updated_at' for Last modified column
+        const set = new Set<string>(['name', ...parsed]);
+        if (set.has('created_at') && !set.has('updated_at')) {
+          set.delete('created_at');
+          set.add('updated_at');
+        }
+        return Array.from(set);
       }
     } catch {
       // ignore
@@ -321,7 +326,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     { id: 'user_ids', label: 'Owner', locked: false },
     { id: 'due_date', label: 'Due date', locked: false },
     { id: 'spot_id', label: 'Location', locked: false },
-    { id: 'created_at', label: 'Last modified', locked: false },
+    { id: 'updated_at', label: 'Last modified', locked: false },
   ] as const), []);
 
   // Workspace-scoped custom fields (from categories -> categoryCustomFields -> customFields)

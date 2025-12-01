@@ -340,7 +340,7 @@ function Statuses() {
               rowData={filteredStatuses}
               columnDefs={columns}
               noRowsMessage="No statuses found"
-              rowSelection="single"
+              rowSelection={{ mode: 'singleRow' }}
               onSelectionChanged={(rows) => setSelectedStatus(rows?.[0] || null)}
               onRowDoubleClicked={(row) => {
                 setSelectedStatus(row);

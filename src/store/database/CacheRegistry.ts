@@ -5,7 +5,7 @@ import { genericCaches } from "../genericSlices";
 // Import Redux store and actions
 import { store } from "../store";
 import { genericActions } from "../genericSlices";
-import { getTasksFromIndexedDB } from "../reducers/tasksSlice";
+// NOTE: getTasksFromIndexedDB intentionally NOT imported - tasks should never be auto-loaded into Redux memory
 
 type CacheHandler = {
 	add: (row: any) => Promise<void>;
@@ -35,21 +35,23 @@ const cacheByTable: Record<string, CacheHandler> = {
 	}), {}),
 };
 
-// Sync handlers: re-load Redux slice state from IndexedDB
+// Sync handlers: re-load Redux slice state from DuckDB caches
 type SyncHandler = () => Promise<void>;
 
 const syncByTable: Record<string, SyncHandler> = {
-	// Tasks use custom thunk
-	wh_tasks: async () => { await store.dispatch(getTasksFromIndexedDB()); },
+	// Tasks: DO NOT auto-sync to Redux - this would load ALL tasks into memory
+	// Tasks Redux slice is only used for optimistic updates (add/update/delete individual tasks)
+	// Settings pages and other components should query DuckTaskCache directly instead
+	// wh_tasks: intentionally omitted - never load all tasks into Redux memory
 
 	// All other tables handled by generic slices
 	...Object.entries(genericCaches).reduce((acc, [key, cache]) => {
 		const tableName = cache.getTableName();
 		const actions = genericActions[key as keyof typeof genericActions];
-		if (actions && (actions as any).getFromIndexedDB) {
+		if (actions && (actions as any).getFromDuckDB) {
 			return {
 				...acc,
-				[tableName]: async () => { await store.dispatch((actions as any).getFromIndexedDB()); },
+				[tableName]: async () => { await store.dispatch((actions as any).getFromDuckDB()); },
 			};
 		}
 		return acc;

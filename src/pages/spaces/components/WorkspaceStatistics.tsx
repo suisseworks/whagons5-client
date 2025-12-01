@@ -9,6 +9,7 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
 import { DuckTaskCache } from "@/store/database/DuckTaskCache";
+import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;
@@ -57,9 +58,8 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   const lastCalculatedWorkspaceRef = useRef<string | undefined>(undefined);
   const [workspaceTasks, setWorkspaceTasks] = useState<Task[]>([]);
 
-  // Load tasks from TasksCache (same as Workspace component)
-  useEffect(() => {
-    const loadTasks = async () => {
+  // Helper to fetch tasks for current workspace
+  const fetchTasksForWorkspace = useCallback(async () => {
       try {
         console.log('WorkspaceStatistics - ===== LOADING TASKS =====');
         console.log('WorkspaceStatistics - workspaceId:', workspaceId, 'type:', typeof workspaceId);
@@ -68,7 +68,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         await DuckTaskCache.init();
         
         // Build query filter
-        const query: any = { startRow: 0, endRow: 10000 }; // Get all tasks
+        const query: any = { startRow: 0, endRow: 10000 }; // Get all tasks (bounded)
         if (workspaceId && workspaceId !== 'all' && workspaceId !== undefined) {
           const wsId = parseInt(workspaceId);
           if (!isNaN(wsId)) {
@@ -106,10 +106,33 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         console.error('WorkspaceStatistics - Error stack:', (error as Error).stack);
         setWorkspaceTasks([]);
       }
-    };
-    
-    loadTasks();
   }, [workspaceId]);
+
+  // Load tasks on mount and when workspaceId changes
+  useEffect(() => {
+    fetchTasksForWorkspace();
+  }, [fetchTasksForWorkspace]);
+
+  // Listen to task events to keep statistics fresh
+  useEffect(() => {
+    const debouncedReloadRef = { t: 0 as any };
+    const scheduleReload = () => {
+      // simple debounce ~150ms
+      if (debouncedReloadRef.t) clearTimeout(debouncedReloadRef.t);
+      debouncedReloadRef.t = setTimeout(() => {
+        fetchTasksForWorkspace();
+      }, 150);
+    };
+    const offCreated = TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, scheduleReload);
+    const offUpdated = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, scheduleReload);
+    const offDeleted = TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, scheduleReload);
+    const offBulk = TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, scheduleReload);
+    const offInvalidate = TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, scheduleReload);
+    return () => {
+      try { offCreated(); offUpdated(); offDeleted(); offBulk(); offInvalidate(); } catch {}
+      if (debouncedReloadRef.t) clearTimeout(debouncedReloadRef.t);
+    };
+  }, [fetchTasksForWorkspace]);
 
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {
@@ -123,6 +146,22 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       return;
     }
     
+    // Ensure priorities and statuses are loaded (they're needed for urgent/overdue calculations)
+    const prioritiesArray = Array.isArray(priorities) ? priorities : [];
+    const statusesArray = Array.isArray(statuses) ? statuses : [];
+    
+    if (prioritiesArray.length === 0 || statusesArray.length === 0) {
+      console.log('WorkspaceStatistics - Waiting for priorities/statuses to load...', {
+        priorities: prioritiesArray.length,
+        statuses: statusesArray.length
+      });
+      // Don't block if we have tasks but no priorities/statuses - we'll calculate what we can
+      // But log a warning for debugging
+      if (workspaceTasks.length > 0) {
+        console.warn('WorkspaceStatistics - Calculating with missing priorities/statuses. Urgent/overdue counts may be inaccurate.');
+      }
+    }
+    
     isCalculatingRef.current = true;
     setStatsLoading(true);
     
@@ -134,13 +173,27 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       console.log('WorkspaceStatistics - workspaceTasks.length:', workspaceTasks.length);
       console.log('WorkspaceStatistics - Sample task:', workspaceTasks[0]);
       console.log('WorkspaceStatistics - categories.length:', (categories as any[]).length);
-      console.log('WorkspaceStatistics - statuses.length:', (statuses as any[]).length);
-      console.log('WorkspaceStatistics - priorities.length:', (priorities as any[]).length);
+      console.log('WorkspaceStatistics - statuses.length:', statusesArray.length);
+      console.log('WorkspaceStatistics - priorities.length:', prioritiesArray.length);
+      console.log('WorkspaceStatistics - Sample status:', statusesArray[0]);
+      console.log('WorkspaceStatistics - Sample priority:', prioritiesArray[0]);
+      console.log('WorkspaceStatistics - Sample category:', (categories as any[])[0]);
+      
+      // Get workspace categories first (for filtering)
+      const workspaceCategories = workspaceId && workspaceId !== 'all' && Array.isArray(categories)
+        ? categories.filter((c: Category) => Number(c.workspace_id) === Number(workspaceId))
+        : (Array.isArray(categories) ? categories : []);
+      
+      console.log('WorkspaceStatistics - workspaceCategories.length:', workspaceCategories.length);
+      console.log('WorkspaceStatistics - workspaceId:', workspaceId);
+      
       // Tasks by status (with actual status names)
       const statusCounts = new Map<number, { name: string; count: number; color?: string }>();
       workspaceTasks.forEach((task: Task) => {
-        const statusId = task.status_id;
-        const status = Array.isArray(statuses) ? statuses.find((s: any) => s.id === statusId) : null;
+        const statusId = Number(task.status_id);
+        if (!Number.isFinite(statusId)) return;
+        // Normalize both IDs to numbers for comparison
+        const status = statusesArray.find((s: any) => Number(s.id) === statusId) || null;
         const statusName = status?.name || `Status ${statusId}`;
         const existing = statusCounts.get(statusId);
         statusCounts.set(statusId, {
@@ -157,10 +210,13 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       // Tasks by priority (with actual priority names and colors)
       const priorityCounts = new Map<number, { name: string; count: number; color?: string }>();
       workspaceTasks.forEach((task: Task) => {
-        const priority = Array.isArray(priorities) ? priorities.find((p: any) => p.id === task.priority_id) : null;
+        const priorityId = Number(task.priority_id);
+        if (!Number.isFinite(priorityId)) return;
+        // Normalize both IDs to numbers for comparison
+        const priority = prioritiesArray.find((p: any) => Number(p.id) === priorityId) || null;
         if (priority) {
-          const existing = priorityCounts.get(task.priority_id);
-          priorityCounts.set(task.priority_id, {
+          const existing = priorityCounts.get(priorityId);
+          priorityCounts.set(priorityId, {
             name: priority.name,
             count: (existing?.count || 0) + 1,
             color: priority.color || undefined
@@ -173,28 +229,266 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         .sort((a, b) => b.count - a.count);
 
       // Urgent tasks (high priority)
-      const urgentTasksCount = workspaceTasks.filter((task: Task) => {
-        const priority = Array.isArray(priorities) ? priorities.find((p: any) => p.id === task.priority_id) : null;
-        if (priority?.level && priority.level >= 4) return true;
-        if (priority?.name) {
-          const nameLower = priority.name.toLowerCase();
-          return nameLower.includes('urgent') || nameLower.includes('critical') || nameLower.includes('high');
+      // First, let's debug what we have
+      console.log('WorkspaceStatistics - === URGENT TASKS DEBUG ===');
+      console.log('WorkspaceStatistics - Total tasks:', workspaceTasks.length);
+      console.log('WorkspaceStatistics - Priorities available:', prioritiesArray.length);
+      if (prioritiesArray.length > 0) {
+        console.log('WorkspaceStatistics - Sample priorities:', prioritiesArray.slice(0, 5).map((p: any) => ({ 
+          id: p.id, 
+          name: p.name, 
+          level: p.level,
+          color: p.color 
+        })));
+      }
+      
+      // Check tasks with priority_id
+      const tasksWithPriorityId = workspaceTasks.filter((t: Task) => {
+        const pid = Number(t.priority_id);
+        return Number.isFinite(pid) && pid > 0;
+      });
+      console.log('WorkspaceStatistics - Tasks with valid priority_id:', tasksWithPriorityId.length);
+      if (tasksWithPriorityId.length > 0) {
+        console.log('WorkspaceStatistics - Sample tasks with priority:', tasksWithPriorityId.slice(0, 5).map((t: Task) => ({
+          id: t.id,
+          priority_id: t.priority_id,
+          name: t.name?.substring(0, 30)
+        })));
+      }
+      
+      const urgentTasks = workspaceTasks.filter((task: Task) => {
+        const priorityId = Number(task.priority_id);
+        if (!Number.isFinite(priorityId) || priorityId <= 0) return false;
+        
+        const priority = prioritiesArray.find((p: any) => Number(p.id) === priorityId) || null;
+        if (!priority) {
+          return false;
+        }
+        
+        // Check priority level (if level >= 4, consider urgent)
+        // Also check if level is in top 2-3 priorities (assuming levels 1-5 or 1-10 scale)
+        const levelNum = priority.level != null && Number.isFinite(priority.level) ? Number(priority.level) : null;
+        if (levelNum != null) {
+          // If level >= 4 out of 5, or level >= 7 out of 10, consider urgent
+          // Also check if it's in the top 20% of priorities (assuming max level is 5 or 10)
+          if (levelNum >= 4) {
+            return true;
+          }
+        }
+        // Check priority name for urgent keywords (case-insensitive)
+        if (priority.name) {
+          const nameLower = String(priority.name).toLowerCase().trim();
+          if (nameLower.includes('urgent') || 
+              nameLower.includes('critical') || 
+              nameLower.includes('high') ||
+              nameLower === 'high' ||
+              nameLower === 'urgent' ||
+              nameLower === 'critical') {
+            return true;
+          }
         }
         return false;
-      }).length;
+      });
+      const urgentTasksCount = urgentTasks.length;
+      console.log('WorkspaceStatistics - Urgent tasks found:', urgentTasksCount);
+      if (urgentTasksCount > 0) {
+        console.log('WorkspaceStatistics - Urgent task details:', urgentTasks.slice(0, 10).map(t => {
+          const p = prioritiesArray.find((p: any) => Number(p.id) === Number(t.priority_id));
+          return { 
+            id: t.id, 
+            priority_id: t.priority_id, 
+            priority_name: p?.name,
+            priority_level: p?.level,
+            name: t.name?.substring(0, 30)
+          };
+        }));
+      } else {
+        console.log('WorkspaceStatistics - No urgent tasks found. Checking why...');
+        if (tasksWithPriorityId.length > 0 && prioritiesArray.length > 0) {
+          // Show what priorities we have vs what tasks have
+          const taskPriorityIds = new Set(tasksWithPriorityId.map(t => Number(t.priority_id)));
+          const availablePriorityIds = new Set(prioritiesArray.map((p: any) => Number(p.id)));
+          console.log('WorkspaceStatistics - Task priority IDs:', Array.from(taskPriorityIds).slice(0, 10));
+          console.log('WorkspaceStatistics - Available priority IDs:', Array.from(availablePriorityIds).slice(0, 10));
+          console.log('WorkspaceStatistics - Priority details:', prioritiesArray.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            level: p.level,
+            levelType: typeof p.level,
+            isUrgent: (p.level != null && Number.isFinite(p.level) && Number(p.level) >= 4) || (p.name?.toLowerCase().includes('urgent') || p.name?.toLowerCase().includes('critical') || p.name?.toLowerCase().includes('high'))
+          })));
+          // Specifically check priority 7 since all tasks use it
+          const priority7 = prioritiesArray.find((p: any) => Number(p.id) === 7);
+          if (priority7) {
+            console.log('WorkspaceStatistics - Priority 7 details:', {
+              id: priority7.id,
+              name: priority7.name,
+              level: priority7.level,
+              levelType: typeof priority7.level,
+              levelAsNumber: Number(priority7.level),
+              isLevel4OrHigher: priority7.level != null && Number.isFinite(priority7.level) && Number(priority7.level) >= 4,
+              nameIncludesUrgent: priority7.name?.toLowerCase().includes('urgent'),
+              nameIncludesCritical: priority7.name?.toLowerCase().includes('critical'),
+              nameIncludesHigh: priority7.name?.toLowerCase().includes('high'),
+              fullObject: priority7
+            });
+          }
+        }
+      }
+      console.log('WorkspaceStatistics - === END URGENT DEBUG ===');
 
       // Overdue tasks
-      const overdueTasksCount = workspaceTasks.filter((task: Task) => {
+      console.log('WorkspaceStatistics - === OVERDUE TASKS DEBUG ===');
+      console.log('WorkspaceStatistics - Total tasks:', workspaceTasks.length);
+      console.log('WorkspaceStatistics - Statuses available:', statusesArray.length);
+      
+      // Check tasks with due_date
+      const tasksWithDueDate = workspaceTasks.filter((t: Task) => {
+        const dd = t.due_date;
+        return dd != null && dd !== '' && dd !== 'null' && dd !== 'undefined';
+      });
+      console.log('WorkspaceStatistics - Tasks with due_date:', tasksWithDueDate.length);
+      if (tasksWithDueDate.length > 0) {
+        console.log('WorkspaceStatistics - Sample tasks with due_date:', tasksWithDueDate.slice(0, 5).map((t: Task) => ({
+          id: t.id,
+          due_date: t.due_date,
+          due_date_type: typeof t.due_date,
+          status_id: t.status_id,
+          name: t.name?.substring(0, 30)
+        })));
+      }
+      
+      const now = new Date();
+      const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      console.log('WorkspaceStatistics - Current date (date only):', nowDateOnly.toISOString().split('T')[0]);
+      
+      const overdueTasks = workspaceTasks.filter((task: Task) => {
         if (!task.due_date) return false;
-        const dueDate = new Date(task.due_date);
-        const now = new Date();
-        return dueDate < now;
-      }).length;
+        
+        // Handle different date formats (string, Date object, timestamp)
+        let dueDate: Date;
+        try {
+          const dueDateValue = task.due_date as any;
+          if (dueDateValue instanceof Date) {
+            dueDate = dueDateValue;
+          } else if (typeof dueDateValue === 'string') {
+            // Try parsing as ISO string
+            dueDate = new Date(dueDateValue);
+          } else if (typeof dueDateValue === 'number') {
+            // Timestamp
+            dueDate = new Date(dueDateValue);
+          } else {
+            return false;
+          }
+          
+          // Check if date is valid
+          if (isNaN(dueDate.getTime())) {
+            return false;
+          }
+          
+          // Only count as overdue if due date is in the past AND task is not completed
+          const statusId = Number(task.status_id);
+          if (Number.isFinite(statusId)) {
+            const status = statusesArray.find((s: any) => Number(s.id) === statusId) || null;
+            // Don't count completed tasks as overdue
+            if (status?.action === 'FINISHED' || status?.semantic_type === 'completed' || (status as any)?.final === true) {
+              return false;
+            }
+          }
+          
+          // Compare dates (ignore time, just compare date portion)
+          // Count as overdue if due date is today or in the past
+          const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+          const isOverdue = dueDateOnly <= nowDateOnly;
+          
+          return isOverdue;
+        } catch (e) {
+          console.warn('WorkspaceStatistics - Error parsing due_date:', task.due_date, 'for task:', task.id, e);
+          return false;
+        }
+      });
+      const overdueTasksCount = overdueTasks.length;
+      console.log('WorkspaceStatistics - Overdue tasks found:', overdueTasksCount);
+      if (overdueTasksCount > 0) {
+        console.log('WorkspaceStatistics - Overdue task details:', overdueTasks.slice(0, 10).map(t => {
+          const s = statusesArray.find((s: any) => Number(s.id) === Number(t.status_id));
+          return { 
+            id: t.id, 
+            due_date: t.due_date,
+            due_date_parsed: new Date(t.due_date as string).toISOString().split('T')[0],
+            status_id: t.status_id,
+            status_name: s?.name,
+            status_action: s?.action,
+            name: t.name?.substring(0, 30)
+          };
+        }));
+      } else {
+        console.log('WorkspaceStatistics - No overdue tasks found. Checking why...');
+        if (tasksWithDueDate.length > 0) {
+          // Show what dates we have
+          const sampleDates = tasksWithDueDate.slice(0, 10).map(t => {
+            try {
+              // Handle timestamp format (number in milliseconds)
+              let d: Date;
+              if (typeof t.due_date === 'number') {
+                d = new Date(t.due_date);
+              } else if (typeof t.due_date === 'string') {
+                d = new Date(t.due_date);
+              } else {
+                d = new Date(t.due_date as any);
+              }
+              const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+              const isPast = dOnly < nowDateOnly;
+              const s = statusesArray.find((s: any) => Number(s.id) === Number(t.status_id));
+              const isCompleted = s?.action === 'FINISHED' || s?.semantic_type === 'completed' || (s as any)?.final === true;
+              return {
+                id: t.id,
+                due_date: t.due_date,
+                due_date_type: typeof t.due_date,
+                parsed: dOnly.toISOString().split('T')[0],
+                nowDate: nowDateOnly.toISOString().split('T')[0],
+                isPast,
+                isCompleted,
+                status: s?.name,
+                status_action: s?.action
+              };
+            } catch (e) {
+              return { id: t.id, due_date: t.due_date, error: String(e) };
+            }
+          });
+          console.log('WorkspaceStatistics - Sample due dates analysis:', sampleDates);
+          
+          // Check if there are any tasks with dates in the past
+          const pastDueTasks = tasksWithDueDate.filter(t => {
+            try {
+              let d: Date;
+              if (typeof t.due_date === 'number') {
+                d = new Date(t.due_date);
+              } else {
+                d = new Date(t.due_date as string);
+              }
+              const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+              return dOnly < nowDateOnly;
+            } catch {
+              return false;
+            }
+          });
+          console.log('WorkspaceStatistics - Tasks with past due dates:', pastDueTasks.length);
+        }
+      }
+      console.log('WorkspaceStatistics - === END OVERDUE DEBUG ===');
 
       // Completed tasks
       const completedTasksCount = workspaceTasks.filter((task: Task) => {
-        const status = Array.isArray(statuses) ? statuses.find((s: any) => s.id === task.status_id) : null;
-        return status?.action === 'FINISHED' || status?.semantic_type === 'completed' || status?.final === true;
+        const statusId = Number(task.status_id);
+        if (!Number.isFinite(statusId)) return false;
+        const status = Array.isArray(statuses) ? statuses.find((s: any) => Number(s.id) === statusId) : null;
+        if (!status) return false;
+        // Check multiple ways a task can be considered completed
+        const action = String(status.action || '').toUpperCase();
+        const semanticType = String(status.semantic_type || '').toLowerCase();
+        const isFinal = (status as any)?.final === true;
+        return action === 'FINISHED' || action === 'DONE' || semanticType === 'completed' || semanticType === 'done' || isFinal;
       }).length;
 
       // Tasks with approvals
@@ -207,17 +501,21 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 10);
 
-      // Tasks by category
+      // Tasks by category (using workspaceCategories defined earlier)
       const categoryCounts = new Map<number, number>();
       workspaceTasks.forEach((task: Task) => {
-        const catId = task.category_id;
+        const catId = Number(task.category_id);
+        if (!Number.isFinite(catId)) return;
         categoryCounts.set(catId, (categoryCounts.get(catId) || 0) + 1);
       });
 
       const tasksByCategory = Array.from(categoryCounts.entries())
         .map(([categoryId, count]) => {
-          const category = Array.isArray(categories) ? categories.find((c: Category) => c.id === categoryId) : null;
-          return { category, count };
+          // Normalize both IDs to numbers for comparison - use workspaceCategories instead of all categories
+          const category = Array.isArray(workspaceCategories) ? workspaceCategories.find((c: Category) => Number(c.id) === categoryId) : null;
+          // Fallback to all categories if not found in workspace categories (for edge cases)
+          const fallbackCategory = !category && Array.isArray(categories) ? categories.find((c: Category) => Number(c.id) === categoryId) : null;
+          return { category: category || fallbackCategory, count };
         })
         .filter((item): item is { category: Category; count: number } => item.category !== null && item.category !== undefined)
         .sort((a, b) => b.count - a.count);
@@ -225,14 +523,18 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       // Recent task types (categories from latest tasks)
       const recentTaskTypesMap = new Map<number, number>();
       latestTasks.forEach((task: Task) => {
-        const catId = task.category_id;
+        const catId = Number(task.category_id);
+        if (!Number.isFinite(catId)) return;
         recentTaskTypesMap.set(catId, (recentTaskTypesMap.get(catId) || 0) + 1);
       });
 
       const recentTaskTypes = Array.from(recentTaskTypesMap.entries())
         .map(([categoryId, count]) => {
-          const category = Array.isArray(categories) ? categories.find((c: Category) => c.id === categoryId) : null;
-          return { category, count };
+          // Normalize both IDs to numbers for comparison - use workspaceCategories instead of all categories
+          const category = Array.isArray(workspaceCategories) ? workspaceCategories.find((c: Category) => Number(c.id) === categoryId) : null;
+          // Fallback to all categories if not found in workspace categories (for edge cases)
+          const fallbackCategory = !category && Array.isArray(categories) ? categories.find((c: Category) => Number(c.id) === categoryId) : null;
+          return { category: category || fallbackCategory, count };
         })
         .filter((item): item is { category: Category; count: number } => item.category !== null && item.category !== undefined)
         .sort((a, b) => b.count - a.count);
@@ -241,15 +543,18 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       const userTaskCounts = new Map<number, number>();
       workspaceTasks.forEach((task: Task) => {
         if (task.user_ids && Array.isArray(task.user_ids)) {
-          task.user_ids.forEach((userId: number) => {
-            userTaskCounts.set(userId, (userTaskCounts.get(userId) || 0) + 1);
+          task.user_ids.forEach((userId: number | string) => {
+            const uid = Number(userId);
+            if (!Number.isFinite(uid)) return;
+            userTaskCounts.set(uid, (userTaskCounts.get(uid) || 0) + 1);
           });
         }
       });
 
       const mostActiveUsers = Array.from(userTaskCounts.entries())
         .map(([userId, taskCount]) => {
-          const user = Array.isArray(users) ? users.find((u: any) => u.id === userId) : null;
+          // Normalize both IDs to numbers for comparison
+          const user = Array.isArray(users) ? users.find((u: any) => Number(u.id) === userId) : null;
           return {
             userId,
             userName: user?.name || user?.email || `User ${userId}`,
@@ -263,14 +568,15 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       // Most used templates
       const templateUsage = new Map<number, number>();
       workspaceTasks.forEach((task: Task) => {
-        if (task.template_id) {
-          templateUsage.set(task.template_id, (templateUsage.get(task.template_id) || 0) + 1);
-        }
+        const templateId = Number(task.template_id);
+        if (!Number.isFinite(templateId)) return;
+        templateUsage.set(templateId, (templateUsage.get(templateId) || 0) + 1);
       });
 
       const mostUsedTemplates = Array.from(templateUsage.entries())
         .map(([templateId, count]) => {
-          const template = Array.isArray(templates) ? templates.find((t: any) => t.id === templateId) : null;
+          // Normalize both IDs to numbers for comparison
+          const template = Array.isArray(templates) ? templates.find((t: any) => Number(t.id) === templateId) : null;
           return {
             templateId,
             templateName: template?.name || `Template ${templateId}`,
@@ -284,14 +590,15 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       // Tasks by spot
       const spotTaskCounts = new Map<number, number>();
       workspaceTasks.forEach((task: Task) => {
-        if (task.spot_id) {
-          spotTaskCounts.set(task.spot_id, (spotTaskCounts.get(task.spot_id) || 0) + 1);
-        }
+        const spotId = Number(task.spot_id);
+        if (!Number.isFinite(spotId)) return;
+        spotTaskCounts.set(spotId, (spotTaskCounts.get(spotId) || 0) + 1);
       });
 
       const tasksBySpot = Array.from(spotTaskCounts.entries())
         .map(([spotId, count]) => {
-          const spot = Array.isArray(spots) ? spots.find((s: any) => s.id === spotId) : null;
+          // Normalize both IDs to numbers for comparison
+          const spot = Array.isArray(spots) ? spots.find((s: any) => Number(s.id) === spotId) : null;
           return {
             spotId,
             spotName: spot?.name || `Spot ${spotId}`,
@@ -315,10 +622,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         .sort((a, b) => a.date.localeCompare(b.date))
         .slice(-30);
 
-      // Get workspace categories
-      const workspaceCategories = workspaceId && workspaceId !== 'all' && Array.isArray(categories)
-        ? categories.filter((c: Category) => c.workspace_id === parseInt(workspaceId))
-        : (Array.isArray(categories) ? categories : []);
 
       // Get workspace teams
       const workspaceTeams = workspaceId && workspaceId !== 'all' && Array.isArray(teams)
@@ -1048,7 +1351,14 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
             <CardContent>
               <div className="space-y-2">
                 {statistics.latestTasks.map((task: Task) => {
-                  const category = (categories as Category[]).find((c: Category) => c.id === task.category_id);
+                  const categoryId = Number(task.category_id);
+                  const category = Number.isFinite(categoryId) 
+                    ? (categories as Category[]).find((c: Category) => Number(c.id) === categoryId)
+                    : null;
+                  const statusId = Number(task.status_id);
+                  const status = Number.isFinite(statusId)
+                    ? (statuses as any[]).find((s: any) => Number(s.id) === statusId)
+                    : null;
                   return (
                     <div key={task.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-accent/50">
                       <div className="flex-1">
@@ -1058,7 +1368,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
                         </div>
                       </div>
                       <Badge variant="outline" className="ml-2">
-                        {task.status_id}
+                        {status?.name || `Status ${statusId}`}
                       </Badge>
                     </div>
                   );

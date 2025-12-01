@@ -267,7 +267,9 @@ export function SelectField({
   defaultValueArray,
   onChangeArray
 }: SelectFieldProps) {
-  const isControlled = value !== undefined && onChange !== undefined;
+  // If onChange is provided, always use controlled mode (even if value is undefined initially)
+  // This prevents React warning about switching from uncontrolled to controlled
+  const isControlled = onChange !== undefined;
   const selectProps = isControlled
     ? { value: String(value ?? ""), onValueChange: onChange }
     : { defaultValue: String(defaultValue ?? "") };

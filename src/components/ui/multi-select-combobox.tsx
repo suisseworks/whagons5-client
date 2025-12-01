@@ -103,7 +103,24 @@ export function MultiSelectCombobox({
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0" 
+        align="start"
+        onInteractOutside={(e) => {
+          // Prevent dialog from closing when clicking inside popover
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest('[data-slot="dialog-content"]')) {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          // Prevent dialog from intercepting clicks inside popover
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest('[data-slot="dialog-content"]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -117,7 +134,18 @@ export function MultiSelectCombobox({
                   <CommandItem
                     key={option.value}
                     value={searchValue}
-                    onSelect={() => handleSelect(option.value)}
+                    onSelect={() => {
+                      handleSelect(option.value);
+                    }}
+                    className="cursor-pointer pointer-events-auto"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSelect(option.value);
+                    }}
                   >
                     <Check
                       className={cn(

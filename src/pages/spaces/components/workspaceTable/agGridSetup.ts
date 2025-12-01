@@ -55,7 +55,6 @@ export const createDefaultColDef = () => ({
   resizable: true,
   floatingFilter: false,
   // Disable menu icon (ellipsis) on columns to prevent it appearing next to priority tags
-  suppressMenuIcon: true,
   suppressHeaderMenuButton: true,
 });
 
@@ -91,12 +90,12 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     getRowId: (params: any) => String(params.data.id),
   }),
   // Default sort by created_at descending (newest first)
-  sortModel: [{ colId: 'created_at', sort: 'desc' }],
-  animateRows: false, // Disabled for scroll performance
+  defaultSortModel: [{ colId: 'created_at', sort: 'desc' }],
+  animateRows: false,
   suppressColumnVirtualisation: false,
   suppressNoRowsOverlay: false,
   loading: false,
-  suppressScrollOnNewData: true, // Prevent scroll jumps
+  suppressScrollOnNewData: true, 
   debounceVerticalScrollbar: false,
   // Disable context menu and menu icons to prevent ellipsis appearing next to priority tags
   suppressContextMenu: true,

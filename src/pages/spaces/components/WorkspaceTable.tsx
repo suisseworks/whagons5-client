@@ -507,15 +507,17 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Column visibility preferences (per-workspace, persisted in localStorage)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'updated_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
       if (!raw) return allDefault;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        // Always ensure "name" column stays visible
-        return Array.from(new Set(['name', ...parsed]));
+        // Map legacy 'created_at' preference to 'updated_at'
+        const mapped = parsed.map((x: string) => (x === 'created_at' ? 'updated_at' : x));
+        // Always ensure "name" and "updated_at" columns stay visible
+        return Array.from(new Set(['name', 'updated_at', ...mapped]));
       }
     } catch {
       // ignore
@@ -525,7 +527,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Reload preferences when workspace changes
   useEffect(() => {
-    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'updated_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
@@ -535,7 +537,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       }
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        setVisibleColumns(Array.from(new Set(['name', ...parsed])));
+        const mapped = parsed.map((x: string) => (x === 'created_at' ? 'updated_at' : x));
+        setVisibleColumns(Array.from(new Set(['name', 'updated_at', ...mapped])));
       } else {
         setVisibleColumns(allDefault);
       }
@@ -726,13 +729,24 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]
   );
 
+  // Force AG Grid to recalculate row positions so DOM virtualization doesn't leave gaps
+  const forceRowLayout = useCallback(() => {
+    if (!gridRef.current?.api) return;
+    try {
+      gridRef.current.api.refreshCells({ force: true, suppressFlash: true });
+      gridRef.current.api.redrawRows?.();
+      gridRef.current.api.ensureIndexVisible?.(0, 'top');
+      gridRef.current.api.ensureIndexVisible?.(1);
+    } catch (err) {
+      console.warn('forceRowLayout failed', err);
+    }
+  }, []);
+
   // Function to refresh the grid
   const refreshGrid = useCallback(async () => {
     if (!modulesLoaded || !gridRef.current?.api) return;
-    console.log('[WT Filters] refreshGrid: mode =', useClientSide ? 'client' : 'infinite');
 
     if (suppressPersistRef.current) {
-      console.log('[WT Filters] Skipping refresh while restoring filters');
       return;
     }
 
@@ -773,13 +787,20 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       }
     } else {
       rowCache.current.clear();
-      gridRef.current.api.refreshInfiniteCache();
+      const api = gridRef.current.api;
+      if (typeof api.purgeInfiniteCache === 'function') {
+        api.purgeInfiniteCache();
+      } else {
+        api.refreshInfiniteCache();
+      }
+      // Force layout shortly after cache refresh so recycled rows get proper translateY
+      setTimeout(forceRowLayout, 30);
     }
 
     setTimeout(() => {
       suppressPersistRef.current = false;
     }, 0);
-  }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
+  }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, forceRowLayout]);
 
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {
@@ -949,8 +970,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
         {...gridOptions}
         autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
-        rowSelection={'multiple'}
-        suppressRowClickSelection={true}
         getRowStyle={getRowStyle}
         onGridReady={onGridReady}
         onFirstDataRendered={() => {

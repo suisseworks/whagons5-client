@@ -376,7 +376,7 @@ function Teams() {
                     rowData={filteredItems}
                     columnDefs={colDefs}
                     noRowsMessage="No teams found"
-                    rowSelection="single"
+                    rowSelection={{ mode: 'singleRow' }}
                     onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
                   />
                 </div>

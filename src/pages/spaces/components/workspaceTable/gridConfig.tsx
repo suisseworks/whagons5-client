@@ -59,7 +59,7 @@ export const createGridContainer = (children: React.ReactNode) => {
     else densityClass = 'wh-density-comfortable';
   } catch {}
   return (
-    <div style={GRID_STYLES.container} className={`ag-theme-quartz wh-workspace-grid wh-modern-grid ${densityClass} h-full w-full`}>
+    <div style={GRID_STYLES.container} className={`ag-theme-quartz wh-workspace-grid wh-modern-grid ${densityClass} h-full w-full overflow-x-auto`}>
       <div style={GRID_STYLES.grid}>
         {children}
       </div>

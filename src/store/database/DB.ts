@@ -122,162 +122,162 @@ export class DB {
         request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
           try { console.log('DB.init: onupgradeneeded'); } catch {}
           const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains('workspaces')) {
-            db.createObjectStore('workspaces', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('categories')) {
-            db.createObjectStore('categories', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('tasks')) {
-            db.createObjectStore('tasks', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('teams')) {
-            db.createObjectStore('teams', { keyPath: 'id' });
-          }
-          // New reference tables used by RTL publications
-          if (!db.objectStoreNames.contains('statuses')) {
-            db.createObjectStore('statuses', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('priorities')) {
-            db.createObjectStore('priorities', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('spots')) {
-            db.createObjectStore('spots', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('tags')) {
-            db.createObjectStore('tags', { keyPath: 'id' });
-          }
-          // Custom fields and category custom fields (GenericCache-backed)
-          if (!db.objectStoreNames.contains('custom_fields')) {
-            db.createObjectStore('custom_fields', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('category_custom_fields')) {
-            db.createObjectStore('category_custom_fields', {
-              keyPath: 'id',
-            });
-          }
+          // if (!db.objectStoreNames.contains('workspaces')) {
+          //   db.createObjectStore('workspaces', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('categories')) {
+          //   db.createObjectStore('categories', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('tasks')) {
+          //   db.createObjectStore('tasks', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('teams')) {
+          //   db.createObjectStore('teams', { keyPath: 'id' });
+          // }
+          // // New reference tables used by RTL publications
+          // if (!db.objectStoreNames.contains('statuses')) {
+          //   db.createObjectStore('statuses', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('priorities')) {
+          //   db.createObjectStore('priorities', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('spots')) {
+          //   db.createObjectStore('spots', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('tags')) {
+          //   db.createObjectStore('tags', { keyPath: 'id' });
+          // }
+          // // Custom fields and category custom fields (GenericCache-backed)
+          // if (!db.objectStoreNames.contains('custom_fields')) {
+          //   db.createObjectStore('custom_fields', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('category_custom_fields')) {
+          //   db.createObjectStore('category_custom_fields', {
+          //     keyPath: 'id',
+          //   });
+          // }
 
-          // User management tables
-          if (!db.objectStoreNames.contains('users')) {
-            db.createObjectStore('users', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('roles')) {
-            db.createObjectStore('roles', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('permissions')) {
-            db.createObjectStore('permissions', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('user_teams')) {
-            db.createObjectStore('user_teams', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('user_permissions')) {
-            db.createObjectStore('user_permissions', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('role_permissions')) {
-            db.createObjectStore('role_permissions', { keyPath: 'id' });
-          }
-          // task_users store removed - user assignments are now stored as JSON in tasks.user_ids
-          if (!db.objectStoreNames.contains('status_transitions')) {
-            db.createObjectStore('status_transitions', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('status_transition_groups')) {
-            db.createObjectStore('status_transition_groups', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('task_tags')) {
-            db.createObjectStore('task_tags', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('spot_types')) {
-            db.createObjectStore('spot_types', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('slas')) {
-            db.createObjectStore('slas', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('sla_policies')) {
-            db.createObjectStore('sla_policies', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('sla_alerts')) {
-            db.createObjectStore('sla_alerts', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('category_priorities')) {
-            db.createObjectStore('category_priorities', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('forms')) {
-            db.createObjectStore('forms', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('invitations')) {
-            db.createObjectStore('invitations', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('task_logs')) {
-            db.createObjectStore('task_logs', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('templates')) {
-            db.createObjectStore('templates', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('messages')) {
-            db.createObjectStore('messages', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('job_positions')) {
-            db.createObjectStore('job_positions', { keyPath: 'id' });
-          }
+          // // User management tables
+          // if (!db.objectStoreNames.contains('users')) {
+          //   db.createObjectStore('users', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('roles')) {
+          //   db.createObjectStore('roles', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('permissions')) {
+          //   db.createObjectStore('permissions', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('user_teams')) {
+          //   db.createObjectStore('user_teams', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('user_permissions')) {
+          //   db.createObjectStore('user_permissions', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('role_permissions')) {
+          //   db.createObjectStore('role_permissions', { keyPath: 'id' });
+          // }
+          // // task_users store removed - user assignments are now stored as JSON in tasks.user_ids
+          // if (!db.objectStoreNames.contains('status_transitions')) {
+          //   db.createObjectStore('status_transitions', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('status_transition_groups')) {
+          //   db.createObjectStore('status_transition_groups', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('task_tags')) {
+          //   db.createObjectStore('task_tags', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('spot_types')) {
+          //   db.createObjectStore('spot_types', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('slas')) {
+          //   db.createObjectStore('slas', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('sla_policies')) {
+          //   db.createObjectStore('sla_policies', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('sla_alerts')) {
+          //   db.createObjectStore('sla_alerts', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('category_priorities')) {
+          //   db.createObjectStore('category_priorities', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('forms')) {
+          //   db.createObjectStore('forms', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('invitations')) {
+          //   db.createObjectStore('invitations', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('task_logs')) {
+          //   db.createObjectStore('task_logs', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('templates')) {
+          //   db.createObjectStore('templates', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('messages')) {
+          //   db.createObjectStore('messages', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('job_positions')) {
+          //   db.createObjectStore('job_positions', { keyPath: 'id' });
+          // }
 
           
 
-          // Approvals
-          if (!db.objectStoreNames.contains('approvals')) {
-            db.createObjectStore('approvals', { keyPath: 'id' });
-          }
-          // Approval approvers
-          if (!db.objectStoreNames.contains('approval_approvers')) {
-            db.createObjectStore('approval_approvers', { keyPath: 'id' });
-          }
-          // Task approval instances
-          if (!db.objectStoreNames.contains('task_approval_instances')) {
-            db.createObjectStore('task_approval_instances', { keyPath: 'id' });
-          }
+          // // Approvals
+          // if (!db.objectStoreNames.contains('approvals')) {
+          //   db.createObjectStore('approvals', { keyPath: 'id' });
+          // }
+          // // Approval approvers
+          // if (!db.objectStoreNames.contains('approval_approvers')) {
+          //   db.createObjectStore('approval_approvers', { keyPath: 'id' });
+          // }
+          // // Task approval instances
+          // if (!db.objectStoreNames.contains('task_approval_instances')) {
+          //   db.createObjectStore('task_approval_instances', { keyPath: 'id' });
+          // }
 
-          // Custom Fields & Values
-          if (!db.objectStoreNames.contains('spot_custom_fields')) {
-            db.createObjectStore('spot_custom_fields', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('template_custom_fields')) {
-            db.createObjectStore('template_custom_fields', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('task_custom_field_values')) {
-            db.createObjectStore('task_custom_field_values', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('spot_custom_field_values')) {
-            db.createObjectStore('spot_custom_field_values', { keyPath: 'id' });
-          }
+          // // Custom Fields & Values
+          // if (!db.objectStoreNames.contains('spot_custom_fields')) {
+          //   db.createObjectStore('spot_custom_fields', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('template_custom_fields')) {
+          //   db.createObjectStore('template_custom_fields', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('task_custom_field_values')) {
+          //   db.createObjectStore('task_custom_field_values', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('spot_custom_field_values')) {
+          //   db.createObjectStore('spot_custom_field_values', { keyPath: 'id' });
+          // }
 
-          // Forms & Fields
-          if (!db.objectStoreNames.contains('form_fields')) {
-            db.createObjectStore('form_fields', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('form_versions')) {
-            db.createObjectStore('form_versions', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('task_forms')) {
-            db.createObjectStore('task_forms', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('field_options')) {
-            db.createObjectStore('field_options', { keyPath: 'id' });
-          }
+          // // Forms & Fields
+          // if (!db.objectStoreNames.contains('form_fields')) {
+          //   db.createObjectStore('form_fields', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('form_versions')) {
+          //   db.createObjectStore('form_versions', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('task_forms')) {
+          //   db.createObjectStore('task_forms', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('field_options')) {
+          //   db.createObjectStore('field_options', { keyPath: 'id' });
+          // }
 
-          // Activity & Logging
-          if (!db.objectStoreNames.contains('session_logs')) {
-            db.createObjectStore('session_logs', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('config_logs')) {
-            db.createObjectStore('config_logs', { keyPath: 'id' });
-          }
+          // // Activity & Logging
+          // if (!db.objectStoreNames.contains('session_logs')) {
+          //   db.createObjectStore('session_logs', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('config_logs')) {
+          //   db.createObjectStore('config_logs', { keyPath: 'id' });
+          // }
 
-          // File Management
-          if (!db.objectStoreNames.contains('task_attachments')) {
-            db.createObjectStore('task_attachments', { keyPath: 'id' });
-          }
-          if (!db.objectStoreNames.contains('task_recurrences')) {
-            db.createObjectStore('task_recurrences', { keyPath: 'id' });
-          }
+          // // File Management
+          // if (!db.objectStoreNames.contains('task_attachments')) {
+          //   db.createObjectStore('task_attachments', { keyPath: 'id' });
+          // }
+          // if (!db.objectStoreNames.contains('task_recurrences')) {
+          //   db.createObjectStore('task_recurrences', { keyPath: 'id' });
+          // }
 
           // Error Tracking
           if (!db.objectStoreNames.contains('exceptions')) {
@@ -563,19 +563,6 @@ export class DB {
     return DB.db.transaction(name, mode).objectStore(name);
   }
 
-  // --- Encryption-aware convenience facade ---
-
-  private static get ENCRYPTION_ENABLED(): boolean {
-    // Allow explicit toggle via VITE_CACHE_ENCRYPTION, otherwise default to OFF.
-    // This means rows are plaintext by default unless explicitly opted-in
-    // via per-store overrides or ENCRYPTED_STORES config.
-    const explicit = (import.meta as any).env?.VITE_CACHE_ENCRYPTION;
-    if (explicit === 'true') return true;
-    if (explicit === 'false') return false;
-    // Default: no encryption globally; only stores explicitly configured
-    // (ENCRYPTED_STORES or runtime overrides) will be encrypted.
-    return false;
-  }
 
   private static toKey(key: number | string): number | string {
     // Most stores use numeric id; allow string keys for flexibility

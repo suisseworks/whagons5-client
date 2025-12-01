@@ -268,7 +268,7 @@ async function verifyBlock(table, blockId) {
   const ids = serverRowHashes.map(r => r.row_id);
 
   // Batch fetch entities
-  const chunk = 200;
+  const chunk = 1000;
   const entities = [];
   for (let i = 0; i < ids.length; i += chunk) {
     const slice = ids.slice(i, i + chunk);

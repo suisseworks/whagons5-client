@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
 import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3 } from 'lucide-react';
@@ -194,30 +194,42 @@ export const Workspace = () => {
       return saved == null ? true : saved === 'true';
     } catch { return true; }
   });
+  // Use ref to prevent circular updates when we dispatch events
+  const isInternalGroupUpdateRef = useRef(false);
+
+  // Combined effect to save to localStorage and dispatch events (prevents duplicate dispatches)
   useEffect(() => {
-    try { localStorage.setItem(`wh_workspace_group_by_${id || 'all'}`, groupBy); } catch {}
+    if (isInternalGroupUpdateRef.current) {
+      isInternalGroupUpdateRef.current = false;
+      return; // Skip if this was triggered by our own listener
+    }
+    try { 
+      localStorage.setItem(`wh_workspace_group_by_${id || 'all'}`, groupBy);
+      localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups));
+    } catch {}
     // Dispatch to Header component
     window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
       detail: { groupBy, collapseGroups } 
     }));
   }, [groupBy, id, collapseGroups]);
-  useEffect(() => {
-    try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
-    // Dispatch to Header component
-    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-      detail: { groupBy, collapseGroups } 
-    }));
-  }, [collapseGroups, id, groupBy]);
 
   // Listen for group changes from Header component
   useEffect(() => {
     const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
+      // Prevent circular updates - only update if values actually changed
       const newGroupBy = event.detail.groupBy as any;
-      if (newGroupBy !== groupBy) {
-        setGroupBy(newGroupBy);
-      }
-      if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
-        setCollapseGroups(event.detail.collapseGroups);
+      const newCollapseGroups = event.detail.collapseGroups;
+      const groupByChanged = newGroupBy !== groupBy;
+      const collapseGroupsChanged = newCollapseGroups !== undefined && newCollapseGroups !== collapseGroups;
+      
+      if (groupByChanged || collapseGroupsChanged) {
+        isInternalGroupUpdateRef.current = true;
+        if (groupByChanged) {
+          setGroupBy(newGroupBy);
+        }
+        if (collapseGroupsChanged) {
+          setCollapseGroups(newCollapseGroups);
+        }
       }
     };
     window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
@@ -266,14 +278,21 @@ export const Workspace = () => {
   const invalidWorkspaceRoute = !id && !isAllWorkspaces;
   const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
 
-  // Derived status groupings for stats
-  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
+  // Derived status groupings for stats (memoized to prevent unnecessary re-renders)
+  const doneStatusId = useMemo(() => 
+    (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
     ?? (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
-    ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
-  const workingStatusIds: number[] = (statuses || [])
-    .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
-    .map((s: any) => Number((s as any).id))
-    .filter((n: number) => Number.isFinite(n));
+    ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id,
+    [statuses]
+  );
+  const workingStatusIds: number[] = useMemo(() => 
+    (statuses || [])
+      .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
+      .map((s: any) => Number((s as any).id))
+      .filter((n: number) => Number.isFinite(n)),
+    [statuses]
+  );
+  const workingStatusIdsKey = useMemo(() => workingStatusIds.join(','), [workingStatusIds]);
 
   // Header stats
   const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; loading: boolean }>({ total: 0, inProgress: 0, completedToday: 0, loading: true });
@@ -332,7 +351,7 @@ export const Workspace = () => {
       TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, load),
     ];
     return () => { cancelled = true; unsubs.forEach((u) => { try { u(); } catch {} }); };
-  }, [id, isAllWorkspaces, doneStatusId, workingStatusIds.join(',')]);
+  }, [id, isAllWorkspaces, doneStatusId, workingStatusIdsKey]);
 
   // Filter builder dialog
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -363,11 +382,6 @@ export const Workspace = () => {
       rowCache.current.clear();
     }
   }, [id, location.pathname]);
-  // Debug logging
-  console.log('Workspace component - id:', id, 'typeof:', typeof id);
-  console.log('Current path:', location.pathname);
-
-  
 
   // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
   useEffect(() => {
@@ -399,10 +413,17 @@ export const Workspace = () => {
     } catch {}
   }, []);
 
+  // Use ref to track last dispatched value to prevent circular updates
+  const lastDispatchedSearchRef = useRef<string>('');
+
   // Listen for search changes from Header component
   useEffect(() => {
     const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
       const newSearchText = event.detail.searchText;
+      // Skip if this is the value we just dispatched
+      if (newSearchText === lastDispatchedSearchRef.current) {
+        return;
+      }
       // Only update if different to prevent unnecessary re-renders
       if (newSearchText !== searchText) {
         setSearchText(newSearchText);
@@ -423,6 +444,8 @@ export const Workspace = () => {
       } else {
         localStorage.removeItem(key);
       }
+      // Track what we're dispatching to prevent circular updates
+      lastDispatchedSearchRef.current = searchText;
       // Dispatch custom event to notify Header component
       window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
     } catch {}
@@ -478,7 +501,7 @@ export const Workspace = () => {
       forceMount: true,
       content: (
         <motion.div
-          className='flex-1 h-full'
+          className='flex-1 h-full overflow-x-auto'
           key='grid'
           initial={false}
           animate={{ x: activeTab === 'grid' ? 0 : getWorkspaceTabInitialX(activeTab, 'grid') }}

@@ -5,7 +5,6 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { DuckTaskCache } from "@/store/database/DuckTaskCache";
 import { TaskRow } from "@/components/TaskList/TaskRow";
-import { motion } from "motion/react";
 
 function createStatusMap(statuses: any[]) {
   const m: Record<number, any> = {};
@@ -119,7 +118,7 @@ export default function TaskListTab({
   }
 
   return (
-    <motion.div className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <div className="space-y-3">
       {rows.map((task) => (
         <TaskRow
           key={task.id}
@@ -132,7 +131,7 @@ export default function TaskListTab({
           density={density}
         />
       ))}
-    </motion.div>
+    </div>
   );
 }
 

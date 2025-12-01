@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { Task } from "../types";
 import { DuckTaskCache } from "../database/DuckTaskCache";
+import { TaskEvents } from "../eventEmiters/taskEvents";
 import api from "@/api/whagonsApi";
 
 // Helper function to ensure task has all required properties
@@ -33,6 +34,7 @@ export const addTaskAsync = createAsyncThunk(
             
             // Update DuckDB cache on success
             await DuckTaskCache.upsertTask(newTask as any);
+            try { TaskEvents.emit(TaskEvents.EVENTS.TASK_CREATED, newTask); } catch {}
             
             return newTask;
         } catch (error: any) {
@@ -59,6 +61,7 @@ export const updateTaskAsync = createAsyncThunk(
             
             // Update DuckDB cache on success
             await DuckTaskCache.upsertTask(updatedTask as any);
+            try { TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, updatedTask); } catch {}
             
             return updatedTask;
         } catch (error: any) {
@@ -78,6 +81,7 @@ export const removeTaskAsync = createAsyncThunk(
             
             // Remove from DuckDB cache on success
             await DuckTaskCache.deleteTask(taskId.toString());
+            try { TaskEvents.emit(TaskEvents.EVENTS.TASK_DELETED, { id: taskId }); } catch {}
             
             return taskId;
         } catch (error: any) {
@@ -87,137 +91,26 @@ export const removeTaskAsync = createAsyncThunk(
     }
 );
 
+// NOTE: Tasks are NOT stored in Redux memory to avoid loading thousands of tasks.
+// This slice only provides async thunks for API calls + DuckDB cache updates.
+// All task data is queried directly from DuckDB via DuckTaskCache.queryForAgGrid().
 const initialState = {
-    value: [] as Task[],
-    loading: false,
-    error: null as string | null,
-    // Store previous state for optimistic update rollbacks
-    previousState: null as Task[] | null
+    // No value array - tasks are never loaded into Redux memory
+    // No loading/error states - components handle their own loading states
 };
 
 export const tasksSlice = createSlice({
     name: 'tasks',
     initialState,
     reducers: {
-        getTasks: (state) => {
-            state.loading = true;
-        },
-        getTasksSuccess: (state, action) => {
-            state.loading = false;
-            state.value = action.payload.map(ensureTaskDefaults);
-        },
-        getTasksFailure: (state, action) => {
-            state.loading = false;
-            state.error = action.payload;
-        },
-        // Clear any stored error
-        clearError: (state) => {
-            state.error = null;
-        }
+        // No reducers needed - this slice is just a container for async thunks
     },
     extraReducers: (builder) => {
-        // Load tasks from IndexedDB
-        builder.addCase(getTasksFromIndexedDB.pending, (state) => {
-            state.loading = true;
-        });
-        builder.addCase(getTasksFromIndexedDB.fulfilled, (state, action) => {
-            state.loading = false;
-            state.value = action.payload.map(ensureTaskDefaults);
-        });
-        builder.addCase(getTasksFromIndexedDB.rejected, (state, action) => {
-            state.loading = false;
-            state.error = action.error.message || null;
-        });
-
-        // Add task with optimistic updates
-        builder.addCase(addTaskAsync.pending, (state, action) => {
-            // Store current state for potential rollback
-            state.previousState = [...state.value];
-            state.error = null;
-            
-            // Optimistic update: create temporary task with negative ID
-            const tempTask = ensureTaskDefaults({
-                ...action.meta.arg,
-                id: Date.now() * -1, // Temporary negative ID
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            });
-            state.value.push(tempTask);
-        });
-        builder.addCase(addTaskAsync.fulfilled, (state, action) => {
-            // Replace temporary task with real one from API
-            const tempIndex = state.value.findIndex(t => t.id < 0);
-            if (tempIndex !== -1) {
-                state.value[tempIndex] = ensureTaskDefaults(action.payload);
-            }
-            state.previousState = null;
-        });
-        builder.addCase(addTaskAsync.rejected, (state, action) => {
-            // Rollback to previous state
-            if (state.previousState) {
-                state.value = state.previousState;
-                state.previousState = null;
-            }
-            state.error = action.payload as string;
-        });
-
-        // Update task with optimistic updates
-        builder.addCase(updateTaskAsync.pending, (state, action) => {
-            // Store current state for potential rollback
-            state.previousState = [...state.value];
-            state.error = null;
-            
-            // Optimistic update
-            const { id, updates } = action.meta.arg;
-            const index = state.value.findIndex(task => task.id === id);
-            if (index !== -1) {
-                state.value[index] = ensureTaskDefaults({
-                    ...state.value[index],
-                    ...updates,
-                    updated_at: new Date().toISOString()
-                });
-            }
-        });
-        builder.addCase(updateTaskAsync.fulfilled, (state, action) => {
-            // Replace optimistic update with real data from API
-            const index = state.value.findIndex(task => task.id === action.payload.id);
-            if (index !== -1) {
-                state.value[index] = ensureTaskDefaults(action.payload);
-            }
-            state.previousState = null;
-        });
-        builder.addCase(updateTaskAsync.rejected, (state, action) => {
-            // Rollback to previous state
-            if (state.previousState) {
-                state.value = state.previousState;
-                state.previousState = null;
-            }
-            state.error = action.payload as string;
-        });
-
-        // Remove task with optimistic updates
-        builder.addCase(removeTaskAsync.pending, (state, action) => {
-            // Store current state for potential rollback
-            state.previousState = [...state.value];
-            state.error = null;
-            
-            // Optimistic update: remove task immediately
-            state.value = state.value.filter(task => task.id !== action.meta.arg);
-        });
-        builder.addCase(removeTaskAsync.fulfilled, (state, action) => {
-            // Keep the optimistic removal, clear previous state
-            state.previousState = null;
-        });
-        builder.addCase(removeTaskAsync.rejected, (state, action) => {
-            // Rollback to previous state
-            if (state.previousState) {
-                state.value = state.previousState;
-                state.previousState = null;
-            }
-            state.error = action.payload as string;
-        });
+        // No reducers needed - async thunks handle API calls and DuckDB updates directly
+        // UI updates happen via TaskEvents emitted by DuckTaskCache
     }
 });
 
-export const { getTasks, getTasksSuccess, getTasksFailure, clearError } = tasksSlice.actions;
+// Export empty actions for compatibility (in case anything imports them)
+export const { } = tasksSlice.actions;
 export default tasksSlice.reducer;

@@ -261,11 +261,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               })();
               setHydrationError(null);
 
-              // Verify manifest
+              // Optional: one-time task hash parity diagnostic
               try {
-                await dataManager.verifyManifest();
+                if (localStorage.getItem('wh-debug-integrity-test') === 'true') {
+                  const { DuckTaskCache } = await import('@/store/database/DuckTaskCache');
+                  await DuckTaskCache.debugCompareIntegrity();
+                  await DuckTaskCache.debugCompareSingleTaskHash();
+                }
               } catch (e) {
-                console.warn('Manifest fetch/verify failed (continuing):', e);
+                console.warn('AuthProvider: task hash debug failed', e);
               }
 
               // Category custom fields will be hydrated by DataManager + on-demand fetches
