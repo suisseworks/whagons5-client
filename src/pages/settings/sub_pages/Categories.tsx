@@ -31,6 +31,7 @@ import {
 } from "../components";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -93,22 +94,10 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
   );
 };
 
-// Custom cell renderer for enabled status
-const EnabledCellRenderer = (props: ICellRendererParams) => {
-  const isEnabled = props.value;
-  
-  return (
-    <Badge 
-      variant={isEnabled ? "default" : "secondary"} 
-      className={isEnabled ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-gray-100 text-gray-800 hover:bg-gray-100"}
-    >
-      {isEnabled ? "Enabled" : "Disabled"}
-    </Badge>
-  );
-};
-
 function Categories() {
   const dispatch = useDispatch();
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: any[] };
@@ -562,13 +551,13 @@ function Categories() {
 
   return (
     <SettingsLayout
-      title="Categories"
-      description="Manage task categories and labels for better organization"
+      title={tc('title', 'Categories')}
+      description={tc('description', 'Manage task categories and labels for better organization')}
       icon={faTags}
       iconColor="#ef4444"
       loading={{
         isLoading: loading,
-        message: "Loading categories..."
+        message: tc('loading', 'Loading categories...')
       }}
       error={error ? {
         message: error,
@@ -578,14 +567,14 @@ function Categories() {
         <div className="flex items-center space-x-2">
           <Link to="/settings/categories/custom-fields">
             <Button variant="outline" className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-              Manage custom fields
+              {tc('header.manageFields', 'Manage custom fields')}
             </Button>
           </Link>
           <Button 
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-            <span>Add Category</span>
+            <span>{tc('header.addCategory', 'Add Category')}</span>
           </Button>
         </div>
       }
@@ -597,7 +586,7 @@ function Categories() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faTags} className="w-4 h-4" />
-                <span>Categories</span>
+                <span>{tc('tabs.categories', 'Categories')}</span>
               </div>
             ),
             content: (
@@ -606,7 +595,7 @@ function Categories() {
                   <SettingsGrid
                     rowData={filteredItems}
                     columnDefs={colDefs}
-                    noRowsMessage="No categories found"
+                    noRowsMessage={tc('grid.noRows', 'No categories found')}
                     rowSelection="single"
                     onRowDoubleClicked={(row: any) => handleEdit(row)}
                     gridOptions={{
@@ -628,7 +617,7 @@ function Categories() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-                <span>Statistics</span>
+                <span>{tc('tabs.statistics', 'Statistics')}</span>
               </div>
             ),
             content: (
@@ -641,7 +630,7 @@ function Categories() {
                         <div className="text-center">
                           <div className="text-2xl font-bold">{categories.length}</div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Total Categories
+                            {tc('stats.cards.total', 'Total Categories')}
                           </div>
                         </div>
                       </CardContent>
@@ -653,7 +642,7 @@ function Categories() {
                             {enabledCategoriesCount}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Enabled Categories
+                            {tc('stats.cards.enabled', 'Enabled Categories')}
                           </div>
                         </div>
                       </CardContent>
@@ -665,7 +654,7 @@ function Categories() {
                             {disabledCategoriesCount}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Disabled Categories
+                            {tc('stats.cards.disabled', 'Disabled Categories')}
                           </div>
                         </div>
                       </CardContent>
@@ -677,10 +666,10 @@ function Categories() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">
-                          Tasks by Category
+                          {tc('stats.charts.tasksByCategory.title', 'Tasks by Category')}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          Distribution of tasks across categories
+                          {tc('stats.charts.tasksByCategory.description', 'Distribution of tasks across categories')}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -698,7 +687,7 @@ function Categories() {
                               },
                               series: [
                                 {
-                                  name: "Tasks",
+                                  name: tc('stats.charts.tasksByCategory.series', 'Tasks'),
                                   type: "pie",
                                   radius: ["40%", "70%"],
                                   avoidLabelOverlap: false,
@@ -732,7 +721,7 @@ function Categories() {
                           />
                         ) : (
                           <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                            No task data available
+                            {tc('stats.charts.tasksByCategory.empty', 'No task data available')}
                           </div>
                         )}
                       </CardContent>
@@ -741,10 +730,10 @@ function Categories() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">
-                          Categories by Team
+                          {tc('stats.charts.categoriesByTeam.title', 'Categories by Team')}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          How categories are distributed across teams
+                          {tc('stats.charts.categoriesByTeam.description', 'How categories are distributed across teams')}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -763,7 +752,7 @@ function Categories() {
                               },
                               xAxis: {
                                 type: "value",
-                                name: "Categories"
+                                name: tc('stats.charts.categoriesByTeam.axis', 'Categories')
                               },
                               yAxis: {
                                 type: "category",
@@ -797,7 +786,7 @@ function Categories() {
                           />
                         ) : (
                           <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                            No team data available
+                            {tc('stats.charts.categoriesByTeam.empty', 'No team data available')}
                           </div>
                         )}
                       </CardContent>
@@ -809,10 +798,10 @@ function Categories() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">
-                          Tasks Created Over Time
+                          {tc('stats.charts.tasksOverTime.title', 'Tasks Over Time')}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          Last 30 days of task creation across categories
+                          {tc('stats.charts.tasksOverTime.description', 'Last 30 days of task creation across categories')}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -843,11 +832,11 @@ function Categories() {
                             },
                             yAxis: {
                               type: "value",
-                              name: "Tasks"
+                              name: tc('stats.charts.tasksOverTime.axis', 'Tasks')
                             },
                             series: [
                               {
-                                name: "Tasks Created",
+                                name: tc('stats.charts.tasksOverTime.series', 'Tasks Created'),
                                 type: "line",
                                 smooth: true,
                                 data: tasksOverTime.map(

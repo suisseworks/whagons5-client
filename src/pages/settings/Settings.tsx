@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { motion } from 'motion/react';
 import { SETTINGS_TAB_ANIMATION, getSettingsTabInitialX } from '@/config/tabAnimation';
+import type { SettingsTabKey } from '@/config/tabAnimation';
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -24,8 +25,11 @@ import {
   faRocket,
   faTrophy,
   faSquareCheck,
-  faLayerGroup
+  faLayerGroup,
+  faGlobe,
+  faStar as faStarSolid
 } from "@fortawesome/free-solid-svg-icons";
+import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
 import { RootState } from "@/store/store";
 import {
   DndContext,
@@ -39,11 +43,13 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UrlTabs } from "@/components/ui/url-tabs";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 
 const STORAGE_KEYS = {
   basic: 'wh-settings-basics-order-v1',
-  advanced: 'wh-settings-advanced-order-v1'
+  advanced: 'wh-settings-advanced-order-v1',
+  favorites: 'wh-settings-favorites-v1'
 } as const;
 
 const loadOrder = (key: string): string[] => {
@@ -73,9 +79,138 @@ interface SettingCard {
 interface SortableSettingCardProps {
   setting: SettingCard;
   onSettingClick: (id: string) => void;
+  dragHandleLabel: string;
+  isFavorite: boolean;
+  onToggleFavorite: (id: string) => void;
+  favoriteLabel: string;
+  unfavoriteLabel: string;
+  favoriteBadgeLabel: string;
+  showFavoriteButton?: boolean;
+  showFavoriteBadge?: boolean;
+  favoriteButtonAlwaysVisible?: boolean;
 }
 
-function SortableSettingCard({ setting, onSettingClick }: SortableSettingCardProps) {
+interface SettingCardDisplayProps {
+  setting: SettingCard;
+  onSettingClick: (id: string) => void;
+  showDragHandle?: boolean;
+  dragHandleLabel?: string;
+  isDragging?: boolean;
+  isFavorite: boolean;
+  onToggleFavorite: (id: string) => void;
+  favoriteLabel: string;
+  unfavoriteLabel: string;
+  favoriteBadgeLabel: string;
+  showFavoriteButton?: boolean;
+  showFavoriteBadge?: boolean;
+  favoriteButtonAlwaysVisible?: boolean;
+}
+
+function SettingCardDisplay({
+  setting,
+  onSettingClick,
+  showDragHandle = false,
+  dragHandleLabel,
+  isDragging = false,
+  isFavorite,
+  onToggleFavorite,
+  favoriteLabel,
+  unfavoriteLabel,
+  favoriteBadgeLabel,
+  showFavoriteButton = true,
+  showFavoriteBadge = true,
+  favoriteButtonAlwaysVisible = false,
+}: SettingCardDisplayProps) {
+  const favoriteTitle = isFavorite ? unfavoriteLabel : favoriteLabel;
+
+  return (
+    <Card
+      className={`transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden ${isDragging ? 'shadow-lg scale-[1.02]' : ''}`}
+      onClick={(e) => {
+        if (isDragging) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        onSettingClick(setting.id);
+      }}
+    >
+      <CardHeader className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
+            <FontAwesomeIcon icon={setting.icon || faCog} />
+          </div>
+          <div className="flex items-center gap-2">
+            {typeof setting.count !== 'undefined' && (
+              <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
+                {setting.count}
+              </Badge>
+            )}
+            {showDragHandle && (
+              <div
+                className="transition flex items-center text-muted-foreground opacity-60"
+                title={dragHandleLabel}
+              >
+                <FontAwesomeIcon icon={faGripVertical} className="text-sm" />
+              </div>
+            )}
+            {showFavoriteButton && (
+              <button
+                type="button"
+                className={`rounded-full p-2 transition text-sm ${
+                  favoriteButtonAlwaysVisible
+                    ? ''
+                    : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
+                } ${
+                  isFavorite ? 'text-yellow-500' : 'text-muted-foreground hover:text-yellow-500'
+                }`}
+                aria-label={favoriteTitle}
+                aria-pressed={isFavorite}
+                title={favoriteTitle}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(setting.id);
+                }}
+              >
+                <FontAwesomeIcon icon={isFavorite ? faStarSolid : faStarRegular} className="text-base" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="space-y-2">
+          {showFavoriteBadge && isFavorite && (
+            <div
+              className="inline-flex items-center text-yellow-600"
+              title={favoriteBadgeLabel}
+              role="img"
+              aria-label={favoriteBadgeLabel}
+            >
+              <FontAwesomeIcon icon={faStarSolid} className="text-sm" />
+            </div>
+          )}
+          <CardTitle className="text-xl">{setting.title}</CardTitle>
+          <CardDescription>{setting.description}</CardDescription>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function SortableSettingCard({
+  setting,
+  onSettingClick,
+  dragHandleLabel,
+  isFavorite,
+  onToggleFavorite,
+  favoriteLabel,
+  unfavoriteLabel,
+  favoriteBadgeLabel,
+  showFavoriteButton = true,
+  showFavoriteBadge = true,
+  favoriteButtonAlwaysVisible = false,
+}: SortableSettingCardProps) {
   const {
     attributes,
     listeners,
@@ -98,43 +233,21 @@ function SortableSettingCard({ setting, onSettingClick }: SortableSettingCardPro
       {...attributes}
       className="h-full cursor-grab active:cursor-grabbing"
     >
-      <Card
-        className={`transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden ${isDragging ? 'shadow-lg scale-[1.02]' : ''}`}
-        onClick={(e) => {
-          // Prevent navigation if dragging
-          if (isDragging) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-          onSettingClick(setting.id);
-        }}
-      >
-        <CardHeader className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className={`text-4xl ${setting.color} group-hover:scale-110 transition-transform duration-200`}>
-              <FontAwesomeIcon icon={setting.icon || faCog} />
-            </div>
-            <div className="flex items-center gap-2">
-              {typeof setting.count !== 'undefined' && (
-                <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
-                  {setting.count}
-                </Badge>
-              )}
-              <div
-                className={`transition flex items-center text-muted-foreground opacity-60`}
-                title="Drag to reorder"
-              >
-                <FontAwesomeIcon icon={faGripVertical} className={`text-sm`} />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <CardTitle className="text-xl">{setting.title}</CardTitle>
-            <CardDescription>{setting.description}</CardDescription>
-          </div>
-        </CardHeader>
-      </Card>
+      <SettingCardDisplay
+        setting={setting}
+        onSettingClick={onSettingClick}
+        showDragHandle
+        dragHandleLabel={dragHandleLabel}
+        isDragging={isDragging}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
+        favoriteLabel={favoriteLabel}
+        unfavoriteLabel={unfavoriteLabel}
+        favoriteBadgeLabel={favoriteBadgeLabel}
+        showFavoriteButton={showFavoriteButton}
+        showFavoriteBadge={showFavoriteBadge}
+        favoriteButtonAlwaysVisible={favoriteButtonAlwaysVisible}
+      />
     </div>
   );
 }
@@ -142,16 +255,17 @@ function SortableSettingCard({ setting, onSettingClick }: SortableSettingCardPro
 
 function Settings() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'basics' | 'advanced'>('basics');
-  const [prevActiveTab, setPrevActiveTab] = useState<'basics' | 'advanced'>('basics');
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<SettingsTabKey>('basics');
+  const [prevActiveTab, setPrevActiveTab] = useState<SettingsTabKey>('basics');
 
   // Sync activeTab with URL on initial load
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabFromUrl = urlParams.get('tab');
-    if (tabFromUrl === 'advanced' || tabFromUrl === 'basics') {
-      setActiveTab(tabFromUrl);
-      setPrevActiveTab(tabFromUrl);
+    if (tabFromUrl === 'advanced' || tabFromUrl === 'basics' || tabFromUrl === 'favorites') {
+      setActiveTab(tabFromUrl as SettingsTabKey);
+      setPrevActiveTab(tabFromUrl as SettingsTabKey);
     }
   }, []);
 
@@ -173,7 +287,7 @@ function Settings() {
   const forms = useSelector((s: RootState) => s.forms?.value ?? []);
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const tags = useSelector((s: RootState) => s.tags?.value ?? []);
-  // const workflows = useSelector((s: RootState) => s.workflows.value);
+  const workflows = useSelector((s: RootState) => (s as any).workflows?.value ?? []);
 
   const counts = useMemo(() => {
     return {
@@ -188,149 +302,156 @@ function Settings() {
       slas: slas.length,
       users: users.length,
       forms: forms.length,
-      workflows: 0,
+      workflows: workflows.length,
     };
-  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length]);
+  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length, workflows.length]);
 
   const basicSettings = useMemo(() => [
     {
       id: 'categories',
-      title: 'Categories',
+      title: t('settings.cards.categories.title', 'Categories'),
       icon: faLayerGroup,
       count: counts.categories,
-      description: 'Manage task categories and labels',
+      description: t('settings.cards.categories.description', 'Manage task categories and labels'),
       color: 'text-red-500'
     },
     {
       id: 'tags',
-      title: 'Tags',
+      title: t('settings.cards.tags.title', 'Tags'),
       icon: faTags,
       count: counts.tags,
-      description: 'Manage task tags',
+      description: t('settings.cards.tags.description', 'Manage task tags'),
       color: 'text-fuchsia-500'
     },
     {
       id: 'templates',
-      title: 'Templates',
+      title: t('settings.cards.templates.title', 'Templates'),
       icon: faClipboardList,
       count: counts.templates,
-      description: 'Manage task templates',
+      description: t('settings.cards.templates.description', 'Manage task templates'),
       color: 'text-blue-500'
     },
     {
       id: 'workspaces',
-      title: 'Workspaces',
+      title: t('settings.cards.workspaces.title', 'Workspaces'),
       icon: faDiagramProject,
       count: counts.workspaces,
-      description: 'Manage workspaces and projects',
+      description: t('settings.cards.workspaces.description', 'Manage workspaces and projects'),
       color: 'text-cyan-500'
     },
     {
       id: 'spots',
-      title: 'Spots',
+      title: t('settings.cards.spots.title', 'Spots'),
       icon: faLocationDot,
       count: counts.spots,
-      description: 'Set up locations and spot management',
+      description: t('settings.cards.spots.description', 'Set up locations and spot management'),
       color: 'text-green-500'
     },
     {
       id: 'teams',
-      title: 'Teams',
+      title: t('settings.cards.teams.title', 'Teams'),
       icon: faUsers,
       count: counts.teams,
-      description: 'Organize and manage work teams',
+      description: t('settings.cards.teams.description', 'Organize and manage work teams'),
       color: 'text-purple-500'
     },
     {
       id: 'users',
-      title: 'Users',
+      title: t('settings.cards.users.title', 'Users'),
       icon: faUser,
       count: counts.users,
-      description: 'User accounts and permissions',
+      description: t('settings.cards.users.description', 'User accounts and permissions'),
       color: 'text-indigo-500'
     },
     {
       id: 'statuses',
-      title: 'Statuses',
+      title: t('settings.cards.statuses.title', 'Statuses'),
       icon: faSitemap,
       count: counts.statuses,
-      description: 'Manage statuses and transitions',
+      description: t('settings.cards.statuses.description', 'Manage statuses and transitions'),
       color: 'text-amber-500'
     },
     {
       id: 'priorities',
-      title: 'Priorities',
+      title: t('settings.cards.priorities.title', 'Priorities'),
       icon: faArrowUpWideShort,
       count: counts.priorities,
-      description: 'Manage priority levels',
+      description: t('settings.cards.priorities.description', 'Manage priority levels'),
       color: 'text-rose-500'
     },
 
-  ], [counts.categories, counts.tags, counts.templates, counts.workspaces, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities]);
+  ], [counts.categories, counts.tags, counts.templates, counts.workspaces, counts.spots, counts.teams, counts.users, counts.statuses, counts.priorities, t]);
 
   // Settings configuration data
   const advancedSettings = useMemo(() => [
-
+    {
+      id: 'global',
+      title: t('settings.cards.global.title', 'Global'),
+      icon: faGlobe,
+      count: 0,
+      description: t('settings.cards.global.description', 'Branding, identity, and platform-wide defaults'),
+      color: 'text-sky-500'
+    },
     {
       id: 'slas',
-      title: 'SLAs',
+      title: t('settings.cards.slas.title', 'SLAs'),
       icon: faStopwatch,
       count: counts.slas,
-      description: 'Manage service level agreements',
+      description: t('settings.cards.slas.description', 'Manage service level agreements'),
       color: 'text-teal-500'
     },
 
 
     {
       id: 'forms',
-      title: 'Forms',
+      title: t('settings.cards.forms.title', 'Forms'),
       icon: faClipboardList,
       count: counts.forms,
-      description: 'Manage forms and submissions',
+      description: t('settings.cards.forms.description', 'Manage forms and submissions'),
       color: 'text-pink-500'
     },
     {
       id: 'approvals',
-      title: 'Approvals',
+      title: t('settings.cards.approvals.title', 'Approvals'),
       icon: faSquareCheck,
       count: 0,
-      description: 'Configure task approvals',
+      description: t('settings.cards.approvals.description', 'Configure task approvals'),
       color: 'text-emerald-500'
     },
     
     {
       id: 'workflows',
-      title: 'Workflows',
+      title: t('settings.cards.workflows.title', 'Workflows'),
       icon: faDiagramProject,
       count: counts.workflows,
-      description: 'Design and automate workflows',
+      description: t('settings.cards.workflows.description', 'Design and automate workflows'),
       color: 'text-cyan-500'
     },
     {
       id: 'schedules',
-      title: 'Schedules',
+      title: t('settings.cards.schedules.title', 'Schedules'),
       icon: faCalendar,
       count: 0,
-      description: 'Manage schedules and time-based workflows',
+      description: t('settings.cards.schedules.description', 'Manage schedules and time-based workflows'),
       color: 'text-orange-500'
     },
     {
       id: 'motivation',
-      title: 'Motivation',
+      title: t('settings.cards.motivation.title', 'Motivation'),
       icon: faRocket,
       count: 0,
-      description: 'Configure motivation and engagement settings',
+      description: t('settings.cards.motivation.description', 'Configure motivation and engagement settings'),
       color: 'text-yellow-500'
     },
     {
       id: 'gamification',
-      title: 'Gamification',
+      title: t('settings.cards.gamification.title', 'Gamification'),
       icon: faTrophy,
       count: 0,
-      description: 'Set up gamification elements and rewards',
+      description: t('settings.cards.gamification.description', 'Set up gamification elements and rewards'),
       color: 'text-purple-500'
     },
-  ], [counts.slas, counts.forms]);
+  ], [counts.slas, counts.forms, counts.workflows, t]);
 
   // Order state management
   const [basicOrder, setBasicOrder] = useState<string[]>(() => {
@@ -370,6 +491,46 @@ function Settings() {
     const settingMap = new Map(advancedSettings.map(s => [s.id, s]));
     return advancedOrder.map(id => settingMap.get(id)).filter(Boolean) as SettingCard[];
   }, [advancedSettings, advancedOrder]);
+
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => loadOrder(STORAGE_KEYS.favorites));
+
+  const allSettingsById = useMemo<Record<string, SettingCard>>(() => {
+    const map: Record<string, SettingCard> = {};
+    [...basicSettings, ...advancedSettings].forEach((setting) => {
+      map[setting.id] = setting;
+    });
+    return map;
+  }, [basicSettings, advancedSettings]);
+
+  useEffect(() => {
+    setFavoriteIds((prev) => {
+      const filtered = prev.filter((id) => allSettingsById[id]);
+      if (filtered.length === prev.length && filtered.every((id, idx) => id === prev[idx])) {
+        return prev;
+      }
+      saveOrder(STORAGE_KEYS.favorites, filtered);
+      return filtered;
+    });
+  }, [allSettingsById]);
+
+  const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+
+  const favoriteSettings = useMemo(() => {
+    return favoriteIds
+      .map((id) => allSettingsById[id])
+      .filter((setting): setting is SettingCard => Boolean(setting));
+  }, [favoriteIds, allSettingsById]);
+
+  const favoriteSortableIds = useMemo(() => favoriteSettings.map((setting) => setting.id), [favoriteSettings]);
+
+  const handleToggleFavorite = (settingId: string) => {
+    setFavoriteIds((prev) => {
+      const exists = prev.includes(settingId);
+      const updated = exists ? prev.filter((id) => id !== settingId) : [...prev, settingId];
+      saveOrder(STORAGE_KEYS.favorites, updated);
+      return updated;
+    });
+  };
 
   // dnd-kit sensors
   const sensors = useSensors(
@@ -541,6 +702,22 @@ function Settings() {
     });
   };
 
+  const handleFavoritesDragEnd = (event: DragEndEvent) => {
+    handleDragEnd(event, () => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = favoriteIds.indexOf(String(active.id));
+      const newIndex = favoriteIds.indexOf(String(over.id));
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(favoriteIds, oldIndex, newIndex);
+        setFavoriteIds(newOrder);
+        saveOrder(STORAGE_KEYS.favorites, newOrder);
+      }
+    });
+  };
+
   // IDs for SortableContext
   const basicIds = useMemo(() => orderedBasicSettings.map(s => s.id), [orderedBasicSettings]);
   const advancedIds = useMemo(() => orderedAdvancedSettings.map(s => s.id), [orderedAdvancedSettings]);
@@ -587,6 +764,9 @@ function Settings() {
       case 'approvals':
         navigate('/settings/approvals');
         break;
+      case 'global':
+        navigate('/settings/global');
+        break;
       
       case 'spots':
         navigate('/settings/spots');
@@ -612,10 +792,71 @@ function Settings() {
   };
 
   // Define tabs for URL persistence
+  const dragHint = t('settings.cards.dragHint', 'Drag cards to reorder.');
+  const dragHandleLabel = t('settings.cards.dragHandle', 'Drag to reorder');
+  const favoriteAddLabel = t('settings.cards.favorite.add', 'Add to favorites');
+  const favoriteRemoveLabel = t('settings.cards.favorite.remove', 'Remove from favorites');
+  const favoriteBadgeLabel = t('settings.cards.favorite.badge', 'Favorite');
+  const favoritesEmptyLabel = t('settings.cards.favorites.empty', 'Star a settings card to see it here.');
+  const favoritesHelperLabel = t('settings.cards.favorites.helper', 'Use the star icon on any card to pin it to this list.');
+
   const mainSettingsTabs = [
     {
+      value: 'favorites',
+      label: t('settings.tabs.favorites', 'Favorites'),
+      content: (
+        <motion.div
+          className="space-y-4 flex-1 h-full"
+          key="favorites"
+          initial={{ x: getSettingsTabInitialX(prevActiveTab, 'favorites') }}
+          animate={{ x: 0 }}
+          transition={SETTINGS_TAB_ANIMATION.transition}
+        >
+          <div className="space-y-4">
+            {favoriteSettings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
+                <FontAwesomeIcon icon={faStarSolid} className="mb-3 text-2xl text-yellow-500" />
+                <p className="font-medium">{favoritesEmptyLabel}</p>
+                <p className="text-sm">{favoritesHelperLabel}</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-muted-foreground">{dragHint}</div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleFavoritesDragEnd}
+                >
+                  <SortableContext items={favoriteSortableIds} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {favoriteSettings.map((setting) => (
+                        <SortableSettingCard
+                          key={setting.id}
+                          setting={setting}
+                          onSettingClick={handleSettingClick}
+                          dragHandleLabel={dragHandleLabel}
+                          isFavorite
+                          onToggleFavorite={handleToggleFavorite}
+                          favoriteLabel={favoriteAddLabel}
+                          unfavoriteLabel={favoriteRemoveLabel}
+                          favoriteBadgeLabel={favoriteBadgeLabel}
+                          showFavoriteBadge={false}
+                          favoriteButtonAlwaysVisible
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </>
+            )}
+          </div>
+        </motion.div>
+      )
+    },
+    {
       value: 'basics',
-      label: 'Basics',
+      label: t('settings.tabs.basics', 'Basics'),
       content: (
         <motion.div
           className="space-y-4 flex-1 h-full"
@@ -625,7 +866,7 @@ function Settings() {
           transition={SETTINGS_TAB_ANIMATION.transition}
         >
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
+            <div className="text-sm text-muted-foreground">{dragHint}</div>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -639,6 +880,12 @@ function Settings() {
                       key={setting.id}
                       setting={setting}
                       onSettingClick={handleSettingClick}
+                      dragHandleLabel={dragHandleLabel}
+                      isFavorite={favoriteSet.has(setting.id)}
+                      onToggleFavorite={handleToggleFavorite}
+                      favoriteLabel={favoriteAddLabel}
+                      unfavoriteLabel={favoriteRemoveLabel}
+                      favoriteBadgeLabel={favoriteBadgeLabel}
                     />
                   ))}
                 </div>
@@ -650,7 +897,7 @@ function Settings() {
     },
     {
       value: 'advanced',
-      label: 'Advanced',
+      label: t('settings.tabs.advanced', 'Advanced'),
       content: (
         <motion.div
           className="space-y-4 flex-1 h-full"
@@ -660,7 +907,7 @@ function Settings() {
           transition={SETTINGS_TAB_ANIMATION.transition}
         >
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">Drag cards to reorder.</div>
+            <div className="text-sm text-muted-foreground">{dragHint}</div>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -674,6 +921,12 @@ function Settings() {
                       key={setting.id}
                       setting={setting}
                       onSettingClick={handleSettingClick}
+                      dragHandleLabel={dragHandleLabel}
+                      isFavorite={favoriteSet.has(setting.id)}
+                      onToggleFavorite={handleToggleFavorite}
+                      favoriteLabel={favoriteAddLabel}
+                      unfavoriteLabel={favoriteRemoveLabel}
+                      favoriteBadgeLabel={favoriteBadgeLabel}
                     />
                   ))}
                 </div>
@@ -697,7 +950,7 @@ function Settings() {
         basePath="/settings"
         onValueChange={(value) => {
           setPrevActiveTab(activeTab);
-          setActiveTab(value as 'basics' | 'advanced');
+          setActiveTab(value as SettingsTabKey);
         }}
       />
 

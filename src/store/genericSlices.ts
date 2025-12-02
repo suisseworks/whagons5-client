@@ -74,6 +74,7 @@ const genericSliceConfigs = [
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','approval_id','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
+    { name: 'workflows', table: 'wh_workflows', endpoint: '/workflows', store: 'workflows', hashFields: ['id','name','description','workspace_id','is_active','current_version_id','created_by','updated_by','activated_at','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
 
     // Job Positions
@@ -138,6 +139,7 @@ export const {
     teams,
     templates,
     messages,
+    workflows,
     workspaces,
     jobPositions,
     complianceStandards,
@@ -204,6 +206,7 @@ export const genericEventNames = {
     teams: genericSlices.slices.teams.eventNames,
     templates: genericSlices.slices.templates.eventNames,
     messages: genericSlices.slices.messages.eventNames,
+    workflows: genericSlices.slices.workflows.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
@@ -261,6 +264,7 @@ export const genericActions = {
     teams: genericSlices.slices.teams.actions,
     templates: genericSlices.slices.templates.actions,
     messages: genericSlices.slices.messages.actions,
+    workflows: genericSlices.slices.workflows.actions,
     workspaces: genericSlices.slices.workspaces.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,

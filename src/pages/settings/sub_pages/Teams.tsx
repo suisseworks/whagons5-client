@@ -3,11 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUsers, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import {
+  faUsers,
+  faPlus,
+  faChartBar,
+  faCircleInfo,
+  faLightbulb,
+  faSitemap,
+  faPalette,
+  faUserTie,
+  faToggleOn,
+  faPen,
+  faLayerGroup,
+  faCheckCircle
+} from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Team, Category, Task } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { StatusIcon } from "@/pages/settings/components/StatusIcon";
 import {
@@ -23,6 +38,7 @@ import {
 } from "../components";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 // Custom cell renderer: show color avatar, name, and description stacked
 const TeamNameCellRenderer = (props: ICellRendererParams) => {
@@ -50,6 +66,10 @@ const TeamNameCellRenderer = (props: ICellRendererParams) => {
 
 function Teams() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const tt = (key: string, fallback: string) => t(`settings.teams.${key}`, fallback);
+  const noneOptionLabel = tt('fields.none', 'None');
+  const unassignedOptionLabel = tt('fields.unassigned', 'Unassigned');
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
@@ -180,7 +200,7 @@ function Teams() {
   const colDefs = useMemo<ColDef[]>(() => [
     { 
       field: 'name', 
-      headerName: 'Team Name',
+      headerName: tt('grid.columns.teamName', 'Team Name'),
       flex: 1.5,
       minWidth: 220,
       maxWidth: 420,
@@ -188,7 +208,7 @@ function Teams() {
     },
     {
       field: 'parent_team_id',
-      headerName: 'Parent Team',
+      headerName: tt('grid.columns.parentTeam', 'Parent Team'),
       flex: 1,
       minWidth: 160,
       valueGetter: (p) => p.data?.parent_team_id ?? null,
@@ -199,7 +219,7 @@ function Teams() {
     },
     {
       field: 'icon',
-      headerName: 'Icon',
+      headerName: tt('grid.columns.icon', 'Icon'),
       width: 90,
       cellRenderer: (p: ICellRendererParams) => {
         const iconStr: string = p?.data?.icon || 'fas fa-circle';
@@ -215,7 +235,7 @@ function Teams() {
     },
     {
       field: 'team_lead_id',
-      headerName: 'Team Lead',
+      headerName: tt('grid.columns.teamLead', 'Team Lead'),
       flex: 1,
       minWidth: 180,
       valueGetter: (p) => p.data?.team_lead_id ?? null,
@@ -227,15 +247,15 @@ function Teams() {
     },
     {
       field: 'is_active',
-      headerName: 'Active',
+      headerName: tt('grid.columns.active', 'Active'),
       width: 100,
       valueGetter: (p) => !!p.data?.is_active,
-      cellRenderer: (p: ICellRendererParams) => (p?.data?.is_active ? 'Yes' : 'No')
+      cellRenderer: (p: ICellRendererParams) => (p?.data?.is_active ? tt('grid.values.yes', 'Yes') : tt('grid.values.no', 'No'))
     },
     // Tasks column removed per request; task counts still used in delete validation and stats
     {
       field: 'actions',
-      headerName: 'Actions',
+      headerName: tt('grid.columns.actions', 'Actions'),
       width: 110,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleQuickEdit,
@@ -246,7 +266,7 @@ function Teams() {
       resizable: false,
       pinned: 'right'
     }
-  ], [handleEdit, handleDeleteTeam, teamIdToName, userIdToName]);
+  ], [handleEdit, handleDeleteTeam, teamIdToName, userIdToName, t]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -254,7 +274,7 @@ function Teams() {
 
     // Validate required fields
     if (!createFormData.name?.trim()) {
-      throw new Error('Team name is required');
+      throw new Error(tt('validation.nameRequired', 'Team name is required'));
     }
 
     const teamData = {
@@ -288,7 +308,7 @@ function Teams() {
 
     // Validate required fields
     if (!editFormData.name?.trim()) {
-      throw new Error('Team name is required');
+      throw new Error(tt('validation.nameRequired', 'Team name is required'));
     }
 
     const updates = {
@@ -306,39 +326,45 @@ function Teams() {
 
 
   // Render entity preview for delete dialog
-  const renderTeamPreview = (team: Team) => (
-    <div className="flex items-center space-x-3">
-      <div 
-        className="w-8 h-8 min-w-[2rem] rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
-        style={{ backgroundColor: team.color ?? '#6B7280' }}
-      >
-        {team.name.charAt(0).toUpperCase()}
-      </div>
-      <div>
-        <div className="font-medium">{team.name}</div>
-        <div className="text-sm text-muted-foreground">{team.description}</div>
-        <div className="flex items-center space-x-2 mt-1">
-          <span className="text-xs text-muted-foreground">
-            {getTeamCategoryCount(team.id)} categories
-          </span>
-          <span className="text-xs text-muted-foreground">•</span>
-          <span className="text-xs text-muted-foreground">
-            {getTeamTaskCount(team.id)} tasks
-          </span>
+  const renderTeamPreview = (team: Team) => {
+    const categoryCount = getTeamCategoryCount(team.id);
+    const taskCount = getTeamTaskCount(team.id);
+    const categoriesLabel = tt('preview.categoriesLabel', '{count} categories').replace('{count}', String(categoryCount));
+    const tasksLabel = tt('preview.tasksLabel', '{count} tasks').replace('{count}', String(taskCount));
+    return (
+      <div className="flex items-center space-x-3">
+        <div 
+          className="w-8 h-8 min-w-[2rem] rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
+          style={{ backgroundColor: team.color ?? '#6B7280' }}
+        >
+          {team.name.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <div className="font-medium">{team.name}</div>
+          <div className="text-sm text-muted-foreground">{team.description}</div>
+          <div className="flex items-center space-x-2 mt-1">
+            <span className="text-xs text-muted-foreground">
+              {categoriesLabel}
+            </span>
+            <span className="text-xs text-muted-foreground">•</span>
+            <span className="text-xs text-muted-foreground">
+              {tasksLabel}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <SettingsLayout
-      title="Teams"
-      description="Organize and manage work teams for collaboration"
+      title={tt('title', 'Teams')}
+      description={tt('description', 'Organize and manage work teams for collaboration')}
       icon={faUsers}
       iconColor="#8b5cf6"
       loading={{
         isLoading: loading,
-        message: "Loading teams..."
+        message: tt('loading', 'Loading teams...')
       }}
       error={error ? {
         message: error,
@@ -347,14 +373,14 @@ function Teams() {
       headerActions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/users')}>
-            Manage Users
+            {tt('header.manageUsers', 'Manage Users')}
           </Button>
           <Button
             size="sm"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
-            Add Team
+            {tt('header.addTeam', 'Add Team')}
           </Button>
         </div>
       }
@@ -366,7 +392,7 @@ function Teams() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faUsers} className="w-4 h-4" />
-                <span>Teams</span>
+                <span>{tt('tabs.grid', 'Teams')}</span>
               </div>
             ),
             content: (
@@ -375,7 +401,7 @@ function Teams() {
                   <SettingsGrid
                     rowData={filteredItems}
                     columnDefs={colDefs}
-                    noRowsMessage="No teams found"
+                    noRowsMessage={tt('grid.noRows', 'No teams found')}
                     rowSelection="single"
                     onRowDoubleClicked={(row: any) => handleQuickEdit(row?.data ?? row)}
                   />
@@ -388,7 +414,7 @@ function Teams() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-                <span>Statistics</span>
+                <span>{tt('tabs.stats', 'Statistics')}</span>
               </div>
             ),
             content: (
@@ -396,6 +422,23 @@ function Teams() {
                 teams={teams}
                 categories={categories}
                 tasks={tasks}
+                translate={tt}
+              />
+            )
+          },
+          {
+            value: "help",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faCircleInfo} className="w-4 h-4" />
+                <span>{tt('tabs.help', 'Visual help')}</span>
+              </div>
+            ),
+            content: (
+              <TeamHelpContent
+                translate={tt}
+                onAddTeam={() => setIsCreateDialogOpen(true)}
+                onManageUsers={() => navigate('/settings/users')}
               />
             )
           }
@@ -424,8 +467,8 @@ function Teams() {
           }
         }}
         type="create"
-        title="Add New Team"
-        description="Create a new team to organize work and collaboration."
+        title={tt('dialogs.create.title', 'Add New Team')}
+        description={tt('dialogs.create.description', 'Create a new team to organize work and collaboration.')}
         onSubmit={handleCreateSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -434,48 +477,48 @@ function Teams() {
         <div className="grid gap-4">
           <TextField
             id="name"
-            label="Name"
+            label={tt('dialogs.create.fields.name', 'Name')}
             value={createFormData.name}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="description"
-            label="Description"
+            label={tt('dialogs.create.fields.description', 'Description')}
             value={createFormData.description}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, description: value }))}
           />
           <TextField
             id="color"
-            label="Color"
+            label={tt('dialogs.create.fields.color', 'Color')}
             type="color"
             value={createFormData.color}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
           <IconPicker
             id="icon"
-            label="Icon"
+            label={tt('dialogs.create.fields.icon', 'Icon')}
             value={createFormData.icon}
             onChange={(icon) => setCreateFormData(prev => ({ ...prev, icon }))}
             color={createFormData.color}
           />
           <SelectField
             id="parent-team"
-            label="Parent Team"
+            label={tt('dialogs.create.fields.parentTeam', 'Parent Team')}
             value={createFormData.parent_team_id ?? 'none'}
             onChange={(val) => setCreateFormData(prev => ({ ...prev, parent_team_id: val === 'none' ? null : Number(val) }))}
-            options={[{ value: 'none', label: 'None' }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
+            options={[{ value: 'none', label: noneOptionLabel }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
           />
           <SelectField
             id="team-lead"
-            label="Team Lead"
+            label={tt('dialogs.create.fields.teamLead', 'Team Lead')}
             value={createFormData.team_lead_id ?? 'none'}
             onChange={(val) => setCreateFormData(prev => ({ ...prev, team_lead_id: val === 'none' ? null : Number(val) }))}
-            options={[{ value: 'none', label: 'Unassigned' }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
+            options={[{ value: 'none', label: unassignedOptionLabel }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
           />
           <CheckboxField
             id="is-active"
-            label="Active"
+            label={tt('dialogs.create.fields.active', 'Active')}
             checked={!!createFormData.is_active}
             onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_active: checked }))}
           />
@@ -501,8 +544,8 @@ function Teams() {
           }
         }}
         type="edit"
-        title="Edit Team"
-        description="Update the team information."
+        title={tt('dialogs.edit.title', 'Edit Team')}
+        description={tt('dialogs.edit.description', 'Update the team information.')}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -512,48 +555,48 @@ function Teams() {
           <div className="grid gap-4">
             <TextField
               id="edit-name"
-              label="Name"
+              label={tt('dialogs.edit.fields.name', 'Name')}
               value={editFormData.name}
               onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <TextField
               id="edit-description"
-              label="Description"
+              label={tt('dialogs.edit.fields.description', 'Description')}
               value={editFormData.description}
               onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
             />
             <TextField
               id="edit-color"
-              label="Color"
+              label={tt('dialogs.edit.fields.color', 'Color')}
               type="color"
               value={editFormData.color}
               onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
             />
             <IconPicker
               id="edit-icon"
-              label="Icon"
+              label={tt('dialogs.edit.fields.icon', 'Icon')}
               value={editFormData.icon}
               onChange={(icon) => setEditFormData(prev => ({ ...prev, icon }))}
               color={editFormData.color}
             />
             <SelectField
               id="edit-parent-team"
-              label="Parent Team"
+              label={tt('dialogs.edit.fields.parentTeam', 'Parent Team')}
               value={editFormData.parent_team_id ?? 'none'}
               onChange={(val) => setEditFormData(prev => ({ ...prev, parent_team_id: val === 'none' ? null : Number(val) }))}
-              options={[{ value: 'none', label: 'None' }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
+              options={[{ value: 'none', label: noneOptionLabel }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
             />
             <SelectField
               id="edit-team-lead"
-              label="Team Lead"
+              label={tt('dialogs.edit.fields.teamLead', 'Team Lead')}
               value={editFormData.team_lead_id ?? 'none'}
               onChange={(val) => setEditFormData(prev => ({ ...prev, team_lead_id: val === 'none' ? null : Number(val) }))}
-              options={[{ value: 'none', label: 'Unassigned' }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
+              options={[{ value: 'none', label: unassignedOptionLabel }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
             />
             <CheckboxField
               id="edit-is-active"
-              label="Active"
+              label={tt('dialogs.edit.fields.active', 'Active')}
               checked={!!editFormData.is_active}
               onChange={(checked) => setEditFormData(prev => ({ ...prev, is_active: checked }))}
             />
@@ -566,16 +609,24 @@ function Teams() {
         open={isDeleteDialogOpen}
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
-        title="Delete Team"
+        title={tt('dialogs.delete.title', 'Delete Team')}
         description={
           deletingTeam ? (() => {
             const categoryCount = getTeamCategoryCount(deletingTeam.id);
             const taskCount = getTeamTaskCount(deletingTeam.id);
             
             if (categoryCount > 0 || taskCount > 0) {
-              return `This team cannot be deleted because it has ${categoryCount} categories and ${taskCount} tasks. Please reassign or delete all associated items first.`;
+              return tt(
+                'dialogs.delete.restricted',
+                'This team cannot be deleted because it has {categories} categories and {tasks} tasks. Please reassign or delete all associated items first.'
+              )
+                .replace('{categories}', String(categoryCount))
+                .replace('{tasks}', String(taskCount));
             } else {
-              return `Are you sure you want to delete the team "${deletingTeam.name}"? This action cannot be undone.`;
+              return tt(
+                'dialogs.delete.confirm',
+                'Are you sure you want to delete the team "{name}"? This action cannot be undone.'
+              ).replace('{name}', deletingTeam.name);
             }
           })() : undefined
         }
@@ -583,7 +634,7 @@ function Teams() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={!deletingTeam || !canDeleteTeam(deletingTeam)}
-        entityName="team"
+        entityName={tt('entityName', 'team')}
         entityData={deletingTeam}
         renderEntityPreview={renderTeamPreview}
       />
@@ -595,9 +646,10 @@ interface TeamStatisticsProps {
   teams: Team[];
   categories: Category[];
   tasks: Task[];
+  translate: (key: string, fallback: string) => string;
 }
 
-function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
+function TeamStatistics({ teams, categories, tasks, translate }: TeamStatisticsProps) {
   const totalTeams = teams.length;
   const totalCategories = categories.length;
   const totalTasks = tasks.length;
@@ -660,6 +712,39 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
   const avgCategoriesPerTeam =
     totalTeams > 0 ? Math.round((totalCategories / totalTeams) * 10) / 10 : 0;
 
+  const summaryLabels = {
+    total: translate('stats.cards.total', 'Total Teams'),
+    active: translate('stats.cards.active', 'Active Teams'),
+    inactive: translate('stats.cards.inactive', 'Inactive Teams'),
+    avgCategories: translate('stats.cards.avgCategories', 'Avg Categories / Team')
+  };
+  const statusChart = {
+    title: translate('stats.charts.status.title', 'Teams by Status'),
+    description: translate('stats.charts.status.description', 'Active vs inactive teams'),
+    legendActive: translate('stats.charts.status.legendActive', 'Active'),
+    legendInactive: translate('stats.charts.status.legendInactive', 'Inactive'),
+    seriesName: translate('stats.charts.status.seriesName', 'Teams'),
+    empty: translate('stats.empty.noTeams', 'No team data available')
+  };
+  const tasksChart = {
+    title: translate('stats.charts.tasksByTeam.title', 'Tasks by Team'),
+    description: translate('stats.charts.tasksByTeam.description', 'Top teams by assigned tasks'),
+    axis: translate('stats.charts.tasksByTeam.axis', 'Tasks'),
+    empty: translate('stats.empty.noTasks', 'No task data available')
+  };
+  const categoriesChart = {
+    title: translate('stats.charts.categoriesByTeam.title', 'Categories by Team'),
+    description: translate('stats.charts.categoriesByTeam.description', 'Distribution of categories across teams'),
+    axis: translate('stats.charts.categoriesByTeam.axis', 'Categories'),
+    empty: translate('stats.empty.noCategories', 'No category data available')
+  };
+  const overTimeChart = {
+    title: translate('stats.charts.tasksOverTime.title', 'Tasks Over Time'),
+    description: translate('stats.charts.tasksOverTime.description', 'Last 30 days of task creation across all teams'),
+    axis: translate('stats.charts.tasksOverTime.axis', 'Tasks'),
+    series: translate('stats.charts.tasksOverTime.series', 'Tasks Created')
+  };
+
   return (
     <div className="flex-1 min-h-0 overflow-auto p-4">
       <div className="space-y-4">
@@ -670,7 +755,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
               <div className="text-center">
                 <div className="text-2xl font-bold">{totalTeams}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Total Teams
+                  {summaryLabels.total}
                 </div>
               </div>
             </CardContent>
@@ -682,7 +767,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                   {activeTeams}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Active Teams
+                  {summaryLabels.active}
                 </div>
               </div>
             </CardContent>
@@ -694,7 +779,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                   {inactiveTeams}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Inactive Teams
+                  {summaryLabels.inactive}
                 </div>
               </div>
             </CardContent>
@@ -704,7 +789,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
               <div className="text-center">
                 <div className="text-2xl font-bold">{avgCategoriesPerTeam}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Avg Categories / Team
+                  {summaryLabels.avgCategories}
                 </div>
               </div>
             </CardContent>
@@ -714,9 +799,9 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
         {/* Donut chart: teams by status */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Teams by Status</CardTitle>
+            <CardTitle className="text-sm">{statusChart.title}</CardTitle>
             <CardDescription className="text-xs">
-              Active vs inactive teams
+              {statusChart.description}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -734,7 +819,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                   },
                   series: [
                     {
-                      name: "Teams",
+                        name: statusChart.seriesName,
                       type: "pie",
                       radius: ["40%", "70%"],
                       avoidLabelOverlap: true,
@@ -765,12 +850,12 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                       data: [
                         {
                           value: activeTeams,
-                          name: "Active",
+                            name: statusChart.legendActive,
                           itemStyle: { color: "#22c55e" }
                         },
                         {
                           value: inactiveTeams,
-                          name: "Inactive",
+                            name: statusChart.legendInactive,
                           itemStyle: { color: "#9ca3af" }
                         }
                       ]
@@ -781,7 +866,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
               />
             ) : (
               <div className="flex items-center justify-center h-[260px] text-muted-foreground text-sm">
-                No team data available
+                  {statusChart.empty}
               </div>
             )}
           </CardContent>
@@ -791,9 +876,9 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks by Team</CardTitle>
+              <CardTitle className="text-sm">{tasksChart.title}</CardTitle>
               <CardDescription className="text-xs">
-                Top teams by assigned tasks
+                {tasksChart.description}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -812,7 +897,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                     },
                     xAxis: {
                       type: "value",
-                      name: "Tasks"
+                      name: tasksChart.axis
                     },
                     yAxis: {
                       type: "category",
@@ -828,7 +913,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                     },
                     series: [
                       {
-                        name: "Tasks",
+                        name: tasksChart.axis,
                         type: "bar",
                         data: tasksByTeam
                           .map((item) => ({
@@ -845,7 +930,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                 />
               ) : (
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No task data available
+                  {tasksChart.empty}
                 </div>
               )}
             </CardContent>
@@ -853,9 +938,9 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Categories by Team</CardTitle>
+              <CardTitle className="text-sm">{categoriesChart.title}</CardTitle>
               <CardDescription className="text-xs">
-                Distribution of categories across teams
+                {categoriesChart.description}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -874,7 +959,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                     },
                     xAxis: {
                       type: "value",
-                      name: "Categories"
+                      name: categoriesChart.axis
                     },
                     yAxis: {
                       type: "category",
@@ -890,7 +975,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                     },
                     series: [
                       {
-                        name: "Categories",
+                        name: categoriesChart.axis,
                         type: "bar",
                         data: categoriesByTeam
                           .map((item) => ({
@@ -907,7 +992,7 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                 />
               ) : (
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No category data available
+                  {categoriesChart.empty}
                 </div>
               )}
             </CardContent>
@@ -918,9 +1003,9 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
         {tasksOverTime.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks Over Time</CardTitle>
+              <CardTitle className="text-sm">{overTimeChart.title}</CardTitle>
               <CardDescription className="text-xs">
-                Last 30 days of task creation across all teams
+                {overTimeChart.description}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -951,11 +1036,11 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
                   },
                   yAxis: {
                     type: "value",
-                    name: "Tasks"
+                    name: overTimeChart.axis
                   },
                   series: [
                     {
-                      name: "Tasks Created",
+                        name: overTimeChart.series,
                       type: "line",
                       smooth: true,
                       data: tasksOverTime.map((item) => item.count),
@@ -993,6 +1078,266 @@ function TeamStatistics({ teams, categories, tasks }: TeamStatisticsProps) {
             </CardContent>
           </Card>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface TeamHelpContentProps {
+  translate: (key: string, fallback: string) => string;
+  onAddTeam: () => void;
+  onManageUsers: () => void;
+}
+
+interface HelpFieldCard {
+  key: string;
+  icon: IconDefinition;
+  title: string;
+  description: string;
+}
+
+interface HelpLifecycleStep {
+  key: string;
+  icon: IconDefinition;
+  title: string;
+  description: string;
+}
+
+function TeamHelpContent({ translate, onAddTeam, onManageUsers }: TeamHelpContentProps) {
+  const fieldCards: HelpFieldCard[] = [
+    {
+      key: 'name',
+      icon: faPen,
+      title: translate('help.fields.name.title', 'Name & description'),
+      description: translate('help.fields.name.description', 'Pick a short, searchable label and explain the team’s scope so other admins know when to use it.')
+    },
+    {
+      key: 'appearance',
+      icon: faPalette,
+      title: translate('help.fields.appearance.title', 'Color & icon'),
+      description: translate('help.fields.appearance.description', 'Visual cues keep the grid readable. Choose contrasting colors for squads that collaborate often.')
+    },
+    {
+      key: 'hierarchy',
+      icon: faSitemap,
+      title: translate('help.fields.hierarchy.title', 'Parent team'),
+      description: translate('help.fields.hierarchy.description', 'Nest teams to mirror departments or regions. Child teams inherit visibility rules from their parent.')
+    },
+    {
+      key: 'lead',
+      icon: faUserTie,
+      title: translate('help.fields.lead.title', 'Team lead'),
+      description: translate('help.fields.lead.description', 'Select a point of contact for escalations. Only users in the directory are available here.')
+    },
+    {
+      key: 'status',
+      icon: faToggleOn,
+      title: translate('help.fields.status.title', 'Active toggle'),
+      description: translate('help.fields.status.description', 'Archive a team without losing history by switching it off instead of deleting it.')
+    },
+    {
+      key: 'relations',
+      icon: faLayerGroup,
+      title: translate('help.fields.relationships.title', 'Linked work'),
+      description: translate('help.fields.relationships.description', 'Categories and tasks rely on their team. Reassign those items before removing a team.')
+    }
+  ];
+
+  const lifecycleSteps: HelpLifecycleStep[] = [
+    {
+      key: 'plan',
+      icon: faLightbulb,
+      title: translate('help.lifecycle.plan.title', 'Plan your structure'),
+      description: translate('help.lifecycle.plan.description', 'List the departments, squads or pods you support and decide which ones should be parent teams.')
+    },
+    {
+      key: 'create',
+      icon: faPlus,
+      title: translate('help.lifecycle.create.title', 'Create & brand the team'),
+      description: translate('help.lifecycle.create.description', 'Use consistent naming and colors so people can instantly recognize the team in filters and dashboards.')
+    },
+    {
+      key: 'assign',
+      icon: faUsers,
+      title: translate('help.lifecycle.assign.title', 'Assign ownership'),
+      description: translate('help.lifecycle.assign.description', 'Set the team lead, link categories, and make sure tasks are routed to the correct team.')
+    },
+    {
+      key: 'measure',
+      icon: faChartBar,
+      title: translate('help.lifecycle.measure.title', 'Measure & iterate'),
+      description: translate('help.lifecycle.measure.description', 'Review the Statistics tab to spot overloaded teams and rebalance categories or workloads.')
+    }
+  ];
+
+  const bestPractices = [
+    translate('help.bestPractices.visual', 'Reuse colors and icons only when teams collaborate closely to avoid visual noise.'),
+    translate('help.bestPractices.naming', 'Stick to a naming convention (region-team-type) so searches stay predictable.'),
+    translate('help.bestPractices.hierarchy', 'Use parent teams sparingly—two levels are usually enough for clear reporting.'),
+    translate('help.bestPractices.integrity', 'Before deleting a team, verify with stakeholders that all tasks and categories have migrated.')
+  ];
+
+  const optionBullets = [
+    translate('help.options.grid.actions', 'Use the action menu in the Teams grid to jump into quick edit or delete.'),
+    translate('help.options.grid.search', 'Search instantly filters by team name or description when you need to find a squad.'),
+    translate('help.options.grid.sort', 'Click column headers to sort by parent, lead, or status to identify gaps.'),
+    translate('help.options.grid.quickEdit', 'Double-click a row to open editing with pre-filled data—no need to leave the grid.')
+  ];
+
+  const deletionReminders = [
+    translate('help.deletion.guard', 'Teams that still own categories or tasks cannot be deleted for integrity reasons.'),
+    translate('help.deletion.reassign', 'Reassign dependent categories/tasks first, then delete or archive the team.'),
+    translate('help.deletion.archive', 'Keep historical reporting by toggling the team inactive instead of deleting it outright.')
+  ];
+
+  return (
+    <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="space-y-4">
+        <Card className="border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-indigo-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FontAwesomeIcon icon={faCircleInfo} className="text-violet-600" />
+              {translate('help.hero.title', 'Need a quick refresher on teams?')}
+            </CardTitle>
+            <CardDescription className="text-sm">
+              {translate('help.hero.description', 'Understand what each option does before creating or updating teams.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              <Button size="sm" onClick={onAddTeam}>
+                <FontAwesomeIcon icon={faPlus} className="mr-2 h-3.5 w-3.5" />
+                {translate('help.hero.createAction', 'Create a team')}
+              </Button>
+              <Button size="sm" variant="outline" onClick={onManageUsers}>
+                <FontAwesomeIcon icon={faUsers} className="mr-2 h-3.5 w-3.5" />
+                {translate('help.hero.manageUsers', 'Assign or invite users')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">
+              {translate('help.fields.title', 'What each option controls')}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {translate('help.fields.subtitle', 'Reference this checklist while filling the team form.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {fieldCards.map((card) => (
+                <div
+                  key={card.key}
+                  className="flex gap-3 rounded-lg border border-border/60 bg-background/60 p-3 shadow-sm"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                    <FontAwesomeIcon icon={card.icon} className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{card.title}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {card.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">
+                {translate('help.lifecycle.title', 'Recommended flow')}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {translate('help.lifecycle.subtitle', 'Follow these steps to keep your structure clean.')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lifecycleSteps.map((step, index) => (
+                <div key={step.key} className="rounded-lg border border-border/60 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Badge variant="secondary">
+                      {translate('help.lifecycle.stepLabel', 'Step {step}').replace('{step}', String(index + 1))}
+                    </Badge>
+                    <FontAwesomeIcon icon={step.icon} className="h-4 w-4 text-violet-500" />
+                  </div>
+                  <div className="text-sm font-medium">{step.title}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">
+                {translate('help.bestPractices.title', 'Best practices')}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {translate('help.bestPractices.subtitle', 'Avoid the most common pitfalls when configuring teams.')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                {bestPractices.map((tip, index) => (
+                  <li key={`${tip}-${index}`} className="flex gap-2">
+                    <FontAwesomeIcon icon={faCheckCircle} className="mt-1 h-3.5 w-3.5 text-emerald-500" />
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">
+              {translate('help.options.title', 'Where to manage everything')}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {translate('help.options.subtitle', 'Use these areas to keep teams, users, and workload perfectly aligned.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border/60 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FontAwesomeIcon icon={faLayerGroup} className="text-violet-500" />
+                {translate('help.options.gridTitle', 'Teams grid')}
+              </div>
+              <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+                {optionBullets.map((item, index) => (
+                  <li key={`${item}-${index}`} className="flex gap-2">
+                    <span className="text-violet-500">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-lg border border-border/60 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FontAwesomeIcon icon={faChartBar} className="text-indigo-500" />
+                {translate('help.options.statsTitle', 'Statistics & safety')}
+              </div>
+              <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+                {deletionReminders.map((item, index) => (
+                  <li key={`${item}-${index}`} className="flex gap-2">
+                    <span className="text-indigo-500">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

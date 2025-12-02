@@ -3,6 +3,8 @@ import './index.css';
 import App from './App';
 import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
+import { BrandingProvider } from './providers/BrandingProvider';
+import { LanguageProvider } from './providers/LanguageProvider';
 import { Provider } from 'react-redux';
 import {store } from './store';
 import { registerSW } from 'virtual:pwa-register';
@@ -18,9 +20,13 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
     <Provider store={store}>
         <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <LanguageProvider>
+            <BrandingProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </BrandingProvider>
+          </LanguageProvider>
         </ThemeProvider>
     </Provider>
   // {/* </React.StrictMode>, */}

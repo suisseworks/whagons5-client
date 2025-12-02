@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
+import { useLanguage } from "@/providers/LanguageProvider";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -50,12 +51,13 @@ function Header() {
 
     const isSettings = useMemo(() => location.pathname.startsWith('/settings'), [location.pathname]);
     const isAnalytics = useMemo(() => location.pathname.startsWith('/analytics'), [location.pathname]);
+    const { t } = useLanguage();
 
 
 
     const breadcrumbs = useMemo(() => {
         const parts = location.pathname.split('/').filter(Boolean);
-        const labelMap: Record<string, string> = {
+        const labelDefaults: Record<string, string> = {
             tasks: 'Tasks',
             workspace: 'Workspace',
             settings: 'Settings',
@@ -67,6 +69,22 @@ function Header() {
             profile: 'Profile',
             analytics: 'Analytics',
             stripe: 'Stripe',
+            tags: 'Tags',
+            priorities: 'Priorities',
+            global: 'Global',
+            forms: 'Forms',
+            approvals: 'Approvals',
+            slas: 'SLAs',
+            workflows: 'Workflows',
+            invitations: 'Invitations',
+            'job-positions': 'Job Positions',
+            statuses: 'Statuses',
+            status: 'Status',
+            'spot-types': 'Spot Types',
+        };
+        const getLabel = (seg: string) => {
+            const fallback = labelDefaults[seg] ?? seg.charAt(0).toUpperCase() + seg.slice(1);
+            return t(`breadcrumbs.${seg}`, fallback);
         };
         const acc: Array<{ label: string; to?: string }> = [];
         let path = '';
@@ -74,23 +92,23 @@ function Header() {
         // Special handling for settings subpages
         if (parts[0] === 'settings' && parts.length > 1) {
             // For settings subpages, create breadcrumbs like: Settings > Subpage
-            acc.push({ label: 'Settings', to: '/settings' });
+            acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
             for (let i = 1; i < parts.length; i++) {
                 const seg = parts[i];
                 path += `/${seg}`;
-                const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+                const label = getLabel(seg);
                 acc.push({ label, to: `/settings${path}` });
             }
         } else {
             // Regular breadcrumbs for non-settings pages
             for (const seg of parts) {
                 path += `/${seg}`;
-                const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+                const label = getLabel(seg);
                 acc.push({ label, to: path });
             }
         }
         return acc;
-    }, [location.pathname]);
+    }, [location.pathname, t]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
@@ -527,7 +545,7 @@ function Header() {
                             <BreadcrumbList className="gap-1.5 sm:gap-2">
                                 <BreadcrumbItem>
                                     <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
-                                        <Link to="/welcome" className="truncate max-w-[6rem]">Home</Link>
+                                        <Link to="/welcome" className="truncate max-w-[6rem]">{t('breadcrumbs.home', 'Home')}</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 {breadcrumbs.map((bc, idx) => (
@@ -585,11 +603,11 @@ function Header() {
                         floating={false}
                         renderTrigger={(open) => (
                             <button
-                                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent/50 text-foreground transition-colors bg-gradient-to-br from-[#0078D4] via-[#00B4D8] to-[#00D4AA] hover:from-[#006BB3] hover:via-[#0099B8] hover:to-[#00B899]"
+                                className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border/60 bg-background/90 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/30 shadow-sm"
                                 title="Copilot"
                                 onClick={open}
                             >
-                                <Sparkles className="h-5 w-5 text-white" />
+                                <Sparkles className="h-5 w-5" />
                             </button>
                         )}
                     />
