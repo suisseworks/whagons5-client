@@ -30,13 +30,13 @@ export const DEFAULT_BRANDING_CONFIG: BrandingConfig = {
   organizationName: 'Whagons',
   productLabel: 'Ops OS',
   tagline: 'Orchestrate every frontline workflow in one branded console.',
-  primaryColor: '#0fb5a9',
+  primaryColor: '#009579',
   accentColor: '#2563eb',
-  backgroundColor: '#f4fffb',
+  backgroundColor: '#ffffff',
   sidebarColor: '#FAFBFC',
   textColor: '#0f172a',
-  neutralColor: '#d7f5ef',
-  gradientAccent: 'linear-gradient(130deg, #0fb5a9 0%, #2563eb 100%)',
+  neutralColor: '#e2e8f0',
+  gradientAccent: 'linear-gradient(130deg, #009579 0%, #2563eb 100%)',
   notes: '',
 };
 

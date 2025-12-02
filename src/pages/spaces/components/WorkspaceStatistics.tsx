@@ -199,7 +199,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       // Completed tasks
       const completedTasksCount = workspaceTasks.filter((task: Task) => {
         const status = Array.isArray(statuses) ? statuses.find((s: any) => s.id === task.status_id) : null;
-        return status?.action === 'FINISHED' || status?.semantic_type === 'completed' || status?.final === true;
+        return status?.action === 'FINISHED' || status?.final === true;
       }).length;
 
       // Tasks with approvals

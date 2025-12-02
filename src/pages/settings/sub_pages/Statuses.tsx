@@ -24,6 +24,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/animated/Tabs";
 
+const STATUS_ACTIONS = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
+
 function Statuses() {
   
   const dispatch = useDispatch<AppDispatch>();
@@ -34,7 +36,6 @@ function Statuses() {
   const statusTransitionGroups = useSelector((s: RootState) => s.statusTransitionGroups.value) as any[];
   
   // Local UI state
-  const [activeTab, setActiveTab] = useState<string>("statuses");
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,7 +106,6 @@ function Statuses() {
   // Form state
   const [formName, setFormName] = useState("");
   const [formAction, setFormAction] = useState("");
-  const [formSemanticType, setFormSemanticType] = useState<string | null>(null);
   const [formColor, setFormColor] = useState("#888888");
   const [formIcon, setFormIcon] = useState("fas fa-circle");
   const [formInitial, setFormInitial] = useState(false);
@@ -116,8 +116,7 @@ function Statuses() {
   const [, setIsDeleting] = useState(false);
   // Toast removed
   // Backend enum values for status.action
-  const allowedActions = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
-  const allowedSemantics = ['pending_review','in_approval','approved','rejected','canceled','expired'] as const;
+  const allowedActions = STATUS_ACTIONS;
 
   
   // Load persisted view and group, and save changes
@@ -163,8 +162,6 @@ function Statuses() {
     setSelectedStatus(row);
     setFormName(row.name || "");
     setFormAction(row.action || "");
-    setFormSemanticType(row.semantic_type || null);
-    setFormSemanticType(row.semantic_type || null);
     setFormColor(row.color || "#888888");
     setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
     setFormInitial(!!row.initial);
@@ -198,7 +195,6 @@ function Statuses() {
       );
     } },
     { headerName: "Action", field: "action", flex: 1, minWidth: 140 },
-    { headerName: "Semantic", field: "semantic_type", flex: 1, minWidth: 160 },
     // Icon column removed; icon shown with color inside Name
     { headerName: "System", field: "system", width: 110 },
     {
@@ -286,9 +282,8 @@ function Statuses() {
     return statuses.filter((s: any) => {
       const name = String(s?.name || '').toLowerCase();
       const action = String(s?.action || '').toLowerCase();
-      const semantic = String(s?.semantic_type || '').toLowerCase();
       const icon = String(s?.icon || '').toLowerCase();
-      return name.includes(q) || action.includes(q) || semantic.includes(q) || icon.includes(q);
+      return name.includes(q) || action.includes(q) || icon.includes(q);
     });
   }, [statuses, searchQuery]);
 
@@ -329,6 +324,19 @@ function Statuses() {
   };
 
   // Define tabs for URL persistence
+  const statusStats = useMemo(() => ({
+    total: statuses.length,
+    system: statuses.filter((s: any) => !!s.system).length,
+    initial: statuses.filter((s: any) => !!s.initial).length,
+    transitionsTotal: statusTransitions.length,
+    selectedGroupTransitions: selectedGroupId ? transitionsByKey.size : null,
+    transitionGroups: statusTransitionGroups.length,
+    actions: STATUS_ACTIONS.map(action => ({
+      action,
+      count: statuses.filter((s: any) => String(s.action).toUpperCase() === action).length,
+    })),
+  }), [statuses, statusTransitionGroups, statusTransitions, selectedGroupId, transitionsByKey]);
+
   const statusesTabs = [
     {
       value: 'statuses',
@@ -346,7 +354,6 @@ function Statuses() {
                 setSelectedStatus(row);
                 setFormName(row.name || "");
                 setFormAction(row.action || "");
-                setFormSemanticType(row.semantic_type || null);
                 setFormColor(row.color || "#888888");
                 setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
                 setFormInitial(!!row.initial);
@@ -500,6 +507,67 @@ function Statuses() {
           )}
         </div>
       )
+    },
+    {
+      value: 'stats',
+      label: 'Statistics',
+      content: (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">Total Statuses</p>
+              <p className="text-2xl font-semibold mt-1">{statusStats.total}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">System Statuses</p>
+              <p className="text-2xl font-semibold mt-1">{statusStats.system}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">Initial Statuses</p>
+              <p className="text-2xl font-semibold mt-1">{statusStats.initial}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">Transition Groups</p>
+              <p className="text-2xl font-semibold mt-1">{statusStats.transitionGroups}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">Transitions (All)</p>
+              <p className="text-2xl font-semibold mt-1">{statusStats.transitionsTotal}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-4 shadow-sm">
+              <p className="text-sm text-muted-foreground">Transitions (Selected Group)</p>
+              <p className="text-2xl font-semibold mt-1">{statusStats.selectedGroupTransitions ?? '—'}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-lg border bg-card shadow-sm">
+            <div className="border-b px-4 py-3">
+              <h3 className="text-base font-semibold">Statuses by Action</h3>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Action</TableHead>
+                  <TableHead className="text-right">Count</TableHead>
+                  <TableHead className="text-right">Percent</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {statusStats.actions.map(({ action, count }) => {
+                  const percent = statusStats.total ? Math.round((count / statusStats.total) * 100) : 0;
+                  return (
+                    <TableRow key={action}>
+                      <TableCell className="font-medium">{action}</TableCell>
+                      <TableCell className="text-right">{count}</TableCell>
+                      <TableCell className="text-right">{percent}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )
     }
   ];
 
@@ -516,22 +584,11 @@ function Statuses() {
         value: searchQuery,
         onChange: setSearchQuery
       }}
-      statistics={activeTab === 'statuses' ? {
-        title: "Status Overview",
-        description: "Quick glance at your workflow setup",
-        items: [
-          { label: 'Total Statuses', value: statuses.length },
-          { label: 'System Statuses', value: statuses.filter((s: any) => !!s.system).length },
-          { label: 'Transition Groups', value: statusTransitionGroups.length },
-          { label: selectedGroupId ? 'Transitions (Selected Group)' : 'Transitions (All)', value: selectedGroupId ? transitionsByKey.size : statusTransitions.length }
-        ]
-      } : undefined}
       headerActions={
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => {
             setFormName("");
             setFormAction("");
-            setFormSemanticType(null);
             setFormColor("#888888");
             setFormIcon("fas fa-circle");
             setFormInitial(false);
@@ -550,7 +607,6 @@ function Statuses() {
         defaultValue="statuses"
         basePath="/settings/statuses"
         className="h-full flex flex-col"
-        onValueChange={setActiveTab}
       />
 
       {/* Global dialogs (available on any tab) */}
@@ -580,7 +636,6 @@ function Statuses() {
               const payload: any = {
                 name: formName.trim(),
                 action: normalizedAction,
-                semantic_type: formSemanticType || null,
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
@@ -601,7 +656,6 @@ function Statuses() {
       >
         <TextField label="Name" value={formName} onChange={setFormName} required />
         <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-        <SelectField label="Semantic" value={formSemanticType ?? 'none'} onChange={(v) => setFormSemanticType(v === 'none' ? null : v)} options={[{ value: 'none', label: 'None' }, ...allowedSemantics.map(s => ({ value: s, label: s }))]} />
         <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
         <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
@@ -635,7 +689,6 @@ function Statuses() {
               const updates: any = {
                 name: formName.trim(),
                 action: normalizedAction,
-                semantic_type: formSemanticType || null,
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
@@ -656,7 +709,6 @@ function Statuses() {
       >
         <TextField label="Name" value={formName} onChange={setFormName} required />
         <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-      <SelectField label="Semantic" value={formSemanticType ?? 'none'} onChange={(v) => setFormSemanticType(v === 'none' ? null : v)} options={[{ value: 'none', label: 'None' }, ...allowedSemantics.map(s => ({ value: s, label: s }))]} />
         <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
         <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />

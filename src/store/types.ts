@@ -102,7 +102,6 @@ export interface Status {
     id: number;
     name: string;
     action: 'NONE' | 'WORKING' | 'PAUSED' | 'FINISHED';
-    semantic_type?: string | null;
     color?: string | null;
     icon?: string | null;
     system: boolean;
@@ -143,6 +142,31 @@ export interface Tag {
     updated_at?: string | Date;
 }
 
+export interface CustomField {
+    id: number;
+    name: string;
+    field_type: string;
+    options?: any;
+    validation_rules?: Record<string, any> | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+}
+
+export type ApprovalConditionOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'is_set' | 'is_not_set';
+
+export interface ApprovalCondition {
+    id?: string;
+    field: string;
+    label?: string | null;
+    source?: 'task_field' | 'custom_field';
+    custom_field_id?: number | null;
+    operator: ApprovalConditionOperator;
+    value?: string | number | boolean | Array<string | number> | null;
+    value_label?: string | null;
+    value_type?: 'string' | 'number' | 'boolean' | 'date' | 'option';
+    metadata?: Record<string, any> | null;
+}
+
 export interface Approval {
     id: number;
     name: string;
@@ -150,8 +174,8 @@ export interface Approval {
     approval_type: 'SEQUENTIAL' | 'PARALLEL' | string;
     require_all: boolean;
     minimum_approvals?: number | null;
-    trigger_type: 'ON_CREATE' | 'ON_STATUS_CHANGE' | 'MANUAL' | 'CONDITIONAL' | string;
-    trigger_status_id?: number | null;
+    trigger_type: 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | string;
+    trigger_conditions?: ApprovalCondition[] | null;
     require_rejection_comment: boolean;
     block_editing_during_approval: boolean;
     deadline_type: 'hours' | 'date' | string;

@@ -7,7 +7,9 @@ import {
   faTags,
   faPlus,
   faCubes,
-  faChartBar
+  faChartBar,
+  faTrash,
+  faPen
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
@@ -22,7 +24,6 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer,
   IconPicker,
   CategoryFieldsManager,
   TextField,
@@ -89,6 +90,78 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
         {props.data?.description ? (
           <span className={`text-xs truncate ${!props.data?.enabled ? "line-through text-muted-foreground" : "text-muted-foreground"}`}>{props.data.description}</span>
         ) : null}
+      </div>
+    </div>
+  );
+};
+
+// Simple badge renderer to show whether a category is enabled
+const EnabledCellRenderer = ({ value }: ICellRendererParams) => {
+  const isEnabled = Boolean(value);
+
+  return (
+    <Badge
+      variant={isEnabled ? "default" : "secondary"}
+      className={`text-xs ${isEnabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
+    >
+      {isEnabled ? "Enabled" : "Disabled"}
+    </Badge>
+  );
+};
+
+type CategoryActionsRendererParams = {
+  onManageFields: (category: Category) => void;
+  onEdit: (category: Category) => void;
+  onDelete: (category: Category) => void;
+  getFieldCount: (categoryId: number) => number;
+};
+
+const CategoryActionsCellRenderer = (
+  props: ICellRendererParams & CategoryActionsRendererParams
+) => {
+  const { data, onManageFields, onEdit, onDelete, getFieldCount } = props;
+  if (!data) return null;
+  const category = data as Category;
+  const id = Number(category.id);
+  const count = getFieldCount(id);
+  const label = count > 0 ? `Fields (${count})` : 'Fields';
+
+  const handleClick = (
+    handler: (category: Category) => void,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation();
+    handler(category);
+  };
+
+  return (
+    <div className="flex w-full justify-end">
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={(event) => handleClick(onManageFields, event)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 text-[12px] font-semibold text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.12)] transition hover:bg-slate-50 focus-visible:outline-none"
+        >
+          <FontAwesomeIcon icon={faCubes} className="h-3.5 w-3.5 text-slate-500" />
+          {label}
+        </button>
+
+        <button
+          type="button"
+          aria-label="Edit category"
+          onClick={(event) => handleClick(onEdit, event)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.12)] transition hover:bg-slate-50"
+        >
+          <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          aria-label="Delete category"
+          onClick={(event) => handleClick(onDelete, event)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff4d4f] text-white shadow-[0_1px_3px_rgba(244,67,54,0.35)] transition hover:bg-[#ea3b3d]"
+        >
+          <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
@@ -234,6 +307,12 @@ function Categories() {
     }
   };
 
+  const handleDeleteFromEdit = () => {
+    if (!editingCategory) return;
+    setIsEditDialogOpen(false);
+    handleDeleteCategory(editingCategory);
+  };
+
   // Derived statistics for charts
   const enabledCategoriesCount = useMemo(
     () => categories.filter((cat: Category) => cat.enabled).length,
@@ -373,7 +452,7 @@ function Categories() {
       field: 'status_transition_group_id',
       headerName: 'Status Transition Group',
       flex: 1.5,
-      minWidth: 240,
+      minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
         const groupId = params.value as number | null | undefined;
         if (!groupId) {
@@ -397,22 +476,15 @@ function Categories() {
     {
       headerName: 'Actions',
       colId: 'actions',
-      minWidth: 200,
+      minWidth: 240,
       suppressSizeToFit: true,
-      cellRenderer: createActionsCellRenderer({
-        customActions: [{
-          icon: faCubes,
-          label: (row: any) => {
-            const count = assignmentCountByCategory[Number(row?.id)] || 0;
-            return count > 0 ? `Fields (${count})` : 'Fields';
-          },
-          variant: 'outline',
-          onClick: openManageFields,
-          className: 'p-1 h-7 relative flex items-center justify-center'
-        }],
+      cellRenderer: CategoryActionsCellRenderer,
+      cellRendererParams: {
+        onManageFields: openManageFields,
         onEdit: handleEdit,
-        onDelete: handleDeleteCategory
-      }),
+        onDelete: handleDeleteCategory,
+        getFieldCount: (id: number) => assignmentCountByCategory[Number(id)] || 0
+      },
       sortable: false,
       filter: false,
       resizable: false,
@@ -1010,6 +1082,17 @@ function Categories() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingCategory}
+        footerActions={
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDeleteFromEdit}
+            disabled={!editingCategory}
+          >
+            <FontAwesomeIcon icon={faTrash} className="mr-2" />
+            Delete
+          </Button>
+        }
       >
         <div className="grid gap-4">
           <TextField

@@ -58,9 +58,9 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "jade-ops",
     label: "Jade Ops",
     description: "Vibrant teal primary with electric indigo highlights",
-    gradient: "linear-gradient(130deg, #0fb5a9 0%, #2563eb 100%)",
+    gradient: "linear-gradient(130deg, #27c1a7 0%, #2563eb 100%)",
     palette: {
-      primary: "#0fb5a9",
+      primary: "#27c1a7",
       accent: "#2563eb",
       background: "#f4fffb",
       text: "#0f172a",
@@ -119,7 +119,7 @@ const PRESET_THEMES: ThemePreset[] = [
     description: "Teal gradients with a dark command-center sidebar.",
     gradient: "linear-gradient(130deg, #0f172a 0%, #2563eb 100%)",
     palette: {
-      primary: "#0fb5a9",
+      primary: "#27c1a7",
       accent: "#22d3ee",
       background: "#f4fffb",
       text: "#0f172a",

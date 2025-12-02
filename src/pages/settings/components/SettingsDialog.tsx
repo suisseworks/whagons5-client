@@ -25,6 +25,7 @@ export interface SettingsDialogProps {
   entityName?: string; // For delete dialogs
   entityData?: any; // The item being deleted
   renderEntityPreview?: (data: any) => ReactNode; // Custom preview for delete dialog
+  footerActions?: ReactNode; // Optional extra buttons rendered near submit
 }
 
 export function SettingsDialog({
@@ -44,7 +45,8 @@ export function SettingsDialog({
   submitIcon,
   entityName,
   entityData,
-  renderEntityPreview
+  renderEntityPreview,
+  footerActions
 }: SettingsDialogProps) {
   const formRef = useRef<HTMLFormElement | null>(null);
   const submitNow = () => {
@@ -159,6 +161,7 @@ export function SettingsDialog({
                 )}
                 {getDefaultSubmitText()}
               </Button>
+              {footerActions ? footerActions : null}
             </DialogFooter>
           </>
         ) : (
@@ -184,6 +187,7 @@ export function SettingsDialog({
               )}
               {getDefaultSubmitText()}
             </Button>
+            {footerActions ? footerActions : null}
           </DialogFooter>
         )}
       </DialogContent>

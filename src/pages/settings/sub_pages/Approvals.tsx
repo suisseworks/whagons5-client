@@ -1,14 +1,13 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { faSquareCheck, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faSquareCheck, faUsers, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
-import { Approval, Status, ApprovalApprover } from "@/store/types";
+import { Approval, ApprovalApprover, ApprovalCondition, CustomField, Status } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import type { AppDispatch } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import {
   SettingsLayout,
@@ -51,9 +50,451 @@ const formatTemplate = (template: string, params: Record<string, string | number
     Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : `{${key}}`
   );
 
+type TriggerType = 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL';
+type ApprovalFlowType = 'SEQUENTIAL' | 'PARALLEL';
+type DeadlineType = 'hours' | 'date';
+type ConditionValueType = 'string' | 'number' | 'boolean' | 'date' | 'option';
+type ConditionOperator = ApprovalCondition['operator'];
+
+type ConditionFieldOption = {
+  value: string;
+  label: string;
+  source: 'task_field' | 'custom_field';
+  valueType: ConditionValueType;
+  customFieldId?: number;
+  options?: Array<{ value: string | number; label: string }>;
+};
+
+type TranslateFn = (key: string, fallback: string) => string;
+
+type ApprovalFormState = {
+  name: string;
+  description: string;
+  approval_type: ApprovalFlowType;
+  require_all: boolean;
+  minimum_approvals: number | string | '';
+  trigger_type: TriggerType;
+  trigger_conditions: ApprovalCondition[];
+  require_rejection_comment: boolean;
+  block_editing_during_approval: boolean;
+  deadline_type: DeadlineType;
+  deadline_value: string;
+  is_active: boolean;
+};
+
+const CONDITION_OPERATORS_BY_TYPE: Record<ConditionValueType, ConditionOperator[]> = {
+  string: ['contains', 'eq', 'ne', 'starts_with', 'ends_with'],
+  number: ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'],
+  boolean: ['eq', 'ne'],
+  date: ['eq', 'gt', 'lt'],
+  option: ['eq', 'ne'],
+};
+
+const DEFAULT_OPERATOR_BY_TYPE: Record<ConditionValueType, ConditionOperator> = {
+  string: 'contains',
+  number: 'eq',
+  boolean: 'eq',
+  date: 'eq',
+  option: 'eq',
+};
+
+const createConditionId = () => `cond_${Math.random().toString(36).slice(2, 9)}`;
+
+const mapCustomFieldTypeToValueType = (fieldType?: string | null): ConditionValueType => {
+  const normalized = (fieldType || '').toUpperCase();
+  switch (normalized) {
+    case 'NUMBER':
+      return 'number';
+    case 'CHECKBOX':
+      return 'boolean';
+    case 'DATE':
+    case 'TIME':
+    case 'DATETIME':
+      return 'date';
+    case 'LIST':
+    case 'RADIO':
+    case 'MULTI_SELECT':
+      return 'option';
+    default:
+      return 'string';
+  }
+};
+
+const normalizeOptionEntries = (options: any): Array<{ value: string | number; label: string }> => {
+  if (!options) return [];
+  if (Array.isArray(options)) {
+    return options.map((opt, index) => {
+      if (opt && typeof opt === 'object') {
+        const val = Object.prototype.hasOwnProperty.call(opt, 'value') ? opt.value : (opt.id ?? index);
+        const label = opt.label ?? opt.name ?? String(val);
+        return { value: val, label: String(label) };
+      }
+      return { value: opt, label: String(opt) };
+    });
+  }
+  if (typeof options === 'string') {
+    try {
+      return normalizeOptionEntries(JSON.parse(options));
+    } catch {
+      return [];
+    }
+  }
+  if (typeof options === 'object') {
+    return Object.entries(options).map(([key, val]) => ({
+      value: key,
+      label: String(val),
+    }));
+  }
+  return [];
+};
+
+const buildConditionFieldOptions = (
+  statuses: Status[],
+  customFields: CustomField[],
+  ta: TranslateFn
+): ConditionFieldOption[] => {
+  const fieldOptions: ConditionFieldOption[] = [];
+
+  if ((statuses || []).length) {
+    fieldOptions.push({
+      value: 'status_id',
+      label: ta('conditions.fields.status', 'Task status'),
+      source: 'task_field',
+      valueType: 'option',
+      options: statuses.map((status) => ({
+        value: status.id,
+        label: status.name || `Status #${status.id}`,
+      })),
+    });
+  }
+
+  const customPrefix = ta('conditions.fields.customPrefix', 'Custom field');
+  (customFields || []).forEach((field) => {
+    fieldOptions.push({
+      value: `custom_field:${field.id}`,
+      label: `${customPrefix}: ${field.name || `#${field.id}`}`,
+      source: 'custom_field',
+      valueType: mapCustomFieldTypeToValueType(field.field_type),
+      customFieldId: field.id,
+      options: normalizeOptionEntries(field.options),
+    });
+  });
+
+  return fieldOptions;
+};
+
+const defaultValueForType = (type: ConditionValueType, option?: ConditionFieldOption): any => {
+  switch (type) {
+    case 'boolean':
+      return true;
+    case 'option':
+      return option?.options?.[0]?.value ?? null;
+    case 'number':
+    case 'date':
+      return '';
+    default:
+      return '';
+  }
+};
+
+const normalizeConditionValue = (value: any, valueType?: ConditionValueType) => {
+  switch (valueType) {
+    case 'number':
+      if (value === '' || value === null || value === undefined) return null;
+      return Number(value);
+    case 'boolean':
+      if (typeof value === 'string') return value === 'true';
+      return Boolean(value);
+    case 'option':
+      if (value === '' || value === null || value === undefined) return null;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+        return Number(value);
+      }
+      return value;
+    case 'date':
+      return value || '';
+    default:
+      return value ?? '';
+  }
+};
+
+const sanitizeConditionsForSubmit = (conditions: ApprovalCondition[]): ApprovalCondition[] => {
+  return (conditions || [])
+    .filter((condition) => condition && condition.field && condition.operator)
+    .map((condition, index) => {
+      const valueType = (condition.value_type as ConditionValueType) ?? 'string';
+      const normalizedValue = normalizeConditionValue(condition.value, valueType);
+      return {
+        ...condition,
+        id: condition.id || createConditionId() || `cond_${index}`,
+        value: normalizedValue,
+        value_type: valueType,
+      };
+    })
+    .filter((condition) => {
+      if (condition.value_type === 'boolean') return true;
+      if (condition.value_type === 'option' || condition.value_type === 'number') {
+        return condition.value !== null && condition.value !== '';
+      }
+      return (condition.value ?? '') !== '';
+    });
+};
+
+const createEmptyFormState = (): ApprovalFormState => ({
+  name: '',
+  description: '',
+  approval_type: 'SEQUENTIAL',
+  require_all: true,
+  minimum_approvals: '',
+  trigger_type: 'ON_CREATE',
+  trigger_conditions: [],
+  require_rejection_comment: false,
+  block_editing_during_approval: false,
+  deadline_type: 'hours',
+  deadline_value: '',
+  is_active: true,
+});
+
+type ConditionBuilderProps = {
+  conditions: ApprovalCondition[];
+  onChange: (next: ApprovalCondition[]) => void;
+  fieldOptions: ConditionFieldOption[];
+  ta: TranslateFn;
+};
+
+const ConditionBuilder = ({ conditions, onChange, fieldOptions, ta }: ConditionBuilderProps) => {
+  const { optionsByValue, selectOptions } = useMemo(() => {
+    const map = new Map<string, ConditionFieldOption>();
+    const combined = [...fieldOptions];
+    fieldOptions.forEach((option) => map.set(option.value, option));
+    conditions.forEach((condition, index) => {
+      const key = condition.field || `missing-${index}`;
+      if (!map.has(key) && condition.field) {
+        const fallbackOption: ConditionFieldOption = {
+          value: condition.field,
+          label: condition.label || condition.field,
+          source: (condition.source as any) || 'task_field',
+          valueType: (condition.value_type as ConditionValueType) || 'string',
+          customFieldId: condition.custom_field_id ?? undefined,
+        };
+        map.set(condition.field, fallbackOption);
+        combined.push(fallbackOption);
+      }
+    });
+    return {
+      optionsByValue: map,
+      selectOptions: combined,
+    };
+  }, [fieldOptions, conditions]);
+
+  const operatorLabels = useMemo(() => ({
+    eq: ta('conditions.operators.eq', 'is equal to'),
+    ne: ta('conditions.operators.ne', 'is not equal to'),
+    gt: ta('conditions.operators.gt', 'is greater than'),
+    gte: ta('conditions.operators.gte', 'is greater than or equal to'),
+    lt: ta('conditions.operators.lt', 'is less than'),
+    lte: ta('conditions.operators.lte', 'is less than or equal to'),
+    contains: ta('conditions.operators.contains', 'contains'),
+    not_contains: ta('conditions.operators.not_contains', 'does not contain'),
+    starts_with: ta('conditions.operators.starts_with', 'starts with'),
+    ends_with: ta('conditions.operators.ends_with', 'ends with'),
+    is_set: ta('conditions.operators.is_set', 'is set'),
+    is_not_set: ta('conditions.operators.is_not_set', 'is not set'),
+  }), [ta]);
+
+  const addCondition = () => {
+    const firstField = fieldOptions.find((option) => !option.value.startsWith('__divider__'));
+    if (!firstField) return;
+    onChange([
+      ...conditions,
+      {
+        id: createConditionId(),
+        field: firstField.value,
+        label: firstField.label,
+        source: firstField.source,
+        custom_field_id: firstField.customFieldId,
+        operator: DEFAULT_OPERATOR_BY_TYPE[firstField.valueType],
+        value: defaultValueForType(firstField.valueType, firstField),
+        value_type: firstField.valueType,
+        value_label: undefined,
+        metadata: undefined,
+      },
+    ]);
+  };
+
+  const updateCondition = (id: string, updates: Partial<ApprovalCondition>) => {
+    onChange(
+      conditions.map((condition) =>
+        (condition.id || condition.field) === id
+          ? { ...condition, ...updates }
+          : condition
+      )
+    );
+  };
+
+  const removeCondition = (id: string) => {
+    onChange(conditions.filter((condition) => (condition.id || condition.field) !== id));
+  };
+
+  const handleFieldChange = (id: string, nextValue: string) => {
+    const fieldOption = optionsByValue.get(nextValue);
+    const valueType = fieldOption?.valueType ?? 'string';
+    updateCondition(id, {
+      field: nextValue,
+      label: fieldOption?.label,
+      source: fieldOption?.source,
+      custom_field_id: fieldOption?.customFieldId,
+      value_type: valueType,
+      operator: DEFAULT_OPERATOR_BY_TYPE[valueType],
+      value: defaultValueForType(valueType, fieldOption),
+      value_label: fieldOption?.options?.[0]?.label,
+    });
+  };
+
+  const handleOperatorChange = (id: string, nextOperator: ConditionOperator) => {
+    updateCondition(id, { operator: nextOperator });
+  };
+
+  const handleValueChange = (
+    id: string,
+    rawValue: string | number | boolean,
+    fieldOption?: ConditionFieldOption,
+    valueType?: ConditionValueType
+  ) => {
+    const resolvedType = valueType ?? 'string';
+    if (resolvedType === 'boolean') {
+      updateCondition(id, { value: Boolean(rawValue) });
+      return;
+    }
+
+    if (resolvedType === 'option') {
+      const optionValue = String(rawValue);
+      const matched = fieldOption?.options?.find((opt) => String(opt.value) === optionValue);
+      updateCondition(id, {
+        value: matched?.value ?? optionValue,
+        value_label: matched?.label ?? optionValue,
+      });
+      return;
+    }
+
+    updateCondition(id, { value: rawValue });
+  };
+
+  const valueLabel = ta('conditions.valueLabel', 'Value');
+  const operatorLabel = ta('conditions.operatorLabel', 'Operator');
+  const fieldLabel = ta('conditions.fieldLabel', 'Field');
+  const helper = ta('conditions.helper', 'All conditions must be met to trigger this approval.');
+  const emptyCopy = ta('conditions.empty', 'Add at least one condition to define when this approval should run.');
+  const sectionTitle = ta('conditions.sectionTitle', 'Conditions');
+  const addLabel = ta('conditions.add', 'Add condition');
+  const removeLabel = ta('conditions.remove', 'Remove');
+
+  return (
+    <div className="rounded-md border border-border p-4 space-y-4 bg-muted/20">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="font-medium">{sectionTitle}</p>
+            <p className="text-sm text-muted-foreground">{helper}</p>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={addCondition} disabled={!fieldOptions.length}>
+            {addLabel}
+          </Button>
+        </div>
+      </div>
+
+      {!conditions.length ? (
+        <div className="text-sm text-muted-foreground border border-dashed rounded-md p-4">
+          {emptyCopy}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {conditions.map((condition, index) => {
+            const conditionId = condition.id || `${condition.field}-${index}`;
+            const fieldOption = optionsByValue.get(condition.field);
+            const valueType = (condition.value_type as ConditionValueType) ?? fieldOption?.valueType ?? 'string';
+            const operators = CONDITION_OPERATORS_BY_TYPE[valueType] ?? CONDITION_OPERATORS_BY_TYPE.string;
+
+            return (
+              <div key={conditionId} className="rounded-md border border-border bg-background p-3 space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <SelectField
+                    id={`condition-field-${conditionId}`}
+                    label={fieldLabel}
+                    value={condition.field}
+                    onChange={(val) => handleFieldChange(conditionId, val)}
+                    options={selectOptions.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  />
+
+                  <SelectField
+                    id={`condition-operator-${conditionId}`}
+                    label={operatorLabel}
+                    value={condition.operator}
+                    onChange={(val) => handleOperatorChange(conditionId, val as ConditionOperator)}
+                    options={operators.map((operator) => ({
+                      value: operator,
+                      label: operatorLabels[operator] ?? operator,
+                    }))}
+                  />
+
+                  {valueType === 'boolean' ? (
+                    <CheckboxField
+                      id={`condition-value-${conditionId}`}
+                      label={valueLabel}
+                      checked={Boolean(condition.value ?? true)}
+                      onChange={(checked) => handleValueChange(conditionId, checked, fieldOption, valueType)}
+                    />
+                  ) : valueType === 'option' ? (
+                    <SelectField
+                      id={`condition-value-${conditionId}`}
+                      label={valueLabel}
+                      value={String(condition.value ?? '')}
+                      onChange={(val) => handleValueChange(conditionId, val, fieldOption, valueType)}
+                      options={(fieldOption?.options || []).map((opt) => ({
+                        value: opt.value,
+                        label: opt.label,
+                      }))}
+                      placeholder={ta('conditions.valuePlaceholder', 'Select a value')}
+                    />
+                  ) : (
+                    <TextField
+                      id={`condition-value-${conditionId}`}
+                      label={valueLabel}
+                      type={valueType === 'number' ? 'number' : valueType === 'date' ? 'date' : 'text'}
+                      value={String(condition.value ?? '')}
+                      onChange={(val) => handleValueChange(conditionId, val, fieldOption, valueType)}
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {ta('conditions.logicHint', 'All conditions are evaluated with AND logic.')}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeCondition(conditionId)}
+                  >
+                    {removeLabel}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function Approvals() {
   const dispatch = useDispatch<AppDispatch>();
-  const { value: statuses } = useSelector((state: RootState) => state.statuses);
   const { t } = useLanguage();
   const ta = useCallback(
     (key: string, fallback: string) => t(`settings.approvals.${key}`, fallback),
@@ -85,12 +526,6 @@ function Approvals() {
     searchFields: ['name', 'description'] as any,
   });
 
-  const statusIdToName = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const s of (statuses as unknown as Status[]) || []) map.set(s.id, s.name);
-    return map;
-  }, [statuses]);
-
   const renderDeadline = useCallback((type: string, value?: string | null) => {
     if (!value) return '-';
     if (type === 'hours') return `${value} h`;
@@ -104,7 +539,6 @@ function Approvals() {
   const triggerTypeLabelMap = useMemo(
     () => ({
       ON_CREATE: ta('options.triggerType.onCreate', 'On Create'),
-      ON_STATUS_CHANGE: ta('options.triggerType.onStatusChange', 'On Status Change'),
       MANUAL: ta('options.triggerType.manual', 'Manual'),
       CONDITIONAL: ta('options.triggerType.conditional', 'Conditional'),
     }),
@@ -114,7 +548,7 @@ function Approvals() {
   const getTriggerTypeLabel = useCallback(
     (type?: string | null) => {
       const normalized = String(type || '').toUpperCase();
-      return triggerTypeLabelMap[normalized] ?? (type ? type : emptyValueLabel);
+      return triggerTypeLabelMap[normalized as keyof typeof triggerTypeLabelMap] ?? (type ? type : emptyValueLabel);
     },
     [triggerTypeLabelMap, emptyValueLabel]
   );
@@ -137,11 +571,17 @@ function Approvals() {
   const deleteEntityName = ta('dialog.delete.entityName', 'approval');
   const previewTypeLabel = ta('preview.typeLabel', 'Type');
   const previewTriggerLabel = ta('preview.triggerLabel', 'Trigger');
+  const previewConditionsLabel = ta('preview.conditionsLabel', 'Conditions');
   const deleteDescription = deletingItem ? formatTemplate(deleteDescriptionTemplate, { name: deletingItem.name ?? '' }) : undefined;
+  const deleteSectionDescription = editingItem
+    ? formatTemplate(deleteDescriptionTemplate, { name: editingItem.name ?? '' })
+    : ta('dialog.delete.description', 'Are you sure you want to delete this approval? This action cannot be undone.');
 
   const [isApproversDialogOpen, setIsApproversDialogOpen] = useState(false);
   const [approversApproval, setApproversApproval] = useState<Approval | null>(null);
   const { value: approvalApprovers } = useSelector((s: RootState) => s.approvalApprovers) as { value: ApprovalApprover[] };
+  const { value: statuses } = useSelector((s: RootState) => (s as any).statuses || { value: [] }) as { value: Status[] };
+  const { value: customFields } = useSelector((s: RootState) => (s as any).customFields || { value: [] }) as { value: CustomField[] };
 
   const approverCountByApproval = useMemo(() => {
     const map = new Map<number, number>();
@@ -152,6 +592,11 @@ function Approvals() {
     }
     return map;
   }, [approvalApprovers]);
+
+  const conditionFieldOptions = useMemo(
+    () => buildConditionFieldOptions(statuses || [], customFields || [], ta),
+    [statuses, customFields, ta]
+  );
 
   const openManageApprovers = useCallback((approval: Approval) => {
     setApproversApproval(approval);
@@ -247,10 +692,9 @@ function Approvals() {
             },
             variant: 'outline',
             onClick: (row: any) => openManageApprovers(row as Approval),
-            className: 'p-1 h-7 relative flex items-center justify-center'
+            className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[150px]'
           }],
           onEdit: handleEdit,
-          onDelete: handleDelete,
         }),
         sortable: false,
         filter: false,
@@ -258,38 +702,12 @@ function Approvals() {
         pinned: 'right',
       },
     ];
-  }, [handleEdit, handleDelete, renderDeadline, statusIdToName, approverCountByApproval, openManageApprovers, ta, getTriggerTypeLabel]);
+  }, [handleEdit, renderDeadline, approverCountByApproval, openManageApprovers, ta, getTriggerTypeLabel]);
 
   // Form state
-  const [createFormData, setCreateFormData] = useState({
-    name: '',
-    description: '',
-    approval_type: 'SEQUENTIAL' as 'SEQUENTIAL' | 'PARALLEL',
-    require_all: true,
-    minimum_approvals: '' as number | string | '',
-    trigger_type: 'ON_CREATE' as 'ON_CREATE' | 'ON_STATUS_CHANGE' | 'MANUAL' | 'CONDITIONAL',
-    trigger_status_id: 'none' as number | 'none',
-    require_rejection_comment: false,
-    block_editing_during_approval: false,
-    deadline_type: 'hours' as 'hours' | 'date',
-    deadline_value: '',
-    is_active: true,
-  });
+  const [createFormData, setCreateFormData] = useState<ApprovalFormState>(() => createEmptyFormState());
 
-  const [editFormData, setEditFormData] = useState({
-    name: '',
-    description: '',
-    approval_type: 'SEQUENTIAL' as 'SEQUENTIAL' | 'PARALLEL',
-    require_all: true,
-    minimum_approvals: '' as number | string | '',
-    trigger_type: 'ON_CREATE' as 'ON_CREATE' | 'ON_STATUS_CHANGE' | 'MANUAL' | 'CONDITIONAL',
-    trigger_status_id: 'none' as number | 'none',
-    require_rejection_comment: false,
-    block_editing_during_approval: false,
-    deadline_type: 'hours' as 'hours' | 'date',
-    deadline_value: '',
-    is_active: true,
-  });
+  const [editFormData, setEditFormData] = useState<ApprovalFormState>(() => createEmptyFormState());
 
   // Populate edit form when editingItem changes
   useEffect(() => {
@@ -302,7 +720,7 @@ function Approvals() {
       require_all: !!item.require_all,
       minimum_approvals: item.minimum_approvals ?? '',
       trigger_type: (item.trigger_type as any) || 'ON_CREATE',
-      trigger_status_id: (item.trigger_status_id ?? 'none') as any,
+      trigger_conditions: Array.isArray(item.trigger_conditions) ? item.trigger_conditions : [],
       require_rejection_comment: !!item.require_rejection_comment,
       block_editing_during_approval: !!item.block_editing_during_approval,
       deadline_type: (item.deadline_type as any) || 'hours',
@@ -320,7 +738,7 @@ function Approvals() {
       require_all: !!item.require_all,
       minimum_approvals: item.minimum_approvals ?? '',
       trigger_type: (item.trigger_type as any) || 'ON_CREATE',
-      trigger_status_id: (item.trigger_status_id ?? 'none') as any,
+      trigger_conditions: Array.isArray(item.trigger_conditions) ? item.trigger_conditions : [],
       require_rejection_comment: !!item.require_rejection_comment,
       block_editing_during_approval: !!item.block_editing_during_approval,
       deadline_type: (item.deadline_type as any) || 'hours',
@@ -331,9 +749,21 @@ function Approvals() {
     setIsEditDialogOpen(true);
   }, [setEditingItem, setIsEditDialogOpen]);
 
+  const openDeleteFromEdit = useCallback(() => {
+    if (!editingItem) return;
+    setIsEditDialogOpen(false);
+    handleDelete(editingItem);
+  }, [editingItem, handleDelete, setIsEditDialogOpen]);
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createFormData.name.trim()) throw new Error(nameRequiredError);
+    const normalizedConditions = createFormData.trigger_type === 'CONDITIONAL'
+      ? sanitizeConditionsForSubmit(createFormData.trigger_conditions)
+      : [];
+    if (createFormData.trigger_type === 'CONDITIONAL' && normalizedConditions.length === 0) {
+      throw new Error(ta('conditions.errors.required', 'Add at least one condition to use the conditional trigger.'));
+    }
     const payload: any = {
       name: createFormData.name.trim(),
       description: createFormData.description?.trim() || null,
@@ -341,7 +771,7 @@ function Approvals() {
       require_all: !!createFormData.require_all,
       minimum_approvals: createFormData.require_all ? null : (createFormData.minimum_approvals === '' ? null : Number(createFormData.minimum_approvals)),
       trigger_type: createFormData.trigger_type,
-      trigger_status_id: createFormData.trigger_status_id === 'none' ? null : Number(createFormData.trigger_status_id),
+      trigger_conditions: createFormData.trigger_type === 'CONDITIONAL' ? normalizedConditions : null,
       require_rejection_comment: !!createFormData.require_rejection_comment,
       block_editing_during_approval: !!createFormData.block_editing_during_approval,
       deadline_type: createFormData.deadline_type,
@@ -350,15 +780,19 @@ function Approvals() {
       deleted_at: null,
     };
     await createItem(payload);
-    setCreateFormData({
-      name: '', description: '', approval_type: 'SEQUENTIAL', require_all: true, minimum_approvals: '', trigger_type: 'ON_CREATE', trigger_status_id: 'none', require_rejection_comment: false, block_editing_during_approval: false, deadline_type: 'hours', deadline_value: '', is_active: true,
-    });
+    setCreateFormData(createEmptyFormState());
   };
 
   const handleEditSubmit = async (e: React.FormEvent, editingItem?: Approval | null) => {
     e.preventDefault();
     if (!editingItem) return;
     if (!editFormData.name.trim()) throw new Error(nameRequiredError);
+    const normalizedConditions = editFormData.trigger_type === 'CONDITIONAL'
+      ? sanitizeConditionsForSubmit(editFormData.trigger_conditions)
+      : [];
+    if (editFormData.trigger_type === 'CONDITIONAL' && normalizedConditions.length === 0) {
+      throw new Error(ta('conditions.errors.required', 'Add at least one condition to use the conditional trigger.'));
+    }
     const updates: any = {
       name: editFormData.name.trim(),
       description: editFormData.description?.trim() || null,
@@ -366,7 +800,7 @@ function Approvals() {
       require_all: !!editFormData.require_all,
       minimum_approvals: editFormData.require_all ? null : (editFormData.minimum_approvals === '' ? null : Number(editFormData.minimum_approvals)),
       trigger_type: editFormData.trigger_type,
-      trigger_status_id: editFormData.trigger_status_id === 'none' ? null : Number(editFormData.trigger_status_id),
+      trigger_conditions: editFormData.trigger_type === 'CONDITIONAL' ? normalizedConditions : null,
       require_rejection_comment: !!editFormData.require_rejection_comment,
       block_editing_during_approval: !!editFormData.block_editing_during_approval,
       deadline_type: editFormData.deadline_type,
@@ -383,14 +817,15 @@ function Approvals() {
     // Load approvers for counts and manager
     dispatch(genericActions.approvalApprovers.getFromIndexedDB());
     dispatch(genericActions.approvalApprovers.fetchFromAPI());
-    // Ensure statuses available for name mapping
-    dispatch(genericActions.statuses.getFromIndexedDB());
-    dispatch(genericActions.statuses.fetchFromAPI());
     // Load users and roles for approver selection UI
     dispatch(genericActions.users.getFromIndexedDB());
     dispatch(genericActions.users.fetchFromAPI());
     dispatch(genericActions.roles.getFromIndexedDB());
     dispatch(genericActions.roles.fetchFromAPI());
+    dispatch(genericActions.statuses.getFromIndexedDB());
+    dispatch(genericActions.statuses.fetchFromAPI());
+    dispatch(genericActions.customFields.getFromIndexedDB());
+    dispatch(genericActions.customFields.fetchFromAPI());
   }, [dispatch]);
 
   return (
@@ -428,7 +863,7 @@ function Approvals() {
         onOpenChange={(open) => {
           setIsCreateDialogOpen(open);
           if (!open) {
-            setCreateFormData({ name: '', description: '', approval_type: 'SEQUENTIAL', require_all: true, minimum_approvals: '', trigger_type: 'ON_CREATE', trigger_status_id: 'none', require_rejection_comment: false, block_editing_during_approval: false, deadline_type: 'hours', deadline_value: '', is_active: true });
+            setCreateFormData(createEmptyFormState());
           }
         }}
         type="create"
@@ -460,12 +895,16 @@ function Approvals() {
               )}
               <SelectField id="trigger_type" label={ta('fields.triggerType', 'Trigger Type')} value={createFormData.trigger_type} onChange={(v) => setCreateFormData(p => ({ ...p, trigger_type: v as any }))} options={[
                 { value: 'ON_CREATE', label: ta('options.triggerType.onCreate', 'On Create') },
-                { value: 'ON_STATUS_CHANGE', label: ta('options.triggerType.onStatusChange', 'On Status Change') },
                 { value: 'MANUAL', label: ta('options.triggerType.manual', 'Manual') },
                 { value: 'CONDITIONAL', label: ta('options.triggerType.conditional', 'Conditional') },
               ]} />
-              {createFormData.trigger_type === 'ON_STATUS_CHANGE' && (
-                <SelectField id="trigger_status_id" label={ta('fields.triggerStatus', 'Trigger Status')} value={createFormData.trigger_status_id} onChange={(v) => setCreateFormData(p => ({ ...p, trigger_status_id: (v as any) }))} options={[{ value: 'none', label: ta('options.triggerStatus.none', 'None') }, ...((statuses as unknown as Status[]) || []).map(s => ({ value: s.id, label: s.name }))]} />
+              {createFormData.trigger_type === 'CONDITIONAL' && (
+                <ConditionBuilder
+                  conditions={createFormData.trigger_conditions}
+                  onChange={(next) => setCreateFormData((prev) => ({ ...prev, trigger_conditions: next }))}
+                  fieldOptions={conditionFieldOptions}
+                  ta={ta}
+                />
               )}
               <CheckboxField id="require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!createFormData.require_rejection_comment} onChange={(c) => setCreateFormData(p => ({ ...p, require_rejection_comment: c }))} />
               <CheckboxField id="block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!createFormData.block_editing_during_approval} onChange={(c) => setCreateFormData(p => ({ ...p, block_editing_during_approval: c }))} />
@@ -491,7 +930,7 @@ function Approvals() {
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);
           if (!open) {
-            setEditFormData({ name: '', description: '', approval_type: 'SEQUENTIAL', require_all: true, minimum_approvals: '', trigger_type: 'ON_CREATE', trigger_status_id: 'none', require_rejection_comment: false, block_editing_during_approval: false, deadline_type: 'hours', deadline_value: '', is_active: true });
+            setEditFormData(createEmptyFormState());
           }
         }}
         type="edit"
@@ -501,6 +940,17 @@ function Approvals() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting}
+        footerActions={editingItem ? (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={openDeleteFromEdit}
+            title={deleteSectionDescription}
+          >
+            <FontAwesomeIcon icon={faTrash} className="mr-2" />
+            {deleteDialogTitle}
+          </Button>
+        ) : undefined}
       >
         <Tabs defaultValue="general" className="w-full">
           <TabsList>
@@ -523,12 +973,16 @@ function Approvals() {
               )}
               <SelectField id="edit-trigger_type" label={ta('fields.triggerType', 'Trigger Type')} value={editFormData.trigger_type} onChange={(v) => setEditFormData(p => ({ ...p, trigger_type: v as any }))} options={[
                 { value: 'ON_CREATE', label: ta('options.triggerType.onCreate', 'On Create') },
-                { value: 'ON_STATUS_CHANGE', label: ta('options.triggerType.onStatusChange', 'On Status Change') },
                 { value: 'MANUAL', label: ta('options.triggerType.manual', 'Manual') },
                 { value: 'CONDITIONAL', label: ta('options.triggerType.conditional', 'Conditional') },
               ]} />
-              {editFormData.trigger_type === 'ON_STATUS_CHANGE' && (
-                <SelectField id="edit-trigger_status_id" label={ta('fields.triggerStatus', 'Trigger Status')} value={editFormData.trigger_status_id} onChange={(v) => setEditFormData(p => ({ ...p, trigger_status_id: (v as any) }))} options={[{ value: 'none', label: ta('options.triggerStatus.none', 'None') }, ...((statuses as unknown as Status[]) || []).map(s => ({ value: s.id, label: s.name }))]} />
+              {editFormData.trigger_type === 'CONDITIONAL' && (
+                <ConditionBuilder
+                  conditions={editFormData.trigger_conditions}
+                  onChange={(next) => setEditFormData((prev) => ({ ...prev, trigger_conditions: next }))}
+                  fieldOptions={conditionFieldOptions}
+                  ta={ta}
+                />
               )}
               <CheckboxField id="edit-require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!editFormData.require_rejection_comment} onChange={(c) => setEditFormData(p => ({ ...p, require_rejection_comment: c }))} />
               <CheckboxField id="edit-block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!editFormData.block_editing_during_approval} onChange={(c) => setEditFormData(p => ({ ...p, block_editing_during_approval: c }))} />
@@ -570,6 +1024,11 @@ function Approvals() {
             <div className="text-xs text-muted-foreground mt-1">
               {previewTypeLabel}: {getApprovalTypeLabel(a.approval_type)} • {previewTriggerLabel}: {getTriggerTypeLabel(a.trigger_type)}
             </div>
+            {a.trigger_type === 'CONDITIONAL' && Array.isArray(a.trigger_conditions) && a.trigger_conditions.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {previewConditionsLabel}: {a.trigger_conditions.map((condition) => condition.label || condition.field).join(', ')}
+              </div>
+            )}
           </div>
         )}
       />
