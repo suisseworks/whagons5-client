@@ -14,16 +14,29 @@ export interface FormFieldProps {
   required?: boolean;
   className?: string;
   children: React.ReactNode;
+  hideLabel?: boolean;
 }
 
-export function FormField({ id, label, required = false, className = "", children }: FormFieldProps) {
+export function FormField({
+  id,
+  label,
+  required = false,
+  className = "",
+  children,
+  hideLabel = false,
+}: FormFieldProps) {
+  const gridColumnsClass = hideLabel ? "grid-cols-1" : "grid-cols-4";
+  const contentSpanClass = hideLabel ? "col-span-1" : "col-span-3";
+
   return (
-    <div className={`grid grid-cols-4 items-center gap-4 ${className}`}>
-      <Label htmlFor={id} className="text-right">
-        {label}
-        {required && <span className="text-destructive ml-1">*</span>}
-      </Label>
-      <div className="col-span-3">
+    <div className={`grid ${gridColumnsClass} items-center gap-4 ${className}`}>
+      {!hideLabel && (
+        <Label htmlFor={id} className="text-right">
+          {label}
+          {required && <span className="text-destructive ml-1">*</span>}
+        </Label>
+      )}
+      <div className={contentSpanClass}>
         {children}
       </div>
     </div>
@@ -350,6 +363,7 @@ export interface CheckboxFieldProps {
   description?: string;
   className?: string;
   disabled?: boolean;
+  hideFieldLabel?: boolean;
 }
 
 export function CheckboxField({
@@ -361,7 +375,8 @@ export function CheckboxField({
   onChange,
   description,
   className = "",
-  disabled = false
+  disabled = false,
+  hideFieldLabel = false
 }: CheckboxFieldProps) {
   const isControlled = checked !== undefined && onChange !== undefined;
 
@@ -373,7 +388,7 @@ export function CheckboxField({
   };
 
   return (
-    <FormField id={id} label={label} className={className}>
+    <FormField id={id} label={label} className={className} hideLabel={hideFieldLabel}>
       <div className="flex items-center space-x-2">
         <Checkbox
           id={id}

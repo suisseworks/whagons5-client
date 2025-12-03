@@ -140,9 +140,9 @@ const CategoryActionsCellRenderer = (
         <button
           type="button"
           onClick={(event) => handleClick(onManageFields, event)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 text-[12px] font-semibold text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.12)] transition hover:bg-slate-50 focus-visible:outline-none"
+          className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
         >
-          <FontAwesomeIcon icon={faCubes} className="h-3.5 w-3.5 text-slate-500" />
+          <FontAwesomeIcon icon={faCubes} className="h-3 w-3 text-slate-500" />
           {label}
         </button>
 

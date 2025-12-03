@@ -26,7 +26,6 @@ import {
   faTrophy,
   faSquareCheck,
   faLayerGroup,
-  faGlobe,
   faStar as faStarSolid
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
@@ -285,6 +284,7 @@ function Settings() {
   const slas = useSelector((s: RootState) => s.slas?.value ?? []);
   const users = useSelector((s: RootState) => s.users?.value ?? []);
   const forms = useSelector((s: RootState) => s.forms?.value ?? []);
+  const approvals = useSelector((s: RootState) => s.approvals?.value ?? []);
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const tags = useSelector((s: RootState) => s.tags?.value ?? []);
   const workflows = useSelector((s: RootState) => (s as any).workflows?.value ?? []);
@@ -303,8 +303,9 @@ function Settings() {
       users: users.length,
       forms: forms.length,
       workflows: workflows.length,
+      approvals: approvals.length,
     };
-  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length, workflows.length]);
+  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length, workflows.length, approvals.length]);
 
   const basicSettings = useMemo(() => [
     {
@@ -385,14 +386,6 @@ function Settings() {
   // Settings configuration data
   const advancedSettings = useMemo(() => [
     {
-      id: 'global',
-      title: t('settings.cards.global.title', 'Global'),
-      icon: faGlobe,
-      count: 0,
-      description: t('settings.cards.global.description', 'Branding, identity, and platform-wide defaults'),
-      color: 'text-sky-500'
-    },
-    {
       id: 'slas',
       title: t('settings.cards.slas.title', 'SLAs'),
       icon: faStopwatch,
@@ -414,7 +407,7 @@ function Settings() {
       id: 'approvals',
       title: t('settings.cards.approvals.title', 'Approvals'),
       icon: faSquareCheck,
-      count: 0,
+      count: counts.approvals,
       description: t('settings.cards.approvals.description', 'Configure task approvals'),
       color: 'text-emerald-500'
     },
