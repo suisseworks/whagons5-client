@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShieldAlt, faPlus } from "@fortawesome/free-solid-svg-icons";
@@ -72,6 +72,10 @@ function RolesAndPermissions() {
     description: ''
   });
 
+  // Permissions modal state
+  const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
+  const [selectedRoleName, setSelectedRoleName] = useState<string>('');
+
   // Reset create form when dialog opens
   useEffect(() => {
     if (isCreateDialogOpen) {
@@ -91,6 +95,11 @@ function RolesAndPermissions() {
       });
     }
   }, [editingItem]);
+
+  const handleOpenPermissions = useCallback((role: Role) => {
+    setSelectedRoleName(role.name || '');
+    setIsPermissionsDialogOpen(true);
+  }, []);
 
   const columns = useMemo<ColDef[]>(() => [
     {
@@ -127,18 +136,27 @@ function RolesAndPermissions() {
     {
       field: "actions",
       headerName: tu('grid.actions', 'Actions'),
-      width: 100,
+      width: 260,
       suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
-        onDelete: handleDelete
+        onDelete: handleDelete,
+        customActions: [
+          {
+            icon: faShieldAlt,
+            label: tu('grid.permissions', 'Permissions'),
+            variant: "outline",
+            className: "px-2 h-8",
+            onClick: (row: Role) => handleOpenPermissions(row)
+          }
+        ]
       }),
       sortable: false,
       filter: false,
       resizable: false,
       pinned: "right"
     }
-  ], [handleEdit, handleDelete, tu]);
+  ], [handleEdit, handleDelete, handleOpenPermissions, tu]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,6 +301,23 @@ function RolesAndPermissions() {
             />
           </div>
         )}
+      </SettingsDialog>
+
+      {/* Permissions Dialog (empty for now) */}
+      <SettingsDialog
+        open={isPermissionsDialogOpen}
+        onOpenChange={setIsPermissionsDialogOpen}
+        type="custom"
+        title={tu('permissionsDialog.title', 'Assign permissions')}
+        description={selectedRoleName ? tu('permissionsDialog.description', `Configure permissions for "${selectedRoleName}"`) : tu('permissionsDialog.description', 'Configure permissions')}
+        onSubmit={(e) => { e.preventDefault(); setIsPermissionsDialogOpen(false); }}
+        isSubmitting={false}
+        submitDisabled={false}
+        submitText={tu('permissionsDialog.close', 'Close')}
+      >
+        <div className="min-h-[120px] flex items-center justify-center text-muted-foreground text-sm">
+          {tu('permissionsDialog.empty', 'Permissions UI coming soon.')}
+        </div>
       </SettingsDialog>
 
       {/* Delete Dialog */}
