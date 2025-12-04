@@ -883,6 +883,9 @@ function Users() {
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
             {tu('header.manageJobPositions', 'Manage Job Positions')}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings/roles-and-permissions')}>
+            {tu('header.rolesAndPermissions', 'Roles and Permissions')}
+          </Button>
           <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
             {tu('header.createUser', 'Create User')}
           </Button>

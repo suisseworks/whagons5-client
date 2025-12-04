@@ -18,6 +18,7 @@ import Spots from '@/pages/settings/sub_pages/Spots';
 import SpotTypes from '@/pages/settings/sub_pages/SpotTypes';
 import Users from '@/pages/settings/sub_pages/Users';
 import JobPositions from '@/pages/settings/sub_pages/JobPositions';
+import RolesAndPermissions from '@/pages/settings/sub_pages/RolesAndPermissions';
 import Statuses from '@/pages/settings/sub_pages/Statuses';
 import Priorities from '@/pages/settings/sub_pages/Priorities';
 import Tags from '@/pages/settings/sub_pages/Tags';
@@ -84,6 +85,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/spots/types" element={<SpotTypes />} />
           <Route path="/settings/job-positions" element={<JobPositions />} />
           <Route path="/settings/users" element={<Users />} /> 
+          <Route path="/settings/roles-and-permissions" element={<RolesAndPermissions />} />
           <Route path="/settings/statuses" element={<Statuses />} />
           <Route path="/settings/priorities" element={<Priorities />} />
           <Route path="/settings/tags" element={<Tags />} />

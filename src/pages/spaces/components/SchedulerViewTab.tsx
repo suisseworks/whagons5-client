@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
-import { BryntumSchedulerPro } from "@bryntum/schedulerpro-react";
-import "@bryntum/schedulerpro/schedulerpro.css";
-import "@bryntum/schedulerpro/stockholm-light.css";
+// TODO: Install @bryntum/schedulerpro-react package (requires commercial license)
+// import { BryntumSchedulerPro } from "@bryntum/schedulerpro-react";
+// import "@bryntum/schedulerpro/schedulerpro.css";
+// import "@bryntum/schedulerpro/stockholm-light.css";
 
 interface RowItem {
   id: string;
@@ -283,8 +284,24 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
           </div>
         </CardHeader>
         <CardContent className="flex-1 pt-0">
-          <div className="h-full min-h-[480px]">
-            <BryntumSchedulerPro {...schedulerConfig} style={{ height: "100%" }} />
+          <div className="h-full min-h-[480px] flex items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg">
+            <div className="text-center space-y-2 p-8">
+              <Clock className="w-12 h-12 mx-auto text-muted-foreground/50" />
+              <h3 className="text-lg font-semibold">Scheduler Component</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                The Bryntum Scheduler Pro component requires a commercial license and is not currently installed.
+                <br />
+                <br />
+                To enable this feature:
+                <br />
+                1. Obtain a Bryntum license
+                <br />
+                2. Configure the private npm registry or install from a local package
+                <br />
+                3. Uncomment the imports at the top of this file
+              </p>
+            </div>
+            {/* <BryntumSchedulerPro {...schedulerConfig} style={{ height: "100%" }} /> */}
           </div>
         </CardContent>
       </Card>
