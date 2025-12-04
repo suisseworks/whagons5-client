@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
 import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3 } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
@@ -26,8 +26,22 @@ import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 
+const WORKSPACE_TAB_PATHS = {
+  grid: '',
+  calendar: '/calendar',
+  scheduler: '/scheduler',
+  map: '/map',
+  board: '/board',
+  settings: '/settings',
+  statistics: '/statistics'
+} as const;
+
+type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
+const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'statistics', 'settings'];
+
 export const Workspace = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Extract workspace ID from the current path
   const getWorkspaceIdFromPath = (pathname: string): string | undefined => {
@@ -36,14 +50,15 @@ export const Workspace = () => {
   };
 
   const id = getWorkspaceIdFromPath(location.pathname);
+  const workspaceBasePath = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
+  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
   
   // Helper function to get current tab from URL (matches UrlTabs logic)
-  const getCurrentTabFromUrl = (): string => {
-    const pathMap = { grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' };
-    const normalizedBase = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
+  const getCurrentTabFromUrl = (): WorkspaceTabKey => {
+    const normalizedBase = workspaceBasePath;
     if (location.pathname.startsWith(normalizedBase)) {
       const rest = location.pathname.slice(normalizedBase.length) || '';
-      const entries = Object.entries(pathMap).map(([k, v]) => [k, (v || '') as string]) as Array<[string,string]>;
+      const entries = Object.entries(WORKSPACE_TAB_PATHS) as Array<[WorkspaceTabKey, string]>;
       entries.sort((a, b) => (b[1].length || 0) - (a[1].length || 0));
       for (const [key, value] of entries) {
         const val = value || '';
@@ -59,12 +74,18 @@ export const Workspace = () => {
 
   // Initialize tab state from URL to prevent incorrect animation on mount
   const initialTab = getCurrentTabFromUrl();
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [prevActiveTab, setPrevActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>(initialTab);
+  const [prevActiveTab, setPrevActiveTab] = useState<WorkspaceTabKey>(initialTab);
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
   const tableRef = useRef<WorkspaceTableHandle | null>(null);
+
+  const allowedTabOrder = DEFAULT_TAB_SEQUENCE;
+  const resolvedOrder = useMemo(() => buildTabSequence(allowedTabOrder), [allowedTabOrder]);
+  const primaryTabValue = resolvedOrder[0] || 'grid';
+  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
+  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
   const [showClearFilters, setShowClearFilters] = useState(false);
   const [openCreateTask, setOpenCreateTask] = useState(false);
   const [openEditTask, setOpenEditTask] = useState(false);
@@ -263,11 +284,6 @@ export const Workspace = () => {
     };
   }, []);
 
-  // Check if this is the "all" workspace route (needed for stats and presets)
-  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
-  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
-  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
-
   // Derived status groupings for stats
   const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
     ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
@@ -343,6 +359,20 @@ export const Workspace = () => {
       setActiveTab(currentTabFromUrl);
     }
   }, [location.pathname, id]);
+
+  useEffect(() => {
+    if (invalidWorkspaceRoute || invalidWorkspaceId) return;
+    const allowedSet = new Set(resolvedOrder);
+    if (!allowedSet.has(activeTab)) {
+      const fallbackTab = resolvedOrder[0] || 'grid';
+      const targetPath = `${workspaceBasePath}${WORKSPACE_TAB_PATHS[fallbackTab]}`;
+      const normalizedTarget = targetPath.replace(/\/+$/, '');
+      const normalizedCurrent = location.pathname.replace(/\/+$/, '');
+      if (normalizedCurrent !== normalizedTarget) {
+        navigate(targetPath, { replace: true });
+      }
+    }
+  }, [resolvedOrder, activeTab, navigate, location.pathname, workspaceBasePath, invalidWorkspaceRoute, invalidWorkspaceId]);
 
   //
   // Clear cache when workspace ID changes
@@ -587,6 +617,29 @@ export const Workspace = () => {
     }
   ];
 
+  function buildTabSequence(order: WorkspaceTabKey[]) {
+    const sequence: WorkspaceTabKey[] = [];
+    const seen = new Set<WorkspaceTabKey>();
+    const pushUnique = (key: WorkspaceTabKey) => {
+      if (!seen.has(key)) {
+        seen.add(key);
+        sequence.push(key);
+      }
+    };
+    order.forEach(pushUnique);
+    ['statistics', 'settings'].forEach((key) => pushUnique(key as WorkspaceTabKey));
+    return sequence;
+  }
+
+  const workspaceTabMap = workspaceTabs.reduce<Record<string, typeof workspaceTabs[number]>>((acc, tab) => {
+    acc[tab.value] = tab;
+    return acc;
+  }, {});
+  const orderedVisibleTabs = resolvedOrder
+    .map((key) => workspaceTabMap[key])
+    .filter((tab): tab is typeof workspaceTabs[number] => Boolean(tab));
+  const tabsForRender = orderedVisibleTabs.length > 0 ? orderedVisibleTabs : workspaceTabs;
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Controls moved to Header toolbar */}
@@ -653,12 +706,12 @@ export const Workspace = () => {
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
         <div className='flex-1 min-w-0'>
         <UrlTabs
-          tabs={workspaceTabs}
-          defaultValue="grid"
+          tabs={tabsForRender}
+          defaultValue={primaryTabValue}
           basePath={`/workspace/${id}`}
-          pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' }}
+          pathMap={WORKSPACE_TAB_PATHS}
           className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
-          onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v); }}
+          onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v as WorkspaceTabKey); }}
           showClearFilters={showClearFilters}
           onClearFilters={() => tableRef.current?.clearFilters()}
         />

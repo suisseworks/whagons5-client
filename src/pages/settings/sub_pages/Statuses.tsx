@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPlus,
+  faEdit,
+  faTrash,
+  faCircleNodes,
+  faLayerGroup,
+  faLink,
+  faLifeRing,
+  faSitemap
+} from "@fortawesome/free-solid-svg-icons";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +23,6 @@ import { SettingsDialog } from "@/pages/settings/components/SettingsDialog";
 import { TextField, CheckboxField, SelectField } from "@/pages/settings/components/FormFields";
 import { IconPicker } from "@/pages/settings/components/IconPicker";
 import { SettingsLayout, createActionsCellRenderer } from "@/pages/settings/components";
-import { faSitemap } from "@fortawesome/free-solid-svg-icons";
 import { StatusIcon } from "@/pages/settings/components/StatusIcon";
 import { VisualTransitions } from "@/pages/settings/components/VisualTransitions";
 import { getCurrentTenant } from "@/api/whagonsApi";
@@ -23,8 +31,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/animated/Tabs";
+import { Badge } from "@/components/ui/badge";
 
 const STATUS_ACTIONS = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
+
+const ACTION_ACCENTS: Record<string, string> = {
+  NONE: "from-slate-400 to-slate-200",
+  WORKING: "from-emerald-400 to-emerald-300",
+  PAUSED: "from-amber-400 to-amber-200",
+  FINISHED: "from-indigo-400 to-indigo-300"
+};
 
 function Statuses() {
   
@@ -42,6 +58,7 @@ function Statuses() {
 
   const [transitionsView, setTransitionsView] = useState<'matrix' | 'visual'>('visual');
   const [activeStatuses, setActiveStatuses] = useState<Set<number>>(new Set());
+  const activeStatusesCount = activeStatuses.size;
   const tenant = getCurrentTenant();
 
   // Update active statuses when group selection changes
@@ -117,6 +134,11 @@ function Statuses() {
   // Toast removed
   // Backend enum values for status.action
   const allowedActions = STATUS_ACTIONS;
+
+  const percentOf = (value: number, total: number) => {
+    if (!total) return 0;
+    return Math.min(100, Math.round((value / total) * 100));
+  };
 
   
   // Load persisted view and group, and save changes
@@ -337,6 +359,108 @@ function Statuses() {
     })),
   }), [statuses, statusTransitionGroups, statusTransitions, selectedGroupId, transitionsByKey]);
 
+  const maxActionCount = useMemo(() => {
+    const highest = statusStats.actions.reduce((max, current) => Math.max(max, current.count), 0);
+    return highest || 1;
+  }, [statusStats.actions]);
+
+  const avgTransitionsPerGroup = useMemo(() => {
+    if (!statusStats.transitionGroups) return 0;
+    return Math.round(statusStats.transitionsTotal / statusStats.transitionGroups);
+  }, [statusStats.transitionGroups, statusStats.transitionsTotal]);
+
+  const selectedGroupCoverage = useMemo(() => {
+    if (!selectedGroupId || !activeStatusesCount) return 0;
+    const possible = activeStatusesCount * Math.max(activeStatusesCount - 1, 0);
+    if (!possible) return 0;
+    const actual = statusStats.selectedGroupTransitions ?? 0;
+    return Math.min(100, Math.round((actual / possible) * 100));
+  }, [selectedGroupId, activeStatusesCount, statusStats.selectedGroupTransitions]);
+
+  const helpMilestones = [
+    {
+      label: "01",
+      title: "Design statuses",
+      subtitle: "Names, icons, actions",
+      accent: "from-emerald-300 via-emerald-400 to-emerald-500"
+    },
+    {
+      label: "02",
+      title: "Shape transitions",
+      subtitle: "Matrix or visual builder",
+      accent: "from-sky-300 via-sky-400 to-indigo-500"
+    },
+    {
+      label: "03",
+      title: "Link to categories",
+      subtitle: "Assign per workflow",
+      accent: "from-amber-300 via-orange-400 to-orange-500"
+    }
+  ];
+
+  const helpHeroStatuses = [
+    { name: "Backlog", action: "NONE", color: "#94a3b8" },
+    { name: "In Progress", action: "WORKING", color: "#34d399" },
+    { name: "Blocked", action: "PAUSED", color: "#fb923c" },
+    { name: "Completed", action: "FINISHED", color: "#6366f1" }
+  ];
+
+  const helpInfoCards = [
+    {
+      icon: faCircleNodes,
+      title: "Global status library",
+      description: "One palette powers every workspace. Update once and all teams stay consistent.",
+      accent: "text-sky-500",
+      iconWrapper: "bg-sky-500/10 border-sky-500/30",
+      cardBorder: "border-sky-500/20"
+    },
+    {
+      icon: faLayerGroup,
+      title: "Transition groups",
+      description: "Use multiple groups to reflect different lifecycle rules (standard, approvals, field ops, etc.).",
+      accent: "text-indigo-500",
+      iconWrapper: "bg-indigo-500/10 border-indigo-500/30",
+      cardBorder: "border-indigo-500/20"
+    },
+    {
+      icon: faLink,
+      title: "Category linking",
+      description: "Each category picks a transition group. Tasks inherit the graph automatically.",
+      accent: "text-amber-500",
+      iconWrapper: "bg-amber-500/10 border-amber-500/30",
+      cardBorder: "border-amber-500/20"
+    },
+    {
+      icon: faLifeRing,
+      title: "Resilience & support",
+      description: "Clone groups to experiment safely. System statuses prevent accidental deletes.",
+      accent: "text-rose-500",
+      iconWrapper: "bg-rose-500/10 border-rose-500/30",
+      cardBorder: "border-rose-500/20"
+    }
+  ];
+
+  const helpTimeline = [
+    {
+      step: "01",
+      title: "Plan & align",
+      description: "Audit existing task states, decide on action codes, confirm naming with stakeholders.",
+      gradient: "from-emerald-400 to-emerald-600"
+    },
+    {
+      step: "02",
+      title: "Model transitions",
+      description: "Build the graph per group. Use the visual tab to validate bidirectional steps and blockers.",
+      gradient: "from-indigo-400 to-indigo-600"
+    },
+    {
+      step: "03",
+      title: "Rollout & monitor",
+      description: "Attach groups to categories, monitor adoption, and iterate using analytics + config logs.",
+      gradient: "from-amber-400 to-orange-500"
+    }
+  ];
+
   const statusesTabs = [
     {
       value: 'statuses',
@@ -512,59 +636,273 @@ function Statuses() {
       value: 'stats',
       label: 'Statistics',
       content: (
-        <div className="flex-1 min-h-0 overflow-auto">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">Total Statuses</p>
-              <p className="text-2xl font-semibold mt-1">{statusStats.total}</p>
+        <div className="flex-1 min-h-0 overflow-auto space-y-6">
+          <div className="rounded-3xl border bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white p-6 shadow-xl relative overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none" aria-hidden>
+              <div className="absolute -top-10 left-10 h-40 w-40 bg-emerald-400/30 blur-[120px]" />
+              <div className="absolute -bottom-16 right-4 h-48 w-48 bg-cyan-500/30 blur-[140px]" />
             </div>
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">System Statuses</p>
-              <p className="text-2xl font-semibold mt-1">{statusStats.system}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">Initial Statuses</p>
-              <p className="text-2xl font-semibold mt-1">{statusStats.initial}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">Transition Groups</p>
-              <p className="text-2xl font-semibold mt-1">{statusStats.transitionGroups}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">Transitions (All)</p>
-              <p className="text-2xl font-semibold mt-1">{statusStats.transitionsTotal}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <p className="text-sm text-muted-foreground">Transitions (Selected Group)</p>
-              <p className="text-2xl font-semibold mt-1">{statusStats.selectedGroupTransitions ?? '—'}</p>
+            <div className="relative space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <Badge variant="outline" className="bg-white/10 text-white border-white/20 uppercase tracking-[0.35em] text-[10px]">
+                    status pulse
+                  </Badge>
+                  <h3 className="mt-3 text-3xl font-semibold leading-tight">Lifecycle health overview</h3>
+                  <p className="text-sm text-white/70">
+                    {statusStats.total} statuses wired into {statusStats.transitionGroups} transition groups.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {statusStats.actions.map(({ action, count }) => (
+                    <div key={action} className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-left shadow-sm">
+                      <p className="text-xs uppercase tracking-widest text-white/70">{action}</p>
+                      <p className="text-xl font-semibold">{count}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="h-32 flex items-end gap-4">
+                {statusStats.actions.map(({ action, count }) => {
+                  const height = Math.max((count / maxActionCount) * 100, 8);
+                  return (
+                    <div key={`bar-${action}`} className="flex-1 flex flex-col items-center gap-2 text-white/80">
+                      <div className="flex-1 flex items-end w-full">
+                        <div
+                          className={`w-full rounded-xl bg-gradient-to-t ${ACTION_ACCENTS[action] ?? 'from-slate-400 to-slate-200'}`}
+                          style={{ height: `${height}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] uppercase tracking-wide">{action}</p>
+                      <p className="text-sm font-semibold text-white">{count}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg border bg-card shadow-sm">
-            <div className="border-b px-4 py-3">
-              <h3 className="text-base font-semibold">Statuses by Action</h3>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">System statuses</p>
+              <p className="text-3xl font-semibold mt-2">{statusStats.system}</p>
+              <p className="text-xs text-muted-foreground">Protected defaults</p>
+              <div className="mt-3 h-2 rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-500"
+                  style={{ width: `${percentOf(statusStats.system, statusStats.total || 1)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {percentOf(statusStats.system, statusStats.total || 1)}% of the library.
+              </p>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Action</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                  <TableHead className="text-right">Percent</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {statusStats.actions.map(({ action, count }) => {
-                  const percent = statusStats.total ? Math.round((count / statusStats.total) * 100) : 0;
-                  return (
-                    <TableRow key={action}>
-                      <TableCell className="font-medium">{action}</TableCell>
-                      <TableCell className="text-right">{count}</TableCell>
-                      <TableCell className="text-right">{percent}%</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">Initial statuses</p>
+              <p className="text-3xl font-semibold mt-2">{statusStats.initial}</p>
+              <p className="text-xs text-muted-foreground">Entry points</p>
+              <div className="mt-3 h-2 rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500"
+                  style={{ width: `${percentOf(statusStats.initial, statusStats.total || 1)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Usually one per workflow; add more for branching templates.
+              </p>
+            </div>
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">Transition groups</p>
+              <p className="text-3xl font-semibold mt-2">{statusStats.transitionGroups}</p>
+              <p className="text-xs text-muted-foreground">
+                Avg transitions/group: <span className="text-foreground font-semibold">{avgTransitionsPerGroup}</span>
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <div className="rounded-xl border bg-muted/40 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide">All transitions</p>
+                  <p className="text-sm font-semibold text-foreground">{statusStats.transitionsTotal}</p>
+                </div>
+                <div className="rounded-xl border bg-muted/40 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide">Selected group</p>
+                  <p className="text-sm font-semibold text-foreground">{statusStats.selectedGroupTransitions ?? '—'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">Group coverage</p>
+              <div className="mt-3 flex items-center gap-4">
+                <div className="relative h-20 w-20">
+                  <div className="absolute inset-0 rounded-full bg-muted" />
+                  <div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: `conic-gradient(hsl(var(--primary)) ${selectedGroupCoverage}%, rgba(148,163,184,0.3) ${selectedGroupCoverage}% 100%)`
+                    }}
+                  />
+                  <div className="absolute inset-4 rounded-full bg-card flex items-center justify-center text-sm font-semibold text-foreground">
+                    {selectedGroupId ? `${selectedGroupCoverage}%` : '—'}
+                  </div>
+                </div>
+                <div className="flex-1 text-sm text-muted-foreground">
+                  {selectedGroupId ? (
+                    <>
+                      <p className="font-semibold text-foreground">{selectedGroupCoverage}% of possible paths covered</p>
+                      <p>{activeStatusesCount || 0} active statuses with {statusStats.selectedGroupTransitions ?? 0} edges in this group.</p>
+                    </>
+                  ) : (
+                    <p>Select a transition group in the Transitions tab to visualize coverage.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase text-muted-foreground tracking-wide">Action mix</p>
+                <h3 className="text-lg font-semibold">Where statuses land</h3>
+              </div>
+              <Badge variant="outline">{statusStats.total ? '100% scaled' : 'No data'}</Badge>
+            </div>
+            <div className="mt-4 space-y-4">
+              {statusStats.actions.map(({ action, count }) => {
+                const percent = percentOf(count, statusStats.total || 1);
+                return (
+                  <div key={`mix-${action}`}>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{action}</span>
+                        <span className="text-muted-foreground">{count} statuses</span>
+                      </div>
+                      <span className="font-mono text-xs">{percent}%</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full bg-gradient-to-r ${ACTION_ACCENTS[action] ?? 'from-slate-400 to-slate-200'}`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      value: 'help',
+      label: 'Help',
+      content: (
+        <div className="flex-1 min-h-0 overflow-auto space-y-6">
+          <div className="rounded-3xl border bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white p-6 shadow-xl relative overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none" aria-hidden>
+              <div className="absolute -top-10 right-0 h-48 w-48 bg-cyan-400/40 blur-[120px]" />
+              <div className="absolute -bottom-16 left-4 h-52 w-52 bg-purple-500/30 blur-[120px]" />
+            </div>
+            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
+              <div className="flex-1 space-y-4">
+                <Badge variant="outline" className="bg-white/10 text-white border-white/20 uppercase tracking-[0.35em] text-[10px]">
+                  workflow map
+                </Badge>
+                <h3 className="text-3xl font-semibold leading-tight">Statuses keep every lifecycle synchronized</h3>
+                <p className="text-sm text-white/80 max-w-2xl">
+                  Define a single library of statuses, connect them with transition groups, then assign those groups to categories. Tasks instantly inherit the right path without extra automation.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {helpMilestones.map((item) => (
+                    <div key={item.title} className="rounded-2xl border border-white/15 bg-white/5 p-3 space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-white/60">{item.label}</p>
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="text-xs text-white/70">{item.subtitle}</p>
+                      <div className={`mt-3 h-1 rounded-full bg-gradient-to-r ${item.accent}`} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="w-full max-w-sm rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur p-4 shadow-lg">
+                <p className="text-xs uppercase tracking-wide text-white/70">Sample workflow</p>
+                <div className="mt-3 space-y-3">
+                  {helpHeroStatuses.map((status, index) => (
+                    <div key={status.name}>
+                      <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-2 shadow-sm">
+                        <div
+                          className="h-9 w-9 rounded-full border border-white/30 shadow-inner"
+                          style={{ backgroundColor: status.color }}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">{status.name}</p>
+                          <p className="text-[11px] uppercase tracking-wide text-white/70">{status.action}</p>
+                        </div>
+                      </div>
+                      {index < helpHeroStatuses.length - 1 && (
+                        <div className="ml-5 mt-1 flex items-center gap-2 text-[10px] text-white/60">
+                          <div className="h-px flex-1 bg-white/25" />
+                          Next step
+                          <div className="h-px flex-1 bg-white/25" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] text-white/70">
+                  Tip: duplicate a transition group when teams need a custom journey—categories inherit whichever group you attach.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {helpInfoCards.map((card) => (
+              <div key={card.title} className={`rounded-2xl border bg-card p-4 shadow-sm ${card.cardBorder}`}>
+                <div className="flex items-start gap-4">
+                  <div className={`h-12 w-12 rounded-2xl border flex items-center justify-center ${card.iconWrapper}`}>
+                    <FontAwesomeIcon icon={card.icon} className={`text-xl ${card.accent}`} />
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-semibold text-foreground">{card.title}</p>
+                    <p className="text-muted-foreground">{card.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <p className="text-xs uppercase text-muted-foreground tracking-wide">Rollout guide</p>
+                <h3 className="text-lg font-semibold">3-step adoption path</h3>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Align with ops, publish the graph, then link it to categories for instant enforcement.
+              </span>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {helpTimeline.map((item, index) => (
+                <div key={item.title} className="relative rounded-2xl border border-dashed border-muted-foreground/40 bg-muted/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <div className={`px-2 py-0.5 text-[11px] font-semibold uppercase tracking-widest text-white rounded-full bg-gradient-to-r ${item.gradient}`}>
+                      {item.step}
+                    </div>
+                    <p className="text-sm font-semibold">{item.title}</p>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">{item.description}</p>
+                  {index < helpTimeline.length - 1 && (
+                    <div className="hidden md:block absolute top-1/2 right-[-18px] h-px w-9 bg-gradient-to-r from-transparent via-muted-foreground/40 to-transparent" aria-hidden />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 flex flex-wrap items-center gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Next stop: Categories</p>
+              <p className="text-xs text-muted-foreground">Open Settings → Categories to attach transition groups to each queue and keep tasks compliant.</p>
+            </div>
+            <span className="text-xs text-muted-foreground">Need help? Ping the platform team with a screenshot of this flow.</span>
           </div>
         </div>
       )

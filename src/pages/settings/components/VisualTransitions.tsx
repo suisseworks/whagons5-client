@@ -1,6 +1,14 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTenant } from "@/api/whagonsApi";
 import { useTheme } from "@/providers/ThemeProvider";
+import { Button } from "@/components/ui/button";
+
+const ACTION_COLUMN_ORDER = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
+const ACTION_COLUMN_MAP: Record<string, number> = ACTION_COLUMN_ORDER.reduce((acc, action, index) => {
+  acc[action] = index;
+  return acc;
+}, {} as Record<string, number>);
+const FALLBACK_ACTION_COLUMN = ACTION_COLUMN_ORDER.length;
 
 // Status Palette Component
 const StatusPalette = memo(function StatusPalette({
@@ -79,6 +87,7 @@ export const VisualTransitions = memo(function VisualTransitions({
   const nodeHeight = 70;
   const hGap = 80;
   const vGap = 30;
+  const EDGE_OFFSET_STEP = 22;
 
   const [posById, setPosById] = useState<Record<number, { x: number; y: number }>>({});
 
@@ -146,6 +155,15 @@ export const VisualTransitions = memo(function VisualTransitions({
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [hoverTarget, setHoverTarget] = useState<number | null>(null);
   const [moving, setMoving] = useState<{ id: number; offsetX: number; offsetY: number } | null>(null);
+  const [edgeHandles, setEdgeHandles] = useState<Record<string, { offset: number }>>({});
+  const [handleDrag, setHandleDrag] = useState<{
+    key: string;
+    mid: { x: number; y: number };
+    normal: { x: number; y: number };
+  } | null>(null);
+  const edgeHandleStorageKey = useMemo(() => (
+    selectedGroupId ? `wh_status_edge_handles:${tenant || 'default'}:${selectedGroupId}` : null
+  ), [tenant, selectedGroupId]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const getCenter = (id: number) => {
@@ -154,9 +172,40 @@ export const VisualTransitions = memo(function VisualTransitions({
     return { x: p.x + nodeWidth / 2, y: p.y + nodeHeight / 2 };
   };
 
+  useEffect(() => {
+    if (!edgeHandleStorageKey) return;
+    try {
+      const raw = localStorage.getItem(edgeHandleStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, { offset: number }>;
+      if (parsed && typeof parsed === 'object') {
+        setEdgeHandles(parsed);
+      }
+    } catch {
+      // ignore
+    }
+  }, [edgeHandleStorageKey]);
+
+  useEffect(() => {
+    if (!edgeHandleStorageKey) return;
+    try {
+      localStorage.setItem(edgeHandleStorageKey, JSON.stringify(edgeHandles));
+    } catch {
+      // ignore
+    }
+  }, [edgeHandles, edgeHandleStorageKey]);
+
   const handleMouseMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
     const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
     const rel = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (handleDrag) {
+      const { key, mid, normal } = handleDrag;
+      const dx = rel.x - mid.x;
+      const dy = rel.y - mid.y;
+      const offset = Math.max(-300, Math.min(300, dx * normal.x + dy * normal.y));
+      setEdgeHandles((prev) => ({ ...prev, [key]: { offset } }));
+      return;
+    }
     if (moving) {
       const nx = rel.x - moving.offsetX;
       const ny = rel.y - moving.offsetY;
@@ -194,6 +243,7 @@ export const VisualTransitions = memo(function VisualTransitions({
     setCursor(null);
     setHoverTarget(null);
     setMoving(null);
+    setHandleDrag(null);
   };
 
   const transitionsSet = useMemo(() => {
@@ -201,6 +251,55 @@ export const VisualTransitions = memo(function VisualTransitions({
     for (const t of transitions) set.add(`${t.from_status}->${t.to_status}`);
     return set;
   }, [transitions]);
+
+  const edgeOrdering = useMemo(() => {
+    const outMap: Record<number, number[]> = {};
+    const inMap: Record<number, number[]> = {};
+
+    transitions.forEach((t: any) => {
+      if (!outMap[t.from_status]) outMap[t.from_status] = [];
+      if (!inMap[t.to_status]) inMap[t.to_status] = [];
+
+      if (!outMap[t.from_status].includes(t.to_status)) {
+        outMap[t.from_status].push(t.to_status);
+      }
+      if (!inMap[t.to_status].includes(t.from_status)) {
+        inMap[t.to_status].push(t.from_status);
+      }
+    });
+
+    const outIndex: Record<string, number> = {};
+    const outCount: Record<number, number> = {};
+    Object.entries(outMap).forEach(([from, list]) => {
+      list.forEach((to, idx) => {
+        outIndex[`${from}->${to}`] = idx;
+      });
+      outCount[Number(from)] = list.length;
+    });
+
+    const inIndex: Record<string, number> = {};
+    const inCount: Record<number, number> = {};
+    Object.entries(inMap).forEach(([to, list]) => {
+      list.forEach((from, idx) => {
+        inIndex[`${from}->${to}`] = idx;
+      });
+      inCount[Number(to)] = list.length;
+    });
+
+    return { outIndex, outCount, inIndex, inCount };
+  }, [transitions]);
+
+  useEffect(() => {
+    setEdgeHandles((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (!transitionsSet.has(key)) {
+          delete next[key];
+        }
+      }
+      return next;
+    });
+  }, [transitionsSet]);
 
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -225,6 +324,75 @@ export const VisualTransitions = memo(function VisualTransitions({
     !activeStatuses.find(active => active.id === status.id)
   );
 
+  const handleAutoOrganize = useCallback(() => {
+    if (!activeStatuses.length) return;
+
+    const columnBuckets: Record<number, Array<{ status: any; index: number }>> = {};
+    const columnByStatus: Record<number, number> = {};
+    activeStatuses.forEach((status: any, index: number) => {
+      const actionKey = String(status.action || '').toUpperCase();
+      const column = ACTION_COLUMN_MAP[actionKey] ?? FALLBACK_ACTION_COLUMN;
+      if (!columnBuckets[column]) columnBuckets[column] = [];
+      columnBuckets[column].push({ status, index });
+      columnByStatus[status.id] = column;
+    });
+
+    const sortedColumns = Object.keys(columnBuckets).map(Number).sort((a, b) => a - b);
+    const layoutPositions: Record<number, { x: number; y: number }> = {};
+    const rowSpacing = nodeHeight + vGap;
+    const columnSpacing = nodeWidth + hGap;
+
+    sortedColumns.forEach((columnValue, columnIndex) => {
+      const bucket = columnBuckets[columnValue];
+      bucket.sort((a, b) => {
+        if (a.status.initial && !b.status.initial) return -1;
+        if (!a.status.initial && b.status.initial) return 1;
+        return String(a.status.name || '').localeCompare(String(b.status.name || ''));
+      });
+      bucket.forEach((entry, rowIndex) => {
+        const diagonalShift = (columnIndex % 2 === 0 ? 0 : rowSpacing / 2);
+        layoutPositions[entry.status.id] = {
+          x: columnIndex * columnSpacing,
+          y: rowIndex * rowSpacing + diagonalShift
+        };
+      });
+    });
+
+    const paddingX = 80;
+    const paddingY = 60;
+    const minX = Math.min(...Object.values(layoutPositions).map((pos) => pos.x));
+    const minY = Math.min(...Object.values(layoutPositions).map((pos) => pos.y));
+
+    const normalizedPositions: Record<number, { x: number; y: number }> = {};
+    Object.entries(layoutPositions).forEach(([id, pos]) => {
+      normalizedPositions[Number(id)] = {
+        x: pos.x - minX + paddingX,
+        y: pos.y - minY + paddingY
+      };
+    });
+
+    const newEdgeHandles: Record<string, { offset: number }> = {};
+    transitions.forEach((t: any) => {
+      const fromCol = columnByStatus[t.from_status];
+      const toCol = columnByStatus[t.to_status];
+      if (fromCol == null || toCol == null) return;
+      const columnDelta = toCol - fromCol;
+      if (Math.abs(columnDelta) <= 1) return;
+      const fromPos = normalizedPositions[t.from_status];
+      const toPos = normalizedPositions[t.to_status];
+      if (!fromPos || !toPos) return;
+      const verticalDirection = fromPos.y <= toPos.y ? -1 : 1;
+      const magnitude = 70 * Math.max(1, Math.abs(columnDelta) - 1);
+      const key = `${t.from_status}->${t.to_status}`;
+      newEdgeHandles[key] = {
+        offset: verticalDirection * magnitude
+      };
+    });
+
+    setPosById(normalizedPositions);
+    setEdgeHandles(newEdgeHandles);
+  }, [activeStatuses, hGap, nodeHeight, nodeWidth, transitions, vGap]);
+
   return (
     <div className={embedded ? "h-full w-full flex gap-4" : "border rounded-md p-5 overflow-auto flex gap-4"}>
       <StatusPalette
@@ -232,7 +400,15 @@ export const VisualTransitions = memo(function VisualTransitions({
         onDragStart={handlePaletteDragStart}
         onDragEnd={handlePaletteDragEnd}
       />
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            Drag statuses to reposition manually or auto-arrange for a clean baseline.
+          </p>
+          <Button size="sm" variant="outline" onClick={handleAutoOrganize} disabled={!activeStatuses.length}>
+            Auto arrange
+          </Button>
+        </div>
         <div
           className="relative"
           style={embedded ? { width: `max(100%, ${width}px)`, height: `${height}px`, ...checkerBackgroundStyle } : { width, height, ...checkerBackgroundStyle }}
@@ -256,6 +432,10 @@ export const VisualTransitions = memo(function VisualTransitions({
                 }
               }
             }
+            if (e.key === 'Escape') {
+              setSelectedEdge(null);
+              setHandleDrag(null);
+            }
           }}
         >
         <svg className="absolute inset-0 w-full h-full" shapeRendering="geometricPrecision">
@@ -275,6 +455,7 @@ export const VisualTransitions = memo(function VisualTransitions({
             const b = idToPos[t.to_status];
             if (!a || !b) return null;
 
+            const key = `${t.from_status}->${t.to_status}`;
             const srcCenter = { x: a.x + nodeWidth / 2, y: a.y + nodeHeight / 2 };
             const dstCenter = { x: b.x + nodeWidth / 2, y: b.y + nodeHeight / 2 };
             const dx = dstCenter.x - srcCenter.x;
@@ -313,6 +494,24 @@ export const VisualTransitions = memo(function VisualTransitions({
             }
 
             const verticalDominant = Math.abs(dy) > Math.abs(dx);
+            const outCount = edgeOrdering.outCount[t.from_status] ?? 1;
+            const outIdx = edgeOrdering.outIndex[key] ?? 0;
+            const outOffset = (outIdx - (outCount - 1) / 2) * EDGE_OFFSET_STEP;
+            if (verticalDominant) {
+              x1 += outOffset;
+            } else {
+              y1 += outOffset;
+            }
+
+            const inCount = edgeOrdering.inCount[t.to_status] ?? 1;
+            const inIdx = edgeOrdering.inIndex[key] ?? 0;
+            const inOffset = (inIdx - (inCount - 1) / 2) * EDGE_OFFSET_STEP;
+            if (verticalDominant) {
+              x2 += inOffset;
+            } else {
+              y2 += inOffset;
+            }
+
             let c1x: number; let c1y: number; let c2x: number; let c2y: number;
             if (verticalDominant) {
               const k = dy > 0 ? 60 : -60;
@@ -325,28 +524,20 @@ export const VisualTransitions = memo(function VisualTransitions({
             }
             const segdx = x2 - x1; const segdy = y2 - y1;
             const segLen2 = Math.max(1, segdx*segdx + segdy*segdy);
-            const corridor = 36;
-            const midX = (x1 + x2) / 2; const midY = (y1 + y2) / 2;
-            let bumpX = 0, bumpY = 0;
-            for (const n of nodes) {
-              if (n.id === t.from_status || n.id === t.to_status) continue;
-              const cx = n.x + nodeWidth / 2; const cy = n.y + nodeHeight / 2;
-              const tproj = ((cx - x1) * segdx + (cy - y1) * segdy) / segLen2;
-              if (tproj <= 0 || tproj >= 1) continue;
-              const px = x1 + tproj * segdx; const py = y1 + tproj * segdy;
-              const dist = Math.hypot(cx - px, cy - py);
-              if (dist < corridor) {
-                if (Math.abs(segdx) > Math.abs(segdy)) bumpY += cy > midY ? 60 : -60; else bumpX += cx > midX ? 60 : -60;
-              }
+
+            const segLen = Math.max(1, Math.sqrt(segLen2));
+            const normalX = -segdy / segLen;
+            const normalY = segdx / segLen;
+            const bendOffset = edgeHandles[key]?.offset ?? 0;
+            if (bendOffset) {
+              c1x += normalX * bendOffset;
+              c2x += normalX * bendOffset;
+              c1y += normalY * bendOffset;
+              c2y += normalY * bendOffset;
             }
-            c1x += bumpX; c2x += bumpX; c1y += bumpY; c2y += bumpY;
-            if (verticalDominant) {
-              c1x = x1; c2x = x2;
-            } else {
-              c1y = y1; c2y = y2;
-            }
+            const handleX = (c1x + c2x) / 2;
+            const handleY = (c1y + c2y) / 2;
             const path = `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
-            const key = `${t.from_status}->${t.to_status}`;
             const hovered = hoverEdge === key;
             const selected = selectedEdge === key;
             return (
@@ -362,6 +553,58 @@ export const VisualTransitions = memo(function VisualTransitions({
                 onMouseLeave={() => setHoverEdge(null)}
                 onClick={(e) => { e.stopPropagation(); if (!selectedGroupId) return; setSelectedEdge((prev: string | null) => prev === key ? null : key); }}
                 markerEnd={`url(#${hovered ? 'arrow-red' : 'arrow-blue'})`}
+              />
+            );
+          })}
+          {transitions.map((t: any) => {
+            const key = `${t.from_status}->${t.to_status}`;
+            if (selectedEdge !== key) return null;
+            const a = idToPos[t.from_status];
+            const b = idToPos[t.to_status];
+            if (!a || !b) return null;
+            const srcCenter = { x: a.x + nodeWidth / 2, y: a.y + nodeHeight / 2 };
+            const dstCenter = { x: b.x + nodeWidth / 2, y: b.y + nodeHeight / 2 };
+            const dx = dstCenter.x - srcCenter.x;
+            const dy = dstCenter.y - srcCenter.y;
+            const x1 = srcCenter.x;
+            const y1 = srcCenter.y;
+            const x2 = dstCenter.x;
+            const y2 = dstCenter.y;
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const segLen = Math.max(1, Math.hypot(dx, dy));
+            const normal = { x: -dy / segLen, y: dx / segLen };
+            const offset = edgeHandles[key]?.offset ?? 0;
+            const handleX = midX + normal.x * offset;
+            const handleY = midY + normal.y * offset;
+            return (
+              <circle
+                key={`handle-${key}`}
+                cx={handleX}
+                cy={handleY}
+                r={8}
+                fill="#ffffff"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                style={{ cursor: 'grab' }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
+                  setHandleDrag({
+                    key,
+                    mid: { x: midX, y: midY },
+                    normal
+                  });
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEdgeHandles((prev) => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                  });
+                }}
               />
             );
           })}
