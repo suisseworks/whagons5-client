@@ -6,13 +6,20 @@ import { tasksSlice } from "./reducers/tasksSlice";
 // All other slices (30+ tables) handled by generic factory
 import { genericSlices } from "./genericSlices";
 
-const rootReducer = combineReducers({
+const appReducer = combineReducers({
     // Only custom slice with advanced features (tasks)
     tasks: tasksSlice.reducer,
 
     // All other slices (30+ tables) handled by generic factory
     ...genericSlices.reducers,
 }) as any;
+
+const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
+    if (action?.type === 'auth/logout/reset') {
+        state = undefined;
+    }
+    return appReducer(state, action);
+};
 
 const store = configureStore({
     reducer: rootReducer,

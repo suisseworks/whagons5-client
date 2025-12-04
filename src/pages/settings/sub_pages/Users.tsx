@@ -1,27 +1,37 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { faUser } from "@fortawesome/free-solid-svg-icons";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
+import { Check, Copy as CopyIcon } from "lucide-react";
+import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
 import { Team } from "@/store/types";
+import { UserTeam } from "@/store/types";
+import { Invitation } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Label } from "@/components/ui/label";
+import { getEnvVariables } from "@/lib/getEnvVariables";
 
 // Extended User type based on actual API data structure
 interface UserData {
   id: number;
   name: string;
   email: string;
-  team_id?: number | null;
+  teams?: Array<{ id: number; name: string; description?: string; color?: string; role_id?: number }> | null;
   role_id?: number | null;
+  job_position_id?: number | null;
+  job_position?: { id: number; title: string } | null;
   organization_name?: string | null;
   is_admin?: boolean;
   has_active_subscription?: boolean;
   url_picture?: string | null;
+  color?: string | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -33,23 +43,23 @@ import {
   SettingsDialog,
   useSettingsState,
   createActionsCellRenderer,
-  AvatarCellRenderer
+  AvatarCellRenderer,
+  TextField,
+  SelectField,
+  CheckboxField
 } from "../components";
+import ReactECharts from "echarts-for-react";
+import dayjs from "dayjs";
 
 function Users() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   // Redux state for related data
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+  const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
+  const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
+  const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
   
-  // Hydrate users and teams (IndexedDB -> Redux), then background refresh
-  useEffect(() => {
-    dispatch(genericActions.users.getFromIndexedDB());
-    dispatch(genericActions.users.fetchFromAPI({ per_page: 1000 }));
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(genericActions.teams.fetchFromAPI({ per_page: 1000 }));
-  }, [dispatch]);
-
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
   // Use shared state management
@@ -61,11 +71,11 @@ function Users() {
     searchQuery,
     setSearchQuery,
     handleSearch,
-    createItem,
     updateItem,
     deleteItem,
     isSubmitting,
     formError,
+    setFormError,
     isCreateDialogOpen,
     setIsCreateDialogOpen,
     isEditDialogOpen,
@@ -81,103 +91,229 @@ function Users() {
     searchFields: ['name', 'email']
   });
 
-  // Ensure teams are fetched when opening create dialog (in case page loaded elsewhere first)
+  // Ensure users, teams, and job positions are loaded when users page mounts
   useEffect(() => {
-    if (!isCreateDialogOpen) return;
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(genericActions.teams.fetchFromAPI({ per_page: 1000 }));
-  }, [isCreateDialogOpen, dispatch]);
+    // Load users data
+    dispatch((genericActions as any).users.getFromIndexedDB());
+    
+    // Load teams (needed for team column and dropdown)
+    dispatch((genericActions as any).teams.getFromIndexedDB());
+    
+    // Load job positions (needed for dropdown/labels)
+    dispatch((genericActions as any).jobPositions.getFromIndexedDB());
+    
+    // Load roles (needed for invitation form)
+    dispatch((genericActions as any).roles.getFromIndexedDB());
+    
+    // Load user-teams pivot table (needed for team assignments)
+    dispatch((genericActions as any).userTeams.getFromIndexedDB());
+    
+    // Load invitations from IndexedDB only (no automatic API fetch)
+    dispatch((genericActions as any).invitations.getFromIndexedDB());
+  }, [dispatch]);
 
-  // Ensure teams are fetched when opening edit dialog as well
+  // Form state for controlled components
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    email: string;
+    job_position_id: string;
+    organization_name: string;
+    color: string;
+    is_admin: boolean;
+    has_active_subscription: boolean;
+  }>({
+    name: '',
+    email: '',
+    job_position_id: '',
+    organization_name: '',
+    color: '',
+    is_admin: false,
+    has_active_subscription: false
+  });
+
+  // Selected teams state (using string IDs for MultiSelect)
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Create form state
+  const [createFormData, setCreateFormData] = useState<{
+    name: string;
+    email: string;
+    job_position_id: string;
+    organization_name: string;
+    color: string;
+    is_admin: boolean;
+    has_active_subscription: boolean;
+  }>({
+    name: '',
+    email: '',
+    job_position_id: '',
+    organization_name: '',
+    color: '',
+    is_admin: false,
+    has_active_subscription: false
+  });
+
+  // Update form data when editing user changes
   useEffect(() => {
-    if (!isEditDialogOpen) return;
-    dispatch(genericActions.teams.getFromIndexedDB());
-    dispatch(genericActions.teams.fetchFromAPI({ per_page: 1000 }));
-  }, [isEditDialogOpen, dispatch]);
+    if (editingUser) {
+      setEditFormData({
+        name: editingUser.name || '',
+        email: editingUser.email || '',
+        job_position_id: editingUser.job_position_id != null ? editingUser.job_position_id.toString() : '',
+        organization_name: editingUser.organization_name || '',
+        color: editingUser.color || '',
+        is_admin: !!editingUser.is_admin,
+        has_active_subscription: !!editingUser.has_active_subscription
+      });
+
+      // Load existing user-team relationships
+      const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
+      setSelectedTeams(existingUserTeams.map((ut: UserTeam) => ut.team_id.toString()));
+    } else {
+      // Reset selected teams when dialog closes
+      setSelectedTeams([]);
+    }
+  }, [editingUser, userTeams]);
+
+  // Reset create form when create dialog closes
+  useEffect(() => {
+    if (!isCreateDialogOpen) {
+      setCreateFormData({
+        name: '',
+        email: '',
+        job_position_id: '',
+        organization_name: '',
+        color: '',
+        is_admin: false,
+        has_active_subscription: false
+      });
+      setCreateSelectedTeams([]);
+    }
+  }, [isCreateDialogOpen]);
 
   const columnDefs = useMemo<ColDef[]>(() => ([
-    { 
-      field: 'id', 
+    {
+      field: 'id',
       headerName: 'ID',
-      width: 80 
+      width: 90,
+      hide: true
     },
-    { 
-      field: 'name', 
+    {
+      field: 'name',
       headerName: 'Name',
       flex: 2,
-      minWidth: 150, 
+      minWidth: 180,
       cellRenderer: (params: ICellRendererParams) => (
-        <AvatarCellRenderer name={params.data?.name || ''} />
-      ) 
+        <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
+      )
     },
-    { 
-      field: 'email', 
+    {
+      field: 'email',
       headerName: 'Email',
-      flex: 2,
-      minWidth: 200 
+      flex: 2.5,
+      minWidth: 220
     },
-    { 
-      field: 'team_id', 
-      headerName: 'Team',
-      width: 220,
+    {
+      field: 'teams',
+      headerName: 'Teams',
+      flex: 2,
+      minWidth: 240,
       cellRenderer: (params: ICellRendererParams) => {
-        const teamId = params.value;
-        if (!teamId) return <span className="text-muted-foreground">No Team</span>;
+        const userId = params.data?.id;
+        if (!userId) return <span className="text-muted-foreground">No Teams</span>;
+
+        // Get user-team relationships from reducer
+        const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userId);
         
-        const team = teams.find((t: Team) => t.id === teamId);
-        if (!team) return <span className="text-muted-foreground">Team {teamId}</span>;
-        const initial = (team.name || '').charAt(0).toUpperCase();
-        const hex = String((team as any).color || '').trim();
-        let bg = hex;
-        let fg = '#fff';
-        try {
-          if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
-            const h = hex.length === 4
-              ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-              : hex;
-            const r = parseInt(h.slice(1, 3), 16);
-            const g = parseInt(h.slice(3, 5), 16);
-            const b = parseInt(h.slice(5, 7), 16);
-            const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-            fg = brightness > 180 ? '#111827' : '#ffffff';
-          } else if (!hex) {
-            bg = '';
-          }
-        } catch { /* ignore */ }
+        if (!userTeamRelationships || userTeamRelationships.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
+        // Map relationships to team objects
+        const userTeamObjects = userTeamRelationships
+          .map((ut: UserTeam) => {
+            const team = teams.find((t: Team) => t.id === ut.team_id);
+            return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+          })
+          .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+        if (userTeamObjects.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
         return (
-          <div className="flex items-center gap-2 h-full">
-            <div
-              className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 self-center ${bg ? '' : 'bg-muted text-foreground/80'}`}
-              style={bg ? { backgroundColor: bg, color: fg } : undefined}
-              title={team.name}
-            >
-              {initial || 'T'}
-            </div>
-            <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">
-              {team.name}
-            </Badge>
+          <div className="flex flex-wrap gap-1">
+            {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
+                  <div
+                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                  {team.name}
+                </Badge>
+              );
+            })}
           </div>
         );
       }
     },
-    { 
-      field: 'is_admin', 
-      headerName: 'Role',
-      width: 120, 
-      cellRenderer: (params: ICellRendererParams) => 
-        params.value ? <Badge variant="default">Admin</Badge> : <Badge variant="outline">User</Badge> 
+    {
+      field: 'job_position_id',
+      headerName: 'Job Position',
+      flex: 2,
+      minWidth: 220,
+      cellRenderer: (params: ICellRendererParams) => {
+        const idVal = params.value as number | string | undefined;
+        if (idVal == null || idVal === '') return <span className="text-muted-foreground">No Job Position</span>;
+        const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
+        const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
+        return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
+      }
     },
-    { 
-      field: 'has_active_subscription', 
+    {
+      field: 'is_admin',
+      headerName: 'Role',
+      flex: 0.8,
+      minWidth: 130,
+      cellRenderer: (params: ICellRendererParams) =>
+        params.value ? <Badge variant="default">Admin</Badge> : <Badge variant="outline">User</Badge>
+    },
+    {
+      field: 'has_active_subscription',
       headerName: 'Subscription',
-      width: 130, 
-      cellRenderer: (params: ICellRendererParams) => 
-        params.value ? <Badge variant="default" className="bg-green-500">Active</Badge> : <Badge variant="destructive">Inactive</Badge> 
+      flex: 1,
+      minWidth: 150,
+      cellRenderer: (params: ICellRendererParams) =>
+        params.value ? <Badge variant="default" className="bg-green-500">Active</Badge> : <Badge variant="destructive">Inactive</Badge>
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 100,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
         onDelete: handleDelete
@@ -187,71 +323,497 @@ function Users() {
       resizable: false,
       pinned: 'right'
     }
-  ]), [teams, handleEdit, handleDelete]);
+  ]), [teams, jobPositions, userTeams, handleEdit, handleDelete]);
 
-  // Render entity preview for delete dialog
-  const renderUserPreview = (user: UserData) => (
-    <div className="flex items-center space-x-3">
-      <div className="w-8 h-8 min-w-[2rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
-        {user.name.charAt(0).toUpperCase()}
-      </div>
-      <div>
-        <div className="font-medium">{user.name}</div>
-        <div className="text-sm text-muted-foreground">{user.email}</div>
-        <div className="flex items-center space-x-2 mt-1">
-          {user.team_id && (
-            <Badge variant="secondary" className="text-xs">
-              {teams.find(t => t.id === user.team_id)?.name || `Team ${user.team_id}`}
-            </Badge>
-          )}
-          <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
-            {user.is_admin ? "Admin" : "User"}
-          </Badge>
-          <Badge 
-            variant={user.has_active_subscription ? "default" : "destructive"} 
-            className="text-xs"
-          >
-            {user.has_active_subscription ? "Active" : "Inactive"}
-          </Badge>
+  // Copy button component for table cells
+  const CopyButton = ({ text }: { text: string }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 4000);
+    };
+
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleCopy}
+        className="min-w-[80px]"
+      >
+        {copied ? (
+          <>
+            <Check className="h-4 w-4 mr-1" />
+            Copied
+          </>
+        ) : (
+          <>
+            <CopyIcon className="h-4 w-4 mr-1" />
+            Copy
+          </>
+        )}
+      </Button>
+    );
+  };
+
+  // Invitation column definitions
+  const invitationColumnDefs = useMemo<ColDef[]>(() => ([
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 90,
+      hide: true
+    },
+    {
+      field: 'user_email',
+      headerName: 'Email',
+      flex: 2,
+      minWidth: 220,
+      cellRenderer: (params: ICellRendererParams) => {
+        return params.value || <span className="text-muted-foreground">No email</span>;
+      }
+    },
+    {
+      field: 'team_ids',
+      headerName: 'Teams',
+      flex: 2,
+      minWidth: 240,
+      cellRenderer: (params: ICellRendererParams) => {
+        const teamIds = params.value as number[] | null | undefined;
+        if (!teamIds || teamIds.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
+        const invitationTeams = teamIds
+          .map((teamId: number) => {
+            const team = teams.find((t: Team) => t.id === teamId);
+            return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+          })
+          .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+        if (invitationTeams.length === 0) {
+          return <span className="text-muted-foreground">No Teams</span>;
+        }
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
+                  <div
+                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                  {team.name}
+                </Badge>
+              );
+            })}
+          </div>
+        );
+      }
+    },
+    {
+      field: 'invitation_link',
+      headerName: 'Invitation Link',
+      flex: 3,
+      minWidth: 300,
+      cellRenderer: (params: ICellRendererParams) => {
+        const invitation = params.data as Invitation;
+        if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
+        
+        // Generate invitation link using VITE_DOMAIN
+        const { VITE_DOMAIN } = getEnvVariables();
+        const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
+        const tenantPrefix = invitation.tenant_domain_prefix || '';
+        const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+        
+        // Build domain: {tenant_prefix}.{base_domain}
+        const domain = tenantPrefix 
+          ? `${tenantPrefix}.${baseDomain}`
+          : baseDomain;
+        
+        const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+        
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={invitationLink}
+              className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <CopyButton text={invitationLink} />
+          </div>
+        );
+      }
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      flex: 1.5,
+      minWidth: 150,
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return <span className="text-muted-foreground">-</span>;
+        const date = new Date(params.value);
+        return <span>{date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+      }
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      cellRenderer: createActionsCellRenderer({
+        onDelete: (invitation: Invitation) => {
+          setDeletingInvitation(invitation);
+          setIsDeleteInvitationDialogOpen(true);
+        }
+      }),
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right'
+    }
+  ]), [teams, dispatch]);
+
+  // Handle invitation deletion
+  const handleDeleteInvitation = async () => {
+    if (!deletingInvitation) return;
+    
+    try {
+      await dispatch((genericActions as any).invitations.removeAsync(deletingInvitation.id)).unwrap();
+      // Refresh invitations list from IndexedDB (will be updated by real-time listener or next validation)
+      dispatch((genericActions as any).invitations.getFromIndexedDB());
+      setIsDeleteInvitationDialogOpen(false);
+      setDeletingInvitation(null);
+    } catch (error: any) {
+      // If error is 404 or 500, the invitation might already be deleted
+      // Refresh from IndexedDB to sync state
+      if (error?.response?.status === 404 || error?.response?.status === 500) {
+        console.warn('Invitation may already be deleted, refreshing from cache');
+        dispatch((genericActions as any).invitations.getFromIndexedDB());
+      }
+      console.error('Failed to delete invitation:', error);
+      setIsDeleteInvitationDialogOpen(false);
+      setDeletingInvitation(null);
+    }
+  };
+
+  // Render invitation preview for delete dialog
+  const renderInvitationPreview = (invitation: Invitation) => {
+    const invitationTeams = (invitation.team_ids || [])
+      .map((teamId: number) => {
+        const team = teams.find((t: Team) => t.id === teamId);
+        return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+      })
+      .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+    // Generate invitation link using VITE_DOMAIN
+    const { VITE_DOMAIN } = getEnvVariables();
+    const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
+    const tenantPrefix = invitation.tenant_domain_prefix || '';
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+    
+    // Build domain: {tenant_prefix}.{base_domain}
+    const domain = tenantPrefix 
+      ? `${tenantPrefix}.${baseDomain}`
+      : baseDomain;
+    
+    const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+
+    return (
+      <div className="space-y-2">
+        {invitation.user_email && (
+          <div>
+            <div className="text-sm font-medium">Email</div>
+            <div className="text-sm text-muted-foreground">{invitation.user_email}</div>
+          </div>
+        )}
+        {invitationTeams.length > 0 && (
+          <div>
+            <div className="text-sm font-medium">Teams</div>
+            <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
+              {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+                const initial = (team.name || '').charAt(0).toUpperCase();
+                const hex = String(team.color || '').trim();
+                let bg = hex;
+                let fg = '#fff';
+                try {
+                  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                    const h = hex.length === 4
+                      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                      : hex;
+                    const r = parseInt(h.slice(1, 3), 16);
+                    const g = parseInt(h.slice(3, 5), 16);
+                    const b = parseInt(h.slice(5, 7), 16);
+                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                    fg = brightness > 180 ? '#111827' : '#ffffff';
+                  } else if (!hex) {
+                    bg = '';
+                  }
+                } catch { /* ignore */ }
+                return (
+                  <Badge key={team.id} variant="secondary" className="text-xs inline-flex items-center gap-1">
+                    <div
+                      className={`w-3 h-3 min-w-[0.75rem] rounded-full flex items-center justify-center text-[9px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                      style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                      title={team.name}
+                    >
+                      {initial || 'T'}
+                    </div>
+                    {team.name}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div>
+          <div className="text-sm font-medium">Invitation Link</div>
+          <div className="text-xs text-muted-foreground break-all mt-1">{invitationLink}</div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Render entity preview for delete dialog
+  const renderUserPreview = (user: UserData) => {
+    // Get user-team relationships from reducer
+    const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === user.id);
+    const userTeamObjects = userTeamRelationships
+      .map((ut: UserTeam) => {
+        const team = teams.find((t: Team) => t.id === ut.team_id);
+        return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+      })
+      .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+    return (
+      <div className="flex items-center space-x-3">
+        <div className="w-8 h-8 min-w-[2rem] bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+          {user.name.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <div className="font-medium">{user.name}</div>
+          <div className="text-sm text-muted-foreground">{user.email}</div>
+          <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
+            {userTeamObjects.length > 0 && userTeamObjects.map((team: { id: number; name: string; color: string | null }) => (
+              <Badge key={team.id} variant="secondary" className="text-xs">
+                {team.name}
+              </Badge>
+            ))}
+            <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
+              {user.is_admin ? "Admin" : "User"}
+            </Badge>
+            <Badge 
+              variant={user.has_active_subscription ? "default" : "destructive"} 
+              className="text-xs"
+            >
+              {user.has_active_subscription ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Invitation dialog state
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>([]);
+  const [inviteEmail, setInviteEmail] = useState<string>('');
+  const [sendEmail, setSendEmail] = useState<boolean>(true);
+  const [invitationLink, setInvitationLink] = useState<string>('');
+  const [showInvitationLink, setShowInvitationLink] = useState(false);
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  const [copiedDialogLink, setCopiedDialogLink] = useState<boolean>(false);
+  const [isDeleteInvitationDialogOpen, setIsDeleteInvitationDialogOpen] = useState(false);
+  const [deletingInvitation, setDeletingInvitation] = useState<Invitation | null>(null);
+
+  // Reset invitation form when invitation dialog closes
+  useEffect(() => {
+    if (!isInviteDialogOpen) {
+      setInviteSelectedTeams([]);
+      setInviteEmail('');
+      setSendEmail(true); // Reset to checked by default
+      setInvitationLink('');
+      setShowInvitationLink(false);
+      setCopiedDialogLink(false); // Reset copied state
+    } else {
+      // When dialog opens, ensure checkbox is checked by default
+      setSendEmail(true);
+    }
+  }, [isInviteDialogOpen]);
+
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSendingInvitation(true);
+    setFormError(null);
+    
+    try {
+      const payload: any = {
+        team_ids: inviteSelectedTeams.length > 0 ? inviteSelectedTeams.map(id => Number(id)) : [],
+        user_email: inviteEmail || null,
+        send_email: sendEmail && !!inviteEmail,
+      };
+      
+          const result = await dispatch((genericActions as any).invitations.addAsync(payload)).unwrap();
+          
+          // Refresh invitations list from IndexedDB (real-time listener will update cache automatically)
+          dispatch((genericActions as any).invitations.getFromIndexedDB());
+          
+          // Show invitation link if available
+          if (result?.invitation_link) {
+            setInvitationLink(result.invitation_link);
+            setShowInvitationLink(true);
+          }
+          
+          // If email was sent, close dialog after a moment
+          if (sendEmail && inviteEmail) {
+            setTimeout(() => {
+              setIsInviteDialogOpen(false);
+            }, 2000);
+          } else {
+            // Keep dialog open to show link
+            setIsInviteDialogOpen(true);
+          }
+    } catch (error: any) {
+      const backendErrors = error?.response?.data?.errors;
+      const backendMessage = error?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || error?.message || 'Failed to create invitation');
+      setFormError(errorMessage);
+    } finally {
+      setIsSendingInvitation(false);
+    }
+  };
 
   // Create submit handler
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const data = new FormData(form);
-    const payload: Omit<UserData, 'id' | 'created_at' | 'updated_at' | 'deleted_at'> = {
-      name: String(data.get('name') || ''),
-      email: String(data.get('email') || ''),
-      team_id: data.get('team_id') ? Number(data.get('team_id')) : null,
-      role_id: data.get('role_id') ? Number(data.get('role_id')) : null,
-      organization_name: (data.get('organization_name') as string) || null,
-      is_admin: data.get('is_admin') === 'on',
-      has_active_subscription: data.get('has_active_subscription') === 'on',
-      url_picture: null
+
+    const userData: Omit<UserData, 'id' | 'created_at' | 'updated_at'> = {
+      name: createFormData.name,
+      email: createFormData.email,
+      job_position_id: createFormData.job_position_id ? Number(createFormData.job_position_id) : null,
+      organization_name: createFormData.organization_name || null,
+      color: createFormData.color || null,
+      is_admin: createFormData.is_admin,
+      has_active_subscription: createFormData.has_active_subscription
     };
-    await createItem(payload as any);
+
+    try {
+      setIsCreating(true);
+      setFormError(null);
+      // Create user directly using addAsync to get the created user back
+      const createdUserResult = await dispatch((genericActions as any).users.addAsync(userData)).unwrap();
+      const createdUser = createdUserResult as UserData;
+      
+      if (createdUser && createSelectedTeams.length > 0) {
+        // Add user-team relationships
+        for (const teamIdStr of createSelectedTeams) {
+          const teamId = Number(teamIdStr);
+          try {
+            await dispatch((genericActions as any).userTeams.addAsync({
+              user_id: createdUser.id,
+              team_id: teamId
+            })).unwrap();
+          } catch (error) {
+            console.error(`Failed to add user-team relationship:`, error);
+          }
+        }
+      }
+      
+      // Close dialog
+      setIsCreateDialogOpen(false);
+    } catch (error: any) {
+      // Handle and display errors
+      const backendErrors = error?.response?.data?.errors;
+      const backendMessage = error?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || error?.message || 'Failed to create user');
+      setFormError(errorMessage);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   // Edit submit handler
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
-    const form = e.target as HTMLFormElement;
-    const data = new FormData(form);
+
     const updates: Partial<UserData> = {
-      name: String(data.get('name') || editingUser.name),
-      email: String(data.get('email') || editingUser.email),
-      team_id: data.get('team_id') ? Number(data.get('team_id')) : null,
-      role_id: data.get('role_id') ? Number(data.get('role_id')) : null,
-      organization_name: (data.get('organization_name') as string) || null,
-      is_admin: data.get('is_admin') === 'on',
-      has_active_subscription: data.get('has_active_subscription') === 'on'
+      name: editFormData.name,
+      email: editFormData.email,
+      job_position_id: editFormData.job_position_id ? Number(editFormData.job_position_id) : null,
+      role_id: null, // Not used in this form
+      organization_name: editFormData.organization_name || null,
+      color: editFormData.color || null,
+      is_admin: editFormData.is_admin,
+      has_active_subscription: editFormData.has_active_subscription
     };
+    
+    // Update user first
     await updateItem(editingUser.id, updates);
+
+    // Handle user-team relationships
+    const selectedTeamIds = selectedTeams.map(id => Number(id));
+    const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
+    const existingTeamIds = existingUserTeams.map((ut: UserTeam) => ut.team_id);
+
+    // Find teams to add (in selectedTeams but not in existing)
+    const teamsToAdd = selectedTeamIds.filter(teamId => !existingTeamIds.includes(teamId));
+    
+    // Find teams to remove (in existing but not in selectedTeams)
+    const teamsToRemove = existingTeamIds.filter(teamId => !selectedTeamIds.includes(teamId));
+
+    // Add new user-team relationships
+    for (const teamId of teamsToAdd) {
+      try {
+        await dispatch((genericActions as any).userTeams.addAsync({
+          user_id: editingUser.id,
+          team_id: teamId
+        })).unwrap();
+      } catch (error) {
+        console.error(`Failed to add user-team relationship:`, error);
+      }
+    }
+
+    // Remove deleted user-team relationships
+    for (const teamId of teamsToRemove) {
+      const userTeamToRemove = existingUserTeams.find((ut: UserTeam) => ut.team_id === teamId);
+      if (userTeamToRemove) {
+        try {
+          await dispatch((genericActions as any).userTeams.removeAsync(userTeamToRemove.id)).unwrap();
+        } catch (error) {
+          console.error(`Failed to remove user-team relationship:`, error);
+        }
+      }
+    }
   };
 
   return (
@@ -276,38 +838,88 @@ function Users() {
         message: error,
         onRetry: () => window.location.reload()
       } : undefined}
-      statistics={{
-        title: "User Statistics",
-        description: "Overview of users across your teams",
-        items: [
-          { label: "Total Users", value: users.length },
-          { label: "Admins", value: users.filter((user: UserData) => user.is_admin).length },
-          { 
-            label: "Active Subscriptions", 
-            value: users.length > 0 
-              ? `${Math.round((users.filter((user: UserData) => user.has_active_subscription).length / users.length) * 100)}%`
-              : "0%"
-          }
-        ]
-      }}
       headerActions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/teams')}>
             Manage Teams
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
-            <span className="mr-2 inline-flex items-center"><svg width="0" height="0" className="hidden" aria-hidden="true"></svg></span>
-            Add User
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
+            Manage Job Positions
+          </Button>
+          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
+            Create User
+          </Button>
+          <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
+            Create Invitation
           </Button>
         </div>
       }
     >
-      <SettingsGrid
-        rowData={filteredItems}
-        columnDefs={columnDefs}
-        noRowsMessage="No users found"
-        height="500px"
-        onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+      <UrlTabs
+        tabs={[
+          {
+            value: "users",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faUser} className="w-4 h-4" />
+                <span>Users</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={filteredItems}
+                    columnDefs={columnDefs}
+                    noRowsMessage="No users found"
+                    onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+                  />
+                </div>
+              </div>
+            )
+          },
+          {
+            value: "statistics",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
+                <span>Statistics</span>
+              </div>
+            ),
+            content: (
+              <UserStatistics
+                users={users}
+                teams={teams}
+                userTeams={userTeams}
+                jobPositions={jobPositions}
+                invitations={invitations}
+              />
+            )
+          },
+          {
+            value: "invitations",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faEnvelope} className="w-4 h-4" />
+                <span>Invitations</span>
+              </div>
+            ),
+            content: (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 min-h-0">
+                  <SettingsGrid
+                    rowData={invitations}
+                    columnDefs={invitationColumnDefs}
+                    noRowsMessage="No invitations found"
+                  />
+                </div>
+              </div>
+            )
+          }
+        ]}
+        defaultValue="users"
+        basePath="/settings/users"
+        className="h-full flex flex-col"
       />
 
       {/* Create User Dialog */}
@@ -315,57 +927,182 @@ function Users() {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         type="create"
-        title="Add New User"
+        title="Create User"
         description="Create a new user account."
         onSubmit={handleCreateSubmit}
-        isSubmitting={isSubmitting}
+        isSubmitting={isCreating}
         error={formError}
-        submitDisabled={isSubmitting}
+        submitDisabled={isCreating}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <Input id="name" name="name" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="email" className="text-right">Email *</Label>
-            <Input id="email" name="email" type="email" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="team_id" className="text-right">Team</Label>
-            <select
-              id="team_id"
-              name="team_id"
-              className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-            >
-              {teamsLoading && teams.length === 0 && (
-                <option value="" disabled>Loading…</option>
-              )}
-              <option value="">No Team</option>
-              {teams.map((team: Team) => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="organization_name" className="text-right">Organization</Label>
-            <Input id="organization_name" name="organization_name" className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_admin" className="text-right">Admin</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input type="checkbox" id="is_admin" name="is_admin" className="rounded" />
-              <Label htmlFor="is_admin" className="text-sm">Grant admin role</Label>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="has_active_subscription" className="text-right">Subscription</Label>
-            <div className="col-span-3 flex items-center space-x-2">
-              <input type="checkbox" id="has_active_subscription" name="has_active_subscription" className="rounded" />
-              <Label htmlFor="has_active_subscription" className="text-sm">Active subscription</Label>
+          <TextField
+            id="create-name"
+            label="Name"
+            value={createFormData.name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
+            required
+          />
+          <TextField
+            id="create-email"
+            label="Email"
+            type="email"
+            value={createFormData.email}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
+            required
+          />
+          <TextField
+            id="create-color"
+            label="Color"
+            type="color"
+            value={createFormData.color}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
+          />
+          <SelectField
+            id="create-job_position_id"
+            label="Job Position"
+            value={createFormData.job_position_id}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
+            placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+            options={jobPositions.map((jp: any) => ({
+              value: jp.id?.toString?.() ?? String(jp.id),
+              label: jp.title
+            }))}
+          />
+          <TextField
+            id="create-organization_name"
+            label="Organization"
+            value={createFormData.organization_name}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
+          />
+          <CheckboxField
+            id="create-is_admin"
+            label="Admin"
+            checked={createFormData.is_admin}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
+            description="Grant admin role"
+          />
+          <CheckboxField
+            id="create-has_active_subscription"
+            label="Subscription"
+            checked={createFormData.has_active_subscription}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
+            description="Active subscription"
+          />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Teams</Label>
+            <div className="col-span-3">
+              <MultiSelect
+                options={teams.map((team: Team) => ({
+                  value: team.id.toString(),
+                  label: team.name
+                }))}
+                onValueChange={setCreateSelectedTeams}
+                defaultValue={createSelectedTeams}
+                placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                maxCount={10}
+                className="w-full"
+              />
             </div>
           </div>
         </div>
+      </SettingsDialog>
+
+      {/* Create Invitation Dialog */}
+      <SettingsDialog
+        open={isInviteDialogOpen}
+        onOpenChange={setIsInviteDialogOpen}
+        type="create"
+        title="Create Invitation"
+        description={showInvitationLink ? "Invitation created successfully!" : "Create an invitation link. Users who sign up will be automatically added to the selected teams."}
+        onSubmit={showInvitationLink ? undefined : handleInviteSubmit}
+        isSubmitting={isSendingInvitation}
+        error={formError}
+        submitDisabled={isSendingInvitation || showInvitationLink}
+        submitText={showInvitationLink ? undefined : "Create Invitation"}
+      >
+        {showInvitationLink ? (
+          <div className="grid gap-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <Label className="text-sm font-medium mb-2 block">Invitation Link</Label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={invitationLink}
+                  className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(invitationLink);
+                    setCopiedDialogLink(true);
+                    setTimeout(() => setCopiedDialogLink(false), 4000);
+                  }}
+                  className="min-w-[80px]"
+                >
+                  {copiedDialogLink ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="h-4 w-4 mr-1" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Share this link with the user. They will be added to the selected teams when they sign up.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setIsInviteDialogOpen(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            <TextField
+              id="invite-email"
+              label="Email (Optional)"
+              type="email"
+              value={inviteEmail}
+              onChange={(value) => setInviteEmail(value)}
+              placeholder="user@example.com"
+            />
+            <CheckboxField
+              id="invite-send-email"
+              label=""
+              checked={sendEmail}
+              onChange={(checked) => setSendEmail(checked)}
+              description="Send invitation email to the address above"
+              disabled={!inviteEmail}
+            />
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Teams</Label>
+              <div className="col-span-3">
+                <MultiSelect
+                  options={teams.map((team: Team) => ({
+                    value: team.id.toString(),
+                    label: team.name
+                  }))}
+                  onValueChange={setInviteSelectedTeams}
+                  defaultValue={inviteSelectedTeams}
+                  placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                  maxCount={10}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </SettingsDialog>
 
       {/* Edit User Dialog */}
@@ -382,47 +1119,73 @@ function Users() {
       >
         {editingUser && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <Input id="edit-name" name="name" defaultValue={editingUser.name} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-email" className="text-right">Email *</Label>
-              <Input id="edit-email" name="email" type="email" defaultValue={editingUser.email} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-team_id" className="text-right">Team</Label>
-              <select
-                id="edit-team_id"
-                name="team_id"
-                defaultValue={editingUser.team_id ?? ''}
-                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-              >
-                {teamsLoading && teams.length === 0 && (
-                  <option value="" disabled>Loading…</option>
-                )}
-                <option value="">No Team</option>
-                {teams.map((team: Team) => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-organization_name" className="text-right">Organization</Label>
-              <Input id="edit-organization_name" name="organization_name" defaultValue={editingUser.organization_name ?? ''} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-is_admin" className="text-right">Admin</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input type="checkbox" id="edit-is_admin" name="is_admin" defaultChecked={!!editingUser.is_admin} className="rounded" />
-                <Label htmlFor="edit-is_admin" className="text-sm">Grant admin role</Label>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-has_active_subscription" className="text-right">Subscription</Label>
-              <div className="col-span-3 flex items-center space-x-2">
-                <input type="checkbox" id="edit-has_active_subscription" name="has_active_subscription" defaultChecked={!!editingUser.has_active_subscription} className="rounded" />
-                <Label htmlFor="edit-has_active_subscription" className="text-sm">Active subscription</Label>
+            <TextField
+              id="edit-name"
+              label="Name"
+              value={editFormData.name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+              required
+            />
+            <TextField
+              id="edit-email"
+              label="Email"
+              type="email"
+              value={editFormData.email}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
+              required
+            />
+            <TextField
+              id="edit-color"
+              label="Color"
+              type="color"
+              value={editFormData.color}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
+            />
+            <SelectField
+              id="edit-job_position_id"
+              label="Job Position"
+              value={editFormData.job_position_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
+              placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+              options={jobPositions.map((jp: any) => ({
+                value: jp.id?.toString?.() ?? String(jp.id),
+                label: jp.title
+              }))}
+            />
+            <TextField
+              id="edit-organization_name"
+              label="Organization"
+              value={editFormData.organization_name}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
+            />
+            <CheckboxField
+              id="edit-is_admin"
+              label="Admin"
+              checked={editFormData.is_admin}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
+              description="Grant admin role"
+            />
+            <CheckboxField
+              id="edit-has_active_subscription"
+              label="Subscription"
+              checked={editFormData.has_active_subscription}
+              onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
+              description="Active subscription"
+            />
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-2">Teams</Label>
+              <div className="col-span-3">
+                <MultiSelect
+                  options={teams.map((team: Team) => ({
+                    value: team.id.toString(),
+                    label: team.name
+                  }))}
+                  onValueChange={setSelectedTeams}
+                  defaultValue={selectedTeams}
+                  placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                  maxCount={10}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>
@@ -447,7 +1210,361 @@ function Users() {
         entityData={deletingUser}
         renderEntityPreview={renderUserPreview}
       />
+
+      {/* Delete Invitation Dialog */}
+      <SettingsDialog
+        open={isDeleteInvitationDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteInvitationDialogOpen(open);
+          if (!open) {
+            setDeletingInvitation(null);
+          }
+        }}
+        type="delete"
+        title="Delete Invitation"
+        description={
+          deletingInvitation
+            ? `Are you sure you want to delete this invitation${deletingInvitation.user_email ? ` for ${deletingInvitation.user_email}` : ''}? This action cannot be undone.`
+            : undefined
+        }
+        onConfirm={handleDeleteInvitation}
+        entityName="invitation"
+        entityData={deletingInvitation}
+        renderEntityPreview={renderInvitationPreview}
+      />
     </SettingsLayout>
+  );
+}
+
+interface UserStatisticsProps {
+  users: UserData[];
+  teams: Team[];
+  userTeams: UserTeam[];
+  jobPositions: any[];
+  invitations: Invitation[];
+}
+
+function UserStatistics({
+  users,
+  teams,
+  userTeams,
+  jobPositions,
+  invitations
+}: UserStatisticsProps) {
+  const totalUsers = users.length;
+  const adminCount = users.filter((u) => u.is_admin).length;
+  const activeSubCount = users.filter((u) => u.has_active_subscription).length;
+  const activeSubPercent =
+    totalUsers > 0 ? Math.round((activeSubCount / totalUsers) * 100) : 0;
+
+  const usersByTeam = useMemo(() => {
+    const counts = new Map<number, number>();
+    userTeams.forEach((ut) => {
+      counts.set(ut.team_id, (counts.get(ut.team_id) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([teamId, count]) => {
+        const team = teams.find((t) => t.id === teamId);
+        return team ? { team, count } : null;
+      })
+      .filter(
+        (item): item is { team: Team; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [userTeams, teams]);
+
+  const usersByJobPosition = useMemo(() => {
+    const counts = new Map<number, number>();
+    users.forEach((u) => {
+      const jpId = u.job_position_id as number | null | undefined;
+      if (!jpId) return;
+      counts.set(jpId, (counts.get(jpId) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([jobPositionId, count]) => {
+        const jp = jobPositions.find(
+          (p: any) => Number(p.id) === Number(jobPositionId)
+        );
+        return jp ? { jobPosition: jp, count } : null;
+      })
+      .filter(
+        (item): item is { jobPosition: any; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [users, jobPositions]);
+
+  const invitationsOverTime = useMemo(() => {
+    const map = new Map<string, number>();
+    invitations.forEach((inv) => {
+      if (!inv.created_at) return;
+      const date = dayjs(inv.created_at as any).format("YYYY-MM-DD");
+      map.set(date, (map.get(date) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+  }, [invitations]);
+
+  return (
+    <div className="flex-1 min-h-0 overflow-auto p-4">
+      <div className="space-y-4">
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{totalUsers}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Total Users
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-600">
+                  {adminCount}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">Admins</div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-600">
+                  {activeSubPercent}%
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Active Subscriptions
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-sky-600">
+                  {invitations.length}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Pending Invitations
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Users per Team</CardTitle>
+              <CardDescription className="text-xs">
+                Distribution of users across teams
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersByTeam.length > 0 ? (
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: "axis",
+                      axisPointer: { type: "shadow" }
+                    },
+                    grid: {
+                      left: "3%",
+                      right: "4%",
+                      bottom: "3%",
+                      containLabel: true
+                    },
+                    xAxis: {
+                      type: "value",
+                      name: "Users"
+                    },
+                    yAxis: {
+                      type: "category",
+                      data: usersByTeam
+                        .map((item) => item.team.name)
+                        .reverse(),
+                      axisLabel: {
+                        formatter: (value: string) =>
+                          value.length > 20
+                            ? value.substring(0, 20) + "..."
+                            : value
+                      }
+                    },
+                    series: [
+                      {
+                        name: "Users",
+                        type: "bar",
+                        data: usersByTeam
+                          .map((item) => ({
+                            value: item.count,
+                            itemStyle: {
+                              color: item.team.color || "#6366f1"
+                            }
+                          }))
+                          .reverse()
+                      }
+                    ]
+                  }}
+                  style={{ height: "300px" }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                  No team assignment data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Users by Job Position</CardTitle>
+              <CardDescription className="text-xs">
+                Distribution across job positions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {usersByJobPosition.length > 0 ? (
+                <ReactECharts
+                  option={{
+                    tooltip: {
+                      trigger: "item",
+                      formatter: "{b}: {c} ({d}%)"
+                    },
+                    legend: {
+                      orient: "vertical",
+                      left: "left",
+                      textStyle: { fontSize: 10 }
+                    },
+                    series: [
+                      {
+                        name: "Users",
+                        type: "pie",
+                        radius: ["40%", "70%"],
+                        avoidLabelOverlap: false,
+                        itemStyle: {
+                          borderRadius: 8,
+                          borderColor: "#fff",
+                          borderWidth: 2
+                        },
+                        label: {
+                          show: true,
+                          formatter: "{b}: {c}"
+                        },
+                        emphasis: {
+                          label: {
+                            show: true,
+                            fontSize: 12,
+                            fontWeight: "bold"
+                          }
+                        },
+                        data: usersByJobPosition.map((item) => ({
+                          value: item.count,
+                          name: item.jobPosition.title
+                        }))
+                      }
+                    ]
+                  }}
+                  style={{ height: "300px" }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                  No job position data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Invitations over time */}
+        {invitationsOverTime.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Invitations Over Time</CardTitle>
+              <CardDescription className="text-xs">
+                Last 30 days of invitation creation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ReactECharts
+                option={{
+                  tooltip: {
+                    trigger: "axis",
+                    formatter: (params: any) => {
+                      const param = params[0];
+                      return `${param.axisValue}<br/>${param.marker}${param.seriesName}: ${param.value}`;
+                    }
+                  },
+                  grid: {
+                    left: "3%",
+                    right: "4%",
+                    bottom: "3%",
+                    containLabel: true
+                  },
+                  xAxis: {
+                    type: "category",
+                    data: invitationsOverTime.map((item) =>
+                      dayjs(item.date).format("MMM DD")
+                    ),
+                    axisLabel: {
+                      rotate: 45,
+                      fontSize: 10
+                    }
+                  },
+                  yAxis: {
+                    type: "value",
+                    name: "Invitations"
+                  },
+                  series: [
+                    {
+                      name: "Invitations",
+                      type: "line",
+                      smooth: true,
+                      data: invitationsOverTime.map((item) => item.count),
+                      areaStyle: {
+                        color: {
+                          type: "linear",
+                          x: 0,
+                          y: 0,
+                          x2: 0,
+                          y2: 1,
+                          colorStops: [
+                            {
+                              offset: 0,
+                              color: "rgba(99, 102, 241, 0.3)"
+                            },
+                            {
+                              offset: 1,
+                              color: "rgba(99, 102, 241, 0.05)"
+                            }
+                          ]
+                        }
+                      },
+                      itemStyle: {
+                        color: "#6366f1"
+                      },
+                      lineStyle: {
+                        color: "#6366f1",
+                        width: 2
+                      }
+                    }
+                  ]
+                }}
+                style={{ height: "300px" }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
   );
 }
 

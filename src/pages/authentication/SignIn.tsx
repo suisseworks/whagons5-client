@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithGoogle, signInWithEmail, linkGoogleProvider, logout } from './auth';
+import { signInWithGoogle, signInWithEmail, linkGoogleProvider } from './auth';
 import { api, updateAuthToken } from '@/api/whagonsApi';
 import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { InitializationStage } from '@/types/user';
+import { useAuth } from '@/providers/AuthProvider';
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const navigate = useNavigate();
+  const { firebaseUser, user, loading, userLoading, refetchUser } = useAuth();
 
   async function checkPassword() {
     //make sure password meets requirements and confirm password matches
@@ -39,13 +41,9 @@ const SignIn: React.FC = () => {
         console.log('Successfully logged in and sent idToken to backend');
         updateAuthToken(response.data.token);
         
-        // Check initialization stage and redirect accordingly
-        const user = response.data.user;
-        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
-          navigate('/onboarding');
-        } else {
-          navigate('/');
-        }
+        // Refetch user data after login - the useEffect will handle redirect once user data is loaded
+        await refetchUser();
+        
         return true;
       } else {
         console.error('Login failed with status:', response.status);
@@ -86,26 +84,49 @@ const SignIn: React.FC = () => {
   };
 
   const handleEmailSignin = async () => {
-    try {
-      if (!(await checkPassword())) {
-        return;
-      }
-      const userCredential = await signInWithEmail(email, password);
-      const user = userCredential.user;
-
-      // Get the ID token
-      const idToken = await user.getIdToken();
-
-      const loginSuccess = await backendLogin(idToken);
-      if (!loginSuccess) {
-        // Handle login failure - you might want to show an error message to the user
+    // If already authenticated with Firebase (e.g., reload), reuse that session
+    if (firebaseUser) {
+      try {
+        const idToken = await firebaseUser.getIdToken();
+        const ok = await backendLogin(idToken);
+        if (!ok) alert('Login failed. Please try again.');
+      } catch (e) {
+        console.error('Reusing Firebase session failed:', e);
         alert('Login failed. Please try again.');
       }
+      return;
+    }
+
+    // 1) Validate password locally
+    if (!(await checkPassword())) {
+      return;
+    }
+
+    // 2) Firebase sign-in (only this block shows the "Email sign-in failed" alert)
+    let userCredential;
+    try {
+      userCredential = await signInWithEmail(email, password);
     } catch (error) {
-      console.error('Email sign-in error:', error);
+      console.error('Email sign-in error (Firebase):', error);
       alert('Email sign-in failed. Please try again.');
-      await logout();
-      navigate('/auth/signin');
+      return; // Do not logout here; let auth state remain untouched
+    }
+
+    // 3) Get ID token
+    let idToken: string | null = null;
+    try {
+      idToken = await userCredential.user.getIdToken();
+    } catch (error) {
+      console.error('Failed to get ID token:', error);
+      alert('Login failed. Please try again.');
+      return;
+    }
+
+    // 4) Backend login for API token; on failure, show a targeted message
+    const loginSuccess = await backendLogin(idToken);
+    if (!loginSuccess) {
+      alert('Login failed. Please try again.');
+      return;
     }
   };
 
@@ -128,6 +149,18 @@ const SignIn: React.FC = () => {
     }
   };
 
+
+  // Redirect away from SignIn if already authenticated (handles page reloads)
+  useEffect(() => {
+    if (loading) return; // wait for auth state init
+    if (firebaseUser && !userLoading && user) {
+      if (user.initialization_stage !== InitializationStage.COMPLETED) {
+        navigate('/onboarding');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [loading, userLoading, firebaseUser, user, navigate]);
 
   useEffect(() => {
     const { linkGoogle } = (navigate as any).location?.state || {};
@@ -352,6 +385,7 @@ const SignIn: React.FC = () => {
 
               <div className="mb-5">
                 <button
+                 cypress-id="signin-button"
                   onClick={handleEmailSignin}
                   className="w-full cursor-pointer rounded-lg border border-primary bg-primary py-4 px-4 text-primary-foreground font-medium transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >

@@ -18,6 +18,10 @@ export interface Team {
     name: string;
     description: string | null;
     color: string | null;
+    icon?: string | null;
+    is_active?: boolean;
+    parent_team_id?: number | null;
+    team_lead_id?: number | null;
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
@@ -30,7 +34,8 @@ export interface Category {
     color: string;
     icon: string;
     enabled: boolean;
-    sla_id: number;
+    sla_id?: number | null;
+    approval_id?: number | null;
     team_id: number;
     workspace_id: number;
     status_transition_group_id: number;
@@ -46,8 +51,10 @@ export interface Template {
     category_id: number;
     priority_id: number | null;
     sla_id: number | null;
+    approval_id?: number | null;
     default_spot_id?: number | null;
     default_user_ids?: number[] | null;
+    expected_duration?: number | null;
     // Legacy/previous fields kept optional for compatibility during transition
     description?: string | null;
     team_id?: number;
@@ -72,6 +79,10 @@ export interface Task {
     spot_id: number | null;
     status_id: number;
     priority_id: number;
+    approval_id: number | null;
+    approval_status: 'pending' | 'approved' | 'rejected' | 'cancelled' | null;
+    approval_triggered_at: string | null;
+    approval_completed_at: string | null;
     start_date: string | null;
     due_date: string | null;
     expected_duration: number;
@@ -82,6 +93,7 @@ export interface Task {
     // Store responsible user IDs as JSON array for efficient storage
     // Most tasks have few responsible users, so this avoids a large junction table
     user_ids: number[] | null;
+    
     created_at: string;
     updated_at: string;
 }
@@ -90,6 +102,7 @@ export interface Status {
     id: number;
     name: string;
     action: 'NONE' | 'WORKING' | 'PAUSED' | 'FINISHED';
+    semantic_type?: string | null;
     color?: string | null;
     icon?: string | null;
     system: boolean;
@@ -104,6 +117,7 @@ export interface Priority {
     name: string;
     color?: string | null;
     level?: number | null;
+    category_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
 }
@@ -123,8 +137,44 @@ export interface Tag {
     id: number;
     name: string;
     color?: string | null;
+    icon?: string | null;
+    category_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
+}
+
+export interface Approval {
+    id: number;
+    name: string;
+    description?: string | null;
+    approval_type: 'SEQUENTIAL' | 'PARALLEL' | string;
+    require_all: boolean;
+    minimum_approvals?: number | null;
+    trigger_type: 'ON_CREATE' | 'ON_STATUS_CHANGE' | 'MANUAL' | 'CONDITIONAL' | string;
+    trigger_status_id?: number | null;
+    require_rejection_comment: boolean;
+    block_editing_during_approval: boolean;
+    deadline_type: 'hours' | 'date' | string;
+    deadline_value?: string | null;
+    is_active: boolean;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+    deleted_at?: string | Date | null;
+}
+
+export interface ApprovalApprover {
+    id: number;
+    approval_id: number;
+    approver_type: 'user' | 'role' | string;
+    approver_id: number;
+    scope?: 'global' | 'creator_department' | 'creator_manager' | 'specific_department' | string;
+    scope_id?: number | null;
+    required: boolean;
+    order_index: number;
+    created_by?: number | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+    deleted_at?: string | Date | null;
 }
 
 // High Priority - User Management & Authentication
@@ -133,6 +183,7 @@ export interface User {
     name: string;
     email: string;
     url_picture?: string | null;
+    color?: string | null;
     role_id?: number | null;
     workspace_id?: number | null;
     is_active: boolean;
@@ -161,6 +212,20 @@ export interface Permission {
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;
+}
+
+export type JobPositionLevel = 'executive' | 'director' | 'manager' | 'senior' | 'junior';
+
+export interface JobPosition {
+    id: number;
+    code: string;
+    title: string;
+    level: JobPositionLevel;
+    is_leadership: boolean;
+    is_active: boolean;
+    description?: string | null;
+    created_at?: string;
+    updated_at?: string;
 }
 
 // Relations & Assignments
@@ -422,13 +487,10 @@ export interface TaskRecurrence {
 // Invitations & Onboarding
 export interface Invitation {
     id: number;
-    email: string;
-    role_id?: number | null;
-    workspace_id?: number | null;
-    invited_by: number;
-    token: string;
-    expires_at: string;
-    accepted_at?: string | null;
+    invitation_token: string;
+    user_email?: string | null;
+    team_ids?: number[] | null;
+    tenant_domain_prefix?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -446,5 +508,19 @@ export interface Exception {
     resolved_at?: string | null;
     resolved_by?: number | null;
     created_at: string;
+}
+
+// Workflow Management (Coming Soon)
+export interface Workflow {
+    id: number;
+    name: string;
+    description?: string | null;
+    workspace_id?: number | null;
+    is_active: boolean;
+    trigger_conditions?: string | null; // JSON conditions for when workflow runs
+    actions?: string | null; // JSON array of actions to perform
+    created_by?: number | null;
+    created_at: string;
+    updated_at: string;
 }
 

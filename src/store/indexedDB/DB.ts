@@ -10,10 +10,11 @@ import {
   hasKEK,
 } from '@/crypto/crypto';
 import { getCurrentTenant } from '@/api/whagonsApi';
+import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.8.0';
+const CURRENT_DB_VERSION = '1.9.11';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -22,6 +23,7 @@ export class DB {
   static db: IDBDatabase;
   static inited = false;
   private static nuking = false;
+  private static deleting = false; // Track when database deletion is in progress
   private static initPromise: Promise<boolean> | null = null;
   // Per-store operation queue to serialize actions over the same object store
   private static storeQueues: Map<string, Promise<any>> = new Map();
@@ -49,8 +51,15 @@ export class DB {
   }
 
   private static isEncryptionEnabledForStore(storeName: string): boolean {
+    // First check explicit runtime overrides
     const override = DB.storeEncryptionOverrides.get(storeName);
     if (override !== undefined) return override;
+    
+    // Then check static config from encryptionConfig.ts (synchronous fallback)
+    if (DISABLED_ENCRYPTION_STORES.includes(storeName)) {
+      return false;
+    }
+    
     return DB.ENCRYPTION_ENABLED;
   }
 
@@ -132,12 +141,12 @@ export class DB {
           if (!db.objectStoreNames.contains('tags')) {
             db.createObjectStore('tags', { keyPath: 'id' });
           }
-          // Custom fields and category-field-assignments (GenericCache-backed)
+          // Custom fields and category custom fields (GenericCache-backed)
           if (!db.objectStoreNames.contains('custom_fields')) {
             db.createObjectStore('custom_fields', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('category_field_assignments')) {
-            db.createObjectStore('category_field_assignments', {
+          if (!db.objectStoreNames.contains('category_custom_fields')) {
+            db.createObjectStore('category_custom_fields', {
               keyPath: 'id',
             });
           }
@@ -177,6 +186,9 @@ export class DB {
           if (!db.objectStoreNames.contains('slas')) {
             db.createObjectStore('slas', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('sla_policies')) {
+            db.createObjectStore('sla_policies', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('sla_alerts')) {
             db.createObjectStore('sla_alerts', { keyPath: 'id' });
           }
@@ -197,6 +209,24 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('messages')) {
             db.createObjectStore('messages', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('job_positions')) {
+            db.createObjectStore('job_positions', { keyPath: 'id' });
+          }
+
+          
+
+          // Approvals
+          if (!db.objectStoreNames.contains('approvals')) {
+            db.createObjectStore('approvals', { keyPath: 'id' });
+          }
+          // Approval approvers
+          if (!db.objectStoreNames.contains('approval_approvers')) {
+            db.createObjectStore('approval_approvers', { keyPath: 'id' });
+          }
+          // Task approval instances
+          if (!db.objectStoreNames.contains('task_approval_instances')) {
+            db.createObjectStore('task_approval_instances', { keyPath: 'id' });
           }
 
           // Custom Fields & Values
@@ -282,9 +312,11 @@ export class DB {
           try { console.warn('DB.onversionchange: closing DB connection'); } catch {}
           try { DB.db?.close(); } catch {}
           DB.inited = false;
+          DB.deleting = false; // Reset deletion flag on version change
         };
       } catch {}
       DB.inited = true;
+      DB.deleting = false; // Ensure deletion flag is cleared after successful init
       try { console.log('DB.init: DB assigned and inited set to true'); } catch {}
       DB.initPromise = null as any;
       return true as any;
@@ -329,6 +361,9 @@ export class DB {
   }
 
   public static async deleteDatabase(userID: string): Promise<void> {
+    // Mark deletion as in progress to prevent operations during deletion
+    DB.deleting = true;
+    
     // Clear session storage for good measure
     sessionStorage.clear();
 
@@ -371,6 +406,7 @@ export class DB {
       // Create a timeout to prevent indefinite hanging
       const timeout = setTimeout(() => {
         console.warn('Database deletion timed out after 5 seconds');
+        DB.deleting = false; // Reset flag on timeout
         resolve(); // Resolve anyway to prevent hanging
       }, 5000);
 
@@ -380,12 +416,14 @@ export class DB {
         request.onsuccess = () => {
           clearTimeout(timeout);
           console.log('Database successfully deleted');
+          DB.deleting = false; // Reset flag on success
           resolve();
         };
 
         request.onerror = () => {
           clearTimeout(timeout);
           console.error('Error deleting database:', request.error);
+          DB.deleting = false; // Reset flag on error
           // Still resolve to prevent hanging
           resolve();
         };
@@ -398,6 +436,7 @@ export class DB {
       } catch (err) {
         clearTimeout(timeout);
         console.error('Exception during database deletion:', err);
+        DB.deleting = false; // Reset flag on exception
         resolve(); // Resolve anyway to prevent hanging
       }
     });
@@ -416,7 +455,7 @@ export class DB {
       | 'spots'
       | 'tags'
       | 'custom_fields'
-      | 'category_field_assignments'
+      | 'category_custom_fields'
       | 'users'
       | 'roles'
       | 'permissions'
@@ -428,12 +467,18 @@ export class DB {
       | 'task_tags'
       | 'spot_types'
       | 'slas'
+      | 'sla_policies'
       | 'sla_alerts'
       | 'category_priorities'
       | 'forms'
       | 'invitations'
       | 'task_logs'
       | 'templates'
+      | 'messages'
+      | 'job_positions'
+      | 'status_transition_groups'
+      | 'approval_approvers'
+      | 'task_approval_instances'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -450,6 +495,7 @@ export class DB {
       | 'avatars',
     mode: IDBTransactionMode = 'readonly'
   ) {
+    if (DB.deleting) throw new Error('DB deletion in progress');
     if (!DB.inited) throw new Error('DB not initialized');
     if (!DB.db) throw new Error('DB not initialized');
     return DB.db.transaction(name, mode).objectStore(name);
@@ -466,7 +512,7 @@ export class DB {
       | 'spots'
       | 'tags'
       | 'custom_fields'
-      | 'category_field_assignments'
+      | 'category_custom_fields'
       | 'users'
       | 'roles'
       | 'permissions'
@@ -478,12 +524,18 @@ export class DB {
       | 'task_tags'
       | 'spot_types'
       | 'slas'
+      | 'sla_policies'
       | 'sla_alerts'
       | 'category_priorities'
       | 'forms'
       | 'invitations'
       | 'task_logs'
       | 'templates'
+      | 'messages'
+      | 'job_positions'
+      | 'status_transition_groups'
+      | 'approval_approvers'
+      | 'task_approval_instances'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -527,6 +579,10 @@ export class DB {
         console.warn('[DB] getAll skipped during nuking');
         return [] as any[];
       }
+      if (DB.deleting) {
+        console.warn('[DB] getAll skipped during deletion');
+        return [] as any[];
+      }
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
         console.warn(`[DB] getAll: DB not initialized for ${storeName}`);
@@ -534,21 +590,63 @@ export class DB {
       }
 
       // Use an explicit transaction and await its completion to ensure read consistency
-      const tx = DB.db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName as any);
-      const rows = await new Promise<any[]>((resolve, reject) => {
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error as any);
-      });
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error as any);
-        tx.onabort = () => reject(tx.error as any);
-      });
-      if (!DB.isEncryptionEnabledForStore(storeName)) return rows.filter((r) => r != null);
-      // If encrypted rows exist, make sure KEK/CEK are ready before attempting decrypt
+      // Catch InvalidStateError and retry once after ensuring DB is ready
+      let rows: any[];
+      try {
+        const tx = DB.db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName as any);
+        rows = await new Promise<any[]>((resolve, reject) => {
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error as any);
+        });
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error as any);
+          tx.onabort = () => reject(tx.error as any);
+        });
+      } catch (error: any) {
+        // Catch InvalidStateError specifically - DB connection is closing
+        if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
+          console.warn(`[DB] getAll: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          // Reset state
+          DB.inited = false;
+          DB.db = undefined as unknown as IDBDatabase;
+          // Wait a bit for deletion/closure to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          // Retry init and operation once
+          await DB.init();
+          if (!DB.inited || !DB.db || DB.deleting) {
+            console.warn(`[DB] getAll: DB not ready after retry for ${storeName}`);
+            return [] as any[];
+          }
+          // Retry the transaction
+          const tx = DB.db.transaction(storeName, 'readonly');
+          const store = tx.objectStore(storeName as any);
+          rows = await new Promise<any[]>((resolve, reject) => {
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error as any);
+          });
+          await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error as any);
+            tx.onabort = () => reject(tx.error as any);
+          });
+        } else {
+          // Re-throw other errors
+          throw error;
+        }
+      }
+      
+      // If any encrypted rows exist (even if encryption is currently disabled),
+      // attempt to decrypt for backward compatibility with previously-encrypted caches
       const hasEncrypted = rows.some((r) => r && r.enc && r.enc.ct);
+      if (!hasEncrypted) {
+        return rows.filter((r) => r != null);
+      }
+      
+      // For encrypted rows, ensure crypto is initialized and CEK ready
       if (hasEncrypted) {
         if (!CryptoHandler.inited) await CryptoHandler.init();
         try {
@@ -594,24 +692,64 @@ export class DB {
         console.warn('[DB] get skipped during nuking');
         return null;
       }
+      if (DB.deleting) {
+        console.warn('[DB] get skipped during deletion');
+        return null;
+      }
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
         console.warn(`[DB] get: DB not initialized for ${storeName}`);
         return null;
       }
       // Use an explicit transaction and await its completion for consistent reads
-      const tx = DB.db.transaction(storeName, 'readonly');
-      const store = tx.objectStore(storeName as any);
-      const rec = await new Promise<any>((resolve, reject) => {
-        const req = store.get(DB.toKey(key));
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error as any);
-      });
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error as any);
-        tx.onabort = () => reject(tx.error as any);
-      });
+      // Catch InvalidStateError and retry once after ensuring DB is ready
+      let rec: any;
+      try {
+        const tx = DB.db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName as any);
+        rec = await new Promise<any>((resolve, reject) => {
+          const req = store.get(DB.toKey(key));
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error as any);
+        });
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error as any);
+          tx.onabort = () => reject(tx.error as any);
+        });
+      } catch (error: any) {
+        // Catch InvalidStateError specifically - DB connection is closing
+        if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
+          console.warn(`[DB] get: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          // Reset state
+          DB.inited = false;
+          DB.db = undefined as unknown as IDBDatabase;
+          // Wait a bit for deletion/closure to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          // Retry init and operation once
+          await DB.init();
+          if (!DB.inited || !DB.db || DB.deleting) {
+            console.warn(`[DB] get: DB not ready after retry for ${storeName}`);
+            return null;
+          }
+          // Retry the transaction
+          const tx = DB.db.transaction(storeName, 'readonly');
+          const store = tx.objectStore(storeName as any);
+          rec = await new Promise<any>((resolve, reject) => {
+            const req = store.get(DB.toKey(key));
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error as any);
+          });
+          await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error as any);
+            tx.onabort = () => reject(tx.error as any);
+          });
+        } else {
+          // Re-throw other errors
+          throw error;
+        }
+      }
       if (!rec) return null;
       if (!DB.isEncryptionEnabledForStore(storeName) || !(rec && rec.enc && rec.enc.ct)) return rec;
       return await DB.decryptEnvelope(storeName, rec);
@@ -623,6 +761,10 @@ export class DB {
     const rowCopy = row ? JSON.parse(JSON.stringify(row)) : null;
 
     return DB.runExclusive(storeName, async () => {
+      if (DB.deleting) {
+        console.warn('[DB] put skipped during deletion');
+        return;
+      }
       if (!DB.inited) await DB.init();
 
       // Debug: Log only if there's an issue
@@ -684,36 +826,79 @@ export class DB {
       }
 
 
-      const tx = DB.db.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName as any);
-      // Debug: store keyPath visibility
+      // Catch InvalidStateError and retry once after ensuring DB is ready
       try {
-        const dbg = localStorage.getItem('wh-debug-cache') === 'true';
-        if (dbg) {
-          const kp = (store as any)?.keyPath;
-          console.log('DB.put: target store', { storeName, keyPath: kp, payloadHasId: payload?.id !== undefined && payload?.id !== null, payloadId: payload?.id });
-        }
-      } catch {}
-      const putRequest = store.put(payload);
+        const tx = DB.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName as any);
+        // Debug: store keyPath visibility
+        try {
+          const dbg = localStorage.getItem('wh-debug-cache') === 'true';
+          if (dbg) {
+            const kp = (store as any)?.keyPath;
+            console.log('DB.put: target store', { storeName, keyPath: kp, payloadHasId: payload?.id !== undefined && payload?.id !== null, payloadId: payload?.id });
+          }
+        } catch {}
+        const putRequest = store.put(payload);
 
-      putRequest.onerror = (event) => {
-        console.error(`DB.put: IndexedDB put request failed for ${storeName}`, {
-          error: putRequest.error,
-          event,
-          payload,
-          storeName
+        putRequest.onerror = (event) => {
+          console.error(`DB.put: IndexedDB put request failed for ${storeName}`, {
+            error: putRequest.error,
+            event,
+            payload,
+            storeName
+          });
+        };
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error as any);
+          tx.onabort = () => reject(tx.error as any);
         });
-      };
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error as any);
-        tx.onabort = () => reject(tx.error as any);
-      });
+      } catch (error: any) {
+        // Catch InvalidStateError specifically - DB connection is closing
+        if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
+          console.warn(`[DB] put: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          // Reset state
+          DB.inited = false;
+          DB.db = undefined as unknown as IDBDatabase;
+          // Wait a bit for deletion/closure to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          // Retry init and operation once
+          await DB.init();
+          if (!DB.inited || !DB.db || DB.deleting) {
+            console.warn(`[DB] put: DB not ready after retry for ${storeName}`);
+            return;
+          }
+          // Retry the transaction
+          const tx = DB.db.transaction(storeName, 'readwrite');
+          const store = tx.objectStore(storeName as any);
+          const putRequest = store.put(payload);
+          putRequest.onerror = (event) => {
+            console.error(`DB.put: IndexedDB put request failed for ${storeName}`, {
+              error: putRequest.error,
+              event,
+              payload,
+              storeName
+            });
+          };
+          await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error as any);
+            tx.onabort = () => reject(tx.error as any);
+          });
+        } else {
+          // Re-throw other errors
+          throw error;
+        }
+      }
     });
   }
 
   public static async bulkPut(storeName: string, rows: any[]): Promise<void> {
     return DB.runExclusive(storeName, async () => {
+      if (DB.deleting) {
+        console.warn('[DB] bulkPut skipped during deletion');
+        return;
+      }
       if (!DB.inited) await DB.init();
 
       // Same rationale as put(): precompute all encryption material before opening
@@ -735,14 +920,45 @@ export class DB {
         }
         payloads = envelopes;
       }
-      const tx = DB.db.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName as any);
-      for (const p of payloads) store.put(p);
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error as any);
-        tx.onabort = () => reject(tx.error as any);
-      });
+      // Catch InvalidStateError and retry once after ensuring DB is ready
+      try {
+        const tx = DB.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName as any);
+        for (const p of payloads) store.put(p);
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error as any);
+          tx.onabort = () => reject(tx.error as any);
+        });
+      } catch (error: any) {
+        // Catch InvalidStateError specifically - DB connection is closing
+        if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
+          console.warn(`[DB] bulkPut: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          // Reset state
+          DB.inited = false;
+          DB.db = undefined as unknown as IDBDatabase;
+          // Wait a bit for deletion/closure to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          // Retry init and operation once
+          await DB.init();
+          if (!DB.inited || !DB.db || DB.deleting) {
+            console.warn(`[DB] bulkPut: DB not ready after retry for ${storeName}`);
+            return;
+          }
+          // Retry the transaction
+          const tx = DB.db.transaction(storeName, 'readwrite');
+          const store = tx.objectStore(storeName as any);
+          for (const p of payloads) store.put(p);
+          await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error as any);
+            tx.onabort = () => reject(tx.error as any);
+          });
+        } else {
+          // Re-throw other errors
+          throw error;
+        }
+      }
     });
   }
 
@@ -752,14 +968,56 @@ export class DB {
   ): Promise<void> {
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
-      DB.getStoreWrite(storeName as any).delete(DB.toKey(key));
+      if (!DB.inited || !DB.db) {
+        throw new Error('DB not initialized');
+      }
+      
+      const tx = DB.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName as any);
+      const deleteRequest = store.delete(DB.toKey(key));
+      
+      deleteRequest.onerror = (event) => {
+        console.error(`DB.delete: IndexedDB delete request failed for ${storeName}`, {
+          error: deleteRequest.error,
+          event,
+          key,
+          storeName
+        });
+      };
+      
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
     });
   }
 
   public static async clear(storeName: string): Promise<void> {
+    console.warn(`[DB] Clearing IndexedDB store: ${storeName}`, new Error().stack);
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
-      DB.getStoreWrite(storeName as any).clear();
+      if (!DB.inited || !DB.db) {
+        throw new Error('DB not initialized');
+      }
+      
+      const tx = DB.db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName as any);
+      const clearRequest = store.clear();
+      
+      clearRequest.onerror = (event) => {
+        console.error(`DB.clear: IndexedDB clear request failed for ${storeName}`, {
+          error: clearRequest.error,
+          event,
+          storeName
+        });
+      };
+      
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error as any);
+        tx.onabort = () => reject(tx.error as any);
+      });
     });
   }
 
@@ -827,9 +1085,13 @@ export class DB {
     }
   }
 
-  private static async ensureCEKForStore(storeName: string): Promise<boolean> {
+  public static async ensureCEKForStore(storeName: string): Promise<boolean> {
     return DB.runExclusive('cache_keys', async () => {
       if (DB.nuking) return false;
+      if (DB.deleting) {
+        // When DB is being deleted/closed, skip CEK work silently
+        return false;
+      }
       if (!DB.inited) await DB.init();
       if (CryptoHandler.kid == null || !CryptoHandler.inited) {
         await CryptoHandler.init();
@@ -841,6 +1103,10 @@ export class DB {
       }
 
       if (!DB.db) {
+        if (DB.deleting) {
+          // Transient during deletion/version change
+          return false;
+        }
         console.warn('[DB] ensureCEKForStore: DB not ready');
         return false;
       }
@@ -889,6 +1155,19 @@ export class DB {
           return false;
         }
       } catch (error) {
+        const msg = String((error as any)?.message || '');
+        const name = (error as any)?.name;
+        const isClosing =
+          name === 'InvalidStateError' ||
+          msg.includes('connection is closing') ||
+          msg.includes("Failed to execute 'transaction'");
+
+        if (isClosing || DB.deleting) {
+          // Transient DB closure during delete/version-change; skip CEK ensure without treating as crypto mismatch
+          console.warn(`[DB] ensureCEKForStore transient DB error for ${storeName} (connection closing); skipping`);
+          return false;
+        }
+
         console.warn(`[DB] ensureCEKForStore error for ${storeName}:`, error);
         const isUnwrap = String((error as any)?.message || error || '').toLowerCase().includes('unwrap');
         const kekReady = await hasKEK();

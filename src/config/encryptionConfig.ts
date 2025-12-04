@@ -30,12 +30,8 @@ export interface EncryptionConfig {
  * - 'custom_fields' - Custom field definitions
  */
 export const DISABLED_ENCRYPTION_STORES: string[] = [
-  // Add store names here to disable encryption for them
-  'tasks',           // Fast rendering for tasks
-  // 'categories',   // Uncomment to disable encryption for categories
-  // 'workspaces',   // Uncomment to disable encryption for workspaces
-  // 'teams',        // Uncomment to disable encryption for teams
-  // Add more stores as needed...
+  // Only disable encryption for tasks (legacy requirement for TasksCache)
+  'tasks',
 ];
 
 /**

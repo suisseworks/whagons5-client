@@ -4,11 +4,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faSpinner, faTrash, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from '@/store/genericSlices';
+import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Category } from "@/store/types";
+import api from "@/api/whagonsApi";
 
 type CategoryFieldAssignment = { 
   id: number; 
@@ -38,36 +38,43 @@ export interface CategoryFieldsManagerProps {
 export function CategoryFieldsManager({ open, onOpenChange, category }: CategoryFieldsManagerProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { value: customFields } = useSelector((state: RootState) => state.customFields) as { value: CustomField[] };
-  const { value: categoryFieldAssignments } = useSelector((state: RootState) => state.categoryFieldAssignments) as { value: CategoryFieldAssignment[] };
+  const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: CategoryFieldAssignment[] };
   
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [newFieldId, setNewFieldId] = useState<string>("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [localAssignments, setLocalAssignments] = useState<CategoryFieldAssignment[]>([]);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const lastMutationRef = React.useRef<number>(0);
+  const [deleteTarget, setDeleteTarget] = useState<CategoryFieldAssignment | null>(null);
+
+  // Accessors tolerant to API shape differences (snake_case vs camelCase)
+  const getCategoryId = (a: any): number => Number(a?.category_id ?? a?.categoryId ?? a?.categoryID ?? a?.categoryid);
+  const getFieldId = (a: any): number => Number(a?.field_id ?? a?.fieldId ?? a?.custom_field_id ?? a?.customFieldId);
 
   const currentAssignments = useMemo(() => {
     if (!category) return [] as CategoryFieldAssignment[];
-    return (categoryFieldAssignments as CategoryFieldAssignment[])
-      .filter(a => a.category_id === category.id)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  }, [categoryFieldAssignments, category]);
+    const cid = Number(category.id);
+    const source = localAssignments.length ? localAssignments : (categoryCustomFields as CategoryFieldAssignment[]);
+    return source
+      .filter(a => getCategoryId(a) === cid)
+      .sort((a, b) => ((a as any).order ?? 0) - ((b as any).order ?? 0));
+  }, [localAssignments, categoryCustomFields, category]);
 
-  const assignedFieldIds = useMemo(() => new Set(currentAssignments.map(a => a.field_id)), [currentAssignments]);
+  const assignedFieldIds = useMemo(() => new Set(currentAssignments.map(a => getFieldId(a))), [currentAssignments]);
   const availableFields = useMemo(() => {
-    return (customFields as CustomField[]).filter(f => !assignedFieldIds.has(f.id));
+    return (customFields as CustomField[]).filter(f => !assignedFieldIds.has(Number(f.id)));
   }, [customFields, assignedFieldIds]);
 
   const loadData = useCallback(async () => {
     if (!category) return;
     try {
       await Promise.all([
-        dispatch(genericActions.customFields.getFromIndexedDB()),
-        dispatch(genericActions.categoryFieldAssignments.getFromIndexedDB()),
-      ]);
-      await Promise.all([
         dispatch(genericActions.customFields.fetchFromAPI() as any),
-        dispatch(genericActions.categoryFieldAssignments.fetchFromAPI({ category_id: category.id }) as any),
+        dispatch(genericActions.categoryCustomFields.fetchFromAPI() as any),
       ]);
+      await refreshFromCache();
     } catch (e) {
       console.error('Error loading fields/assignments', e);
     }
@@ -80,21 +87,136 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     }
   }, [open, category, loadData]);
 
+  // Local cache refresh helper
+  const refreshFromCache = useCallback(async () => {
+    if (!category) return;
+    try {
+      const rows = await genericCaches.categoryCustomFields.getAll();
+      const cid = Number(category.id);
+      const filtered = rows.filter((r: any) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
+      if (filtered.length === 0) {
+        // Fallback to Redux state if cache is empty (e.g., encryption not ready)
+        const reduxRows = (categoryCustomFields as any[]).filter((r) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
+        const recentlyMutated = Date.now() - lastMutationRef.current < 2000;
+        if (reduxRows.length) {
+          // Merge with local (preserve optimistic entries)
+          setLocalAssignments(prev => {
+            const byId = new Map<number, any>();
+            for (const r of reduxRows as any[]) if (r && r.id != null) byId.set(Number(r.id), r);
+            const out: any[] = [];
+            // Include server/redux rows first
+            for (const r of byId.values()) out.push(r);
+            // Preserve any optimistic (negative id) not yet matched
+            for (const r of prev) if (r && r.id < 0) out.push(r);
+            return out;
+          });
+          return;
+        }
+        // If nothing yet and we just mutated, keep current local view to avoid flash-removal
+        if (recentlyMutated) {
+          return;
+        }
+      }
+      if (filtered.length > 0) {
+        // Merge cache rows with any optimistic rows: replace optimistic if same field/category
+        setLocalAssignments(prev => {
+          const out: any[] = [];
+          const byId = new Map<number, any>();
+          const byKey = new Map<string, any>();
+          for (const r of filtered as any[]) {
+            if (r && r.id != null) byId.set(Number(r.id), r);
+            const key = `${Number((r as any)?.field_id ?? (r as any)?.fieldId)}-${Number((r as any)?.category_id ?? (r as any)?.categoryId)}`;
+            byKey.set(key, r);
+          }
+          // Start with server rows
+          for (const r of byId.values()) out.push(r);
+          // Add optimistic ones that don't have a matching server row yet
+          for (const r of prev) {
+            if (r && r.id < 0) {
+              const key = `${Number((r as any)?.field_id ?? (r as any)?.fieldId)}-${Number((r as any)?.category_id ?? (r as any)?.categoryId)}`;
+              if (!byKey.has(key)) out.push(r);
+            }
+          }
+          return out;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [category]);
+
+  // Subscribe to generic events to keep the dialog in sync
+  React.useEffect(() => {
+    if (!open || !category) return;
+    const names = genericEventNames.categoryCustomFields;
+    const off1 = genericEvents.on(names.CREATED, refreshFromCache);
+    const off2 = genericEvents.on(names.UPDATED, refreshFromCache);
+    const off3 = genericEvents.on(names.DELETED, refreshFromCache);
+    return () => { off1(); off2(); off3(); };
+  }, [open, category, refreshFromCache]);
+
   const addAssignment = async () => {
     if (!category || !newFieldId) return;
+    if (assignedFieldIds.has(Number(newFieldId))) {
+      setInlineError('Field already assigned to this category.');
+      return;
+    }
+    setInlineError(null);
     setAssignSubmitting(true);
     try {
+      lastMutationRef.current = Date.now();
+      const dbg = true;
+      if (dbg) console.log('[CFM] addAssignment start', { category, newFieldId });
       const nextOrder = currentAssignments.length > 0 ? Math.max(...currentAssignments.map(a => a.order || 0)) + 1 : 0;
-      await dispatch(genericActions.categoryFieldAssignments.addAsync({
+      // Optimistic local push to avoid flash if cache write lags
+      const optimistic: any = {
+        id: -Date.now(),
         field_id: parseInt(newFieldId, 10),
-        category_id: category.id,
+        category_id: Number(category.id),
+        is_required: false,
+        order: nextOrder,
+        default_value: null,
+      };
+      setLocalAssignments(prev => [...prev, optimistic]);
+
+      const saved = await dispatch(genericActions.categoryCustomFields.addAsync({
+        field_id: parseInt(newFieldId, 10),
+        custom_field_id: parseInt(newFieldId, 10),
+        category_id: Number(category.id),
         is_required: false,
         order: nextOrder,
         default_value: null,
       } as any)).unwrap();
+      if (dbg) console.log('[CFM] addAssignment saved', saved);
       setNewFieldId("");
-    } catch (e) {
-      console.error('Error adding assignment', e);
+      // Replace optimistic row with server row to prevent flash-removal
+      setLocalAssignments(prev => {
+        const copy = [...prev];
+        const idx = copy.findIndex(r => r.id === optimistic.id);
+        if (idx !== -1) copy[idx] = saved as any; else copy.push(saved as any);
+        return copy;
+      });
+      // Background refresh
+      refreshFromCache();
+
+      // Debug: verify server and cache immediately
+      try {
+        const resp = await api.get('/category-field-assignments', { params: { category_id: Number(category.id), per_page: 1000 } });
+        const serverRows = (resp.data?.data ?? resp.data?.rows ?? resp.data) as any[];
+        console.log('[CFM] server list', serverRows);
+      const cacheRows = await genericCaches.categoryCustomFields.getAll();
+        console.log('[CFM] cache list (all)', cacheRows);
+        const cid = Number(category.id);
+        console.log('[CFM] cache list (filtered)', cacheRows.filter((r: any) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid));
+      } catch (e) {
+        console.log('[CFM] debug fetch error', e);
+      }
+    } catch (e: any) {
+      console.error('Error adding assignment', e?.response?.data || e);
+      // If server add fails, remove our optimistic row
+      setLocalAssignments(prev => prev.filter(r => r.id >= 0));
+      const msg = e?.response?.data?.message || e?.response?.data?.error || (Array.isArray(e?.response?.data?.errors) ? e.response.data.errors.join(', ') : '') || e?.message || 'Failed to add field';
+      setInlineError(String(msg));
     } finally {
       setAssignSubmitting(false);
     }
@@ -103,7 +225,8 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const removeAssignment = async (assignment: CategoryFieldAssignment) => {
     setAssignSubmitting(true);
     try {
-      await dispatch(genericActions.categoryFieldAssignments.removeAsync(assignment.id)).unwrap();
+      await dispatch(genericActions.categoryCustomFields.removeAsync(assignment.id)).unwrap();
+      await refreshFromCache();
     } catch (e) {
       console.error('Error removing assignment', e);
     } finally {
@@ -113,7 +236,8 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
 
   const updateAssignment = async (assignmentId: number, updates: Partial<CategoryFieldAssignment>) => {
     try {
-      await dispatch(genericActions.categoryFieldAssignments.updateAsync({ id: assignmentId, updates } as any)).unwrap();
+      await dispatch(genericActions.categoryCustomFields.updateAsync({ id: assignmentId, updates } as any)).unwrap();
+      await refreshFromCache();
     } catch (e) {
       console.error('Error updating assignment', e);
     }
@@ -131,6 +255,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         updateAssignment(a.id, { order: desired } as any);
       }
     }
+    await refreshFromCache();
   };
 
   // Helpers to render default value editor by field type
@@ -281,7 +406,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
 
   return (
     <Dialog open={open} onOpenChange={closeDialog}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Manage Fields{category ? ` • ${category.name}` : ''}</DialogTitle>
           <DialogDescription>
@@ -305,6 +430,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
               {assignSubmitting ? <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" /> : <FontAwesomeIcon icon={faPlus} className="mr-2" />}
               Add Field
             </Button>
+            {inlineError && <span className="text-sm text-red-600 ml-2">{inlineError}</span>}
           </div>
 
           {currentAssignments.length === 0 ? (
@@ -322,7 +448,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
               </div>
               <div className="divide-y">
                 {currentAssignments.map((a, idx) => {
-                  const f = (customFields as CustomField[]).find(cf => cf.id === a.field_id);
+                  const f = (customFields as CustomField[]).find(cf => Number(cf.id) === getFieldId(a));
                   return (
                     <div
                       key={a.id}
@@ -354,7 +480,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
                         {renderDefaultValueEditor(a, f)}
                       </div>
                       <div className="col-span-1 flex items-center justify-end gap-1">
-                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => removeAssignment(a)} title="Remove field" aria-label="Remove field">
+                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(a)} title="Remove field" aria-label="Remove field">
                           <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -370,6 +496,27 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
           <Button variant="outline" onClick={closeDialog}>Close</Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Confirm delete assignment */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove field from category</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const fid = deleteTarget ? getFieldId(deleteTarget) : null;
+                const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
+                const name = f?.name || (fid != null ? `Field #${fid}` : 'this field');
+                return `Are you sure you want to remove "${name}" from ${category?.name ?? 'this category'}? This does not delete the custom field itself.`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={async () => { if (deleteTarget) { await removeAssignment(deleteTarget); setDeleteTarget(null); } }}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

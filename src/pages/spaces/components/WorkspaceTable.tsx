@@ -1,101 +1,150 @@
 'use client';
 
-import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense, forwardRef, useImperativeHandle } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { TaskEvents } from '@/store/eventEmiters/taskEvents';
-import 'ag-grid-enterprise';
-import { LicenseManager } from 'ag-grid-enterprise';
-import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '@/store';
+import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { updateTaskAsync } from '@/store/reducers/tasksSlice';
-
-import type { User, Task } from '@/store/types';
 import { iconService } from '@/database/iconService';
-import HoverPopover from '@/pages/spaces/components/HoverPopover';
-import StatusCell from '@/pages/spaces/components/StatusCell';
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-import localizedFormat from 'dayjs/plugin/localizedFormat';
-import { AvatarCache } from '@/store/indexedDB/AvatarCache';
+import { buildWorkspaceColumns } from './workspaceTable/columns';
+import { genericActions } from '@/store/genericSlices';
 
-// Helper functions for user display
-const getUserInitials = (user: User): string => {
-  if (user?.name) {
-    return user.name.split(' ').map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2);
+// Import abstracted utilities
+import { loadAgGridModules, createDefaultColDef, createGridOptions } from './workspaceTable/agGridSetup';
+import {
+  getUserDisplayName,
+  getUsersFromIds,
+  formatDueDate
+} from './workspaceTable/userUtils';
+import { GRID_CONSTANTS, createLoadingSpinner, createGridContainer } from './workspaceTable/gridConfig';
+import { setupTaskEventHandlers } from './workspaceTable/eventHandlers';
+import {
+  useGridReduxState,
+  useDerivedGridState,
+  useMetadataLoadedFlags
+} from './workspaceTable/gridState';
+import {
+  createStatusMap,
+  createPriorityMap,
+  createSpotMap,
+  createUserMap,
+  createCategoryToGroup,
+  createTransitionsByGroupFrom,
+  createFilteredPriorities,
+  createTagMap
+} from './workspaceTable/mappers';
+const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'name', 'description', 'due_date']);
+
+const sanitizeFilterModel = (model: any): any => {
+  if (!model || typeof model !== 'object') return {};
+  const cleaned: any = {};
+  for (const key of Object.keys(model)) {
+    if (ALLOWED_FILTER_KEYS.has(key)) cleaned[key] = model[key];
   }
-  if (user?.email) {
-    return user.email.slice(0, 2).toUpperCase();
-  }
-  return 'U';
+  return cleaned;
 };
 
-const getUserDisplayName = (user: User): string => {
-  return user?.name || user?.email || 'User';
+// Normalize a filter model for AG Grid's internal expectations (string keys for set filters)
+const normalizeFilterModelForGrid = (raw: any): any => {
+  if (!raw || typeof raw !== 'object') return {};
+  const fm = sanitizeFilterModel(raw);
+  for (const key of ['status_id', 'priority_id', 'spot_id']) {
+    if (fm[key]) {
+      const st = { ...fm[key] } as any;
+      if ((st as any).filterType === 'set') {
+        const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
+        st.values = rawValues.map((v) => String(v));
+        fm[key] = st;
+      }
+    }
+  }
+  return fm;
 };
 
-
-
-// Initialize dayjs plugins
-dayjs.extend(relativeTime);
-dayjs.extend(localizedFormat);
-
-// Avatar images are cached globally via AvatarCache (IndexedDB)
-
-const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
-if (AG_GRID_LICENSE) {
-  LicenseManager.setLicenseKey(AG_GRID_LICENSE);
-} else {
-  console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
-}
+const normalizeFilterModelForQuery = (raw: any): any => {
+  const fm = sanitizeFilterModel(raw);
+  if (fm.status_id) {
+    const st = { ...fm.status_id } as any;
+    const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
+    const hasNonNumeric = rawValues.some((v) => isNaN(Number(v)));
+    st.values = hasNonNumeric ? rawValues.map((v) => String(v)) : rawValues.map((v) => Number(v));
+    fm.status_id = st;
+  }
+  // Text/date filters pass through unchanged
+  for (const key of ['priority_id', 'spot_id']) {
+    if (fm[key]) {
+      const st = { ...fm[key] } as any;
+      const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
+      st.values = rawValues.map((v) => Number(v));
+      fm[key] = st;
+    }
+  }
+  return fm;
+};
+import { buildGetRows } from './workspaceTable/dataSource';
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
 
-const loadRequiredModules = async () => {
-  const community: any = await import('ag-grid-community');
-  const enterprise: any = await import('ag-grid-enterprise');
 
-  const { ModuleRegistry } = community;
-
-  const pick = (pkg: any, name: string) => (pkg && pkg[name]) || null;
-
-  const toRegister = [
-    // community
-    'TextFilterModule',
-    'NumberFilterModule',
-    'DateFilterModule',
-    'CustomFilterModule',
-    'ExternalFilterModule',
-    'QuickFilterModule',
-    'InfiniteRowModelModule',
-    // enterprise
-    'SetFilterModule',
-    'MultiFilterModule',
-    'AdvancedFilterModule',
-    'ServerSideRowModelModule',
-  ]
-    .map((n) => pick(community, n) || pick(enterprise, n))
-    .filter(Boolean);
-
-  ModuleRegistry.registerModules(toRegister);
+export type WorkspaceTableHandle = {
+  clearFilters: () => void;
+  hasFilters: () => boolean;
+  setFilterModel: (model: any) => void;
+  getFilterModel: () => any;
 };
 
-const WorkspaceTable = ({ 
-  rowCache, 
-  workspaceId,
-  searchText = ''
-}: { 
-  rowCache: React.MutableRefObject<Map<string, { rows: any[]; rowCount: number }>>; 
+const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
+  rowCache: React.MutableRefObject<Map<string, { rows: any[]; rowCount: number }>>;
   workspaceId: string;
   searchText?: string;
-}) => {
-  const containerStyle = useMemo(() => ({ width: '100%', height: '100%' }), []);
-  const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
+  onFiltersChanged?: (active: boolean) => void;
+  onSelectionChanged?: (selectedIds: number[]) => void;
+  onRowDoubleClicked?: (task: any) => void;
+  rowHeight?: number;
+  groupBy?: 'none' | 'spot_id' | 'status_id' | 'priority_id';
+  collapseGroups?: boolean;
+  onReady?: () => void;
+  onModeChange?: (info: { useClientSide: boolean; totalFiltered: number }) => void;
+  tagDisplayMode?: 'icon' | 'icon-text';
+}>(({
+  rowCache,
+  workspaceId,
+  searchText = '',
+  onFiltersChanged,
+  onSelectionChanged,
+  onRowDoubleClicked,
+  rowHeight,
+  groupBy = 'none',
+  collapseGroups = true,
+  onReady,
+  onModeChange,
+  tagDisplayMode = 'icon-text',
+}, ref): React.ReactNode => {
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
+  const externalFilterModelRef = useRef<any>({});
+  const debugFilters = useRef<boolean>(false);
+  const lastDoubleClickRef = useRef<{ rowId: any; timestamp: number } | null>(null);
+  useEffect(() => {
+    try { debugFilters.current = localStorage.getItem('wh-debug-filters') === 'true'; } catch { debugFilters.current = false; }
+  }, []);
+  // Preload any saved filter model so effects that reset columnDefs can reapply it
+  // even before onGridReady/onReady run.
+  useEffect(() => {
+    try {
+      const key = `wh_workspace_filters_${(workspaceId || 'all')}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        externalFilterModelRef.current = normalizeFilterModelForGrid(parsed);
+      } else {
+        externalFilterModelRef.current = {};
+      }
+    } catch {
+      externalFilterModelRef.current = {};
+    }
+  }, [workspaceId]);
   // Refs to avoid stale closures so we can refresh cache without rebinding datasource
   const searchRef = useRef<string>(searchText);
   useEffect(() => { searchRef.current = searchText; }, [searchText]);
@@ -104,34 +153,43 @@ const WorkspaceTable = ({
 
   // Load modules on component mount
   useEffect(() => {
-    loadRequiredModules()
+    loadAgGridModules()
       .then(() => {
         setModulesLoaded(true);
       })
       .catch(console.error);
   }, []);
 
-  // Removed unused getCacheKey helper
-
-  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
-  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
-  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
-  const workspaces = useSelector((s: RootState) => (s as any).workspaces.value as any[]);
-  const users = useSelector((s: RootState) => (s as any).users.value as User[]);
-  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
-  const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
+  // Redux state management
   const dispatch = useDispatch<AppDispatch>();
-  const isAllWorkspaces = useMemo(() => workspaceId === 'all', [workspaceId]);
-  const workspaceNumericId = useMemo(() => isAllWorkspaces ? null : Number(workspaceId), [workspaceId, isAllWorkspaces]);
-  const currentWorkspace = useMemo(() => {
-    if (isAllWorkspaces) return null;
-    return workspaces.find((w: any) => Number(w.id) === workspaceNumericId);
-  }, [workspaces, workspaceNumericId, isAllWorkspaces]);
-  const defaultCategoryId = currentWorkspace?.category_id ?? null;
+  const reduxState = useGridReduxState();
+  const derivedState = useDerivedGridState(reduxState, { workspaceId, searchText });
 
   // State for status icons
   const [statusIcons, setStatusIcons] = useState<{ [key: string]: any }>({});
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
+
+  // Extract state from abstracted hooks
+  const {
+    statuses,
+    priorities,
+    spots,
+    users,
+    categories,
+    statusTransitions,
+    approvals,
+    approvalApprovers,
+    taskApprovalInstances,
+    tags,
+    taskTags,
+    customFields,
+    categoryCustomFields,
+    taskCustomFieldValues,
+    taskNotes,
+    taskAttachments,
+  } = reduxState as any;
+  const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
+  const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
 
   // Load default status icon
   useEffect(() => {
@@ -196,49 +254,113 @@ const WorkspaceTable = ({
     loadStatusIcons();
   }, [globalStatuses]);
 
-  // Loaded flags to avoid interim fallbacks
-  const statusesLoaded = !!(globalStatuses && globalStatuses.length > 0);
-  const prioritiesLoaded = !!(priorities && priorities.length > 0);
-  const spotsLoaded = !!(spots && spots.length > 0);
-  const usersLoaded = !!(users && users.length > 0);
-
-  const statusMap = useMemo(() => {
-    const m: Record<number, { name: string; color?: string; icon?: string }> = {};
-    for (const st of globalStatuses || []) {
-      const anySt: any = st as any;
-      if (anySt && typeof anySt.id !== 'undefined') {
-        const idNum = Number(anySt.id);
-        m[idNum] = { name: anySt.name || `Status ${idNum}` , color: anySt.color, icon: anySt.icon } as any;
-      }
+  // Create mapping objects using abstracted utilities
+  const statusMap = useMemo(() => createStatusMap(globalStatuses), [globalStatuses]);
+  const categoryToGroup = useMemo(() => createCategoryToGroup(categories), [categories]);
+  const transitionsByGroupFrom = useMemo(() => createTransitionsByGroupFrom(statusTransitions), [statusTransitions]);
+  const priorityMap = useMemo(() => createPriorityMap(priorities), [priorities]);
+  const spotMap = useMemo(() => createSpotMap(spots), [spots]);
+  const userMap = useMemo(() => createUserMap(users), [users]);
+  const filteredPriorities = useMemo(() => createFilteredPriorities(priorities, defaultCategoryId), [priorities, defaultCategoryId]);
+  const tagMap = useMemo(() => createTagMap(tags), [tags]);
+  const taskTagsMap = useMemo(() => {
+    const m = new Map<number, number[]>();
+    for (const tt of taskTags || []) {
+      const ttid = Number((tt as any).task_id);
+      const tagId = Number((tt as any).tag_id);
+      if (!Number.isFinite(ttid) || !Number.isFinite(tagId)) continue;
+      const arr = m.get(ttid);
+      if (arr) arr.push(tagId); else m.set(ttid, [tagId]);
     }
     return m;
-  }, [globalStatuses]);
-  // Map: category_id -> status_transition_group_id
-  const categoryToGroup = useMemo(() => {
-    const m = new Map<number, number>();
+  }, [taskTags]);
+  const categoryMap = useMemo(() => {
+    const m: Record<number, any> = {};
     for (const c of categories || []) {
       const id = Number((c as any).id);
-      const gid = Number((c as any).status_transition_group_id);
-      if (Number.isFinite(id) && Number.isFinite(gid)) m.set(id, gid);
+      if (Number.isFinite(id)) m[id] = { id, name: (c as any).name, color: (c as any).color, icon: (c as any).icon };
     }
     return m;
   }, [categories]);
 
-  // Map: group_id -> from_status -> Set(to_status)
-  const transitionsByGroupFrom = useMemo(() => {
-    const map = new Map<number, Map<number, Set<number>>>();
-    for (const tr of statusTransitions || []) {
-      const g = Number((tr as any).status_transition_group_id);
-      const from = Number((tr as any).from_status);
-      const to = Number((tr as any).to_status);
-      if (!Number.isFinite(g) || !Number.isFinite(from) || !Number.isFinite(to)) continue;
-      if (!map.has(g)) map.set(g, new Map());
-      const inner = map.get(g)!;
-      if (!inner.has(from)) inner.set(from, new Set());
-      inner.get(from)!.add(to);
+  // Workspace-scoped custom fields (category-based)
+  const workspaceCustomFields = useMemo(() => {
+    if (!categories || categories.length === 0 || !customFields || customFields.length === 0) return [] as any[];
+
+    const allowedCategoryIds = new Set<number>();
+    for (const c of categories as any[]) {
+      const cid = Number((c as any).id);
+      const wsId = Number((c as any).workspace_id);
+      if (!Number.isFinite(cid)) continue;
+      if (isAllWorkspaces || workspaceNumericId == null || wsId === workspaceNumericId) {
+        allowedCategoryIds.add(cid);
+      }
     }
-    return map;
-  }, [statusTransitions]);
+
+    if (allowedCategoryIds.size === 0) return [] as any[];
+
+    const byId: Record<number, { field: any; categories: any[] }> = {};
+
+    for (const link of (categoryCustomFields || []) as any[]) {
+      const catId = Number((link as any).category_id);
+      const fieldId = Number((link as any).field_id);
+      if (!allowedCategoryIds.has(catId) || !Number.isFinite(fieldId)) continue;
+      const field = (customFields as any[]).find((f: any) => Number(f.id) === fieldId);
+      if (!field) continue;
+      const cat = categoryMap[catId];
+      if (!byId[fieldId]) {
+        byId[fieldId] = { field, categories: [] };
+      }
+      if (cat) byId[fieldId].categories.push(cat);
+    }
+
+    return Object.entries(byId).map(([fid, data]) => ({
+      fieldId: Number(fid),
+      field: (data as any).field,
+      categories: (data as any).categories,
+    }));
+  }, [categories, customFields, categoryCustomFields, categoryMap, workspaceNumericId, isAllWorkspaces]);
+
+  // Map of (task_id, field_id) -> custom field value for fast lookup
+  const taskCustomFieldValueMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const v of (taskCustomFieldValues || []) as any[]) {
+      const taskId = Number((v as any).task_id);
+      // Backend column is field_id; fallback to custom_field_id if present
+      const fieldId = Number((v as any).field_id ?? (v as any).custom_field_id);
+      if (!Number.isFinite(taskId) || !Number.isFinite(fieldId)) continue;
+      m.set(`${taskId}:${fieldId}`, v);
+    }
+    return m;
+  }, [taskCustomFieldValues]);
+
+  const approvalMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const a of approvals || []) {
+      const id = Number((a as any).id);
+      if (Number.isFinite(id)) m[id] = a;
+    }
+    return m;
+  }, [approvals]);
+
+  // Memoize taskApprovalInstances to prevent unnecessary column rebuilds
+  const stableTaskApprovalInstances = useMemo(() => taskApprovalInstances, [taskApprovalInstances]);
+
+  // Refs for data access in callbacks
+  const statusMapRef = useRef(statusMap);
+  useEffect(() => { statusMapRef.current = statusMap; }, [statusMap]);
+  const priorityMapRef = useRef(priorityMap);
+  useEffect(() => { priorityMapRef.current = priorityMap; }, [priorityMap]);
+  const spotMapRef = useRef(spotMap);
+  useEffect(() => { spotMapRef.current = spotMap; }, [spotMap]);
+  const userMapRef = useRef(userMap);
+  useEffect(() => { userMapRef.current = userMap; }, [userMap]);
+  const tagMapRef = useRef(tagMap);
+  useEffect(() => { tagMapRef.current = tagMap; }, [tagMap]);
+  const taskTagsRef = useRef(taskTags);
+  useEffect(() => { taskTagsRef.current = taskTags; }, [taskTags]);
+  const globalStatusesRef = useRef(globalStatuses);
+  useEffect(() => { globalStatusesRef.current = globalStatuses; }, [globalStatuses]);
 
   const getAllowedNextStatuses = useCallback((task: any): number[] => {
     const groupId = categoryToGroup.get(Number(task.category_id));
@@ -248,6 +370,15 @@ const WorkspaceTable = ({
     const set = byFrom.get(Number(task.status_id));
     return set ? Array.from(set.values()) : [];
   }, [categoryToGroup, transitionsByGroupFrom]);
+
+  const getDoneStatusId = useCallback((): number | undefined => {
+    const statusesArr = globalStatusesRef.current || [];
+    const byAction = statusesArr.find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE');
+    if (byAction?.id != null) return Number(byAction.id);
+    const byName = statusesArr.find((s: any) => String((s as any).name || '').toLowerCase().includes('done'));
+    if (byName?.id != null) return Number(byName.id);
+    return undefined;
+  }, []);
 
   const handleChangeStatus = useCallback(async (task: any, toStatusId: number): Promise<boolean> => {
     if (!task || Number(task.status_id) === Number(toStatusId)) return true;
@@ -260,209 +391,63 @@ const WorkspaceTable = ({
     }
   }, [dispatch]);
 
-  const statusMapRef = useRef(statusMap);
-  useEffect(() => { statusMapRef.current = statusMap; }, [statusMap]);
-
-  const priorityMap = useMemo(() => {
-    const m: Record<number, { name: string; color?: string; level?: number }> = {};
-    for (const priority of priorities || []) {
-      const anyPriority: any = priority as any;
-      if (anyPriority && typeof anyPriority.id !== 'undefined') {
-        const idNum = Number(anyPriority.id);
-        m[idNum] = { name: anyPriority.name || `Priority ${idNum}`, color: anyPriority.color, level: anyPriority.level } as any;
-      }
-    }
-    return m;
-  }, [priorities]);
-  const priorityMapRef = useRef(priorityMap);
-  useEffect(() => { priorityMapRef.current = priorityMap; }, [priorityMap]);
-
-  const filteredPriorities = useMemo(() => {
-    if (defaultCategoryId == null) return priorities;
-    return (priorities || []).filter((p: any) => Number((p as any).category_id) === Number(defaultCategoryId));
-  }, [priorities, defaultCategoryId]);
-
-  const spotMap = useMemo(() => {
-    const m: Record<number, { name: string; description?: string }> = {};
-    for (const spot of spots || []) {
-      const anySpot: any = spot as any;
-      if (anySpot && typeof anySpot.id !== 'undefined') {
-        const idNum = Number(anySpot.id);
-        m[idNum] = { name: anySpot.name || `Spot ${idNum}`, description: anySpot.description } as any;
-      }
-    }
-    return m;
-  }, [spots]);
-  const spotMapRef = useRef(spotMap);
-  useEffect(() => { spotMapRef.current = spotMap; }, [spotMap]);
-
-  // Create user map for quick lookup
-  const userMap = useMemo(() => {
-    const m: Record<number, User> = {};
-    for (const user of users || []) {
-      m[user.id] = user;
-    }
-    return m;
-  }, [users]);
-  const userMapRef = useRef(userMap);
-  useEffect(() => { userMapRef.current = userMap; }, [userMap]);
-  const globalStatusesRef = useRef(globalStatuses);
-  useEffect(() => { globalStatusesRef.current = globalStatuses; }, [globalStatuses]);
-
   // Hybrid mode: client-side when filtered row count is small enough
-  const CLIENT_THRESHOLD = 1000;
   const [useClientSide, setUseClientSide] = useState(false);
-  const [clientRows, setClientRows] = useState<Task[]>([]);
+  const [clientRows, setClientRows] = useState<any[]>([]);
 
   useEffect(() => {
-    const decideMode = async () => {
-      try {
-        if (!TasksCache.initialized) await TasksCache.init();
-
-        // Build minimal params equivalent to the grid query
-        const baseParams: any = { search: searchText };
-        if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
-
-        // Normalize status set filter by names if ever needed in future (not applied here)
-
-        // Get filtered count only
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
-        const totalFiltered = countResp?.rowCount ?? 0;
-        if (totalFiltered > 0 && totalFiltered <= CLIENT_THRESHOLD) {
+    const run = async () => {
+      // When grouping is enabled we must use client-side row model
+      if (groupBy && groupBy !== 'none') {
+        setUseClientSide(true);
+        try {
+          if (!TasksCache.initialized) await TasksCache.init();
+          const baseParams: any = { search: searchText };
+          if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+          baseParams.__statusMap = statusMapRef.current;
+          baseParams.__priorityMap = priorityMapRef.current;
+          baseParams.__spotMap = spotMapRef.current;
+          baseParams.__userMap = userMapRef.current;
+          baseParams.__tagMap = tagMapRef.current;
+          baseParams.__taskTags = taskTagsRef.current;
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
+          const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+          const totalFiltered = countResp?.rowCount ?? 0;
           const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
           setClientRows(rowsResp?.rows || []);
-          setUseClientSide(true);
-        } else {
+          try { onModeChange?.({ useClientSide: true, totalFiltered }); } catch {}
+        } catch (e) {
+          console.warn('Failed to load client-side rows for grouping', e);
           setClientRows([]);
-          setUseClientSide(false);
         }
-      } catch (e) {
-        console.warn('decideMode failed', e);
-        setUseClientSide(false);
+        return;
       }
+
+      // No grouping: always use infinite row model to avoid client-side filter quirks
+      setUseClientSide(false);
+      setClientRows([]);
+      try { onModeChange?.({ useClientSide: false, totalFiltered: 0 }); } catch {}
     };
-    decideMode();
-  }, [workspaceId, searchText]);
+    run();
+  }, [workspaceId, searchText, groupBy, onModeChange, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
+  // Load taskTags, tags, notes, attachments on mount so they're available for display
+  useEffect(() => {
+    dispatch(genericActions.taskTags.getFromIndexedDB());
+    dispatch(genericActions.tags.getFromIndexedDB());
+    dispatch(genericActions.taskNotes.getFromIndexedDB());
+    dispatch(genericActions.taskAttachments.getFromIndexedDB());
+    dispatch(genericActions.approvalApprovers.getFromIndexedDB());
+    dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
+    // Optionally fetch from API to ensure we have the latest data
+    // dispatch(genericActions.taskTags.fetchFromAPI());
+    // dispatch(genericActions.tags.fetchFromAPI());
+    // dispatch(genericActions.taskNotes.fetchFromAPI());
+    // dispatch(genericActions.taskAttachments.fetchFromAPI());
+    // dispatch(genericActions.approvalApprovers.fetchFromAPI());
+    // dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
+  }, [dispatch]);
 
-
-  // Function to get user names from user IDs
-  const getUserNames = useCallback((userIds: any): string => {
-    if (!userIds) return 'No users assigned';
-
-    // Handle different possible formats
-    let userIdArray: number[] = [];
-
-    try {
-      if (Array.isArray(userIds)) {
-        userIdArray = userIds;
-      } else if (typeof userIds === 'string') {
-        // Try to parse JSON string
-        const parsed = JSON.parse(userIds);
-        userIdArray = Array.isArray(parsed) ? parsed : [];
-      } else if (typeof userIds === 'number') {
-        // Handle single user ID
-        userIdArray = [userIds];
-      }
-
-      // Ensure userIdArray is actually an array
-      if (!Array.isArray(userIdArray)) {
-        console.warn('userIds is not an array:', userIds);
-        return 'No users assigned';
-      }
-
-      if (userIdArray.length === 0) return 'No users assigned';
-
-      const userNames = userIdArray
-        .map(id => userMap[id]?.name || `User ${id}`)
-        .join(', ');
-
-      return userNames;
-    } catch (error) {
-      console.error('Error processing userIds:', error, userIds);
-      return 'No users assigned';
-    }
-  }, [userMap]);
-
-  // Function to get users from user IDs
-  const getUsersFromIds = useCallback((userIds: any): User[] => {
-    if (!userIds) return [];
-
-    // Handle different possible formats
-    let userIdArray: number[] = [];
-
-    try {
-      if (Array.isArray(userIds)) {
-        userIdArray = userIds;
-      } else if (typeof userIds === 'string') {
-        // Try to parse JSON string
-        const parsed = JSON.parse(userIds);
-        userIdArray = Array.isArray(parsed) ? parsed : [];
-      } else if (typeof userIds === 'number') {
-        // Handle single user ID
-        userIdArray = [userIds];
-      }
-
-      // Ensure userIdArray is actually an array
-      if (!Array.isArray(userIdArray)) {
-        console.warn('userIds is not an array:', userIds);
-        return [];
-      }
-
-      if (userIdArray.length === 0) return [];
-
-      return userIdArray
-        .map(id => userMap[id])
-        .filter(Boolean) as User[];
-    } catch (error) {
-      console.error('Error processing userIds:', error, userIds);
-      return [];
-    }
-  }, [userMap]);
-
-
-
-  // Per-cell avatar image component backed by global AvatarCache
-  const AvatarImg = ({ user }: { user: User }) => {
-    const [src, setSrc] = useState<string>('');
-    useEffect(() => {
-      let cancelled = false;
-      const run = async () => {
-        if (!user?.id) return;
-        // Read synchronously from cache first (no network)
-        const cached = await AvatarCache.getByAny([user.id, (user as any).google_uuid]);
-        if (!cancelled && cached) { setSrc(cached); return; }
-        // Only if no cache, trigger a single fetch with dedupe
-        if (user?.url_picture) {
-          const data = await AvatarCache.fetchAndCache(user.id, user.url_picture, [(user as any).google_uuid]);
-          if (!cancelled && data) setSrc(data);
-        }
-      };
-      run();
-      return () => { cancelled = true; };
-    }, [user?.id, user?.url_picture]);
-    return (
-      <AvatarImage
-        src={src}
-        alt={getUserDisplayName(user)}
-        onError={() => {}}
-      />
-    );
-  };
-
-  // Function to format due date with dayjs
-  const formatDueDate = useCallback((dateString: string | null): string => {
-    if (!dateString) return 'No due date';
-
-    const date = dayjs(dateString);
-    const now = dayjs();
-
-    if (date.isBefore(now)) {
-      return `${date.fromNow()} overdue`;
-    } else {
-      return `Due ${date.fromNow()}`;
-    }
-  }, []);
   // Removed on-mount loads; AuthProvider hydrates core slices
 
   // When statuses are loaded/updated, refresh the Status column cells to replace #id with names
@@ -472,12 +457,26 @@ const WorkspaceTable = ({
     }
   }, [statusMap]);
 
+  // Refresh name column when taskTags or tags load/update to show tags
+  useEffect(() => {
+    if (gridRef.current?.api && taskTags.length > 0) {
+      gridRef.current.api.refreshCells({ columns: ['name'], force: true, suppressFlash: true });
+    }
+  }, [taskTags, tagMap]);
+
+  // Refresh config column (notes/attachments) when they change
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.refreshCells({ columns: ['config'], force: true, suppressFlash: true });
+    }
+  }, [taskNotes, taskAttachments]);
+
   // Refresh other columns when their metadata resolves
   useEffect(() => {
     if (gridRef.current?.api) {
       gridRef.current.api.refreshCells({ columns: ['user_ids'], force: true, suppressFlash: true });
     }
-  }, [usersLoaded]);
+  }, [metadataLoadedFlags.usersLoaded]);
 
   useEffect(() => {
     if (gridRef.current?.api) {
@@ -491,465 +490,295 @@ const WorkspaceTable = ({
     }
   }, [spotMap]);
 
-  const columnDefs = useMemo(() => ([
-    {
-      field: 'id',
-      headerName: 'ID',
-      filter: false,
-      maxWidth: 90
-    },
-  
-    {
-      field: 'name',
-      headerName: 'Task',
-      flex: 2.5,
-      filter: false,
-      cellRenderer: (p: any) => {
-        const name = p.data?.name || '';
-        const description = p.data?.description || '';
-        return (
-          <div className="flex flex-col gap-1 h-full justify-center py-2">
-            <div className="font-semibold text-base text-foreground">{name}</div>
-            {description && (
-              <div className="text-sm text-muted-foreground line-clamp-2">{description}</div>
-            )}
-          </div>
-        );
-      },
-      minWidth: 300,
-    },
-    {
-      field: 'status_id',
-      headerName: 'Status',
-      sortable: true,
-      filter: 'agSetColumnFilter',
-      valueFormatter: (p: any) => {
-        const meta: any = statusMap[p.value as number];
-        return meta?.name || `#${p.value}`;
-      },
-      filterParams: {
-        values: (params: any) => {
-          const ids = (globalStatuses || []).map((s: any) => Number((s as any).id));
-          params.success(ids);
-        },
-        suppressMiniFilter: false,
-        valueFormatter: (p: any) => {
-          const meta: any = statusMap[p.value as number];
-          return meta?.name || `#${p.value}`;
-        },
-      },
-      cellRenderer: (p: any) => {
-        const row = p.data;
-        if (!statusesLoaded || !row) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const meta: any = statusMap[p.value as number];
-        if (!meta) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const allowedNext = getAllowedNextStatuses(row);
-        return (
-          <StatusCell
-            value={p.value}
-            statusMap={statusMap}
-            getStatusIcon={getStatusIcon}
-            allowedNext={allowedNext}
-            onChange={(to) => handleChangeStatus(row, to)}
-          />
-        );
-      },
-      width: 160,
-      minWidth: 110,
-      maxWidth: 200,
-    },
-    // Priority column with badge
-    {
-      field: 'priority_id',
-      headerName: 'Priority',
-      sortable: true,
-      filter: 'agSetColumnFilter',
-      valueFormatter: (p: any) => {
-        const meta: any = priorityMap[p.value as number];
-        return meta?.name || `#${p.value}`;
-      },
-      filterParams: {
-        values: (params: any) => {
-          const ids = (filteredPriorities || []).map((p: any) => Number((p as any).id));
-          params.success(ids);
-        },
-        suppressMiniFilter: false,
-        valueFormatter: (p: any) => {
-          const meta: any = priorityMap[p.value as number];
-          return meta?.name || `#${p.value}`;
-        },
-      },
-      cellRenderer: (p: any) => {
-        if (!prioritiesLoaded) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        if (p.value == null) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const meta: any = priorityMap[p.value as number];
-        if (!meta) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const name = meta.name;
-        const color = meta?.color || '#6B7280';
+  // Determine current density to decide whether to show row descriptions
+  const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
+    try { return (localStorage.getItem('wh_workspace_density') as any) || 'comfortable'; } catch { return 'comfortable'; }
+  });
 
-        return (
-          <div className="flex items-center h-full py-2">
-            <Badge
-              variant="outline"
-              style={{
-                borderColor: color,
-                color: color,
-                backgroundColor: `${color}10`
-              }}
-              className="text-xs px-2 py-0.5 font-medium leading-tight truncate max-w-[90px]"
-              title={name}
-            >
-              {name}
-            </Badge>
-          </div>
-        );
-      },
-      width: 110,
-      minWidth: 72,
-      maxWidth: 120,
-    },
-    // Responsible column with avatars
-    {
-      field: 'user_ids',
-      headerName: 'Responsible',
-      flex: 1,
-      filter: false,
-      cellRenderer: (p: any) => {
-        if (!usersLoaded) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const userIds = p.data?.user_ids;
-        // If the field hasn't arrived yet for this row, render placeholder instead of false "No users"
-        if (userIds == null) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const users = getUsersFromIds(userIds);
+  // Listen for density changes
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e?.detail as any;
+      if (v === 'compact' || v === 'comfortable' || v === 'spacious') setRowDensity(v);
+    };
+    window.addEventListener('wh:rowDensityChanged', handler);
+    return () => window.removeEventListener('wh:rowDensityChanged', handler);
+  }, []);
 
-        if (!users || users.length === 0) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <div className="text-sm text-muted-foreground">
-                No users assigned
-              </div>
-            </div>
-          );
-        }
+  // Column visibility preferences (per-workspace, persisted in localStorage)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    try {
+      const key = `wh_workspace_columns_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) return allDefault;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        // Always ensure "name" column stays visible
+        return Array.from(new Set(['name', ...parsed]));
+      }
+    } catch {
+      // ignore
+    }
+    return allDefault;
+  });
 
-        // Show up to 3 avatars, with a count indicator if more
-        const displayUsers = users.slice(0, 3);
-        const remainingCount = users.length - displayUsers.length;
+  // Reload preferences when workspace changes
+  useEffect(() => {
+    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    try {
+      const key = `wh_workspace_columns_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) {
+        setVisibleColumns(allDefault);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        setVisibleColumns(Array.from(new Set(['name', ...parsed])));
+      } else {
+        setVisibleColumns(allDefault);
+      }
+    } catch {
+      setVisibleColumns(allDefault);
+    }
+  }, [workspaceId]);
 
-        return (
-          <div className="flex items-center h-full py-2 gap-2">
-            <div className="flex items-center -space-x-2"
-            >
-              {displayUsers.map((user) => (
-                <HoverPopover
-                  key={user.id}
-                  content={(
-                    <div className="flex flex-col items-center gap-3"
-                    >
-                      <Avatar className="h-16 w-16 border-2 border-background">
-                        <AvatarImg user={user} />
-                        <AvatarFallback className="text-base font-medium">
-                          {getUserInitials(user)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-base font-medium text-popover-foreground text-center">
-                        {getUserDisplayName(user)}
-                      </span>
-                    </div>
-                  )}
-                >
-                  <Avatar className="h-8 w-8 border border-background hover:border-primary transition-colors cursor-pointer">
-                    <AvatarImg user={user} />
-                    <AvatarFallback className="text-xs">
-                      {getUserInitials(user)}
-                    </AvatarFallback>
-                  </Avatar>
-                </HoverPopover>
-              ))}
-              {remainingCount > 0 && (
-                <div className="h-8 w-8 rounded-full bg-muted border border-background flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground font-medium">
-                    +{remainingCount}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      },
-      minWidth: 140,
-    },
-    {
-      field: 'due_date',
-      headerName: 'Due',
-      filter: false,
-      cellRenderer: (p: any) => {
-        const dueDate = p.data?.due_date;
-        const formatted = formatDueDate(dueDate);
-        return (
-          <div className="flex items-center h-full py-2">
-            <span className={`text-sm ${dueDate && dayjs(dueDate).isBefore(dayjs()) ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-              {formatted}
-            </span>
-          </div>
-        );
-      },
-      minWidth: 140,
-    },
-    // Spot column
-    {
-      field: 'spot_id',
-      headerName: 'Location',
-      sortable: true,
-      filter: 'agSetColumnFilter',
-      valueFormatter: (p: any) => {
-        const meta: any = spotMap[p.value as number];
-        return meta?.name || `#${p.value}`;
-      },
-      filterParams: {
-        values: (params: any) => {
-          const ids = (spots || []).map((s: any) => Number((s as any).id));
-          params.success(ids);
-        },
-        suppressMiniFilter: false,
-        valueFormatter: (p: any) => {
-          const meta: any = spotMap[p.value as number];
-          return meta?.name || `#${p.value}`;
-        },
-      },
-      cellRenderer: (p: any) => {
-        if (!spotsLoaded) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
+  // Listen for settings changes from the Workspace Settings "Display" tab
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<any>;
+      const detail = custom.detail || {};
+      if (!detail) return;
+      // If a specific workspaceId is provided, respect it; otherwise apply to "all"
+      const targetId = detail.workspaceId ?? 'all';
+      const currentId = workspaceRef.current || 'all';
+      if (String(targetId) !== String(currentId)) return;
+      if (Array.isArray(detail.visibleColumns)) {
+        const next = detail.visibleColumns.filter((x: any) => typeof x === 'string');
+        if (next.length > 0) {
+          setVisibleColumns(Array.from(new Set(['name', ...next])));
         }
-        if (p.value == null) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const meta: any = spotMap[p.value as number];
-        if (!meta) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="opacity-0">.</span>
-            </div>
-          );
-        }
-        const name = meta.name;
+      }
+    };
 
-        return (
-          <div className="flex items-center h-full py-2">
-            <span className="text-sm text-muted-foreground">
-              {name}
-            </span>
-          </div>
-        );
-      },
-      minWidth: 100,
-    },
-    {
-      field: 'response_date',
-      headerName: 'Response',
-      filter: false,
-      cellRenderer: (p: any) => {
-        const responseDate = p.data?.response_date;
-        const formatted = formatDueDate(responseDate);
-        return (
-          <div className="flex items-center h-full py-2">
-            <span className="text-sm text-muted-foreground">
-              {responseDate ? formatted.replace('Due ', 'Responded ').replace('overdue', 'late') : 'No response'}
-            </span>
-          </div>
-        );
-      },
-      minWidth: 140,
-    },
-    {
-      field: 'resolution_date',
-      headerName: 'Resolution',
-      filter: false,
-      cellRenderer: (p: any) => {
-        const resolutionDate = p.data?.resolution_date;
-        const formatted = formatDueDate(resolutionDate);
-        return (
-          <div className="flex items-center h-full py-2">
-            <span className="text-sm text-muted-foreground">
-              {resolutionDate ? formatted.replace('Due ', 'Resolved ').replace('overdue', 'late') : 'No resolution'}
-            </span>
-          </div>
-        );
-      },
-      width: 150,
-    },
-    { 
-      field: 'work_duration', 
-      headerName: 'Work (min)', 
-      filter: false, 
-      width: 120
-    },
-    { field: 'pause_duration', 
-      headerName: 'Pause (min)', 
-      filter: false, 
-      width: 120 },
-  ]), [statusMap, statuses, priorityMap, priorities, spotMap, spots, getUserNames, getUsersFromIds, getStatusIcon, formatDueDate]);
-  const defaultColDef = useMemo(() => {
-    return {
-      minWidth: 100,
-      sortable: true,
-      filter: false, // disable filters globally; we'll enable only on Status column
-      resizable: true,
-      floatingFilter: false, // remove the under-header filter row
+    try {
+      window.addEventListener('wh:workspaceColumnsChanged' as any, handler as any);
+    } catch {
+      // no-op (SSR)
+    }
+
+    return () => {
+      try {
+        window.removeEventListener('wh:workspaceColumnsChanged' as any, handler as any);
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
-  // Infinite Row Model datasource using IndexedDB as the data source
-  const getRows = useCallback(
-    async (params: any) => {
-      // Build cache key using current refs so we don't need to rebind datasource
-      const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(
-        params.filterModel || {}
-      )}-${JSON.stringify(params.sortModel || [])}-${searchRef.current}`;
+  const columnDefs = useMemo(() => buildWorkspaceColumns({
+    getUserDisplayName,
+    getStatusIcon,
+    getAllowedNextStatuses,
+    handleChangeStatus,
+    statusesLoaded: metadataLoadedFlags.statusesLoaded,
+    priorityMap,
+    prioritiesLoaded: metadataLoadedFlags.prioritiesLoaded,
+    filteredPriorities,
+    statusMap,
+    usersLoaded: metadataLoadedFlags.usersLoaded,
+    getUsersFromIds,
+    formatDueDate,
+    spotMap,
+    spotsLoaded: metadataLoadedFlags.spotsLoaded,
+    userMap,
+    getDoneStatusId,
+    groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
+    categoryMap,
+    showDescriptions: rowDensity !== 'compact',
+    density: rowDensity,
+    approvalMap,
+    taskApprovalInstances: stableTaskApprovalInstances,
+    tagMap,
+    taskTags,
+    taskTagsMap,
+    tagDisplayMode,
+    visibleColumns,
+    workspaceCustomFields,
+    taskCustomFieldValueMap,
+    taskNotes,
+    taskAttachments,
+    approvalApprovers,
+  } as any), [
+    statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
+    getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
+    metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
+    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
+    approvalMap, approvalApprovers, stableTaskApprovalInstances,
+    visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, taskNotes, taskAttachments,
+  ]);
+  const defaultColDef = useMemo(() => createDefaultColDef(), []);
 
-      if (rowCache.current.has(cacheKey)) {
-        const cachedData = rowCache.current.get(cacheKey)!;
-        params.successCallback(cachedData.rows, cachedData.rowCount);
-        return;
-      }
+  // Initialize filter persistence helpers
+  const suppressPersistRef = useRef(false);
 
-      try {
-        if (!TasksCache.initialized) {
-          await TasksCache.init();
-        }
-
-        // Normalize set filter selections by name -> ids for statuses if needed
-        const normalized = { ...params } as any;
-        if (normalized.filterModel && normalized.filterModel.status_id) {
-          const fm = { ...normalized.filterModel } as any;
-          const st = { ...fm.status_id } as any;
-          const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
-          const hasNonNumeric = rawValues.some((v) => isNaN(Number(v)));
-          if (hasNonNumeric) {
-            const wanted = new Set<string>(rawValues.map((v) => String(v)));
-            const idSet = new Set<number>();
-            for (const s of globalStatusesRef.current || []) {
-              const anyS: any = s as any;
-              if (wanted.has(String(anyS.name))) idSet.add(Number(anyS.id));
-            }
-            st.values = Array.from(idSet.values());
-            fm.status_id = st;
-            normalized.filterModel = fm;
-          } else {
-            st.values = rawValues.map((v) => Number(v));
-            fm.status_id = st;
-            normalized.filterModel = fm;
-          }
-        }
-
-        const queryParams: any = {
-          ...normalized,
-          search: searchRef.current,
-        };
-
-        // Only add workspace_id if we're not in "all" mode
-        if (workspaceRef.current !== 'all') {
-          queryParams.workspace_id = workspaceRef.current;
-        }
-
-        // Provide lookup maps for richer local searching
-        queryParams.__statusMap = statusMapRef.current;
-        queryParams.__priorityMap = priorityMapRef.current;
-        queryParams.__spotMap = spotMapRef.current;
-        queryParams.__userMap = userMapRef.current;
-
-        const result = await TasksCache.queryTasks(queryParams);
-
-        const rows = result?.rows || [];
-        const total = result?.rowCount || 0;
-        rowCache.current.set(cacheKey, { rows, rowCount: total });
-        params.successCallback(rows, total);
-      } catch (error) {
-        console.error('Error querying local tasks cache:', error);
-        params.failCallback();
-      }
+  // Group column and row styles must be defined before any conditional return to preserve hook order
+  const autoGroupColumnDef = useMemo(() => ({
+    headerName: groupBy === 'status_id' ? 'Status' : groupBy === 'priority_id' ? 'Priority' : 'Location',
+    minWidth: 220,
+    cellRendererParams: {
+      suppressCount: false,
     },
-    [rowCache]
+  }), [groupBy]);
+
+  const getRowStyle = useCallback((_params: any) => {
+    // Remove decorative left color bar to keep focus on the new status-colored priority initial
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    const colApi = gridRef.current?.columnApi;
+    if (!api) return;
+
+    const currentFilterModel = api.getFilterModel?.() || {};
+
+    // In infinite mode, ensure grouping is cleared visually
+    if (!useClientSide) {
+      try {
+        api.setGridOption('autoGroupColumnDef', undefined as any);
+        colApi?.setRowGroupColumns([]);
+        api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        // If grid lost filters, re-apply from saved external model
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
+      } catch {}
+      return;
+    }
+
+    // Client-side mode: apply or clear
+    try {
+      if (groupBy === 'none') {
+        api.setGridOption('autoGroupColumnDef', undefined as any);
+        colApi?.setRowGroupColumns([]);
+        // show hidden group columns if previously hidden
+        colApi?.setColumnVisible('spot_id', true);
+        colApi?.setColumnVisible('status_id', true);
+        colApi?.setColumnVisible('priority_id', true);
+        api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
+        api.refreshClientSideRowModel?.('everything');
+      } else {
+        api.setGridOption('autoGroupColumnDef', autoGroupColumnDef);
+        api.setGridOption('groupDefaultExpanded', collapseGroups ? 0 : 1);
+        // Explicitly set the grouped column to ensure switch takes effect
+        const field = groupBy;
+        colApi?.setRowGroupColumns([field]);
+        // hide the grouped column to avoid duplication
+        colApi?.setColumnVisible('spot_id', field !== 'spot_id');
+        colApi?.setColumnVisible('status_id', field !== 'status_id');
+        colApi?.setColumnVisible('priority_id', field !== 'priority_id');
+        api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
+        api.refreshClientSideRowModel?.('everything');
+      }
+    } catch {}
+  }, [autoGroupColumnDef, collapseGroups, groupBy, columnDefs, useClientSide]);
+
+  const getRows = useMemo(
+    () =>
+      buildGetRows(TasksCache, {
+        rowCache,
+        workspaceRef,
+        searchRef,
+        statusMapRef,
+        priorityMapRef,
+        spotMapRef,
+        userMapRef,
+        tagMapRef,
+        taskTagsRef,
+        externalFilterModelRef,
+        normalizeFilterModelForQuery,
+      }),
+    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]
   );
 
   // Function to refresh the grid
   const refreshGrid = useCallback(async () => {
     if (!modulesLoaded || !gridRef.current?.api) return;
+    console.log('[WT Filters] refreshGrid: mode =', useClientSide ? 'client' : 'infinite');
+
+    if (suppressPersistRef.current) {
+      console.log('[WT Filters] Skipping refresh while restoring filters');
+      return;
+    }
+
+    suppressPersistRef.current = true;
+
     if (useClientSide) {
-      // Recompute client rows from IndexedDB and update rowData
       try {
+        if (!TasksCache.initialized) await TasksCache.init();
         const baseParams: any = { search: searchRef.current };
         if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
-        // Provide lookup maps for richer local searching
         baseParams.__statusMap = statusMapRef.current;
         baseParams.__priorityMap = priorityMapRef.current;
         baseParams.__spotMap = spotMapRef.current;
         baseParams.__userMap = userMapRef.current;
+        baseParams.__tagMap = tagMapRef.current;
+        baseParams.__taskTags = taskTagsRef.current;
+        // Let AG Grid handle column filters in client-side mode; only apply search/workspace here.
+        const sortModel = gridRef.current.api.getSortModel?.() || [];
+        if (sortModel.length > 0) {
+          baseParams.sortModel = sortModel;
+        } else {
+          baseParams.sortModel = [{ colId: 'created_at', sort: 'desc' }];
+        }
 
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
         const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
         const rows = rowsResp?.rows || [];
+        if (debugFilters.current) {
+          console.log('[WT Filters] client-side refresh rows=', rows.length, 'totalFiltered=', totalFiltered);
+        }
+
         setClientRows(rows);
         gridRef.current.api.setGridOption('rowData', rows);
-        return;
+        gridRef.current.api.refreshClientSideRowModel?.('everything');
       } catch (e) {
         console.warn('refreshGrid (client-side) failed', e);
       }
+    } else {
+      rowCache.current.clear();
+      gridRef.current.api.refreshInfiniteCache();
     }
-    // Infinite row model refresh
-    rowCache.current.clear();
-    gridRef.current.api.refreshInfiniteCache();
-  }, [modulesLoaded, rowCache, useClientSide]);
+
+    setTimeout(() => {
+      suppressPersistRef.current = false;
+    }, 0);
+  }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {
@@ -966,94 +795,250 @@ const WorkspaceTable = ({
     }
   }, [searchText, modulesLoaded, refreshGrid]);
 
-  // Listen for task events to refresh the table
+  // When reference data (statuses, priorities, spots, users, tags, categories, customFields) changes, refresh the grid
+  // This ensures that when someone updates a status/priority/etc in settings, the grid shows the updated data
   useEffect(() => {
-    const unsubscribeCreated = TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, (data) => {
-      console.log('Task created, refreshing grid:', data);
+    if (gridRef.current?.api && modulesLoaded) {
+      // Refresh the grid to pick up changes in reference data
       refreshGrid();
-    });
+    }
+  }, [statuses, priorities, spots, users, tags, categories, customFields, categoryCustomFields, modulesLoaded, refreshGrid]);
 
-    const unsubscribeUpdated = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, (data) => {
-      console.log('Task updated, refreshing grid:', data);
-      refreshGrid();
-    });
-
-    const unsubscribeDeleted = TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, (data) => {
-      console.log('Task deleted, refreshing grid:', data);
-      refreshGrid();
-    });
-
-    const unsubscribeBulkUpdate = TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, () => {
-      console.log('Bulk task update, refreshing grid');
-      refreshGrid();
-    });
-
-    const unsubscribeInvalidate = TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, () => {
-      console.log('Cache invalidated, refreshing grid');
-      refreshGrid();
-    });
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      unsubscribeCreated();
-      unsubscribeUpdated();
-      unsubscribeDeleted();
-      unsubscribeBulkUpdate();
-      unsubscribeInvalidate();
-    };
-  }, [refreshGrid]);
+  // Set up task event handlers using abstracted utility
+  useEffect(() => {
+    const cleanup = setupTaskEventHandlers({ refreshGrid, workspaceId });
+    return cleanup;
+  }, [refreshGrid, workspaceId]);
 
   const onGridReady = useCallback((params: any) => {
+    onFiltersChanged?.(!!params.api.isAnyFilterPresent?.());
+
+    suppressPersistRef.current = true;
+    try {
+      const currentSort = params.api.getSortModel?.() || [];
+      if (currentSort.length === 0) {
+        params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+      }
+    } catch {}
+
     if (!useClientSide) {
+      // Set sort again to ensure it's applied (in case the first call didn't work)
+      try {
+        const sortModel = params.api.getSortModel?.() || [];
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
+          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        }
+      } catch {}
+      
       const ds = { rowCount: undefined, getRows };
       params.api.setGridOption('datasource', ds);
+      console.log('[WT Filters] onGridReady refreshing infinite cache');
+      params.api.refreshInfiniteCache();
+    } else {
+      console.log('[WT Filters] onGridReady client-side refresh');
+      // Ensure sort is set before refreshing
+      try {
+        const sortModel = params.api.getSortModel?.() || [];
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
+          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        }
+      } catch {}
+      refreshGrid();
     }
-  }, [getRows, useClientSide]);
+
+    setTimeout(() => {
+      suppressPersistRef.current = false;
+    }, 0);
+
+    try { onReady?.(); } catch {}
+  }, [getRows, useClientSide, onFiltersChanged, refreshGrid]);
+
+  // Expose imperative methods
+  useImperativeHandle(ref, () => ({
+    clearFilters: () => {
+      if (!gridRef.current?.api) return;
+      gridRef.current.api.setFilterModel(null);
+      externalFilterModelRef.current = {};
+      onFiltersChanged?.(false);
+      // Also clear any persisted filters for this workspace so the
+      // datasource doesn't keep applying an invisible filter
+      try {
+        const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+        localStorage.removeItem(key);
+      } catch {}
+      refreshGrid();
+    },
+    hasFilters: () => {
+      try {
+        return !!gridRef.current?.api?.isAnyFilterPresent();
+      } catch { return false; }
+    },
+    setFilterModel: (model: any) => {
+      if (!gridRef.current?.api) return;
+      // If model is null/undefined, this is a request to CLEAR all filters
+      if (!model) {
+        externalFilterModelRef.current = {};
+        try { if (debugFilters.current) console.log('[WT] setFilterModel CLEAR'); } catch {}
+
+        gridRef.current.api.setFilterModel(null);
+        onFiltersChanged?.(false);
+
+        // Clear persisted filters for this workspace
+        try {
+          const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+          localStorage.removeItem(key);
+        } catch {}
+
+        refreshGrid();
+        return;
+      }
+
+   
+      const gridModel = normalizeFilterModelForGrid(model);
+      // Keep external model in sync with what AG Grid actually sees
+      externalFilterModelRef.current = gridModel;
+      try { if (debugFilters.current) console.log('[WT] setFilterModel external=', externalFilterModelRef.current); } catch {}
+
+      gridRef.current.api.setFilterModel(Object.keys(gridModel).length > 0 ? gridModel : null);
+
+      onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+      try {
+        const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+        // Persist exactly the external model so Workspace and datasource
+        // see the same canonical filter definition
+        localStorage.setItem(key, JSON.stringify(model));
+        if (debugFilters.current) console.log('[WT] persisted model=', model);
+      } catch {}
+      refreshGrid();
+    },
+    getFilterModel: () => {
+      try {
+        // AG Grid's filter model is the single source of truth for the UI & modal
+        return gridRef.current?.api?.getFilterModel?.() || {};
+      } catch { return {}; }
+    }
+  }), [refreshGrid, onFiltersChanged]);
 
   // Show loading spinner while modules are loading
   if (!modulesLoaded) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <i className="fas fa-spinner fa-pulse fa-2x"></i>
-      </div>
-    );
+    return createLoadingSpinner();
   }
 
-  return (
-    <div style={containerStyle} className="ag-theme-quartz h-full w-full">
-      <div style={gridStyle}>
-        <Suspense fallback={<div>Loading AgGridReact...</div>}>
-          <AgGridReact
-            key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}`}
-            ref={gridRef}
-            columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
-            rowHeight={80}
-            headerHeight={44}
-            rowBuffer={50}
-            {...(useClientSide ? {
-              // Client-Side Row Model
-              rowData: clientRows,
-              immutableData: true,
-              getRowId: (params: any) => String(params.data.id),
-            } : {
-              // Infinite Row Model
-              rowModelType: 'infinite' as const,
-              cacheBlockSize: 500,
-              maxConcurrentDatasourceRequests: 1,
-              maxBlocksInCache: 10,
-              getRowId: (params: any) => String(params.data.id),
-            })}
-            onGridReady={onGridReady}
-            animateRows={true}
-            suppressColumnVirtualisation={true}
-            suppressLoadingOverlay={true}
-            suppressNoRowsOverlay={true}
-          />
-        </Suspense>
-      </div>
-    </div>
+  const gridOptions = createGridOptions(useClientSide, clientRows, collapseGroups);
+
+  
+
+  return createGridContainer(
+    <Suspense fallback={createLoadingSpinner()}>
+      <AgGridReact
+        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
+        ref={gridRef}
+        columnDefs={columnDefs}
+        defaultColDef={defaultColDef}
+        rowHeight={rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}
+        headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
+        rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
+        {...gridOptions}
+        autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
+        rowSelection={'multiple'}
+        suppressRowClickSelection={true}
+        getRowStyle={getRowStyle}
+        onGridReady={onGridReady}
+        onFirstDataRendered={() => {
+          if (!gridRef.current?.api) return;
+          onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+          const count = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
+          if (count === 0) gridRef.current.api.showNoRowsOverlay?.(); else gridRef.current.api.hideOverlay?.();
+        }}
+        onFilterChanged={(e: any) => {
+          if (suppressPersistRef.current) return;
+          onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
+          const count = e.api.getDisplayedRowCount?.() ?? 0;
+          if (count === 0) e.api.showNoRowsOverlay?.(); else e.api.hideOverlay?.();
+          try {
+            const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+            const gm = e.api.getFilterModel?.() || {};
+            // Keep externalFilterModelRef in sync with AG Grid so datasource
+            // and modal both see the same canonical model.
+            externalFilterModelRef.current = gm;
+            if (debugFilters.current) {
+              console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+            }
+            // Persist only when there is an active model; do not remove the saved
+            // filter on incidental empty events (those can happen during grid resets).
+            if (gm && Object.keys(gm).length > 0) {
+              localStorage.setItem(key, JSON.stringify(gm));
+            }
+          } catch {}
+          // Only refresh if not in client-side mode (client-side mode handles filtering internally)
+          // or if suppressPersistRef is false (meaning this is a user-initiated filter change)
+          if (!useClientSide) {
+            refreshGrid();
+          }
+        }}
+        onModelUpdated={(e: any) => {
+          const api = e.api;
+          const count = api.getDisplayedRowCount?.() ?? 0;
+          if (count === 0) api.showNoRowsOverlay?.(); else api.hideOverlay?.();
+        }}
+        onSelectionChanged={(e: any) => {
+          if (!onSelectionChanged) return;
+          try {
+            const rows = e.api.getSelectedRows?.() || [];
+            const ids = rows.map((r: any) => Number(r.id)).filter((n: any) => Number.isFinite(n));
+            onSelectionChanged(ids);
+          } catch { onSelectionChanged([] as number[]); }
+        }}
+        onRowDoubleClicked={(e: any) => {
+          // Don't open edit task if double click was on status column
+          const target = e?.event?.target as HTMLElement;
+          if (target) {
+            const cellElement = target.closest('[col-id="status_id"]');
+            const statusCell = target.closest('.ag-cell[col-id="status_id"]');
+            if (cellElement || statusCell) {
+              return; // Ignore double clicks on status column
+            }
+          }
+          // Also check the column property if available
+          if (e?.column?.colId === 'status_id') {
+            return; // Ignore double clicks on status column
+          }
+          // Call the handler if provided
+          if (onRowDoubleClicked && e?.data) {
+            onRowDoubleClicked(e.data);
+          }
+        }}
+        onCellDoubleClicked={(e: any) => {
+          // Fallback: handle double click at cell level if row-level doesn't work
+          // Only process if it's not the status column
+          if (e?.column?.colId === 'status_id') {
+            return; // Ignore double clicks on status column
+          }
+          // Prevent multiple calls for the same row (onCellDoubleClicked fires for each cell)
+          const rowId = e?.data?.id;
+          const now = Date.now();
+          if (lastDoubleClickRef.current && lastDoubleClickRef.current.rowId === rowId && now - lastDoubleClickRef.current.timestamp < 100) {
+            return; // Already handled this row's double-click
+          }
+          lastDoubleClickRef.current = { rowId, timestamp: now };
+          // Call the handler if provided
+          if (onRowDoubleClicked && e?.data) {
+            onRowDoubleClicked(e.data);
+          }
+        }}
+        onRowClicked={(_e: any) => {
+          // Prevent single click from doing anything (we only want double click)
+          // But still allow row selection
+        }}
+        animateRows={false}
+        suppressColumnVirtualisation={false}
+        suppressNoRowsOverlay={false}
+        loading={false}
+        suppressScrollOnNewData={true}
+        suppressAnimationFrame={false}
+      />
+    </Suspense>
   );
-};
+});
 
 export default WorkspaceTable; 

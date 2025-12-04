@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,8 @@ export function IconPicker({
           const iconName = value.replace('fas fa-', '');
           const icon = await iconService.getIcon(iconName);
           setCurrentIcon(icon);
+        } else {
+          setCurrentIcon(null);
         }
         
         // Load popular icons immediately
@@ -191,7 +193,7 @@ export function IconPicker({
     };
   }, [showDropdown]);
 
-  const iconName = value.replace('fas fa-', '');
+  const iconName = (value || '').replace('fas fa-', '');
 
   const fieldContent = (
     <div className="relative" ref={dropdownRef}>
@@ -200,18 +202,22 @@ export function IconPicker({
         onClick={() => setShowDropdown(!showDropdown)}
       >
         <div className="flex items-center space-x-2">
-          <FontAwesomeIcon 
-            icon={currentIcon} 
-            className="w-4 h-4" 
-            style={{ color }}
-          />
-          <span className="text-sm">{iconName}</span>
+          {currentIcon ? (
+            <FontAwesomeIcon 
+              icon={currentIcon} 
+              className="w-4 h-4" 
+              style={{ color }}
+            />
+          ) : (
+            <span className="inline-block w-4 h-4 rounded-full border" style={{ backgroundColor: color }} />
+          )}
+          <span className="text-sm">{iconName || 'none'}</span>
         </div>
         <ChevronDown className="w-4 h-4 text-muted-foreground" />
       </div>
       
       {showDropdown && (
-        <div className="absolute top-full left-0 mt-2 w-96 bg-popover border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-96 bg-popover text-popover-foreground border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
           <div className="p-3">
             <Input
               placeholder="Search icons... (e.g., heart, user, star)"

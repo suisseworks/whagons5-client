@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import React, { ReactNode, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -12,7 +12,7 @@ export interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   type: DialogType;
   title?: string;
-  description?: string;
+  description?: string | ReactNode;
   children?: ReactNode;
   onSubmit?: (e: React.FormEvent) => void;
   onConfirm?: () => void;
@@ -46,6 +46,21 @@ export function SettingsDialog({
   entityData,
   renderEntityPreview
 }: SettingsDialogProps) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const submitNow = () => {
+    if (type === 'delete' && onConfirm) {
+      onConfirm();
+      return;
+    }
+    if (onSubmit) {
+      const fakeEvent: any = {
+        preventDefault: () => {},
+        target: formRef.current,
+        currentTarget: formRef.current,
+      };
+      onSubmit(fakeEvent as React.FormEvent);
+    }
+  };
   const getDefaultTitle = () => {
     switch (type) {
       case 'create': return title || 'Create Item';
@@ -99,7 +114,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={type === 'delete' ? "sm:max-w-[425px]" : "max-w-2xl"}>
+      <DialogContent className={type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"}>
         <DialogHeader>
           <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
             {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
@@ -119,19 +134,21 @@ export function SettingsDialog({
         )}
 
         {(type === 'create' || type === 'edit' || type === 'custom') ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {children}
+          <>
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate onKeyDown={(e)=>{ if(e.key==='Enter' && (e.target as HTMLElement)?.tagName?.toLowerCase() !== 'textarea'){ e.preventDefault(); } }}>
+              {children}
+              <button type="submit" style={{ display: 'none' }} data-hidden-submit="true" />
+            </form>
             <DialogFooter>
-              {error && (
-                <div className="text-sm text-destructive mb-2 text-left mr-auto">
-                  {error}
-                </div>
-              )}
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
+              </div>
+              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 {cancelText}
               </Button>
               <Button
-                type="submit"
+                type="button"
+                onClick={submitNow}
                 variant={getSubmitVariant()}
                 disabled={isSubmitting || submitDisabled}
               >
@@ -143,7 +160,7 @@ export function SettingsDialog({
                 {getDefaultSubmitText()}
               </Button>
             </DialogFooter>
-          </form>
+          </>
         ) : (
           <DialogFooter>
             {error && (
@@ -151,7 +168,7 @@ export function SettingsDialog({
                 {error}
               </div>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
               {cancelText}
             </Button>
             <Button

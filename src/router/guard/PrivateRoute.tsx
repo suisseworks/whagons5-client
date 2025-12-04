@@ -31,8 +31,17 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   }
 
   // If user hasn't completed onboarding, redirect to onboarding
-  if (user.initialization_stage !== InitializationStage.COMPLETED) {
+  // BUT: Users with tenant subdomain should never see onboarding (they're joining existing tenant)
+  const hasTenant = user.tenant_domain_prefix && user.tenant_domain_prefix.trim() !== '';
+  if (!hasTenant && user.initialization_stage !== InitializationStage.COMPLETED) {
     return <Navigate to="/onboarding" replace />;
+  }
+  
+  // If user has tenant but initialization_stage is not completed, still allow access
+  // (they might be in the process of joining via invitation)
+  if (hasTenant && user.initialization_stage !== InitializationStage.COMPLETED) {
+    // Allow access - don't redirect to onboarding
+    return <>{children}</>;
   }
 
   // If authenticated and onboarding complete, show the protected content

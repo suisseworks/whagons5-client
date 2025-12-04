@@ -23,10 +23,10 @@ const genericSliceConfigs = [
     { name: 'fieldOptions', table: 'wh_field_options', endpoint: '/field-options', store: 'field_options', hashFields: ['id','name','version','data','enabled','created_by','updated_at'] },
 
     // User Management
-    { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','team_id','role_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
+    { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','role_id','job_position_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
     { name: 'roles', table: 'wh_roles', endpoint: '/roles', store: 'roles', hashFields: ['id','name','description','updated_at'] },
     { name: 'permissions', table: 'wh_permissions', endpoint: '/permissions', store: 'permissions', hashFields: ['id','name','key','group','type','updated_at'] },
-    { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','role_id','updated_at'] },
+    { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','updated_at'] },
     { name: 'userPermissions', table: 'wh_user_permission', endpoint: '/user-permissions', store: 'user_permissions', hashFields: ['id','user_id','permission_id','updated_at'] },
     { name: 'rolePermissions', table: 'wh_role_permission', endpoint: '/role-permissions', store: 'role_permissions', hashFields: ['id','role_id','permission_id','updated_at'] },
 
@@ -38,18 +38,22 @@ const genericSliceConfigs = [
 
     // Reference Tables
     { name: 'statuses', table: 'wh_statuses', endpoint: '/statuses', store: 'statuses', hashFields: ['id','name','action','color','icon','system','initial','updated_at'] },
-    { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','sla_id','category_id','updated_at'] },
+    { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','category_id','updated_at'] },
     { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','parent_id','spot_type_id','is_branch','updated_at'] },
-    { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','updated_at'] },
-    { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','updated_at'] },
+    { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','icon','category_id','updated_at'] },
+    { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','color','updated_at'] },
     { name: 'statusTransitions', table: 'wh_status_transitions', endpoint: '/status-transitions', store: 'status_transitions', hashFields: ['id','status_transition_group_id','from_status','to_status','initial','updated_at'] },
     { name: 'statusTransitionGroups', table: 'wh_status_transition_groups', endpoint: '/status-transition-groups', store: 'status_transition_groups', hashFields: ['id','name','description','is_default','is_active','updated_at'] },
 
     // Business Logic
-    { name: 'slas', table: 'wh_slas', endpoint: '/slas', store: 'slas', hashFields: ['id','name','response_time','resolution_time','updated_at'] },
+    { name: 'slas', table: 'wh_slas', endpoint: '/slas', store: 'slas', hashFields: ['id','name', 'description', 'color', 'enabled', 'response_time','resolution_time','sla_policy_id','updated_at'] },
+    { name: 'slaPolicies', table: 'wh_sla_policies', endpoint: '/sla-policies', store: 'sla_policies', hashFields: ['id','name','description','active','trigger_type','trigger_status_id','trigger_field_id','trigger_operator','trigger_value_text','trigger_value_number','trigger_value_boolean','grace_seconds','updated_at'] },
     { name: 'slaAlerts', table: 'wh_sla_alerts', endpoint: '/sla-alerts', store: 'sla_alerts', hashFields: ['id','sla_id','time','type','notify_to','updated_at'] },
+    { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','approval_type','require_all','minimum_approvals','trigger_type','trigger_status_id','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','is_active','updated_at'] },
+    { name: 'approvalApprovers', table: 'wh_approval_approvers', endpoint: '/approval-approvers', store: 'approval_approvers', hashFields: ['id','approval_id','approver_type','approver_id','scope','scope_id','required','order_index','created_by','updated_at'] },
+    { name: 'taskApprovalInstances', table: 'wh_task_approval_instances', endpoint: '/task-approval-instances', store: 'task_approval_instances', hashFields: ['id','task_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
     { name: 'categoryPriorities', table: 'wh_category_priority', endpoint: '/category-priorities', store: 'category_priorities', hashFields: ['id','priority_id','category_id','sla_id','updated_at'] },
-    { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','updated_at'] },
+    { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','team_ids','tenant_domain_prefix','updated_at'] },
 
     // Activity & Logging
     { name: 'sessionLogs', table: 'wh_session_logs', endpoint: '/session-logs', store: 'session_logs', hashFields: ['id','user_id','action_type','ip_address','user_agent','description','device_data','updated_at'] },
@@ -57,19 +61,29 @@ const genericSliceConfigs = [
 
     // File Management
     { name: 'taskAttachments', table: 'wh_task_attachments', endpoint: '/task-attachments', store: 'task_attachments', hashFields: ['id','uuid','task_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
+    { name: 'taskNotes', table: 'wh_task_notes', endpoint: '/task-notes', store: 'task_notes', hashFields: ['id','uuid','task_id','note','user_id','updated_at'] },
     { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','updated_at'] },
 
     // Error Tracking
     { name: 'exceptions', table: 'wh_exceptions', endpoint: '/exceptions', store: 'exceptions', hashFields: ['id','workspace_id','user_id','role_id','updated_at'] },
 
     // Core Entities (converted from custom to generic)
-    { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','updated_at'] },
-    { name: 'categoryFieldAssignments', table: 'wh_category_field_assignments', endpoint: '/category-field-assignments', store: 'category_field_assignments', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
+    { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','approval_id','team_id','workspace_id','updated_at'] },
+    { name: 'categoryCustomFields', table: 'wh_category_custom_field', endpoint: '/category-custom-fields', store: 'category_custom_fields', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
-    { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','updated_at'] },
-    { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','updated_at'] },
+    { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },
+    { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','approval_id','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
+
+    // Job Positions
+    { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
+
+    // Compliance Module
+    { name: 'complianceStandards', table: 'wh_compliance_standards', endpoint: '/compliance-standards', store: 'compliance_standards', hashFields: ['id','name','code','version','description','authority','active','created_by','updated_at'] },
+    { name: 'complianceRequirements', table: 'wh_compliance_requirements', endpoint: '/compliance-requirements', store: 'compliance_requirements', hashFields: ['id','standard_id','clause_number','title','description','implementation_guidance','mandatory','parent_id','updated_at'] },
+    { name: 'complianceMappings', table: 'wh_compliance_mappings', endpoint: '/compliance-mappings', store: 'compliance_mappings', hashFields: ['id','requirement_id','mapped_entity_type','mapped_entity_id','justification','created_by','updated_at'] },
+    { name: 'complianceAudits', table: 'wh_compliance_audits', endpoint: '/compliance-audits', store: 'compliance_audits', hashFields: ['id','standard_id','name','type','status','scheduled_start_date','scheduled_end_date','actual_start_date','completed_date','auditor_id','external_auditor_name','scope','summary_findings','score','created_by','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -104,22 +118,32 @@ export const {
     statusTransitions,
     statusTransitionGroups,
     slas,
+    slaPolicies,
     slaAlerts,
+    approvals,
+    approvalApprovers,
+    taskApprovalInstances,
     categoryPriorities,
     invitations,
     sessionLogs,
     configLogs,
     taskAttachments,
+    taskNotes,
     taskRecurrences,
     exceptions,
     // Core entities (converted from custom)
     categories,
-    categoryFieldAssignments,
+    categoryCustomFields,
     customFields,
     teams,
     templates,
     messages,
     workspaces,
+    jobPositions,
+    complianceStandards,
+    complianceRequirements,
+    complianceMappings,
+    complianceAudits,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -160,22 +184,32 @@ export const genericEventNames = {
     statusTransitions: genericSlices.slices.statusTransitions.eventNames,
     statusTransitionGroups: genericSlices.slices.statusTransitionGroups.eventNames,
     slas: genericSlices.slices.slas.eventNames,
+    slaPolicies: genericSlices.slices.slaPolicies.eventNames,
     slaAlerts: genericSlices.slices.slaAlerts.eventNames,
+    approvals: genericSlices.slices.approvals.eventNames,
+    approvalApprovers: genericSlices.slices.approvalApprovers.eventNames,
+    taskApprovalInstances: genericSlices.slices.taskApprovalInstances.eventNames,
     categoryPriorities: genericSlices.slices.categoryPriorities.eventNames,
     invitations: genericSlices.slices.invitations.eventNames,
     sessionLogs: genericSlices.slices.sessionLogs.eventNames,
     configLogs: genericSlices.slices.configLogs.eventNames,
     taskAttachments: genericSlices.slices.taskAttachments.eventNames,
+    taskNotes: genericSlices.slices.taskNotes.eventNames,
     taskRecurrences: genericSlices.slices.taskRecurrences.eventNames,
     exceptions: genericSlices.slices.exceptions.eventNames,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.eventNames,
-    categoryFieldAssignments: genericSlices.slices.categoryFieldAssignments.eventNames,
+    categoryCustomFields: genericSlices.slices.categoryCustomFields.eventNames,
     customFields: genericSlices.slices.customFields.eventNames,
     teams: genericSlices.slices.teams.eventNames,
     templates: genericSlices.slices.templates.eventNames,
     messages: genericSlices.slices.messages.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
+    jobPositions: genericSlices.slices.jobPositions.eventNames,
+    complianceStandards: genericSlices.slices.complianceStandards.eventNames,
+    complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
+    complianceMappings: genericSlices.slices.complianceMappings.eventNames,
+    complianceAudits: genericSlices.slices.complianceAudits.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -207,20 +241,30 @@ export const genericActions = {
     statusTransitions: genericSlices.slices.statusTransitions.actions,
     statusTransitionGroups: genericSlices.slices.statusTransitionGroups.actions,
     slas: genericSlices.slices.slas.actions,
+    slaPolicies: genericSlices.slices.slaPolicies.actions,
     slaAlerts: genericSlices.slices.slaAlerts.actions,
+    approvals: genericSlices.slices.approvals.actions,
+    approvalApprovers: genericSlices.slices.approvalApprovers.actions,
+    taskApprovalInstances: genericSlices.slices.taskApprovalInstances.actions,
     categoryPriorities: genericSlices.slices.categoryPriorities.actions,
     invitations: genericSlices.slices.invitations.actions,
     sessionLogs: genericSlices.slices.sessionLogs.actions,
     configLogs: genericSlices.slices.configLogs.actions,
     taskAttachments: genericSlices.slices.taskAttachments.actions,
+    taskNotes: genericSlices.slices.taskNotes.actions,
     taskRecurrences: genericSlices.slices.taskRecurrences.actions,
     exceptions: genericSlices.slices.exceptions.actions,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.actions,
-    categoryFieldAssignments: genericSlices.slices.categoryFieldAssignments.actions,
+    categoryCustomFields: genericSlices.slices.categoryCustomFields.actions,
     customFields: genericSlices.slices.customFields.actions,
     teams: genericSlices.slices.teams.actions,
     templates: genericSlices.slices.templates.actions,
     messages: genericSlices.slices.messages.actions,
     workspaces: genericSlices.slices.workspaces.actions,
+    jobPositions: genericSlices.slices.jobPositions.actions,
+    complianceStandards: genericSlices.slices.complianceStandards.actions,
+    complianceRequirements: genericSlices.slices.complianceRequirements.actions,
+    complianceMappings: genericSlices.slices.complianceMappings.actions,
+    complianceAudits: genericSlices.slices.complianceAudits.actions,
 } as const;

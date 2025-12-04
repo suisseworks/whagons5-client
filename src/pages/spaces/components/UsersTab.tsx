@@ -230,7 +230,7 @@ function UsersTab({
         </CardHeader>
       </Card>
 
-       <div className="flex-1 mt-4 min-h-0">
+       <div className="flex-1 mt-4 h-full">
         {!modulesLoaded ? (
           <div className="flex items-center justify-center h-64">
             <i className="fas fa-spinner fa-pulse fa-2x"></i>

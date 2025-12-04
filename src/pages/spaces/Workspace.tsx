@@ -1,54 +1,460 @@
 import { useState, useRef, useEffect } from 'react';
-import { useMatch, useLocation } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardList, Settings, Plus } from 'lucide-react';
-import WorkspaceTable from '@/pages/spaces/components/WorkspaceTable';
+import { useLocation } from 'react-router-dom';
+import { UrlTabs } from '@/components/ui/url-tabs';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3 } from 'lucide-react';
+import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
-import { Input } from '@/components/ui/input';
-import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
+import ChatTab from '@/pages/spaces/components/ChatTab';
+import ResourcesTab from '@/pages/spaces/components/ResourcesTab';
+import CalendarViewTab from '@/pages/spaces/components/CalendarViewTab';
+import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
+import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
+import MapViewTab from '@/pages/spaces/components/MapViewTab';
+import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { Button } from '@/components/ui/button';
+import TaskDialog from '@/pages/spaces/components/TaskDialog';
+import { motion } from 'motion/react';
+import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
+import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
+import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 
 export const Workspace = () => {
-  const match = useMatch('/workspace/:id');
-  const id = (match && (match.params as any)?.id) as string | undefined;
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState('grid');
-  // State to store the fetched data
+
+  // Extract workspace ID from the current path
+  const getWorkspaceIdFromPath = (pathname: string): string | undefined => {
+    const match = pathname.match(/\/workspace\/([^/?]+)/);
+    return match ? match[1] : undefined;
+  };
+
+  const id = getWorkspaceIdFromPath(location.pathname);
+  
+  // Helper function to get current tab from URL (matches UrlTabs logic)
+  const getCurrentTabFromUrl = (): string => {
+    const pathMap = { grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' };
+    const normalizedBase = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
+    if (location.pathname.startsWith(normalizedBase)) {
+      const rest = location.pathname.slice(normalizedBase.length) || '';
+      const entries = Object.entries(pathMap).map(([k, v]) => [k, (v || '') as string]) as Array<[string,string]>;
+      entries.sort((a, b) => (b[1].length || 0) - (a[1].length || 0));
+      for (const [key, value] of entries) {
+        const val = value || '';
+        if (val === '' && (rest === '' || rest === '/')) {
+          return key;
+        } else if (rest === val || rest.replace(/\/$/, '') === val.replace(/\/$/, '') || rest.startsWith(val.endsWith('/') ? val : `${val}/`)) {
+          return key;
+        }
+      }
+    }
+    return 'grid';
+  };
+
+  // Initialize tab state from URL to prevent incorrect animation on mount
+  const initialTab = getCurrentTabFromUrl();
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [prevActiveTab, setPrevActiveTab] = useState(initialTab);
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const [searchText, setSearchText] = useState('');
+  const tableRef = useRef<WorkspaceTableHandle | null>(null);
+  const [showClearFilters, setShowClearFilters] = useState(false);
   const [openCreateTask, setOpenCreateTask] = useState(false);
+  const [openEditTask, setOpenEditTask] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [rightPanel, setRightPanel] = useState<'chat' | 'resources' | null>(null);
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('wh_workspace_right_panel_w');
+      return saved ? Math.max(280, Math.min(640, parseInt(saved, 10))) : 384; // default 384px (w-96)
+    } catch {
+      return 384;
+    }
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStartX, setResizeStartX] = useState<number | null>(null);
+  const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
 
+  // Display options - workspace-specific
+  const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
+    try {
+      const key = `wh_workspace_show_kpis_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      return saved == null ? true : saved === 'true';
+    } catch { return true; }
+  });
+  const [tagDisplayMode, setTagDisplayMode] = useState<'icon' | 'icon-text'>(() => {
+    try {
+      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      return (saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text';
+    } catch { return 'icon-text'; }
+  });
+  useEffect(() => {
+    // Update when workspace changes
+    try {
+      const key = `wh_workspace_show_kpis_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      setShowHeaderKpis(saved == null ? true : saved === 'true');
+    } catch {}
+    try {
+      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      setTagDisplayMode((saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text');
+    } catch {}
+  }, [id]);
+  useEffect(() => {
+    const handler = (e: any) => {
+      const eventWorkspaceId = e?.detail?.workspaceId || 'all';
+      const currentWorkspaceId = id || 'all';
+      // Only update if the event is for the current workspace
+      if (eventWorkspaceId === currentWorkspaceId) {
+        const v = e?.detail?.showKpis;
+        if (typeof v === 'boolean') setShowHeaderKpis(v);
+        const tagMode = e?.detail?.tagDisplayMode;
+        if (tagMode === 'icon' || tagMode === 'icon-text') setTagDisplayMode(tagMode);
+      }
+    };
+    window.addEventListener('wh:displayOptionsChanged', handler as any);
+    return () => window.removeEventListener('wh:displayOptionsChanged', handler as any);
+  }, [id]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('wh_workspace_right_panel_w', String(rightPanelWidth));
+    } catch {}
+  }, [rightPanelWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMove = (e: MouseEvent) => {
+      if (resizeStartX == null || resizeStartWidth == null) return;
+      const dx = resizeStartX - e.clientX; // moving left increases width
+      const next = Math.max(280, Math.min(640, resizeStartWidth + dx));
+      setRightPanelWidth(next);
+      e.preventDefault();
+    };
+    const handleUp = () => {
+      setIsResizing(false);
+      setResizeStartX(null);
+      setResizeStartWidth(null);
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isResizing, resizeStartX, resizeStartWidth]);
+
+
+  // Row density (affects grid row height)
+  const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
+    try {
+      return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
+    } catch { return 'compact'; }
+  });
+  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 52 : 110;
+  useEffect(() => {
+    try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
+  }, [rowDensity]);
+  // Listen for external density changes (from Settings screen)
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e?.detail as any;
+      if (v === 'compact' || v === 'comfortable' || v === 'spacious') setRowDensity(v);
+    };
+    window.addEventListener('wh:rowDensityChanged', handler);
+    return () => window.removeEventListener('wh:rowDensityChanged', handler);
+  }, []);
+
+  // Selected tasks (for bulk actions)
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Metadata for filters
+  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
+  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
+  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
+  // Grouping
+  const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>(() => {
+    try {
+      const key = `wh_workspace_group_by_${id || 'all'}`;
+      const saved = localStorage.getItem(key) as any;
+      return saved || 'none';
+    } catch { return 'none'; }
+  });
+  const [collapseGroups, setCollapseGroups] = useState<boolean>(() => {
+    try {
+      const key = `wh_workspace_group_collapse_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      return saved == null ? true : saved === 'true';
+    } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(`wh_workspace_group_by_${id || 'all'}`, groupBy); } catch {}
+    // Dispatch to Header component
+    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
+      detail: { groupBy, collapseGroups } 
+    }));
+  }, [groupBy, id, collapseGroups]);
+  useEffect(() => {
+    try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
+    // Dispatch to Header component
+    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
+      detail: { groupBy, collapseGroups } 
+    }));
+  }, [collapseGroups, id, groupBy]);
+
+  // Listen for group changes from Header component
+  useEffect(() => {
+    const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
+      const newGroupBy = event.detail.groupBy as any;
+      if (newGroupBy !== groupBy) {
+        setGroupBy(newGroupBy);
+      }
+      if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
+        setCollapseGroups(event.detail.collapseGroups);
+      }
+    };
+    window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
+    return () => {
+      window.removeEventListener('workspace-group-changed', handleGroupChange as EventListener);
+    };
+  }, [groupBy, collapseGroups]);
+
+  // Listen for filter apply events from Header component
+  useEffect(() => {
+    const handleFilterApply = (event: CustomEvent<{ filterModel: any; clearSearch?: boolean }>) => {
+      if (tableRef.current) {
+        tableRef.current.setFilterModel(event.detail.filterModel);
+        const key = `wh_workspace_filters_${id || 'all'}`;
+        try {
+          if (event.detail.filterModel) {
+            localStorage.setItem(key, JSON.stringify(event.detail.filterModel));
+          } else {
+            localStorage.removeItem(key);
+          }
+        } catch {}
+        if (event.detail.clearSearch) {
+          setSearchText('');
+        }
+      }
+    };
+    window.addEventListener('workspace-filter-apply', handleFilterApply as EventListener);
+    return () => {
+      window.removeEventListener('workspace-filter-apply', handleFilterApply as EventListener);
+    };
+  }, [id]);
+
+  // Listen for filter dialog open events from Header component
+  useEffect(() => {
+    const handleFilterDialogOpen = () => {
+      setFiltersOpen(true);
+    };
+    window.addEventListener('workspace-filter-dialog-open', handleFilterDialogOpen as EventListener);
+    return () => {
+      window.removeEventListener('workspace-filter-dialog-open', handleFilterDialogOpen as EventListener);
+    };
+  }, []);
+
+  // Check if this is the "all" workspace route (needed for stats and presets)
+  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
+  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+
+  // Derived status groupings for stats
+  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
+    ?? (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
+    ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
+  const workingStatusIds: number[] = (statuses || [])
+    .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
+    .map((s: any) => Number((s as any).id))
+    .filter((n: number) => Number.isFinite(n));
+
+  // Header stats
+  const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; loading: boolean }>({ total: 0, inProgress: 0, completedToday: 0, loading: true });
+  const isInitialLoadRef = useRef(true);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        // Only set loading state on initial load, preserve values during updates
+        if (isInitialLoadRef.current) {
+          setStats((s) => ({ ...s, loading: true }));
+        }
+        if (!TasksCache.initialized) await TasksCache.init();
+        const base: any = {};
+        const ws = isAllWorkspaces ? undefined : id;
+        if (ws) base.workspace_id = ws;
+
+        const totalResp = await TasksCache.queryTasks({ ...base, startRow: 0, endRow: 0 });
+        const total = totalResp?.rowCount ?? 0;
+
+        let inProgress = 0;
+        if (workingStatusIds.length > 0) {
+          for (const sid of workingStatusIds) {
+            const r = await TasksCache.queryTasks({ ...base, status_id: sid, startRow: 0, endRow: 0 });
+            inProgress += r?.rowCount ?? 0;
+          }
+        }
+
+        let completedToday = 0;
+        if (doneStatusId != null) {
+          const midnight = new Date();
+          midnight.setHours(0, 0, 0, 0);
+          const r = await TasksCache.queryTasks({ ...base, status_id: Number(doneStatusId), updated_after: midnight.toISOString(), startRow: 0, endRow: 0 });
+          completedToday = r?.rowCount ?? 0;
+        }
+
+        if (!cancelled) {
+          setStats({ total, inProgress, completedToday, loading: false });
+          isInitialLoadRef.current = false;
+        }
+      } catch {
+        if (!cancelled) {
+          setStats((prev) => ({ ...prev, loading: false }));
+          isInitialLoadRef.current = false;
+        }
+      }
+    };
+    // Reset initial load flag when workspace changes
+    isInitialLoadRef.current = true;
+    load();
+    const unsubs = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, load),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, load),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, load),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, load),
+      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, load),
+    ];
+    return () => { cancelled = true; unsubs.forEach((u) => { try { u(); } catch {} }); };
+  }, [id, isAllWorkspaces, doneStatusId, workingStatusIds.join(',')]);
+
+  // Filter builder dialog
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickPresets, setQuickPresets] = useState<SavedFilterPreset[]>([]);
+  const [allPresets, setAllPresets] = useState<SavedFilterPreset[]>([]);
+  const dragIdRef = useRef<string | null>(null);
+
+
+
+
+  // Sync tab state when URL changes (e.g., navigating from settings to workspace)
+  useEffect(() => {
+    const currentTabFromUrl = getCurrentTabFromUrl();
+    if (currentTabFromUrl !== activeTab) {
+      // When URL changes (e.g., navigating from settings), sync both states
+      // to the same value to prevent incorrect animation on mount
+      // This ensures prevActiveTab matches activeTab so initial position is correct
+      setPrevActiveTab(currentTabFromUrl);
+      setActiveTab(currentTabFromUrl);
+    }
+  }, [location.pathname, id]);
+
+  //
   // Clear cache when workspace ID changes
   useEffect(() => {
     if (id) {
       console.log(`Switching to workspace ${id}, clearing cache`);
       rowCache.current.clear();
     }
-  }, [id]);
-
+  }, [id, location.pathname]);
   // Debug logging
   console.log('Workspace component - id:', id, 'typeof:', typeof id);
   console.log('Current path:', location.pathname);
 
-  // Check if this is the "all" workspace route
-  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+  
 
-  // Handle invalid workspace ID - simplified validation
-  if (!id && !isAllWorkspaces) {
-    console.log('No workspace ID provided and not all workspaces route');
+  // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
+  useEffect(() => {
+    const ws = isAllWorkspaces ? 'all' : (id || 'all');
+    try {
+      const quick = listPinnedPresets(ws).slice(0, 4);
+      const all = listPresets(ws);
+      setQuickPresets(quick);
+      setAllPresets(all);
+      // Dispatch to Header component
+      window.dispatchEvent(new CustomEvent('workspace-presets-changed', { 
+        detail: { quickPresets: quick, allPresets: all } 
+      }));
+    } catch {
+      setQuickPresets([]);
+      setAllPresets([]);
+      window.dispatchEvent(new CustomEvent('workspace-presets-changed', { 
+        detail: { quickPresets: [], allPresets: [] } 
+      }));
+    }
+  }, [id, isAllWorkspaces, filtersOpen]);
+
+  // Persist and restore search text globally
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved != null) setSearchText(saved);
+    } catch {}
+  }, []);
+
+  // Listen for search changes from Header component
+  useEffect(() => {
+    const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
+      const newSearchText = event.detail.searchText;
+      // Only update if different to prevent unnecessary re-renders
+      if (newSearchText !== searchText) {
+        setSearchText(newSearchText);
+      }
+    };
+    window.addEventListener('workspace-search-changed', handleSearchChange as EventListener);
+    return () => {
+      window.removeEventListener('workspace-search-changed', handleSearchChange as EventListener);
+    };
+  }, [searchText]);
+
+  // Dispatch event when searchText changes (for Header sync)
+  useEffect(() => {
+    const key = `wh_workspace_search_global`;
+    try {
+      if (searchText) {
+        localStorage.setItem(key, searchText);
+      } else {
+        localStorage.removeItem(key);
+      }
+      // Dispatch custom event to notify Header component
+      window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
+    } catch {}
+  }, [searchText]);
+
+  // Restore saved filters for this workspace when grid is ready
+  const handleTableReady = () => {
+    const key = `wh_workspace_filters_${id || 'all'}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved && tableRef.current) {
+        const model = JSON.parse(saved);
+        tableRef.current.setFilterModel(model);
+      }
+    } catch {}
+  };
+
+
+  if (invalidWorkspaceRoute) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
-          <p className="text-gray-600 mt-2">ID: "{id}" - Please check the URL and try again.</p>
+          <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
         </div>
       </div>
+      
+      
     );
   }
 
-  // Additional validation for numeric IDs (but allow 'all' or all workspaces route)
-  if (!isAllWorkspaces && isNaN(Number(id))) {
-    console.log('Invalid workspace ID detected:', id);
+  if (invalidWorkspaceId) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -59,65 +465,286 @@ export const Workspace = () => {
     );
   }
 
+  // Define tabs for URL persistence
+  const workspaceTabs = [
+    {
+      value: 'grid',
+      label: (
+        <div className="flex items-center gap-2">
+          <ClipboardList />
+          <span className="tab-label-text">Tasks</span>
+        </div>
+      ),
+      forceMount: true,
+      content: (
+        <motion.div
+          className='flex-1 h-full'
+          key='grid'
+          initial={false}
+          animate={{ x: activeTab === 'grid' ? 0 : getWorkspaceTabInitialX(activeTab, 'grid') }}
+          transition={activeTab === 'grid' ? TAB_ANIMATION.transition : { duration: 0 }}
+        >
+          <WorkspaceTable 
+            key={isAllWorkspaces ? 'all' : (id || 'root')}
+            ref={tableRef}
+            rowCache={rowCache} 
+            workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
+            searchText={searchText}
+            onFiltersChanged={(active) => setShowClearFilters(!!active)}
+            onSelectionChanged={setSelectedIds}
+            onRowDoubleClicked={(task) => {
+              setSelectedTask(task);
+              setOpenEditTask(true);
+            }}
+            rowHeight={computedRowHeight}
+            groupBy={groupBy}
+            collapseGroups={collapseGroups}
+            tagDisplayMode={tagDisplayMode}
+            onReady={handleTableReady}
+          />
+        </motion.div>
+      )
+		},
+    {
+      value: 'calendar',
+      label: (
+        <div className="flex items-center gap-2">
+          <Calendar />
+          <span className="tab-label-text">Calendar</span>
+        </div>
+      ),
+      content: (
+        <motion.div className='flex-1 h-full' key='calendar' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <CalendarViewTab workspaceId={id} />
+        </motion.div>
+      )
+    },
+    {
+      value: 'scheduler',
+      label: (
+        <div className="flex items-center gap-2">
+          <Clock />
+          <span className="tab-label-text">Scheduler</span>
+        </div>
+      ),
+      content: (
+        <motion.div className='flex-1 h-full' key='scheduler' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <SchedulerViewTab workspaceId={id} />
+        </motion.div>
+      )
+    },
+    {
+      value: 'map',
+      label: (
+        <div className="flex items-center gap-2">
+          <MapIcon />
+          <span className="tab-label-text">Map</span>
+        </div>
+      ),
+      content: (
+        <motion.div className='flex-1 h-full' key='map' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <MapViewTab workspaceId={id} />
+        </motion.div>
+      )
+    },
+    {
+      value: 'board',
+      label: (
+        <div className="flex items-center gap-2">
+          <LayoutDashboard />
+          <span className="tab-label-text">Board</span>
+        </div>
+      ),
+      content: (
+        <motion.div className='flex-1 h-full' key='board' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <TaskBoardTab workspaceId={id} />
+        </motion.div>
+      )
+    },
+    {
+      value: 'statistics',
+      label: (
+        <div className="flex items-center gap-2" aria-label="Statistics">
+          <div
+            className="flex items-center justify-center rounded-[4px] flex-shrink-0"
+            style={{
+              backgroundColor: '#3B82F6',
+              width: '20px',
+              height: '20px',
+            }}
+          >
+            <BarChart3 size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+          </div>
+        </div>
+      ),
+      content: (
+        <motion.div className='flex-1 h-full' key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <WorkspaceStatistics workspaceId={id} />
+        </motion.div>
+      )
+    },
+    {
+      value: 'settings',
+      label: (
+        <div className="flex items-center gap-2" aria-label="Settings">
+          <Settings />
+        </div>
+      ),
+      content: (
+        <motion.div className='flex-1 h-full' key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+          <SettingsComponent workspaceId={id} />
+        </motion.div>
+      )
+    }
+  ];
 
   return (
-    <Tabs defaultValue="grid" className="w-full h-full flex flex-col" onValueChange={setActiveTab} value={activeTab}>
-      <TabsList className="w-fit h-12 flex-shrink-0">
-        <TabsTrigger value="grid" className="flex items-center gap-2">
-          <ClipboardList />
-          Tasks
-        </TabsTrigger>
-        <TabsTrigger value="list" className="flex items-center gap-2">
-          <Settings />
-          Settings
-        </TabsTrigger>
-      </TabsList>
-      <div className="flex items-center gap-3 mb-3">
-        <Input
-          placeholder="Search tasks..."
-          className="max-w-sm"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
-        {/* Mobile FAB substitute: visible on small screens */}
-        {!isAllWorkspaces && !isNaN(Number(id)) && (
-          <button
-            className="ml-auto sm:hidden inline-flex items-center justify-center h-9 px-3 rounded-md bg-primary text-primary-foreground"
-            onClick={() => setOpenCreateTask(true)}
-            title="Create Task"
+    <div className="w-full h-full flex flex-col">
+      {/* Controls moved to Header toolbar */}
+      <div className="ml-auto flex items-center gap-4 pr-2 -mt-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Toggle Chat"
+          onClick={() => setRightPanel(prev => prev === 'chat' ? null : 'chat')}
+            title="Chat"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            New
-          </button>
+            <MessageSquare className="w-6 h-6" strokeWidth={2.2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle Resources"
+            onClick={() => setRightPanel(prev => prev === 'resources' ? null : 'resources')}
+            title="Resources"
+          >
+            <FolderPlus className="w-6 h-6" strokeWidth={2.2} />
+          </Button>
+        </div>
+      {/* Stats summary (chips) */}
+      {showHeaderKpis && (
+        <div className="flex flex-wrap gap-2.5">
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
+            <ClipboardList className="h-[18px] w-[18px] text-cyan-600" />
+            <span className="text-[12px] text-muted-foreground">Total</span>
+            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.total.toLocaleString()}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
+            <Clock className="h-[18px] w-[18px] text-amber-600" />
+            <span className="text-[12px] text-muted-foreground">In progress</span>
+            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.inProgress.toLocaleString()}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
+            <CheckCircle2 className="h-[18px] w-[18px] text-emerald-600" />
+            <span className="text-[12px] text-muted-foreground">Completed today</span>
+            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.completedToday.toLocaleString()}</span>
+          </div>
+        </div>
+      )}
+      {/* Bulk actions toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center gap-2 mb-2 border rounded px-2 py-1 bg-background/60">
+          <span className="text-sm text-muted-foreground">Selected: {selectedIds.length}</span>
+          <Button variant="ghost" size="sm" title="Mark complete" aria-label="Mark complete" disabled>
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Complete
+          </Button>
+          <Button variant="ghost" size="sm" title="Reassign" aria-label="Reassign" disabled>
+            <UserRound className="h-4 w-4 mr-1" /> Reassign
+          </Button>
+          <Button variant="ghost" size="sm" title="Change priority" aria-label="Change priority" disabled>
+            <Flag className="h-4 w-4 mr-1" /> Priority
+          </Button>
+          <Button variant="ghost" size="sm" title="Reschedule" aria-label="Reschedule" disabled>
+            <CalendarDays className="h-4 w-4 mr-1" /> Reschedule
+          </Button>
+          <div className="ml-auto" />
+          <Button variant="outline" size="sm" onClick={() => setSelectedIds([])}>Clear selection</Button>
+        </div>
+      )}
+      <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
+        <div className='flex-1 min-w-0'>
+        <UrlTabs
+          tabs={workspaceTabs}
+          defaultValue="grid"
+          basePath={`/workspace/${id}`}
+          pathMap={{ grid: '', calendar: '/calendar', scheduler: '/scheduler', map: '/map', board: '/board', settings: '/settings', statistics: '/statistics' }}
+          className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
+          onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v); }}
+          showClearFilters={showClearFilters}
+          onClearFilters={() => tableRef.current?.clearFilters()}
+        />
+        </div>
+        {rightPanel && (
+          <>
+            <div
+              className="w-1.5 cursor-col-resize bg-border hover:bg-primary/40"
+              onMouseDown={(e) => {
+                setIsResizing(true);
+                setResizeStartX(e.clientX);
+                setResizeStartWidth(rightPanelWidth);
+              }}
+              title="Drag to resize"
+            />
+            <div className="border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
+            <div className="flex items-center justify-between px-3 py-2 border-b">
+              <div className="text-sm font-medium">{rightPanel === 'chat' ? 'Chat' : 'Resources'}</div>
+              <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto p-2">
+              {rightPanel === 'chat' ? (
+                <ChatTab workspaceId={id} />
+              ) : (
+                <ResourcesTab workspaceId={id} />
+              )}
+            </div>
+            </div>
+          </>
         )}
       </div>
 
-      <TabsContent
-        forceMount
-        className='flex-1 h-0'
-        value="grid"
-        style={{ display: activeTab === 'grid' ? 'block' : 'none' }}
-      >
-        <WorkspaceTable rowCache={rowCache} workspaceId={isAllWorkspaces ? 'all' : (id || '')} searchText={searchText} />
-      </TabsContent>
-      <TabsContent value="list" className="flex-1 h-0">
-        <SettingsComponent />
-      </TabsContent>
-      {/* Floating Action Button for mobile (bottom-right) */}
-      {!isAllWorkspaces && !isNaN(Number(id)) && (
-        <>
-          <button
-            className="fixed right-5 bottom-20 sm:hidden inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg"
-            onClick={() => setOpenCreateTask(true)}
-            aria-label="Create Task"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
-          <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={parseInt(id!, 10)} />
-        </>
-      )}
-    </Tabs>
+      <FilterBuilderDialog
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        workspaceId={isAllWorkspaces ? 'all' : (id || 'all')}
+        statuses={(statuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
+        priorities={(priorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
+        spots={(spots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
+        currentModel={tableRef.current?.getFilterModel?.()}
+        currentSearchText={searchText}
+        onApply={(model) => {
+          tableRef.current?.setFilterModel(model);
+          try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(model)); } catch {}
+          setSearchText('');
+        }}
+      />
 
+
+      {/* Task Dialog - Unified component for create/edit */}
+      {!isAllWorkspaces && !isNaN(Number(id)) && (
+        <TaskDialog 
+          open={openCreateTask} 
+          onOpenChange={setOpenCreateTask} 
+          mode="create" 
+          workspaceId={parseInt(id!, 10)} 
+        />
+      )}
+      {isAllWorkspaces && (
+        <TaskDialog 
+          open={openCreateTask} 
+          onOpenChange={setOpenCreateTask} 
+          mode="create-all" 
+        />
+      )}
+      <TaskDialog 
+        open={openEditTask} 
+        onOpenChange={setOpenEditTask} 
+        mode="edit" 
+        task={selectedTask} 
+      />
+      <TaskNotesModal />
+    </div>
 
   );
 };

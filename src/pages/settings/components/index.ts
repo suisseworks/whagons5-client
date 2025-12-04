@@ -36,6 +36,7 @@ export type {
   PreviewFieldProps
 } from './FormFields';
 
+
 // Hooks
 export { useSettingsState } from './useSettingsState';
 export type { UseSettingsStateOptions, UseSettingsStateReturn } from './useSettingsState';
@@ -46,3 +47,6 @@ export type { IconPickerProps } from './IconPicker';
 
 export { CategoryFieldsManager } from './CategoryFieldsManager';
 export type { CategoryFieldsManagerProps } from './CategoryFieldsManager';
+
+export { ApprovalApproversManager } from './ApprovalApproversManager';
+export type { ApprovalApproversManagerProps } from './ApprovalApproversManager';

@@ -312,7 +312,7 @@ export class TasksCache {
         }
     }
 
-    public static async validateTasks() {
+    public static async validateTasks(serverGlobalHash?: string | null, serverBlockCount?: number | null) {
         try {
             if (this.validating) {
                 this.dlog('validateTasks: already running, skipping re-entry');
@@ -320,23 +320,57 @@ export class TasksCache {
             }
             this.validating = true;
             const t0 = performance.now();
-            // 0) Quick global-hash short-circuit
+            
+            // Bootstrap: If cache is empty, fetch tasks once before integrity validation
+            const existingTasks = await this.getTasks();
+            console.log(`[TasksCache] validateTasks: existingTasks count=${existingTasks.length}`);
+            
+            if (existingTasks.length === 0) {
+                this.dlog('validateTasks: cache empty, bootstrap fetching tasks');
+                try {
+                    const fetchSuccess = await this.fetchTasks();
+                    if (fetchSuccess) {
+                        this.dlog('validateTasks: bootstrap fetch completed');
+                        // After bootstrap, continue with integrity validation to verify
+                        // (or return early if you prefer to skip validation on first sync)
+                    } else {
+                        this.dlog('validateTasks: bootstrap fetch failed, continuing with validation');
+                    }
+                } catch (e) {
+                    console.warn('TasksCache: bootstrap fetch error', e);
+                    // Continue with validation even if bootstrap fails
+                }
+            } else {
+                console.log('[TasksCache] validateTasks: cache not empty, skipping bootstrap fetch');
+            }
+            
+            // 0) Quick global-hash short-circuit (use batch result if provided, otherwise fetch)
             const localBlocks = await this.computeLocalTaskBlockHashes();
             const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
             const localGlobalHash = sha256(localGlobalConcat).toString(encHex);
-            try {
-                const globalResp = await api.get('/integrity/global', { params: { table: 'wh_tasks' } });
-                const serverGlobal = globalResp.data?.data?.global_hash;
-                const serverBlockCount = globalResp.data?.data?.block_count ?? null;
-                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount, equal: serverGlobal === localGlobalHash });
-                if (serverGlobal && serverGlobal === localGlobalHash && (serverBlockCount === null || serverBlockCount === localBlocks.length)) {
+            
+            let serverGlobal: string | undefined = serverGlobalHash ?? undefined;
+            let serverBlockCountFromServer: number | null = serverBlockCount ?? null;
+            
+            // Only make API call if batch result wasn't provided
+            if (serverGlobalHash === undefined) {
+                try {
+                    const globalResp = await api.get('/integrity/global', { params: { table: 'wh_tasks' } });
+                    serverGlobal = globalResp.data?.data?.global_hash;
+                    serverBlockCountFromServer = globalResp.data?.data?.block_count ?? null;
+                } catch (_) {
+                    // ignore and continue with block-level comparison
+                }
+            }
+            
+            if (serverGlobal) {
+                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount: serverBlockCountFromServer, equal: serverGlobal === localGlobalHash });
+                if (serverGlobal === localGlobalHash && (serverBlockCountFromServer === null || serverBlockCountFromServer === localBlocks.length)) {
                     this.dlog('global hash match; skipping block compare');
                     this.validating = false;
                     // Perfect match – nothing to do
                     return true;
                 }
-            } catch (_) {
-                // ignore and continue with block-level comparison
             }
 
             // 1) Integrity blocks comparison (cheap): compare local block hashes vs server
@@ -410,7 +444,14 @@ export class TasksCache {
                         try {
                             const resp = await api.get('/tasks', { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
                             const rows = (resp.data.data || resp.data.rows) as Task[];
-                            if (rows?.length) await this.addTasks(rows);
+                            if (rows?.length) {
+                                // Attach server-provided row hash so subsequent local hashing can short-circuit
+                                const rowsWithHash = rows.map(r => {
+                                    const h = serverRowMap.get(r.id);
+                                    return h ? { ...(r as any), __h: h } : r;
+                                });
+                                await this.addTasks(rowsWithHash as unknown as Task[]);
+                            }
                         } catch (e) {
                             console.warn('validateTasks: batch fetch failed', e);
                         }
@@ -440,31 +481,60 @@ export class TasksCache {
 
     // --- Integrity helpers ---
     private static hashTask(task: Task): string {
-        const normalizedUserIds = Array.isArray(task.user_ids) && task.user_ids.length
-            ? `[${[...task.user_ids].map(n => Number(n)).filter(n => Number.isFinite(n)).sort((a,b)=>a-b).join(',')}]`
+        // Prefer server-provided hash when available (attached during validation)
+        if ((task as any) && typeof (task as any).__h === 'string' && (task as any).__h.length) {
+            return (task as any).__h as string;
+        }
+
+        // Match backend canonicalization exactly
+        const normalizedUserIds = Array.isArray((task as any).user_ids) && (task as any).user_ids.length
+            ? `[${[...(task as any).user_ids]
+                .map((n: any) => Number(n))
+                .filter((n: number) => Number.isFinite(n))
+                .sort((a: number, b: number) => a - b)
+                .join(', ')}]` // note the space after comma to match jsonb::text
             : '';
+
         const row = [
             task.id,
-            task.name || '',
-            task.description || '',
-            task.workspace_id,
-            task.category_id,
-            task.team_id,
-            task.template_id || 0,
-            task.spot_id || 0,
-            task.status_id,
-            task.priority_id,
+            (task as any).name || '',
+            (task as any).description || '',
+            (task as any).workspace_id,
+            (task as any).category_id,
+            (task as any).team_id,
+            (task as any).template_id || 0,
+            (task as any).spot_id || 0,
+            (task as any).status_id,
+            (task as any).priority_id,
+            (task as any).approval_id || 0,
+            (task as any).approval_status || '',
+            this.toUtcEpochMs((task as any).approval_triggered_at),
+            this.toUtcEpochMs((task as any).approval_completed_at),
             normalizedUserIds,
-            task.start_date ? new Date(task.start_date).getTime() : '',
-            task.due_date ? new Date(task.due_date).getTime() : '',
-            task.expected_duration,
-            task.response_date ? new Date(task.response_date).getTime() : '',
-            task.resolution_date ? new Date(task.resolution_date).getTime() : '',
-            task.work_duration,
-            task.pause_duration,
-            new Date(task.updated_at).getTime()
+            // Timestamps normalized to UTC epoch ms (empty string when falsy)
+            this.toUtcEpochMs((task as any).start_date),
+            this.toUtcEpochMs((task as any).due_date),
+            (task as any).expected_duration,
+            this.toUtcEpochMs((task as any).response_date),
+            this.toUtcEpochMs((task as any).resolution_date),
+            (task as any).work_duration,
+            (task as any).pause_duration,
+            this.toUtcEpochMs((task as any).updated_at)
         ].join('|');
         return sha256(row).toString(encHex);
+    }
+
+    // Normalize various timestamp inputs to UTC epoch ms string to match backend hashing
+    private static toUtcEpochMs(value: any): string {
+        if (!value) return '';
+        let vStr = String(value);
+        // If it looks like 'YYYY-MM-DD HH:mm:ss(.sss)?' without timezone, assume UTC
+        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(vStr) && !/[zZ]|[+\-]\d{2}:?\d{2}$/.test(vStr)) {
+            vStr = vStr.replace(' ', 'T') + 'Z';
+        }
+        const dt = new Date(vStr);
+        const t = dt.getTime();
+        return Number.isFinite(t) ? String(t) : '';
     }
 
     private static async computeLocalTaskBlockHashes() {
@@ -519,14 +589,18 @@ export class TasksCache {
                 this._memTasksStamp = now;
             }
 
-            // Apply simple parameter filters
+            // Check if filterModel is present - if so, skip simple filters for columns that are in filterModel
+            const hasFilterModel = params.filterModel && typeof params.filterModel === 'object' && Object.keys(params.filterModel).length > 0;
+            const filterModelKeys = hasFilterModel ? new Set(Object.keys(params.filterModel)) : new Set();
+            
+            // Apply simple parameter filters (skip if column is in filterModel, as filterModel will handle it)
             if (params.workspace_id) {
                 tasks = tasks.filter(task => task.workspace_id === parseInt(params.workspace_id));
             }
-            if (params.status_id) {
+            if (params.status_id && !filterModelKeys.has('status_id')) {
                 tasks = tasks.filter(task => task.status_id === parseInt(params.status_id));
             }
-            if (params.priority_id) {
+            if (params.priority_id && !filterModelKeys.has('priority_id')) {
                 tasks = tasks.filter(task => task.priority_id === parseInt(params.priority_id));
             }
             if (params.team_id) {
@@ -535,14 +609,14 @@ export class TasksCache {
             if (params.template_id) {
                 tasks = tasks.filter(task => task.template_id === parseInt(params.template_id));
             }
-            if (params.spot_id) {
+            if (params.spot_id && !filterModelKeys.has('spot_id')) {
                 tasks = tasks.filter(task => task.spot_id === parseInt(params.spot_id));
             }
             if (params.category_id) {
                 tasks = tasks.filter(task => task.category_id === parseInt(params.category_id));
             }
 
-            // Apply search filter: includes ID, status/priority/spot names and responsible user names
+            // Apply search filter: includes ID, status/priority/spot names, responsible user names, and tags
             if (params.search) {
                 const searchTerm = String(params.search).toLowerCase();
 
@@ -551,6 +625,19 @@ export class TasksCache {
                 const priorityMap: Record<number, { name?: string }> = params.__priorityMap || {};
                 const spotMap: Record<number, { name?: string }> = params.__spotMap || {};
                 const userMap: Record<number, { name?: string; email?: string }> = params.__userMap || {};
+                const tagMap: Record<number, { name?: string }> = params.__tagMap || {};
+                const taskTags: Array<{ task_id: number; tag_id: number }> = params.__taskTags || [];
+
+                // Build a map of task_id -> tag_ids for efficient lookup
+                const taskTagMap: Record<number, number[]> = {};
+                for (const tt of taskTags) {
+                    const taskId = Number(tt.task_id);
+                    const tagId = Number(tt.tag_id);
+                    if (!taskTagMap[taskId]) {
+                        taskTagMap[taskId] = [];
+                    }
+                    taskTagMap[taskId].push(tagId);
+                }
 
                 const matches = (t: Task): boolean => {
                     // ID
@@ -580,6 +667,15 @@ export class TasksCache {
                             const u = userMap[uid];
                             const uname = u?.name || u?.email;
                             if (uname && uname.toLowerCase().includes(searchTerm)) return true;
+                        }
+                    }
+
+                    // Tags
+                    const tagIds = taskTagMap[t.id];
+                    if (tagIds && tagIds.length > 0) {
+                        for (const tagId of tagIds) {
+                            const tag = tagMap[tagId];
+                            if (tag?.name && tag.name.toLowerCase().includes(searchTerm)) return true;
                         }
                     }
 
@@ -668,14 +764,42 @@ export class TasksCache {
      * Apply complex filterModel to tasks array
      */
     private static applyFilterModel(tasks: Task[], filterModel: any): Task[] {
-        return tasks.filter(task => {
+        // Debug logging if enabled
+        const debugFilters = typeof localStorage !== 'undefined' && localStorage.getItem('wh-debug-filters') === 'true';
+        if (debugFilters) {
+            console.log('[TasksCache] applyFilterModel - filterModel:', JSON.stringify(filterModel, null, 2));
+            console.log('[TasksCache] applyFilterModel - tasks before filter:', tasks.length);
+            
+            // Log sample of task priority_ids if filtering by priority
+            if (filterModel.priority_id) {
+                const samplePriorities = tasks.slice(0, 10).map(t => ({ id: t.id, priority_id: t.priority_id }));
+                console.log('[TasksCache] applyFilterModel - sample task priority_ids:', samplePriorities);
+                const allPriorities = [...new Set(tasks.map(t => t.priority_id).filter(p => p != null))];
+                console.log('[TasksCache] applyFilterModel - all unique priority_ids in tasks:', allPriorities);
+            }
+        }
+        
+        const filtered = tasks.filter(task => {
             for (const [column, filterDetails] of Object.entries(filterModel)) {
-                if (!this.taskMatchesFilter(task, column, filterDetails as any)) {
+                const matches = this.taskMatchesFilter(task, column, filterDetails as any);
+                if (debugFilters && column === 'priority_id') {
+                    console.log(`[TasksCache] task ${task.id} priority_id=${task.priority_id} (type: ${typeof task.priority_id}), filter=${JSON.stringify(filterDetails)}, matches=${matches}`);
+                }
+                if (!matches) {
                     return false;
                 }
             }
             return true;
         });
+        
+        if (debugFilters) {
+            console.log('[TasksCache] applyFilterModel - tasks after filter:', filtered.length);
+        }
+        if (filtered.length === 0 && tasks.length > 0) {
+            console.warn('[TasksCache] applyFilterModel - WARNING: Filter resulted in 0 tasks but had', tasks.length, 'tasks before filtering');
+        }
+        
+        return filtered;
     }
 
     /**
@@ -708,17 +832,35 @@ export class TasksCache {
         if (filterType === 'set') {
             const selected = Array.isArray(values) ? values : [];
             if (selected.length === 0) return true;
-            // Coerce types to compare consistently
-            const normalizedSelectedNums = selected.map((v: any) => {
-                const n = Number(v);
-                return isNaN(n) ? null : n;
-            });
-            // Prefer numeric comparison when possible
-            if (typeof value === 'number') {
-                return normalizedSelectedNums.includes(value);
+            
+            // Handle null/undefined values explicitly
+            if (value === null || value === undefined) {
+                // Check if null/undefined is explicitly in the selected values
+                return selected.includes(null) || selected.includes(undefined) || selected.includes('null') || selected.includes('undefined');
             }
-            // Fall back to string comparison
-            return selected.map((v: any) => String(v)).includes(String(value));
+            
+            // Normalize selected values to both numeric and string sets for robust matching
+            const normalizedSelectedNums = selected.map((v: any) => {
+                if (v === null || v === undefined) return null;
+                const n = Number(v);
+                return Number.isFinite(n) ? n : null;
+            }).filter((n: any) => n !== null);
+            const normalizedSelectedStrs = selected.map((v: any) => {
+                if (v === null) return 'null';
+                if (v === undefined) return 'undefined';
+                return String(v);
+            });
+
+            // Try numeric comparison first (most reliable for IDs)
+            const asNum = Number(value);
+            if (Number.isFinite(asNum) && normalizedSelectedNums.length > 0) {
+                const numericMatch = normalizedSelectedNums.includes(asNum);
+                if (numericMatch) return true;
+            }
+            
+            // Fallback to string compare (handles string IDs and edge cases)
+            const valueStr = value === null ? 'null' : value === undefined ? 'undefined' : String(value);
+            return normalizedSelectedStrs.includes(valueStr);
         }
         
         if (type === 'inRange') {
@@ -791,6 +933,10 @@ export class TasksCache {
      * Apply sorting to tasks array
      */
     private static applySorting(tasks: Task[], sortModel: Array<{ colId: string; sort: string }>): Task[] {
+        if (!sortModel || sortModel.length === 0) {
+            return tasks;
+        }
+        
         return tasks.sort((a, b) => {
             for (const sort of sortModel) {
                 const { colId, sort: direction } = sort;
@@ -804,17 +950,39 @@ export class TasksCache {
                     comparison = bValue === null || bValue === undefined ? 0 : -1;
                 } else if (bValue === null || bValue === undefined) {
                     comparison = 1;
-                } else if (typeof aValue === 'string' && typeof bValue === 'string') {
-                    comparison = aValue.localeCompare(bValue);
-                } else if (aValue instanceof Date || bValue instanceof Date) {
-                    const aDate = new Date(aValue);
-                    const bDate = new Date(bValue);
-                    comparison = aDate.getTime() - bDate.getTime();
                 } else {
-                    comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                    // Check if this is a date field (ends with _at or _date) or is a date string
+                    const isDateField = colId.endsWith('_at') || colId.endsWith('_date') || 
+                                       (typeof aValue === 'string' && !isNaN(Date.parse(aValue)) && !isNaN(Date.parse(bValue)));
+                    
+                    if (isDateField) {
+                        // Convert to Date objects for proper comparison
+                        const aDate = new Date(aValue);
+                        const bDate = new Date(bValue);
+                        const aTime = aDate.getTime();
+                        const bTime = bDate.getTime();
+                        
+                        // Check for invalid dates
+                        if (isNaN(aTime) || isNaN(bTime)) {
+                            // Fallback to string comparison if dates are invalid
+                            comparison = String(aValue).localeCompare(String(bValue));
+                        } else {
+                            comparison = aTime - bTime;
+                        }
+                    } else if (typeof aValue === 'string' && typeof bValue === 'string') {
+                        comparison = aValue.localeCompare(bValue);
+                    } else if (aValue instanceof Date || bValue instanceof Date) {
+                        const aDate = new Date(aValue);
+                        const bDate = new Date(bValue);
+                        comparison = aDate.getTime() - bDate.getTime();
+                    } else {
+                        comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                    }
                 }
                 
                 if (comparison !== 0) {
+                    // For desc: newer dates (larger timestamps) should come first
+                    // If comparison > 0, a is newer than b, so for desc we want a first (return negative)
                     return direction === 'desc' ? -comparison : comparison;
                 }
             }

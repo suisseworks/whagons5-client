@@ -9,46 +9,36 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Settings,
-  Users,
   Plus,
   ChevronDown,
-  Briefcase,
   BarChart3,
-  MessageSquareMore,
+  Layers,
+  Plug,
+  Users2,
+  Globe,
+  FileText, // Add FileText icon
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { RootState } from '@/store';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from '@/components/ui/collapsible';
 import WhagonsCheck from '@/assets/WhagonsCheck';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
+// Removed Messages feature
+import AppSidebarWorkspaces from './AppSidebarWorkspaces';
+import { genericCaches } from '@/store/genericSlices';
 
 // Global pinned state management
-let isPinnedGlobal = false;
+let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
 const pinnedStateCallbacks: ((pinned: boolean) => void)[] = [];
 
 export const setPinnedState = (pinned: boolean) => {
@@ -66,6 +56,29 @@ export const subscribeToPinnedState = (callback: (pinned: boolean) => void) => {
   };
 };
 
+const IconBadge = ({
+  children,
+  color,
+  size = 20,
+}: {
+  children: ReactNode;
+  color: string;
+  size?: number;
+}) => (
+  <div
+    className="grid place-items-center rounded-[6px] flex-shrink-0"
+    style={{
+      backgroundColor: color,
+      width: `${size}px`,
+      height: `${size}px`,
+      lineHeight: 0,
+      position: 'relative'
+    }}
+  >
+    {children}
+  </div>
+);
+
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   const [isPinned, setIsPinned] = useState(isPinnedGlobal);
 
@@ -77,6 +90,7 @@ const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   const handleClick = () => {
     const newPinned = !isPinned;
     setPinnedState(newPinned);
+    localStorage.setItem('sidebarPinned', newPinned.toString());
     // Don't auto-close when unpinning - let hover behavior handle it
   };
 
@@ -103,7 +117,7 @@ const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   );
 };
 
-export function AppSidebar() {
+export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boolean }) {
   const { state, setOpen, isMobile } = useSidebar();
   const location = useLocation();
   const pathname = location.pathname;
@@ -112,29 +126,49 @@ export function AppSidebar() {
   // Extract toggleSidebar to suppress unused warning
   // const { toggleSidebar } = useSidebar();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [workspaceDescription, setWorkspaceDescription] = useState('');
-  const [isPinned, setIsPinned] = useState(getPinnedState());
+  const [, setIsPinned] = useState(getPinnedState());
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
-
-  // const dispatch = useDispatch<AppDispatch>();
-  // const { user } = useAuth(); // Currently not used, uncomment when needed
+  // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
+  // const [createBoardOpen, setCreateBoardOpen] = useState(false);
 
   const workspacesState = useSelector(
     (state: RootState) => state.workspaces
   );
   const { value: workspaces = [] } = workspacesState || {};
 
+  // Local-first: read workspaces directly from IndexedDB to render immediately, then let Redux take over
+  const [initialWorkspaces, setInitialWorkspaces] = useState<Workspace[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const loadLocal = async () => {
+      try {
+        const cache = (genericCaches as any)?.workspaces;
+        if (cache && typeof cache.getAll === 'function') {
+          const rows = await cache.getAll();
+          if (!cancelled) setInitialWorkspaces(rows || []);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadLocal();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Prefer Redux once it has data; otherwise show local IndexedDB rows
+  const displayWorkspaces: Workspace[] = (workspaces && workspaces.length > 0)
+    ? workspaces as any
+    : (initialWorkspaces || []);
+
   // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
   const uniqueWorkspaces = useMemo(() => {
     const map = new Map<string, Workspace>();
-    for (const w of workspaces) map.set(String(w.id), w);
+    for (const w of displayWorkspaces) map.set(String(w.id), w);
     return Array.from(map.values());
-  }, [workspaces]);
+  }, [displayWorkspaces]);
 
   // Debug logging for workspaces state changes (only in development)
   useEffect(() => {
@@ -171,21 +205,11 @@ export function AppSidebar() {
 
 
 
-  // // Additional effect to check if workspaces data is loaded
-  // useEffect(() => {
-  //   if (workspacesState && workspacesState.value && workspacesState.value.length > 0) {
-  //     console.log('AppSidebar: Workspaces loaded successfully:', workspacesState.value.length);
-  //   } else if (workspacesState && workspacesState.loading) {
-  //     console.log('AppSidebar: Workspaces are loading...');
-  //   } else if (workspacesState && workspacesState.error) {
-  //     console.error('AppSidebar: Error loading workspaces:', workspacesState.error);
-  //   }
-  // }, [workspacesState]);
 
   // Load workspace icons when workspaces change
   useEffect(() => {
     const loadWorkspaceIcons = async () => {
-      const iconNames = workspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
+      const iconNames = uniqueWorkspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
       if (iconNames.length > 0) {
         try {
           const icons = await iconService.loadIcons(iconNames);
@@ -197,12 +221,14 @@ export function AppSidebar() {
     };
 
     loadWorkspaceIcons();
-  }, [workspaces]);
+  }, [uniqueWorkspaces]);
 
   // Preload common icons on component mount
   useEffect(() => {
     iconService.preloadCommonIcons();
   }, []);
+
+  // Messages removed
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -237,66 +263,38 @@ export function AppSidebar() {
     return workspaceIcons[parsedIconName] || defaultIcon;
   };
 
-  const handleAddWorkspace = () => {
-    if (!workspaceName.trim() || !workspaceDescription.trim()) {
-      // Basic validation: Ensure fields are not empty
-      // You might want to add more robust validation/feedback
-      alert('Please enter both name and description.');
-      return;
-    }
-
-    // Create workspace data in the format expected by the API
-    // const newWorkspaceData = {
-    //   name: workspaceName,
-    //   description: workspaceDescription,
-    //   type: 'PROJECT',
-    //   created_by: user?.id ? parseInt(user.id) : 0
-    // };
-
-    // TODO: Implement custom async thunk for adding workspaces
-    // dispatch(genericActions.workspaces.addWorkspaceAsync(newWorkspaceData as any));
-
-    // Reset form and close modal
-    setWorkspaceName('');
-    setWorkspaceDescription('');
-    setIsModalOpen(false);
-  };
-
-
   // Determine if we should show expanded content
   const showExpandedContent = !isCollapsed || isMobile;
 
+  // Hover handlers re-enabled for open/close without transform animations
   const handleMouseEnter = () => {
-    // Debounce hover-open to prevent flicker
     if (isMobile) return;
-    if (!isCollapsed) return;
+    if (state !== 'collapsed') return;
     if ((hoverCloseTimerRef.current as any)) {
       clearTimeout(hoverCloseTimerRef.current as any);
       hoverCloseTimerRef.current = null;
     }
     if (!(hoverOpenTimerRef.current as any)) {
       hoverOpenTimerRef.current = setTimeout(() => {
-        setOpen(true);
+        // open sidebar on hover in
+        try { setOpen(true); } catch { }
         hoverOpenTimerRef.current = null;
-      }, 150) as unknown as number;
+      }, 0) as unknown as number;
     }
   };
 
   const handleMouseLeave = () => {
-    // Debounce hover-close to prevent flicker when moving near the edge
     if (isMobile) return;
-    if (isPinned) return;
+    if (getPinnedState()) return;
     if (hoverOpenTimerRef.current as any) {
       clearTimeout(hoverOpenTimerRef.current as any);
       hoverOpenTimerRef.current = null;
     }
-    if (!isCollapsed) {
-      if (!(hoverCloseTimerRef.current as any)) {
-        hoverCloseTimerRef.current = setTimeout(() => {
-          setOpen(false);
-          hoverCloseTimerRef.current = null;
-        }, 300) as unknown as number;
-      }
+    if (!(hoverCloseTimerRef.current as any)) {
+      hoverCloseTimerRef.current = setTimeout(() => {
+        try { setOpen(false); } catch { }
+        hoverCloseTimerRef.current = null;
+      }, 100) as unknown as number;
     }
   };
 
@@ -312,32 +310,32 @@ export function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className={`bg-sidebar border-r border-sidebar-border transition-all duration-300 text-sidebar-foreground`}
+      className={`bg-sidebar text-sidebar-foreground font-montserrat text-[1rem]`}
+      overlayExpanded={overlayOnExpand && !getPinnedState()}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar transition-all duration-300 ${
-          isCollapsed ? 'px-1' : ''
+        className={`shadow-md bg-sidebar-header transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
         }`}
+        style={{ paddingTop: '12px', paddingBottom: '10px', height: '52px', flexShrink: 0 }}
       >
-        <div className="flex items-center justify-center w-full">
+        <div className="flex items-center justify-center w-full h-full">
           <Link
-            to="/home"
+            to="/welcome"
             title="Home"
-            className={`flex items-center pt-3 pb-3 transition-all duration-300 ${
-              isCollapsed ? 'justify-center' : 'justify-center'
+            className={`flex items-center h-full transition-all duration-300 ${isCollapsed ? 'justify-center' : 'justify-center'
             }`}
           >
             <WhagonsCheck
-              width={showExpandedContent ? 45 : 32}
-              height={showExpandedContent ? 21 : 15}
-              color="#27C1A7"
+              width={showExpandedContent ? 40 : 28}
+              height={showExpandedContent ? 18 : 14}
+              color={'var(--sidebar-primary)'}
             />
             {showExpandedContent && (
               <div
-                className="text-xl pl-2 font-semibold text-[#27C1A7]"
-                style={{ fontFamily: 'Montserrat' }}
+                className="pl-2 font-semibold text-[var(--sidebar-primary)]"
+                style={{ fontFamily: 'Montserrat', fontSize: '20px', fontWeight: 600 }}
               >
                 Whagons
               </div>
@@ -349,307 +347,208 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar">
-        <SidebarGroup>
-          {/* Everything workspace - above the Spaces dropdown */}
-          {(!isCollapsed || isMobile) && (
-            <div className="px-3 py-2">
-              <Link
-                to={`/workspace/all`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
-                  pathname === `/workspace/all`
-                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-              >
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
-                  <Users className="w-4 h-4" />
-                </span>
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Everything</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Show Everything icon when collapsed - DESKTOP ONLY */}
-          {isCollapsed && !isMobile && (
-            <div className="px-2 py-2 flex justify-center">
-              <Link
-                to={`/workspace/all`}
-                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
-                  pathname === `/workspace/all`
-                    ? 'bg-primary/20 text-primary border border-primary/40'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                }`}
-                title={'Everything'}
-              >
-                <Users className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
-
-          <Collapsible defaultOpen className="group/collapsible">
-            <SidebarGroup>
-              <SidebarGroupLabel asChild className="text-sm font-normal">
-                <div
-                  className={`flex items-center w-full pr-3 transition-all duration-300 ${
-                    isCollapsed ? 'justify-center px-0' : 'justify-between'
-                  }`}
-                >
-                  <CollapsibleTrigger
-                    className={`flex items-center cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-sm p-1 pr-2 -ml-3 transition-all duration-300 ${
-                      isCollapsed && !isMobile
-                        ? 'flex-col justify-center ml-0 px-2'
-                        : 'justify-start flex-1'
-                    }`}
-                  >
-                    {isCollapsed && !isMobile ? (
-                      <div className="flex flex-col items-center">
-                        <Briefcase className="text-sidebar-foreground w-5 h-5 mb-1" />
-                      </div>
-                    ) : (
-                      <>
-                        <ChevronDown className="transition-transform duration-200 ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-sidebar-foreground" />
-                        <span className="text-base font-semibold pl-2 text-sidebar-foreground flex items-center">
-                          <Briefcase className="w-4 h-4 mr-2" />
-                          Spaces
-                        </span>
-                      </>
-                    )}
-                  </CollapsibleTrigger>
-
-                  {showExpandedContent && (
-                    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent"
-                          title="Add Workspace"
-                        >
-                          <Plus size={16} />
-                          <span className="sr-only">Add Workspace</span>
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Add New Workspace</DialogTitle>
-                          <DialogDescription>
-                            Enter the details for your new workspace. Click save
-                            when you're done.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                              Name
-                            </Label>
-                            <Input
-                              id="name"
-                              value={workspaceName}
-                              onChange={(e) => setWorkspaceName(e.target.value)}
-                              className="col-span-3"
-                              placeholder="e.g., Project Phoenix"
-                            />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="description" className="text-right">
-                              Description
-                            </Label>
-                            <Input
-                              id="description"
-                              value={workspaceDescription}
-                              onChange={(e) =>
-                                setWorkspaceDescription(e.target.value)
-                              }
-                              className="col-span-3"
-                              placeholder="e.g., For managing project tasks"
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsModalOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" onClick={handleAddWorkspace}>
-                            Save Workspace
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </SidebarGroupLabel>
-
-              <CollapsibleContent>
-                {(!isCollapsed || isMobile) && (
-                  <SidebarGroupContent className="pt-2 pl-1">
-
-                    {uniqueWorkspaces.map((workspace: Workspace) => {
-                      // Skip temporary optimistic items (negative IDs)
-                      if ((workspace.id as number) < 0) return null;
-
-                      return (
-                      <Link
-                        key={`workspace-${workspace.id}`}
-                        to={`/workspace/${workspace.id}`}
-                        className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-4 py-2 mx-2 ${
-                          pathname === `/workspace/${workspace.id}`
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-5'
-                        } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-                      >
-                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
-                          <FontAwesomeIcon
-                            icon={getWorkspaceIcon(workspace.icon)}
-                            style={{ color: workspace.color }}
-                            className="w-4 h-4"
-                          />
-                        </span>
-                        <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">{workspace.name}</span>
-                      </Link>
-                      );
-                    })}
-                  </SidebarGroupContent>
-                )}
-
-                {/* Show workspace icons when collapsed AND collapsible is open - DESKTOP ONLY */}
-                {isCollapsed && !isMobile && (
-                  <SidebarGroupContent className="pt-2">
-                    <div className="flex flex-col items-center space-y-1 px-1 py-1 rounded-md bg-sidebar-accent">
-                      {uniqueWorkspaces
-                        .filter((workspace: Workspace) => (workspace.id as number) >= 0) // Skip temp items
-                        .map((workspace: Workspace) => (
-                        <Link
-                          key={`workspace-collapsed-${workspace.id}`}
-                          to={`/workspace/${workspace.id}`}
-                          className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
-                            pathname === `/workspace/${workspace.id}`
-                              ? 'bg-primary/20 text-primary border border-primary/40'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                          }`}
-                          title={workspace.name}
-                        >
-                          <FontAwesomeIcon
-                            icon={getWorkspaceIcon(workspace.icon)}
-                            style={{ color: workspace.color }}
-                            className="w-4 h-4"
-                          />
-                        </Link>
-                      ))}
-                    </div>
-                  </SidebarGroupContent>
-                )}
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
-          {/* Messages link after Spaces */}
-          {(!isCollapsed || isMobile) && (
-            <div className="px-3 py-2">
-              <Link
-                to={`/messages`}
-                className={`group flex items-center space-x-2 rounded-md relative overflow-hidden transition-colors px-3 py-2 ${
-                  pathname === `/messages`
-                    ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                } after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-              >
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-105">
-                  <MessageSquareMore className="w-4 h-4" />
-                </span>
-                <span className="transition-transform duration-200 ease-out group-hover:translate-x-0.5">Messages</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Show Messages icon when collapsed - DESKTOP ONLY */}
-          {isCollapsed && !isMobile && (
-            <div className="px-2 py-2 flex justify-center">
-              <Link
-                to={`/messages`}
-                className={`flex items-center justify-center w-8 h-8 rounded text-xs font-medium transition-colors transition-transform duration-200 hover:scale-105 ${
-                  pathname === `/messages`
-                    ? 'bg-primary/20 text-primary border border-primary/40'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                }`}
-                title={'Messages'}
-              >
-                <MessageSquareMore className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
+      <SidebarContent className="bg-sidebar" style={{ paddingLeft: isCollapsed && !isMobile ? '4px' : '20px', paddingRight: isCollapsed && !isMobile ? '4px' : '20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        {/* Spaces section - scrollable */}
+        <SidebarGroup style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div className="scrollbar-hide" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingBottom: isCollapsed ? '80px' : '16px' }}>
+            <AppSidebarWorkspaces
+              workspaces={uniqueWorkspaces}
+              pathname={pathname}
+              getWorkspaceIcon={getWorkspaceIcon}
+              showEverythingButton={true}
+            />
+          </div>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="bg-sidebar border-t border-sidebar-border">
-        <SidebarGroup>
+      <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid var(--sidebar-border)', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
+        {/* Section: TeamConnect */}
+        <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px', marginTop: '4px' }}>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem className="pt-1 pb-1">
+              <SidebarMenuItem style={{ marginBottom: '0' }}>
                 <SidebarMenuButton
                   asChild
-                  tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
-                  className={`rounded-md relative transition-colors ${
-                    isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${
-                          pathname === '/analytics'
-                            ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/teamconnect'
+                            ? 'text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
-                      : `h-10 ${
-                          pathname === '/analytics'
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      : `${pathname === '/teamconnect'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/teamconnect' ? 600 : 500,
+                    fontSize: '13px',
+                    boxShadow: pathname === '/teamconnect' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/teamconnect' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/teamconnect' ? '4px' : undefined
+                  }}
                 >
                   <Link
-                    to="/analytics"
-                    className={`${
-                      isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                    to="/teamconnect"
+                    className={`${isCollapsed && !isMobile
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
+                    } group relative`}
                   >
-                    <BarChart3 size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
-                    {showExpandedContent && (
-                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Analytics</span>
+                    <IconBadge color="#8B5CF6">
+                      <Users2 size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                    </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">TeamConnect</span>
+                    ) : (
+                      <span className="ml-1.5">TeamConnect</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem className="pt-1 pb-1">
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: 'var(--sidebar-border)', marginBottom: '4px' }} />
+
+        {/* Section: Analytics & Plugins */}
+        <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px' }}>
+          <SidebarGroupContent className="py-0">
+            <SidebarMenu className="space-y-0">
+              {/* Compliance Link */}
+              <SidebarMenuItem style={{ marginBottom: '1px' }}>
                 <SidebarMenuButton
                   asChild
-                  tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
-                  className={`rounded-md relative transition-colors ${
-                    isCollapsed && !isMobile
-                      ? `h-10 flex justify-center items-center ${
-                          pathname === '/settings'
-                            ? 'bg-primary/10 text-primary border-2 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  tooltip={isCollapsed && !isMobile ? 'Compliance' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname.startsWith('/compliance')
+                            ? 'text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
-                      : `h-10 ${
-                          pathname === '/settings'
-                            ? 'bg-primary/15 text-primary border-l-4 border-primary'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      : `${pathname.startsWith('/compliance')
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
                         }`
                   }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname.startsWith('/compliance') ? 600 : 500,
+                    fontSize: '13px',
+                    boxShadow: pathname.startsWith('/compliance') ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname.startsWith('/compliance') ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname.startsWith('/compliance') ? '4px' : undefined
+                  }}
                 >
                   <Link
-                    to="/settings"
+                    to="/compliance/standards"
+                    className={`${isCollapsed && !isMobile
+                        ? 'grid place-items-center w-8 h-8 p-0'
+                        : 'flex items-center'
+                    } group relative`}
+                    >
+                      <IconBadge color="#10B981">
+                        <FileText size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                      </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Compliance</span>
+                    ) : (
+                      <span className="ml-1.5">Compliance</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem style={{ marginBottom: '1px' }}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/analytics'
+                            ? 'text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                      : `${pathname === '/analytics'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                  }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/analytics' ? 600 : 500,
+                    fontSize: '13px',
+                    boxShadow: pathname === '/analytics' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/analytics' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/analytics' ? '4px' : undefined
+                  }}
+                >
+                  <Link
+                    to="/analytics"
+                    className={`${isCollapsed && !isMobile
+                        ? 'grid place-items-center w-8 h-8 p-0'
+                        : 'flex items-center'
+                    } group relative`}
+                    >
+                      <IconBadge color="#0EA5E9">
+                        <BarChart3 size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                      </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Analytics</span>
+                    ) : (
+                      <span className="ml-1.5">Analytics</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem style={{ marginBottom: '0' }}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Plugins' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${
+                    isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${
+                          pathname === '/plugins'
+                            ? 'text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                      : `${
+                          pathname === '/plugins'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                  }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/plugins' ? 600 : 500,
+                    fontSize: '13px',
+                    boxShadow: pathname === '/plugins' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/plugins' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/plugins' ? '4px' : undefined
+                  }}
+                >
+                  <Link
+                    to="/plugins"
                     className={`${
                       isCollapsed && !isMobile
-                        ? 'flex justify-center items-center w-full'
+                        ? 'grid place-items-center w-8 h-8 p-0'
                         : 'flex items-center'
-                    } group relative overflow-hidden after:absolute after:left-0 after:top-0 after:h-full after:w-0 hover:after:w-1 after:bg-primary/60 after:transition-all after:duration-200`}
-                  >
-                    <Settings size={20} className="w-5! h-5! p-[1px] transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:scale-110" />
-                    {showExpandedContent && (
-                      <span className="ml-2 transition-transform duration-200 ease-out group-hover:translate-x-0.5">Settings</span>
+                    } group relative`}
+                    >
+                      <IconBadge color="#F59E0B">
+                        <Plug size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                      </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Plugins</span>
+                    ) : (
+                      <span className="ml-1.5">Plugins</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
@@ -658,8 +557,106 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: 'var(--sidebar-border)', marginBottom: '4px' }} />
+
+        {/* Section: Settings */}
+        <SidebarGroup style={{ flexShrink: 0, paddingTop: '2px', marginTop: 'auto' }}>
+          <SidebarGroupContent className="py-0">
+            <SidebarMenu className="space-y-0">
+              <SidebarMenuItem style={{ marginBottom: '1px' }}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/settings'
+                            ? 'text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                      : `${pathname === '/settings'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                  }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/settings' ? 600 : 500,
+                    fontSize: '13px',
+                    boxShadow: pathname === '/settings' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/settings' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/settings' ? '4px' : undefined
+                  }}
+                >
+                  <Link
+                    to="/settings"
+                    className={`${isCollapsed && !isMobile
+                        ? 'grid place-items-center w-8 h-8 p-0'
+                        : 'flex items-center'
+                    } group relative`}
+                    >
+                      <IconBadge color="#64748B">
+                        <Settings size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                      </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Settings</span>
+                    ) : (
+                      <span className="ml-1.5">Settings</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem style={{ marginBottom: '0' }}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
+                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
+                      ? `flex justify-center items-center ${pathname === '/settings/global'
+                            ? 'text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                      : `${pathname === '/settings/global'
+                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+                        }`
+                  }`}
+                  style={{
+                    height: '32px',
+                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
+                    gap: '8px',
+                    fontWeight: pathname === '/settings/global' ? 600 : 500,
+                    fontSize: '13px',
+                    boxShadow: pathname === '/settings/global' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                    borderTopLeftRadius: pathname === '/settings/global' ? '4px' : undefined,
+                    borderBottomLeftRadius: pathname === '/settings/global' ? '4px' : undefined
+                  }}
+                >
+                  <Link
+                    to="/settings/global"
+                    className={`${isCollapsed && !isMobile
+                        ? 'grid place-items-center w-8 h-8 p-0'
+                        : 'flex items-center'
+                    } group relative`}
+                    >
+                      <IconBadge color="#64748B">
+                        <Globe size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                      </IconBadge>
+                    {isCollapsed && !isMobile ? (
+                      <span className="sr-only">Global Settings</span>
+                    ) : (
+                      <span className="ml-1.5">Global Settings</span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Messages create board dialog removed */}
+
         {showExpandedContent && (
-          <div className="px-2 py-1 text-xs text-muted-foreground">
+          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
             Version 5.0.0
           </div>
         )}
