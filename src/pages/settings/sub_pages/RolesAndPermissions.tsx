@@ -1,10 +1,10 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShieldAlt, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type { ColDef } from "ag-grid-community";
-import type { Role } from "@/store/types";
-import { AppDispatch } from "@/store/store";
+import type { Role, Permission, RolePermission } from "@/store/types";
+import { AppDispatch, RootState } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +23,23 @@ function RolesAndPermissions() {
   const tu = (key: string, fallback: string) => t(`settings.rolesAndPermissions.${key}`, fallback);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Load roles data on mount
+  // Load roles and permissions data on mount
   useEffect(() => {
     dispatch((genericActions as any).roles.getFromIndexedDB());
     dispatch((genericActions as any).roles.fetchFromAPI());
+    dispatch((genericActions as any).permissions.getFromIndexedDB());
+    dispatch((genericActions as any).permissions.fetchFromAPI());
+    dispatch((genericActions as any).rolePermissions.getFromIndexedDB());
+    dispatch((genericActions as any).rolePermissions.fetchFromAPI());
   }, [dispatch]);
+
+  const { value: permissions = [], loading: permissionsLoading } = useSelector((state: RootState) =>
+    state.permissions as { value: Permission[]; loading: boolean }
+  );
+
+  const { value: rolePermissions = [] } = useSelector((state: RootState) =>
+    state.rolePermissions as { value: RolePermission[] }
+  );
 
   const {
     filteredItems,
@@ -75,6 +87,9 @@ function RolesAndPermissions() {
   // Permissions modal state
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false);
   const [selectedRoleName, setSelectedRoleName] = useState<string>('');
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedPermIds, setSelectedPermIds] = useState<Set<string>>(new Set());
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
 
   // Reset create form when dialog opens
   useEffect(() => {
@@ -96,7 +111,97 @@ function RolesAndPermissions() {
     }
   }, [editingItem]);
 
+  // Sync selected permissions when role changes in modal
+  useEffect(() => {
+    if (!selectedRoleId) {
+      setSelectedPermIds(new Set());
+      return;
+    }
+    const current = rolePermissions
+      .filter((rp: RolePermission) => rp.role_id === selectedRoleId)
+      .map((rp: RolePermission) => String(rp.permission_id));
+    setSelectedPermIds(new Set(current));
+  }, [selectedRoleId, rolePermissions]);
+
+  const groupedPermissions = useMemo(() => {
+    const groups: Record<string, Permission[]> = {};
+
+    permissions.forEach((perm) => {
+      // Derive group from key/name/resource; last token after delimiters is the entity (e.g., archive-tasks -> tasks)
+      const raw = (perm as any).key || perm.name || [perm.action, perm.resource].filter(Boolean).join('-');
+      const tokens = (raw || '')
+        .replace(/[.:/]/g, '-')
+        .split('-')
+        .filter(Boolean);
+
+      const entity =
+        (tokens.length >= 2 && tokens[tokens.length - 1]) ||
+        perm.resource ||
+        tokens[0] ||
+        'otros';
+
+      const groupKey = entity.trim().toLowerCase() || 'otros';
+
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(perm);
+    });
+
+    return Object.entries(groups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([group, perms]) => ({
+        group,
+        perms: perms.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      }));
+  }, [permissions]);
+
+  const togglePermission = (id: number | string) => {
+    const key = String(id);
+    setSelectedPermIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allIds = permissions
+      .map((p) => p.id)
+      .filter((id) => id !== undefined && id !== null)
+      .map((id) => String(id));
+    setSelectedPermIds(new Set(allIds));
+  };
+
+  const handleClearAll = () => {
+    setSelectedPermIds(new Set());
+  };
+
+  const handleSavePermissions = useCallback(async () => {
+    if (!selectedRoleId) return;
+    try {
+      setIsSavingPerms(true);
+      const existing = rolePermissions.filter((rp: RolePermission) => rp.role_id === selectedRoleId);
+      const existingIds = existing.map((rp: RolePermission) => rp.permission_id);
+      const desired = Array.from(selectedPermIds).map((id) => Number(id));
+
+      const toAdd = desired.filter((id) => !existingIds.includes(id));
+      const toRemove = existing.filter((rp) => !desired.includes(rp.permission_id));
+
+      for (const permission_id of toAdd) {
+        await dispatch((genericActions as any).rolePermissions.addAsync({ role_id: selectedRoleId, permission_id })).unwrap();
+      }
+      for (const rp of toRemove) {
+        await dispatch((genericActions as any).rolePermissions.removeAsync(rp.id)).unwrap();
+      }
+
+      setIsPermissionsDialogOpen(false);
+    } finally {
+      setIsSavingPerms(false);
+    }
+  }, [dispatch, rolePermissions, selectedPermIds, selectedRoleId]);
+
   const handleOpenPermissions = useCallback((role: Role) => {
+    setSelectedRoleId(role.id);
     setSelectedRoleName(role.name || '');
     setIsPermissionsDialogOpen(true);
   }, []);
@@ -206,7 +311,7 @@ function RolesAndPermissions() {
       icon={faShieldAlt}
       iconColor="#6366f1"
       backPath="/settings"
-      loading={{ isLoading: loading, message: tu('loading', 'Loading roles...') }}
+      loading={{ isLoading: loading || permissionsLoading, message: tu('loading', 'Loading roles...') }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       search={{
         placeholder: tu('searchPlaceholder', 'Search roles...'),
@@ -303,20 +408,69 @@ function RolesAndPermissions() {
         )}
       </SettingsDialog>
 
-      {/* Permissions Dialog (empty for now) */}
+      {/* Permissions Dialog */}
       <SettingsDialog
         open={isPermissionsDialogOpen}
         onOpenChange={setIsPermissionsDialogOpen}
         type="custom"
         title={tu('permissionsDialog.title', 'Assign permissions')}
         description={selectedRoleName ? tu('permissionsDialog.description', `Configure permissions for "${selectedRoleName}"`) : tu('permissionsDialog.description', 'Configure permissions')}
-        onSubmit={(e) => { e.preventDefault(); setIsPermissionsDialogOpen(false); }}
-        isSubmitting={false}
-        submitDisabled={false}
-        submitText={tu('permissionsDialog.close', 'Close')}
+        onSubmit={(e) => { e.preventDefault(); handleSavePermissions(); }}
+        isSubmitting={isSavingPerms}
+        submitDisabled={isSavingPerms || !selectedRoleId}
+        submitText={tu('permissionsDialog.save', 'Save')}
       >
-        <div className="min-h-[120px] flex items-center justify-center text-muted-foreground text-sm">
-          {tu('permissionsDialog.empty', 'Permissions UI coming soon.')}
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <div className="text-sm text-muted-foreground">
+            {tu('permissionsDialog.hint', 'Select the permissions for this role')}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleSelectAll} disabled={permissions.length === 0}>
+              {tu('permissionsDialog.selectAll', 'Select all')}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={handleClearAll} disabled={selectedPermIds.size === 0}>
+              {tu('permissionsDialog.clearAll', 'Clear')}
+            </Button>
+          </div>
+        </div>
+        <div className="max-h-[70vh] overflow-auto pr-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {groupedPermissions.map(({ group, perms }) => (
+              <div key={group} className="border rounded-lg p-3 bg-muted/30">
+                <div className="font-semibold mb-3 capitalize text-center">{group}</div>
+                <div className="grid gap-2">
+                  {perms.map((perm) => {
+                    const raw = (perm as any).key || perm.name || [perm.action, perm.resource].filter(Boolean).join('-');
+                    const tokens = (raw || '').replace(/[.:/]/g, '-').split('-').filter(Boolean);
+                    const actionLabel = (tokens[0] || perm.action || '').toUpperCase();
+                    const displayName = actionLabel || `Permission ${perm.id}`;
+
+                    return (
+                      <label key={perm.id} className="flex items-center gap-2 rounded border border-border/70 bg-background px-3 py-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedPermIds.has(String(perm.id))}
+                          onChange={() => togglePermission(perm.id)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex min-w-[72px] justify-center items-center rounded-md px-2 py-1 text-xs font-semibold tracking-wide uppercase border ${
+                              selectedPermIds.has(String(perm.id))
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}
+                          >
+                            {displayName}
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </SettingsDialog>
 
