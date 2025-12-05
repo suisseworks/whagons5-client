@@ -7,6 +7,7 @@ import type { Role, Permission, RolePermission } from "@/store/types";
 import { AppDispatch, RootState } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { Button } from "@/components/ui/button";
+import api from "@/api/whagonsApi";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -90,6 +91,7 @@ function RolesAndPermissions() {
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [selectedPermIds, setSelectedPermIds] = useState<Set<string>>(new Set());
   const [isSavingPerms, setIsSavingPerms] = useState(false);
+  const [isLoadingRolePerms, setIsLoadingRolePerms] = useState(false);
 
   // Reset create form when dialog opens
   useEffect(() => {
@@ -180,31 +182,43 @@ function RolesAndPermissions() {
     if (!selectedRoleId) return;
     try {
       setIsSavingPerms(true);
-      const existing = rolePermissions.filter((rp: RolePermission) => rp.role_id === selectedRoleId);
-      const existingIds = existing.map((rp: RolePermission) => rp.permission_id);
-      const desired = Array.from(selectedPermIds).map((id) => Number(id));
+      // Convert selected IDs to permission names (Spatie sync expects names)
+      const selectedNames = Array.from(selectedPermIds)
+        .map((idStr) => permissions.find((p) => String(p.id) === idStr)?.name)
+        .filter((name): name is string => Boolean(name));
 
-      const toAdd = desired.filter((id) => !existingIds.includes(id));
-      const toRemove = existing.filter((rp) => !desired.includes(rp.permission_id));
-
-      for (const permission_id of toAdd) {
-        await dispatch((genericActions as any).rolePermissions.addAsync({ role_id: selectedRoleId, permission_id })).unwrap();
-      }
-      for (const rp of toRemove) {
-        await dispatch((genericActions as any).rolePermissions.removeAsync(rp.id)).unwrap();
-      }
+      await api.put(`/roles/${selectedRoleId}/permissions`, {
+        permissions: selectedNames,
+      });
 
       setIsPermissionsDialogOpen(false);
     } finally {
       setIsSavingPerms(false);
     }
-  }, [dispatch, rolePermissions, selectedPermIds, selectedRoleId]);
+  }, [permissions, selectedPermIds, selectedRoleId]);
 
   const handleOpenPermissions = useCallback((role: Role) => {
     setSelectedRoleId(role.id);
     setSelectedRoleName(role.name || '');
+    // Fetch current permissions from backend for this role
+    (async () => {
+      try {
+        setIsLoadingRolePerms(true);
+        const resp = await api.get(`/roles/${role.id}/permissions`);
+        const names: string[] = resp?.data?.permissions || [];
+        const ids = permissions
+          .filter((p) => names.includes(p.name))
+          .map((p) => String(p.id));
+        setSelectedPermIds(new Set(ids));
+      } catch (error) {
+        console.error('Failed to load role permissions', error);
+        setSelectedPermIds(new Set());
+      } finally {
+        setIsLoadingRolePerms(false);
+      }
+    })();
     setIsPermissionsDialogOpen(true);
-  }, []);
+  }, [permissions]);
 
   const columns = useMemo<ColDef[]>(() => [
     {
@@ -422,19 +436,33 @@ function RolesAndPermissions() {
       >
         <div className="flex items-center justify-between mb-3 gap-2">
           <div className="text-sm text-muted-foreground">
-            {tu('permissionsDialog.hint', 'Select the permissions for this role')}
+            {isLoadingRolePerms
+              ? tu('permissionsDialog.loading', 'Loading permissions...')
+              : tu('permissionsDialog.hint', 'Select the permissions for this role')}
           </div>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={handleSelectAll} disabled={permissions.length === 0}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              disabled={permissions.length === 0 || isLoadingRolePerms}
+            >
               {tu('permissionsDialog.selectAll', 'Select all')}
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearAll} disabled={selectedPermIds.size === 0}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAll}
+              disabled={selectedPermIds.size === 0 || isLoadingRolePerms}
+            >
               {tu('permissionsDialog.clearAll', 'Clear')}
             </Button>
           </div>
         </div>
         <div className="max-h-[70vh] overflow-auto pr-2">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
             {groupedPermissions.map(({ group, perms }) => (
               <div key={group} className="border rounded-lg p-3 bg-muted/30">
                 <div className="font-semibold mb-3 capitalize text-center">{group}</div>
