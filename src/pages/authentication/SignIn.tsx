@@ -11,7 +11,7 @@ const SignIn: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const navigate = useNavigate();
-  const { firebaseUser, user, loading, userLoading } = useAuth();
+  const { firebaseUser, user, loading, userLoading, refetchUser } = useAuth();
 
   async function checkPassword() {
     //make sure password meets requirements and confirm password matches
@@ -41,13 +41,9 @@ const SignIn: React.FC = () => {
         console.log('Successfully logged in and sent idToken to backend');
         updateAuthToken(response.data.token);
         
-        // Check initialization stage and redirect accordingly
-        const user = response.data.user;
-        if (user && user.initialization_stage !== InitializationStage.COMPLETED) {
-          navigate('/onboarding');
-        } else {
-          navigate('/');
-        }
+        // Refetch user data after login - the useEffect will handle redirect once user data is loaded
+        await refetchUser();
+        
         return true;
       } else {
         console.error('Login failed with status:', response.status);

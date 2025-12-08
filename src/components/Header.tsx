@@ -17,8 +17,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
-import CreateTaskDialog from '@/pages/spaces/components/CreateTaskDialog';
-import CreateTaskDialogForEverything from '@/pages/spaces/components/CreateTaskDialogForEverything';
+import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
@@ -771,10 +770,10 @@ function Header() {
         )}
 
         {typeof currentWorkspaceId === 'number' && (
-            <CreateTaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} workspaceId={currentWorkspaceId} />
+            <TaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} mode="create" workspaceId={currentWorkspaceId} />
         )}
         {currentWorkspaceName === 'Everything' && (
-            <CreateTaskDialogForEverything open={openCreateTask} onOpenChange={setOpenCreateTask} />
+            <TaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} mode="create-all" />
         )}
 
         </>

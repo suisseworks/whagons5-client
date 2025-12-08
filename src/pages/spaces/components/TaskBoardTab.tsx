@@ -29,7 +29,7 @@ export default function TaskBoardTab({ workspaceId }: { workspaceId: string | un
     <div className="h-full w-full flex flex-col gap-4">
       <div className="flex items-center gap-2 text-muted-foreground">
         <LayoutDashboard className="w-4 h-4" />
-        <span>Task Board (Bryntum mock)</span>
+        <span>Task Board</span>
         <span className="text-xs ml-auto">space {workspaceId ?? ""}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">

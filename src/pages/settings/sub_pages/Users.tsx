@@ -16,6 +16,7 @@ import { Invitation } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
+import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
 
 // Extended User type based on actual API data structure
@@ -380,7 +381,7 @@ function Users() {
   };
 
   // Invitation column definitions
-  const invitationColumnDefs = useMemo<ColDef[]>(() => {
+  const invitationColumnDefs: ColDef[] = useMemo(() => {
     const columnLabels = {
       id: tu('invitations.columns.id', 'ID'),
       email: tu('invitations.columns.email', 'Email'),
@@ -431,107 +432,108 @@ function Users() {
             return <span className="text-muted-foreground">{noTeamsLabel}</span>;
           }
 
-          return (
-            <div className="flex flex-wrap gap-1">
-              {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
-                const initial = (team.name || '').charAt(0).toUpperCase();
-                const hex = String(team.color || '').trim();
-                let bg = hex;
-                let fg = '#fff';
-                try {
-                  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
-                    const h = hex.length === 4
-                      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-                      : hex;
-                    const r = parseInt(h.slice(1, 3), 16);
-                    const g = parseInt(h.slice(3, 5), 16);
-                    const b = parseInt(h.slice(5, 7), 16);
-                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-                    fg = brightness > 180 ? '#111827' : '#ffffff';
-                  } else if (!hex) {
-                    bg = '';
-                  }
-                } catch { /* ignore */ }
-                return (
-                  <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
-                    <div
-                      className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
-                      style={bg ? { backgroundColor: bg, color: fg } : undefined}
-                      title={team.name}
-                    >
-                      {initial || 'T'}
-                    </div>
-                    {team.name}
-                  </Badge>
-                );
-              })}
-            </div>
-          );
-        }
-      },
-      {
-        field: 'invitation_link',
-        headerName: columnLabels.link,
-        flex: 3,
-        minWidth: 300,
-        cellRenderer: (params: ICellRendererParams) => {
-          const invitation = params.data as Invitation;
-          if (!invitation?.invitation_token) return <span className="text-muted-foreground">{noTokenLabel}</span>;
-          
-          const subdomain = localStorage.getItem('whagons-subdomain') || '';
-          const tenantPrefix = subdomain.endsWith('.') ? subdomain.slice(0, -1) : subdomain;
-          const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-          const host = window.location.hostname;
-          const port = window.location.port ? `:${window.location.port}` : '';
-          
-          const domain = tenantPrefix 
-            ? `${tenantPrefix}.${host.split('.').slice(1).join('.') || 'localhost'}${port}`
-            : `${host}${port}`;
-          
-          const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
-          
-          return (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={invitationLink}
-                className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-              />
-              <CopyButton text={invitationLink} />
-            </div>
-          );
-        }
-      },
-      {
-        field: 'created_at',
-        headerName: columnLabels.created,
-        flex: 1.5,
-        minWidth: 150,
-        cellRenderer: (params: ICellRendererParams) => {
-          if (!params.value) return <span className="text-muted-foreground">-</span>;
-          const date = new Date(params.value);
-          return <span>{date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
-        }
-      },
-      {
-        field: 'actions',
-        headerName: columnLabels.actions,
-        width: 100,
-        cellRenderer: createActionsCellRenderer({
-          onDelete: (invitation: Invitation) => {
-            setDeletingInvitation(invitation);
-            setIsDeleteInvitationDialogOpen(true);
-          }
-        }),
-        sortable: false,
-        filter: false,
-        resizable: false,
-        pinned: 'right'
+        return (
+          <div className="flex flex-wrap gap-1">
+            {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
+                  <div
+                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                  {team.name}
+                </Badge>
+              );
+            })}
+          </div>
+        );
       }
-    ];
-  }, [teams, t]);
+    },
+    {
+      field: 'invitation_link',
+      headerName: 'Invitation Link',
+      flex: 3,
+      minWidth: 300,
+      cellRenderer: (params: ICellRendererParams) => {
+        const invitation = params.data as Invitation;
+        if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
+        
+        // Generate invitation link using VITE_DOMAIN
+        const { VITE_DOMAIN } = getEnvVariables();
+        const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
+        const tenantPrefix = invitation.tenant_domain_prefix || '';
+        const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+        
+        // Build domain: {tenant_prefix}.{base_domain}
+        const domain = tenantPrefix 
+          ? `${tenantPrefix}.${baseDomain}`
+          : baseDomain;
+        
+        const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+        
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={invitationLink}
+              className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <CopyButton text={invitationLink} />
+          </div>
+        );
+      }
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      flex: 1.5,
+      minWidth: 150,
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return <span className="text-muted-foreground">-</span>;
+        const date = new Date(params.value);
+        return <span>{date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+      }
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      cellRenderer: createActionsCellRenderer({
+        onDelete: (invitation: Invitation) => {
+          setDeletingInvitation(invitation);
+          setIsDeleteInvitationDialogOpen(true);
+        }
+      }),
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right'
+    }
+  ];
+  }, [teams, dispatch]);
 
   // Handle invitation deletion
   const handleDeleteInvitation = async () => {
@@ -565,15 +567,17 @@ function Users() {
       })
       .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
 
-    // Generate invitation link
-    const subdomain = localStorage.getItem('whagons-subdomain') || '';
-    const tenantPrefix = subdomain.endsWith('.') ? subdomain.slice(0, -1) : subdomain;
+    // Generate invitation link using VITE_DOMAIN
+    const { VITE_DOMAIN } = getEnvVariables();
+    const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
+    const tenantPrefix = invitation.tenant_domain_prefix || '';
     const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-    const host = window.location.hostname;
-    const port = window.location.port ? `:${window.location.port}` : '';
+    
+    // Build domain: {tenant_prefix}.{base_domain}
     const domain = tenantPrefix 
-      ? `${tenantPrefix}.${host.split('.').slice(1).join('.') || 'localhost'}${port}`
-      : `${host}${port}`;
+      ? `${tenantPrefix}.${baseDomain}`
+      : baseDomain;
+    
     const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
 
     return (
