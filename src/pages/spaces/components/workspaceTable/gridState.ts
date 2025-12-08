@@ -24,6 +24,7 @@ export const useGridReduxState = () => {
   const approvals = useSelector((s: RootState) => (s as any).approvals?.value as any[] || []);
   const approvalApprovers = useSelector((s: RootState) => (s as any).approvalApprovers?.value as any[] || []);
   const taskApprovalInstances = useSelector((s: RootState) => (s as any).taskApprovalInstances?.value as any[] || []);
+  const slas = useSelector((s: RootState) => (s as any).slas?.value as any[] || []);
   const tags = useSelector((s: RootState) => (s as any).tags?.value as any[] || []);
   const taskTags = useSelector((s: RootState) => (s as any).taskTags?.value as any[] || []);
   const customFields = useSelector((s: RootState) => (s as any).customFields?.value as any[] || []);
@@ -43,6 +44,7 @@ export const useGridReduxState = () => {
     approvals,
     approvalApprovers,
     taskApprovalInstances,
+    slas,
     tags,
     taskTags,
     customFields,

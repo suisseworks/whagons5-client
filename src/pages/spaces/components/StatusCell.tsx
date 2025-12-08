@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
  
 import { MultiStateBadge, AnimatedSpinner } from '@/animated/Status';
+import { Clock, Zap, Check, PauseCircle } from 'lucide-react';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string };
 
@@ -39,7 +40,22 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     };
   }, [open]);
   const meta = statusMap[value];
-  const isWorkingStatus = meta?.action?.toUpperCase?.() === 'WORKING';
+  const action = meta?.action?.toLowerCase?.() || '';
+  const nameLower = (meta?.name || '').toLowerCase();
+  const isWorkingStatus = action === 'working' || action === 'in_progress' || nameLower.includes('progress');
+  const isPendingStatus = action === 'pending' || action === 'waiting' || action === 'queued' || nameLower.includes('pending') || nameLower.includes('review');
+  const isDoneStatus = action === 'done' || action === 'completed' || nameLower.includes('done') || nameLower.includes('complete');
+  const isNotStarted = action === 'todo' || action === 'not_started' || nameLower.includes('not started') || nameLower.includes('todo');
+
+  const baseColor = meta?.color || '#6B7280';
+
+  const variantIcon = isPendingStatus
+    ? <Clock className="w-3 h-3" />
+    : isWorkingStatus
+      ? <Zap className="w-3 h-3" />
+      : isDoneStatus
+        ? <Check className="w-3 h-3" />
+        : <PauseCircle className="w-3 h-3" />;
   if (!meta) {
     return (
       <div className="flex items-center h-full py-2">
@@ -48,36 +64,30 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
     );
   }
   const name = meta.name;
-  const color = meta?.color || '#6B7280';
-  const iconName = meta?.icon;
-  const icon = getStatusIcon(iconName);
+  const color = baseColor;
 
   // Create custom status config for the MultiStateBadge
   const customStatusConfig = {
     label: name,
-    icon: icon,
-    bg: "text-foreground",
+    icon: null,
+    bg: baseColor,
     glow: "",
-    color: color
+    color: '#ffffff'
   };
 
-  // Status tag: solid colored pill with white text
-  const pillTextColor = '#ffffff';
   const StatusPill = (
     <div
-      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.02em]"
-      style={{ background: color, color: pillTextColor }}
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-semibold"
+      style={{ background: baseColor, color: '#ffffff' }}
     >
       {isWorkingStatus ? (
-        <span className="relative inline-flex items-center justify-center h-3 w-3 mr-0.5" aria-busy="true" style={{ color: '#ffffff' }}>
+        <span className="relative inline-flex items-center justify-center h-3 w-3" aria-busy="true" style={{ color: '#ffffff' }}>
           <AnimatedSpinner />
         </span>
-      ) : meta?.icon ? (
-        <FontAwesomeIcon icon={icon} className="text-[10px]" style={{ color: pillTextColor }} />
       ) : (
-        <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
+        variantIcon
       )}
-      <span className="text-[12px] font-semibold tracking-wide leading-none">{name}</span>
+      <span className="text-[12px] font-semibold leading-none capitalize">{name}</span>
     </div>
   );
 

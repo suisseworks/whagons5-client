@@ -76,15 +76,15 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   const [filtersLoading, setFiltersLoading] = useState(false);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string | null>(null);
   const [columnPrefs, setColumnPrefs] = useState<string[]>(() => {
-    const allDefault = ['name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['id', 'name', 'config', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
       if (!raw) return allDefault;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        // Always ensure name is present
-        return Array.from(new Set(['name', ...parsed]));
+        // Always ensure name and ID are present
+        return Array.from(new Set(['name', 'id', ...parsed]));
       }
     } catch {
       // ignore
@@ -314,6 +314,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
   // Column visibility handling for workspace task grid
   const baseColumns = useMemo(() => ([
+    { id: 'id', label: 'Task ID (always shown)', locked: true },
     { id: 'name', label: 'Task name (always shown)', locked: true },
     { id: 'config', label: 'Config / approvals', locked: false },
     { id: 'status_id', label: 'Status', locked: false },

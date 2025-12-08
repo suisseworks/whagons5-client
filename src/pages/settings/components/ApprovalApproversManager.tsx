@@ -40,6 +40,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
   const [type, setType] = useState<ApproverType>('user');
   const [selectedId, setSelectedId] = useState<string>("");
   const [required, setRequired] = useState<boolean>(true);
+  const isFirstApprover = items.length === 0;
 
   const availableOptions = useMemo(() => {
     return type === 'user'
@@ -115,12 +116,13 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
     const approverId = Number(selectedId);
     const already = items.some(i => i.approver_type === type && i.approver_id === approverId);
     if (already) return;
+    const requiredFlag = isFirstApprover ? true : required;
     const optimistic: LocalApprover = {
       id: -Date.now(),
       approval_id: Number(approval.id),
       approver_type: type,
       approver_id: approverId,
-      required,
+      required: requiredFlag,
       order_index: items.length,
       scope: 'global',
       scope_id: null,
@@ -133,7 +135,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
         approval_id: Number(approval.id),
         approver_type: type,
         approver_id: approverId,
-        required,
+        required: requiredFlag,
         order_index: items.length,
         scope: 'global',
         scope_id: null,
@@ -167,6 +169,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
   };
 
   const toggleRequired = async (id: number) => {
+    if (items.length <= 1) return; // single approver must remain required
     const it = items.find(i => String(i.id) === String(id));
     if (!it) return;
     lastMutationRef.current = Date.now();
@@ -218,10 +221,12 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="rounded" />
-              Required
-            </label>
+            {!isFirstApprover && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="rounded" />
+                Required
+              </label>
+            )}
             <Button onClick={add} disabled={!selectedId} size="sm">
               <FontAwesomeIcon icon={faPlus} className="mr-2" />
               Add
@@ -251,7 +256,14 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
                       <div className="text-sm capitalize">{i.approver_type === 'user' ? 'User' : 'Role'}</div>
                     </div>
                     <div className="col-span-3">
-                      <input type="checkbox" className="rounded" checked={i.required} onChange={() => toggleRequired(i.id)} />
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={i.required}
+                        disabled={items.length <= 1}
+                        onChange={() => toggleRequired(i.id)}
+                        title={items.length <= 1 ? "Single approver is always required" : undefined}
+                      />
                     </div>
                     <div className="col-span-2 flex items-center justify-end">
                       <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => remove(i.id)} title="Remove approver" aria-label="Remove approver">

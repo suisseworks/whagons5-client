@@ -126,3 +126,5 @@ const randomColor = () => {
 	const palette = ["#10b981", "#ec4899", "#3b82f6", "#f97316", "#a855f7", "#14b8a6"];
 	return palette[Math.floor(Math.random() * palette.length)];
 };
+
+

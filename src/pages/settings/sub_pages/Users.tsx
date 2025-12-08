@@ -381,7 +381,7 @@ function Users() {
   };
 
   // Invitation column definitions
-  const invitationColumnDefs = useMemo<ColDef[]>(() => {
+  const invitationColumnDefs: ColDef[] = useMemo(() => {
     const columnLabels = {
       id: tu('invitations.columns.id', 'ID'),
       email: tu('invitations.columns.email', 'Email'),
@@ -532,7 +532,8 @@ function Users() {
       resizable: false,
       pinned: 'right'
     }
-  ]), [teams, dispatch]);
+  ];
+  }, [teams, dispatch]);
 
   // Handle invitation deletion
   const handleDeleteInvitation = async () => {

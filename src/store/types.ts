@@ -148,6 +148,7 @@ export interface CustomField {
     field_type: string;
     options?: any;
     validation_rules?: Record<string, any> | null;
+    category_id?: number | null;
     created_at?: string | Date;
     updated_at?: string | Date;
 }
@@ -180,6 +181,7 @@ export interface Approval {
     block_editing_during_approval: boolean;
     deadline_type: 'hours' | 'date' | string;
     deadline_value?: string | null;
+    order_index?: number;
     is_active: boolean;
     created_at?: string | Date;
     updated_at?: string | Date;
@@ -325,10 +327,13 @@ export interface Sla {
     id: number;
     name: string;
     description?: string | null;
-    target_duration: number; // in minutes
+    color?: string | null;
+    enabled?: boolean;
+    response_time?: number | null;   // seconds
+    resolution_time: number;         // seconds
+    sla_policy_id?: number | null;
     priority_id?: number | null;
     workspace_id?: number | null;
-    is_active: boolean;
     created_at: string;
     updated_at: string;
 }

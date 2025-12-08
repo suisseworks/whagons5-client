@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faShieldAlt, faFilePdf, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faShieldAlt, faFilePdf, faTrash, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Template, Task, Category, Approval } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UrlTabs } from "@/components/ui/url-tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -88,6 +89,8 @@ function Templates() {
   const { value: mappings } = useSelector((state: RootState) => (state as any).complianceMappings || { value: [] });
   const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
+  const [summaryTemplate, setSummaryTemplate] = useState<Template | null>(null);
   // State for default users (using string IDs for MultiSelect)
   const [createDefaultUserValues, setCreateDefaultUserValues] = useState<string[]>([]);
   const [editDefaultUserValues, setEditDefaultUserValues] = useState<string[]>([]);
@@ -278,6 +281,11 @@ function Templates() {
     const mm = String(minutes).padStart(2, '0');
     return `${hh}:${mm}`;
   };
+  const secondsToHHMM = (totalSeconds: number | null | undefined) => {
+    if (totalSeconds == null || !Number.isFinite(totalSeconds) || Number(totalSeconds) <= 0) return '—';
+    const totalMinutes = Math.floor(Number(totalSeconds) / 60);
+    return minutesToHHMM(totalMinutes);
+  };
   const getTemplateTaskCount = (templateId: number) => {
     return tasks.filter((task: Task) => task.template_id === templateId).length;
   };
@@ -285,6 +293,23 @@ function Templates() {
   const canDeleteTemplate = (template: Template) => {
     return getTemplateTaskCount(template.id) === 0;
   };
+
+  const openSummary = useCallback((template: Template) => {
+    setSummaryTemplate(template);
+    setIsSummaryDialogOpen(true);
+  }, []);
+
+  const handleCellValueChanged = useCallback(async (event: any) => {
+    if (!event?.colDef?.field || !event?.data) return;
+    const field = event.colDef.field;
+    const id = event?.data?.id;
+    if (!id) return;
+    if (field === 'sla_id') {
+      const raw = event?.newValue as string | number | null | undefined;
+      const value = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+      await updateItem(id, { sla_id: value } as any);
+    }
+  }, [updateItem]);
 
   // Track active tab to calculate stats when statistics tab is selected
   const [activeTab, setActiveTab] = useState<string>('templates');
@@ -357,8 +382,6 @@ function Templates() {
         .filter(item => item.category)
         .sort((a, b) => b.count - a.count);
 
-      // Tasks over time (last 30 days)
-      const now = dayjs();
       const tasksOverTimeMap = new Map<string, number>();
       
       templateTasks.forEach((task: Task) => {
@@ -464,6 +487,41 @@ function Templates() {
     return map;
   }, [spots]);
 
+  const usageCount = useMemo(() => {
+    const tid = Number(summaryTemplate?.id);
+    if (!Number.isFinite(tid)) return 0;
+    return (tasks as any[]).filter((t: any) => Number((t as any).template_id) === tid).length;
+  }, [summaryTemplate, tasks]);
+
+  const summaryDefaultUsers = useMemo(() => {
+    const tid = Number(summaryTemplate?.id);
+    if (!Number.isFinite(tid)) return [];
+    const defaultIds = (summaryTemplate as any)?.default_user_ids || [];
+    return (users as any[]).filter((u: any) => defaultIds.includes(u.id));
+  }, [summaryTemplate, users]);
+
+  // Compute available category IDs for filter (only categories that have templates)
+  const availableCategoryIds = useMemo(() => {
+    const categoryIds = new Set<number>();
+    templates.forEach((template: Template) => {
+      const categoryId = template.category_id;
+      if (categoryId != null && categoryId !== undefined && !isNaN(Number(categoryId))) {
+        const numId = Number(categoryId);
+        if (numId > 0) {
+          categoryIds.add(numId);
+        }
+      }
+    });
+    // Sort by category name for better UX
+    return Array.from(categoryIds).sort((a, b) => {
+      const catA = (categories as any[]).find((c: any) => Number(c.id) === a);
+      const catB = (categories as any[]).find((c: any) => Number(c.id) === b);
+      const nameA = catA?.name || '';
+      const nameB = catB?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+  }, [templates, categories]);
+
   const renderSlaSummary = (slaId: string | number | null) => {
     const id = Number(slaId);
     if (!id || isNaN(id)) return null;
@@ -478,7 +536,8 @@ function Templates() {
         </div>
         {sla.description && <div className="text-muted-foreground text-xs">{sla.description}</div>}
         <div className="flex flex-wrap gap-2 mt-2">
-           <Badge variant="secondary" className="text-xs">Target: {minutesToHHMM(sla.target_duration)}</Badge>
+           <Badge variant="secondary" className="text-xs">Response: {secondsToHHMM((sla as any).response_time)}</Badge>
+           <Badge variant="secondary" className="text-xs">Resolution: {secondsToHHMM((sla as any).resolution_time)}</Badge>
         </div>
       </div>
     );
@@ -517,6 +576,24 @@ function Templates() {
       minWidth: 250,
       cellRenderer: TemplateNameCellRenderer
     },
+    {
+      field: 'summary',
+      headerName: '',
+      width: 70,
+      suppressMovable: true,
+      cellRenderer: (params: ICellRendererParams) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() => openSummary(params.data as Template)}
+          title="Summary"
+          aria-label="Summary"
+        >
+          <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-muted-foreground" />
+        </Button>
+      ),
+    },
     // Description removed per migration
     {
       field: 'category_id',
@@ -544,7 +621,21 @@ function Templates() {
         );
       },
       sortable: true,
-      filter: true
+      filter: 'agSetColumnFilter',
+      filterParams: {
+        values: availableCategoryIds,
+        valueFormatter: (params: any) => {
+          // Display category name in filter dropdown
+          if (params.value == null || params.value === undefined || isNaN(Number(params.value))) {
+            return '';
+          }
+          const categoryId = Number(params.value);
+          const category = (categories as any[]).find((c: any) => Number(c.id) === categoryId);
+          return category?.name || `Category ${categoryId}`;
+        },
+        searchType: 'match',
+        suppressSorting: true
+      }
     },
     {
       field: 'priority_id',
@@ -575,8 +666,18 @@ function Templates() {
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: () => {
-        const values = [''].concat(Array.from(slaById.keys()).map((id) => String(id)));
-        return { values } as any;
+        const options = Array.from(slaById.entries()).map(([id, sla]) => ({
+          value: String(id),
+          text: sla?.name || `${sla?.response_time ?? '?'} / ${sla?.resolution_time ?? '?'} min`,
+        }));
+        const values = [''].concat(options.map(o => o.value));
+        return {
+          values,
+          formatValue: (val: string) => {
+            const match = options.find(o => o.value === val);
+            return match?.text || val || '';
+          }
+        } as any;
       },
       cellRenderer: (params: ICellRendererParams) => {
         const sid = Number(params.value);
@@ -619,7 +720,7 @@ function Templates() {
     },
     {
       field: 'default_spot_id',
-      headerName: 'Default Spot',
+      headerName: 'Spot',
       flex: 1,
       minWidth: 170,
       cellRenderer: (params: ICellRendererParams) => {
@@ -633,7 +734,7 @@ function Templates() {
     },
     {
       field: 'default_user_ids',
-      headerName: 'Default Users',
+      headerName: 'User',
       flex: 0.8,
       minWidth: 160,
       cellRenderer: (params: ICellRendererParams) => {
@@ -649,30 +750,16 @@ function Templates() {
       headerName: 'Actions',
       width: 100,
       cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
-        onDelete: handleDeleteTemplate
+        onEdit: handleEdit
       }),
       sortable: false,
       filter: false,
       resizable: false,
       pinned: 'right'
     }
-  ], [categories, priorityById, slaById, approvalById, spotById, handleEdit, handleDeleteTemplate]);
+  ], [categories, priorityById, slaById, approvalById, spotById, handleEdit, handleDeleteTemplate, availableCategoryIds]);
 
   // Form handlers
-  const handleCellValueChanged = useCallback(async (event: any) => {
-    const field = event?.colDef?.field;
-    if (field !== 'sla_id') return;
-    const id = event?.data?.id;
-    if (!id) return;
-    const raw = event?.newValue as string | number | null | undefined;
-    const value = raw === '' || raw === null || raw === undefined ? null : Number(raw);
-    try {
-      await updateItem(id, { sla_id: value } as any);
-    } catch (e) {
-      // revert UI if needed; AG Grid keeps the edited value, but store will overwrite on refresh
-    }
-  }, [updateItem]);
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
@@ -1205,6 +1292,93 @@ function Templates() {
         onValueChange={setActiveTab}
       />
 
+      {/* Summary Dialog */}
+      <Dialog open={isSummaryDialogOpen} onOpenChange={(open) => { setIsSummaryDialogOpen(open); if (!open) setSummaryTemplate(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FontAwesomeIcon icon={faInfoCircle} className="text-sky-600 w-4 h-4" />
+              {summaryTemplate?.name || 'Template summary'}
+            </DialogTitle>
+            <DialogDescription>
+              {summaryTemplate?.description || 'Overview of template configuration'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Category</div>
+              <div className="font-medium">
+                {(() => {
+                  const c = (categories as any[]).find((cat: any) => Number(cat.id) === Number((summaryTemplate as any)?.category_id));
+                  return c?.name || '—';
+                })()}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Priority</div>
+              <div className="font-medium">
+                {priorityById.get(Number((summaryTemplate as any)?.priority_id))?.name || '—'}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">SLA</div>
+              <div className="font-medium">
+                {(() => {
+                  const s = slaById.get(Number((summaryTemplate as any)?.sla_id));
+                  if (!s) return '—';
+                  return s.name || `${s.response_time ?? '?'} / ${s.resolution_time ?? '?'} min`;
+                })()}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Approval</div>
+              <div className="font-medium">
+                {(() => {
+                  const a = approvalById.get(Number((summaryTemplate as any)?.approval_id));
+                  return a?.name || '—';
+                })()}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Default Spot</div>
+              <div className="font-medium">
+                {(() => {
+                  const s = spotById.get(Number((summaryTemplate as any)?.default_spot_id));
+                  return s?.name || '—';
+                })()}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Default Users</div>
+              <div className="font-medium">
+                {summaryDefaultUsers.length > 0
+                  ? summaryDefaultUsers.map((u: any) => u.name || `User #${u.id}`).join(', ')
+                  : '—'}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Expected Duration</div>
+              <div className="font-medium">
+                {summaryTemplate?.expected_duration ? `${summaryTemplate.expected_duration} min (${minutesToHHMM(summaryTemplate.expected_duration)})` : '—'}
+              </div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Usage</div>
+              <div className="font-medium">{usageCount}</div>
+            </div>
+            <div className="p-3 border rounded-lg space-y-1">
+              <div className="text-xs text-muted-foreground">Status</div>
+              <div className="font-medium">
+                <Badge variant={(summaryTemplate as any)?.enabled ? 'default' : 'outline'}>
+                  {(summaryTemplate as any)?.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Create Template Dialog */}
       <SettingsDialog
         open={isCreateDialogOpen}
@@ -1219,6 +1393,7 @@ function Templates() {
               category_id: '',
               priority_id: '',
               sla_id: '',
+              approval_id: '',
               default_spot_id: '',
               spots_not_applicable: false,
               expected_duration: '',
@@ -1235,6 +1410,18 @@ function Templates() {
         error={formError}
         submitDisabled={isSubmitting}
       >
+      <div className="rounded-xl bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-sky-900/30 dark:via-slate-900 dark:to-emerald-900/20 border border-sky-100 dark:border-slate-800 px-4 py-3 mb-4 flex items-start gap-3">
+        <div className="h-10 w-10 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-sky-100 dark:border-slate-700 flex items-center justify-center">
+          <FontAwesomeIcon icon={faClipboardList} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">Create a template</p>
+          <p className="text-xs text-muted-foreground">
+            Set the basics, defaults, and rules. You can assign approvals, SLA, default spot and users.
+          </p>
+        </div>
+      </div>
+        <div className="max-h-[75vh] overflow-y-auto pr-1">
         <Tabs defaultValue="general" className="w-full">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
@@ -1242,7 +1429,7 @@ function Templates() {
             <TabsTrigger value="rules">Rules</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
-        <div className="grid gap-4 min-h-[480px]">
+        <div className="grid gap-4 min-h-[320px]">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name *</Label>
             <Input id="name" name="name" className="col-span-3" required />
@@ -1312,7 +1499,7 @@ function Templates() {
         </div>
           </TabsContent>
           <TabsContent value="rules">
-            <div className="grid gap-4 min-h-[480px]">
+            <div className="grid gap-4 min-h-[320px]">
               <SelectField
                 id="sla"
                 label="SLA"
@@ -1346,7 +1533,7 @@ function Templates() {
             </div>
           </TabsContent>
           <TabsContent value="defaults">
-            <div className="grid gap-4 min-h-[480px]">
+            <div className="grid gap-4 min-h-[320px]">
               <CheckboxField 
                 id="spots_not_applicable" 
                 label="Spots Not Applicable" 
@@ -1396,6 +1583,7 @@ function Templates() {
           </TabsContent>
           
         </Tabs>
+        </div>
       </SettingsDialog>
 
       {/* Edit Template Dialog */}
@@ -1412,6 +1600,7 @@ function Templates() {
               category_id: '',
               priority_id: '',
               sla_id: '',
+              approval_id: '',
               default_spot_id: '',
               spots_not_applicable: false,
               expected_duration: '',
@@ -1430,9 +1619,32 @@ function Templates() {
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
-        submitDisabled={isSubmitting || !editingTemplate}
+      submitDisabled={isSubmitting || !editingTemplate}
+      footerActions={editingTemplate ? (
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => editingTemplate && handleDeleteTemplate(editingTemplate)}
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon icon={faTrash} className="mr-2" />
+          Delete
+        </Button>
+      ) : undefined}
       >
+      <div className="rounded-xl bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-sky-900/30 dark:via-slate-900 dark:to-emerald-900/20 border border-sky-100 dark:border-slate-800 px-4 py-3 mb-4 flex items-start gap-3">
+        <div className="h-10 w-10 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-sky-100 dark:border-slate-700 flex items-center justify-center">
+          <FontAwesomeIcon icon={faClipboardList} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">Edit template</p>
+          <p className="text-xs text-muted-foreground">
+            Update details, defaults, and rules. Approvals, SLA, and defaults can be changed here.
+          </p>
+        </div>
+      </div>
         {editingTemplate && (
+          <div className="max-h-[75vh] overflow-y-auto pr-1">
           <Tabs defaultValue="general" className="w-full">
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
@@ -1441,7 +1653,7 @@ function Templates() {
             <TabsTrigger value="compliance">Compliance</TabsTrigger>
           </TabsList>
             <TabsContent value="general">
-          <div className="grid gap-4 min-h-[480px]">
+          <div className="grid gap-4 min-h-[320px]">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-name" className="text-right">Name *</Label>
               <Input
@@ -1519,7 +1731,7 @@ function Templates() {
           </div>
             </TabsContent>
             <TabsContent value="rules">
-              <div className="grid gap-4 min-h-[480px]">
+              <div className="grid gap-4 min-h-[320px]">
                 <SelectField
                   id="edit-sla"
                   label="SLA"
@@ -1541,7 +1753,7 @@ function Templates() {
               </div>
             </TabsContent>
             <TabsContent value="compliance">
-              <div className="grid gap-4 min-h-[480px] content-start">
+              <div className="grid gap-4 min-h-[320px] content-start">
                 <div className="flex justify-between items-center pb-2 border-b">
                   <div className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faShieldAlt} className="text-blue-600" />
@@ -1615,7 +1827,7 @@ function Templates() {
               </div>
             </TabsContent>
             <TabsContent value="defaults">
-              <div className="grid gap-4 min-h-[480px]">
+              <div className="grid gap-4 min-h-[320px]">
                 <CheckboxField 
                   id="edit-spots_not_applicable" 
                   label="Spots Not Applicable" 
@@ -1665,6 +1877,7 @@ function Templates() {
             </TabsContent>
             
           </Tabs>
+          </div>
         )}
       </SettingsDialog>
 

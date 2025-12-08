@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3 } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -180,7 +180,7 @@ export const Workspace = () => {
       return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
     } catch { return 'compact'; }
   });
-  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 52 : 110;
+  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 68 : 110;
   useEffect(() => {
     try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
   }, [rowDensity]);
@@ -292,7 +292,13 @@ export const Workspace = () => {
     .filter((n: number) => Number.isFinite(n));
 
   // Header stats
-  const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; loading: boolean }>({ total: 0, inProgress: 0, completedToday: 0, loading: true });
+  const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; trend: number[]; loading: boolean }>({
+    total: 0,
+    inProgress: 0,
+    completedToday: 0,
+    trend: [],
+    loading: true
+  });
   const isInitialLoadRef = useRef(true);
   useEffect(() => {
     let cancelled = false;
@@ -319,15 +325,29 @@ export const Workspace = () => {
         }
 
         let completedToday = 0;
+        let trend: number[] = [];
         if (doneStatusId != null) {
           const midnight = new Date();
           midnight.setHours(0, 0, 0, 0);
           const r = await TasksCache.queryTasks({ ...base, status_id: Number(doneStatusId), updated_after: midnight.toISOString(), startRow: 0, endRow: 0 });
           completedToday = r?.rowCount ?? 0;
+
+          // Build a 7-day completion trend (including today)
+          const sevenDaysAgo = new Date(midnight);
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+          const trendResp = await TasksCache.queryTasks({ ...base, updated_after: sevenDaysAgo.toISOString() });
+          const trendRows: any[] = (trendResp as any)?.rows ?? [];
+          trend = Array.from({ length: 7 }, (_, idx) => {
+            const dayStart = new Date(sevenDaysAgo);
+            dayStart.setDate(dayStart.getDate() + idx);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setDate(dayEnd.getDate() + 1);
+            return trendRows.filter((t: any) => Number(t.status_id) === Number(doneStatusId) && new Date(t.updated_at) >= dayStart && new Date(t.updated_at) < dayEnd).length;
+          });
         }
 
         if (!cancelled) {
-          setStats({ total, inProgress, completedToday, loading: false });
+          setStats({ total, inProgress, completedToday, trend, loading: false });
           isInitialLoadRef.current = false;
         }
       } catch {
@@ -651,15 +671,129 @@ export const Workspace = () => {
     .filter((tab): tab is typeof workspaceTabs[number] => Boolean(tab));
   const tabsForRender = orderedVisibleTabs.length > 0 ? orderedVisibleTabs : workspaceTabs;
 
+  const statsArePending = stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0;
+  const formatStatValue = (value: number) => (statsArePending ? '—' : value.toLocaleString());
+  const completedLast7Days = stats.trend.reduce((sum, val) => sum + val, 0);
+  const trendDelta = stats.trend.length >= 2 ? stats.trend[stats.trend.length - 1] - stats.trend[stats.trend.length - 2] : 0;
+
+  const TrendSparkline = ({ data }: { data: number[] }) => {
+    if (!data || data.length === 0) {
+      return <div className="text-xs text-muted-foreground">—</div>;
+    }
+    const width = 100;
+    const height = 40;
+    const max = Math.max(...data, 1);
+    const points = data.map((val, idx) => {
+      const x = data.length === 1 ? width / 2 : (idx / Math.max(data.length - 1, 1)) * width;
+      const y = height - ((val / max) * height);
+      return `${x},${y}`;
+    }).join(' ');
+    const lastX = data.length === 1 ? width / 2 : width;
+    const lastY = height - ((data[data.length - 1] / max) * height);
+
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-10 text-sky-600" role="img" aria-label="7 day completion trend">
+        <polyline fill="none" stroke="currentColor" strokeWidth="2.4" points={points} strokeLinecap="round" />
+        <circle cx={lastX} cy={lastY} r="2.6" fill="currentColor" />
+      </svg>
+    );
+  };
+
+  type KpiCard = {
+    key: string;
+    label: string;
+    value: string;
+    icon: ReactNode;
+    badgeClass: string;
+    barClass: string;
+    sparkline?: ReactNode;
+    helperText?: string;
+  };
+
+  const kpiCards: KpiCard[] = [
+    {
+      key: 'total',
+      label: 'Total',
+      value: formatStatValue(stats.total),
+      icon: <BarChart3 className="h-4 w-4" />,
+      badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-200',
+      barClass: 'from-indigo-50 to-indigo-100'
+    },
+    {
+      key: 'inProgress',
+      label: 'In progress',
+      value: formatStatValue(stats.inProgress),
+      icon: <Activity className="h-4 w-4" />,
+      badgeClass: 'bg-sky-100 text-sky-900 border-sky-200',
+      barClass: 'from-sky-50 to-sky-100'
+    },
+    {
+      key: 'completedToday',
+      label: 'Completed today',
+      value: formatStatValue(stats.completedToday),
+      icon: <Sparkles className="h-4 w-4" />,
+      badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-200',
+      barClass: 'from-emerald-50 to-emerald-100'
+    },
+    {
+      key: 'trend',
+      label: '7-day trend',
+      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} done`,
+      icon: <TrendingUp className="h-4 w-4" />,
+      badgeClass: 'bg-purple-100 text-purple-900 border-purple-200',
+      barClass: 'from-purple-50 to-purple-100',
+      sparkline: <TrendSparkline data={stats.trend} />,
+      helperText: statsArePending ? '' : `${trendDelta >= 0 ? '+' : ''}${trendDelta} vs yesterday`
+    }
+  ];
+
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Controls moved to Header toolbar */}
-      <div className="ml-auto flex items-center gap-4 pr-2 -mt-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Toggle Chat"
-          onClick={() => setRightPanel(prev => prev === 'chat' ? null : 'chat')}
+      <div className="flex flex-wrap items-start gap-3 -mt-1 mb-3">
+        {showHeaderKpis && (
+          <div className="flex-1 min-w-[280px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {kpiCards.map((card) => (
+                <div
+                  key={card.key}
+                  className="relative overflow-hidden rounded-xl border bg-card/90 backdrop-blur-sm shadow-sm border-border/60"
+                >
+                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass}`} />
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className={`flex items-center justify-center rounded-lg p-2 border ${card.badgeClass}`}>
+                      {card.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/90">
+                        {card.label}
+                      </div>
+                      <div className="text-xl font-semibold leading-tight text-foreground">
+                        {card.value}
+                      </div>
+                      {card.helperText ? (
+                        <div className="text-[11px] text-muted-foreground">
+                          {card.helperText}
+                        </div>
+                      ) : null}
+                    </div>
+                    {card.sparkline ? (
+                      <div className="ml-auto w-24 sm:w-28">
+                        {card.sparkline}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="ml-auto flex items-center gap-3 pr-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle Chat"
+            onClick={() => setRightPanel(prev => prev === 'chat' ? null : 'chat')}
             title="Chat"
           >
             <MessageSquare className="w-6 h-6" strokeWidth={2.2} />
@@ -674,26 +808,7 @@ export const Workspace = () => {
             <FolderPlus className="w-6 h-6" strokeWidth={2.2} />
           </Button>
         </div>
-      {/* Stats summary (chips) */}
-      {showHeaderKpis && (
-        <div className="flex flex-wrap gap-2.5">
-          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
-            <ClipboardList className="h-[18px] w-[18px] text-cyan-600" />
-            <span className="text-[12px] text-muted-foreground">Total</span>
-            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.total.toLocaleString()}</span>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
-            <Clock className="h-[18px] w-[18px] text-amber-600" />
-            <span className="text-[12px] text-muted-foreground">In progress</span>
-            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.inProgress.toLocaleString()}</span>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-1.5">
-            <CheckCircle2 className="h-[18px] w-[18px] text-emerald-600" />
-            <span className="text-[12px] text-muted-foreground">Completed today</span>
-            <span className="text-base font-semibold">{(stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0) ? '—' : stats.completedToday.toLocaleString()}</span>
-          </div>
-        </div>
-      )}
+      </div>
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
         <div className="flex items-center gap-2 mb-2 border rounded px-2 py-1 bg-background/60">

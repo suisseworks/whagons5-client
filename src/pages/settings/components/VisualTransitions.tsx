@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTenant } from "@/api/whagonsApi";
 import { useTheme } from "@/providers/ThemeProvider";
 import { Button } from "@/components/ui/button";
+import Xarrow, { Xwrapper } from "react-xarrows";
 
 const ACTION_COLUMN_ORDER = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
 const ACTION_COLUMN_MAP: Record<string, number> = ACTION_COLUMN_ORDER.reduce((acc, action, index) => {
@@ -155,15 +156,6 @@ export const VisualTransitions = memo(function VisualTransitions({
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [hoverTarget, setHoverTarget] = useState<number | null>(null);
   const [moving, setMoving] = useState<{ id: number; offsetX: number; offsetY: number } | null>(null);
-  const [edgeHandles, setEdgeHandles] = useState<Record<string, { offset: number }>>({});
-  const [handleDrag, setHandleDrag] = useState<{
-    key: string;
-    mid: { x: number; y: number };
-    normal: { x: number; y: number };
-  } | null>(null);
-  const edgeHandleStorageKey = useMemo(() => (
-    selectedGroupId ? `wh_status_edge_handles:${tenant || 'default'}:${selectedGroupId}` : null
-  ), [tenant, selectedGroupId]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const getCenter = (id: number) => {
@@ -172,40 +164,9 @@ export const VisualTransitions = memo(function VisualTransitions({
     return { x: p.x + nodeWidth / 2, y: p.y + nodeHeight / 2 };
   };
 
-  useEffect(() => {
-    if (!edgeHandleStorageKey) return;
-    try {
-      const raw = localStorage.getItem(edgeHandleStorageKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Record<string, { offset: number }>;
-      if (parsed && typeof parsed === 'object') {
-        setEdgeHandles(parsed);
-      }
-    } catch {
-      // ignore
-    }
-  }, [edgeHandleStorageKey]);
-
-  useEffect(() => {
-    if (!edgeHandleStorageKey) return;
-    try {
-      localStorage.setItem(edgeHandleStorageKey, JSON.stringify(edgeHandles));
-    } catch {
-      // ignore
-    }
-  }, [edgeHandles, edgeHandleStorageKey]);
-
   const handleMouseMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
     const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
     const rel = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    if (handleDrag) {
-      const { key, mid, normal } = handleDrag;
-      const dx = rel.x - mid.x;
-      const dy = rel.y - mid.y;
-      const offset = Math.max(-300, Math.min(300, dx * normal.x + dy * normal.y));
-      setEdgeHandles((prev) => ({ ...prev, [key]: { offset } }));
-      return;
-    }
     if (moving) {
       const nx = rel.x - moving.offsetX;
       const ny = rel.y - moving.offsetY;
@@ -243,7 +204,6 @@ export const VisualTransitions = memo(function VisualTransitions({
     setCursor(null);
     setHoverTarget(null);
     setMoving(null);
-    setHandleDrag(null);
   };
 
   const transitionsSet = useMemo(() => {
@@ -288,18 +248,6 @@ export const VisualTransitions = memo(function VisualTransitions({
 
     return { outIndex, outCount, inIndex, inCount };
   }, [transitions]);
-
-  useEffect(() => {
-    setEdgeHandles((prev) => {
-      const next = { ...prev };
-      for (const key of Object.keys(next)) {
-        if (!transitionsSet.has(key)) {
-          delete next[key];
-        }
-      }
-      return next;
-    });
-  }, [transitionsSet]);
 
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -371,26 +319,7 @@ export const VisualTransitions = memo(function VisualTransitions({
       };
     });
 
-    const newEdgeHandles: Record<string, { offset: number }> = {};
-    transitions.forEach((t: any) => {
-      const fromCol = columnByStatus[t.from_status];
-      const toCol = columnByStatus[t.to_status];
-      if (fromCol == null || toCol == null) return;
-      const columnDelta = toCol - fromCol;
-      if (Math.abs(columnDelta) <= 1) return;
-      const fromPos = normalizedPositions[t.from_status];
-      const toPos = normalizedPositions[t.to_status];
-      if (!fromPos || !toPos) return;
-      const verticalDirection = fromPos.y <= toPos.y ? -1 : 1;
-      const magnitude = 70 * Math.max(1, Math.abs(columnDelta) - 1);
-      const key = `${t.from_status}->${t.to_status}`;
-      newEdgeHandles[key] = {
-        offset: verticalDirection * magnitude
-      };
-    });
-
     setPosById(normalizedPositions);
-    setEdgeHandles(newEdgeHandles);
   }, [activeStatuses, hGap, nodeHeight, nodeWidth, transitions, vGap]);
 
   return (
@@ -434,242 +363,139 @@ export const VisualTransitions = memo(function VisualTransitions({
             }
             if (e.key === 'Escape') {
               setSelectedEdge(null);
-              setHandleDrag(null);
             }
           }}
         >
-        <svg className="absolute inset-0 w-full h-full" shapeRendering="geometricPrecision">
-          <defs>
-            <marker id="arrow-blue" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
-            </marker>
-            <marker id="arrow-red" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
-            </marker>
-            <marker id="arrow-draft" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa" />
-            </marker>
-          </defs>
-          {transitions.map((t: any, i: number) => {
-            const a = idToPos[t.from_status];
-            const b = idToPos[t.to_status];
-            if (!a || !b) return null;
+          <Xwrapper>
+            {transitions.map((t: any) => {
+              const from = idToPos[t.from_status];
+              const to = idToPos[t.to_status];
+              if (!from || !to) return null;
 
-            const key = `${t.from_status}->${t.to_status}`;
-            const srcCenter = { x: a.x + nodeWidth / 2, y: a.y + nodeHeight / 2 };
-            const dstCenter = { x: b.x + nodeWidth / 2, y: b.y + nodeHeight / 2 };
-            const dx = dstCenter.x - srcCenter.x;
-            const dy = dstCenter.y - srcCenter.y;
+              const key = `${t.from_status}->${t.to_status}`;
+              const dx = (to.x + nodeWidth / 2) - (from.x + nodeWidth / 2);
+              const dy = (to.y + nodeHeight / 2) - (from.y + nodeHeight / 2);
 
-            const margin = 8;
-
-            let x1 = srcCenter.x, y1 = srcCenter.y;
-            if (Math.abs(dy) > Math.abs(dx)) {
-              if (dy > 0) {
-                x1 = a.x + nodeWidth / 2; y1 = a.y + nodeHeight + margin;
+              let fromSide: 'top' | 'right' | 'bottom' | 'left';
+              let toSide: 'top' | 'right' | 'bottom' | 'left';
+              if (Math.abs(dy) > Math.abs(dx)) {
+                fromSide = dy > 0 ? 'bottom' : 'top';
+                toSide = dy > 0 ? 'top' : 'bottom';
               } else {
-                x1 = a.x + nodeWidth / 2; y1 = a.y - margin;
+                fromSide = dx > 0 ? 'right' : 'left';
+                toSide = dx > 0 ? 'left' : 'right';
               }
-            } else {
-              if (dx > 0) {
-                x1 = a.x + nodeWidth + margin; y1 = a.y + nodeHeight / 2;
-              } else {
-                x1 = a.x - margin; y1 = a.y + nodeHeight / 2;
-              }
-            }
 
-            let x2 = dstCenter.x, y2 = dstCenter.y;
-            if (Math.abs(dy) > Math.abs(dx)) {
-              if (dy > 0) {
-                x2 = b.x + nodeWidth / 2; y2 = b.y - margin;
-              } else {
-                x2 = b.x + nodeWidth / 2; y2 = b.y + nodeHeight + margin;
-              }
-            } else {
-              if (dx > 0) {
-                x2 = b.x - margin; y2 = b.y + nodeHeight / 2;
-              } else {
-                x2 = b.x + nodeWidth + margin; y2 = b.y + nodeHeight / 2;
-              }
-            }
+              const outCount = edgeOrdering.outCount[t.from_status] ?? 1;
+              const outIdx = edgeOrdering.outIndex[key] ?? 0;
+              const outOffset = (outIdx - (outCount - 1) / 2) * EDGE_OFFSET_STEP;
 
-            const verticalDominant = Math.abs(dy) > Math.abs(dx);
-            const outCount = edgeOrdering.outCount[t.from_status] ?? 1;
-            const outIdx = edgeOrdering.outIndex[key] ?? 0;
-            const outOffset = (outIdx - (outCount - 1) / 2) * EDGE_OFFSET_STEP;
-            if (verticalDominant) {
-              x1 += outOffset;
-            } else {
-              y1 += outOffset;
-            }
+              const inCount = edgeOrdering.inCount[t.to_status] ?? 1;
+              const inIdx = edgeOrdering.inIndex[key] ?? 0;
+              const inOffset = (inIdx - (inCount - 1) / 2) * EDGE_OFFSET_STEP;
 
-            const inCount = edgeOrdering.inCount[t.to_status] ?? 1;
-            const inIdx = edgeOrdering.inIndex[key] ?? 0;
-            const inOffset = (inIdx - (inCount - 1) / 2) * EDGE_OFFSET_STEP;
-            if (verticalDominant) {
-              x2 += inOffset;
-            } else {
-              y2 += inOffset;
-            }
+              const anchorFor = (side: 'top' | 'bottom' | 'left' | 'right', offset: number) => {
+                const offsetObj = side === 'top' || side === 'bottom'
+                  ? { x: offset, y: 0 }
+                  : { x: 0, y: offset };
+                return { position: side, offset: offsetObj };
+              };
 
-            let c1x: number; let c1y: number; let c2x: number; let c2y: number;
-            if (verticalDominant) {
-              const k = dy > 0 ? 60 : -60;
-              c1x = x1; c1y = y1 + k;
-              c2x = x2; c2y = y2 - k;
-            } else {
-              const k = dx > 0 ? 60 : -60;
-              c1x = x1 + k; c1y = y1;
-              c2x = x2 - k; c2y = y2;
-            }
-            const segdx = x2 - x1; const segdy = y2 - y1;
-            const segLen2 = Math.max(1, segdx*segdx + segdy*segdy);
+              const startAnchor = anchorFor(fromSide, outOffset);
+              const endAnchor = anchorFor(toSide, inOffset);
 
-            const segLen = Math.max(1, Math.sqrt(segLen2));
-            const normalX = -segdy / segLen;
-            const normalY = segdx / segLen;
-            const bendOffset = edgeHandles[key]?.offset ?? 0;
-            if (bendOffset) {
-              c1x += normalX * bendOffset;
-              c2x += normalX * bendOffset;
-              c1y += normalY * bendOffset;
-              c2y += normalY * bendOffset;
-            }
-            const handleX = (c1x + c2x) / 2;
-            const handleY = (c1y + c2y) / 2;
-            const path = `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
-            const hovered = hoverEdge === key;
-            const selected = selectedEdge === key;
-            return (
-              <path
-                key={`${key}-${i}`}
-                d={path}
-                stroke={hovered || selected ? '#ef4444' : '#3b82f6'}
-                strokeWidth={selected ? 4 : (hovered ? 3 : 2)}
-                strokeLinecap="round"
-                fill="none"
-                style={{ cursor: selectedGroupId ? 'pointer' : 'default' }}
-                onMouseEnter={() => setHoverEdge(key)}
-                onMouseLeave={() => setHoverEdge(null)}
-                onClick={(e) => { e.stopPropagation(); if (!selectedGroupId) return; setSelectedEdge((prev: string | null) => prev === key ? null : key); }}
-                markerEnd={`url(#${hovered ? 'arrow-red' : 'arrow-blue'})`}
-              />
-            );
-          })}
-          {transitions.map((t: any) => {
-            const key = `${t.from_status}->${t.to_status}`;
-            if (selectedEdge !== key) return null;
-            const a = idToPos[t.from_status];
-            const b = idToPos[t.to_status];
-            if (!a || !b) return null;
-            const srcCenter = { x: a.x + nodeWidth / 2, y: a.y + nodeHeight / 2 };
-            const dstCenter = { x: b.x + nodeWidth / 2, y: b.y + nodeHeight / 2 };
-            const dx = dstCenter.x - srcCenter.x;
-            const dy = dstCenter.y - srcCenter.y;
-            const x1 = srcCenter.x;
-            const y1 = srcCenter.y;
-            const x2 = dstCenter.x;
-            const y2 = dstCenter.y;
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2;
-            const segLen = Math.max(1, Math.hypot(dx, dy));
-            const normal = { x: -dy / segLen, y: dx / segLen };
-            const offset = edgeHandles[key]?.offset ?? 0;
-            const handleX = midX + normal.x * offset;
-            const handleY = midY + normal.y * offset;
-            return (
-              <circle
-                key={`handle-${key}`}
-                cx={handleX}
-                cy={handleY}
-                r={8}
-                fill="#ffffff"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                style={{ cursor: 'grab' }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
-                  setHandleDrag({
-                    key,
-                    mid: { x: midX, y: midY },
-                    normal
-                  });
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  setEdgeHandles((prev) => {
-                    const next = { ...prev };
-                    delete next[key];
-                    return next;
-                  });
-                }}
-              />
-            );
-          })}
-          {dragFrom != null && cursor && (() => {
-            const a = getCenter(dragFrom);
-            const x1 = a.x;
-            const y1 = a.y;
-            const x2 = hoverTarget != null ? getCenter(hoverTarget).x : cursor.x;
-            const y2 = hoverTarget != null ? getCenter(hoverTarget).y : cursor.y;
-            const mx = (x1 + x2) / 2;
-            const path = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
-            return <path d={path} stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 4" strokeLinecap="round" fill="none" markerEnd="url(#arrow-draft)" />;
-          })()}
-        </svg>
+              const hovered = hoverEdge === key;
+              const selected = selectedEdge === key;
 
-        {nodes.map((s: any) => (
-          <div
-            key={s.id}
-            className={`absolute rounded-lg border shadow-sm bg-background select-none ${moving ? 'cursor-move' : (selectedGroupId ? 'cursor-crosshair' : 'cursor-default')} ${dragFrom != null && hoverTarget === s.id ? (transitionsSet.has(`${dragFrom}->${s.id}`) ? 'ring-2 ring-red-400' : 'ring-2 ring-blue-400') : ''}`}
-            style={{ left: s.x, top: s.y, width: nodeWidth, height: nodeHeight, borderColor: s.color || '#e5e7eb' }}
-            onMouseDown={(ev) => {
-              if (ev.shiftKey && selectedGroupId) {
-                setDragFrom(s.id);
-                const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
-                setCursor({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
-              } else {
-                const rect = (ev.currentTarget as HTMLDivElement).getBoundingClientRect();
-                const offsetX = ev.clientX - rect.left;
-                const offsetY = ev.clientY - rect.top;
-                setMoving({ id: s.id, offsetX, offsetY });
-              }
-            }}
-            onMouseUp={() => {
-              if (!selectedGroupId) return;
-              if (dragFrom != null && dragFrom !== s.id) {
-                onToggle(dragFrom, s.id);
-              }
-              stopDrag();
-            }}
-            onMouseEnter={() => { if (dragFrom != null) setHoverTarget(s.id); }}
-            onMouseLeave={() => { if (dragFrom != null) setHoverTarget(null); }}
-          >
-            <div className="h-full w-full flex items-center justify-center relative">
-              <div className="text-center p-2">
-                <div className="font-semibold">{s.name}</div>
-                <div className="text-xs text-muted-foreground">{s.initial ? 'Initial' : (s.system ? 'System' : '')}</div>
-              </div>
-              {selectedGroupId && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveStatus(s.id);
+              return (
+                <Xarrow
+                  key={`${key}-x`}
+                  start={`node-${t.from_status}`}
+                  end={`node-${t.to_status}`}
+                  startAnchor={startAnchor as any}
+                  endAnchor={endAnchor as any}
+                  path="smooth"
+                  curveness={0.25}
+                  showHead
+                  color={hovered || selected ? "#ef4444" : "#3b82f6"}
+                  strokeWidth={selected ? 4 : (hovered ? 3 : 2)}
+                  headSize={6}
+                  passProps={{
+                    onMouseEnter: () => setHoverEdge(key),
+                    onMouseLeave: () => setHoverEdge(null),
+                    onClick: (e: any) => {
+                      e.stopPropagation();
+                      if (!selectedGroupId) return;
+                      setSelectedEdge(prev => prev === key ? null : key);
+                    }
                   }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors"
-                  title="Remove from workflow"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+                />
+              );
+            })}
+
+            {dragFrom != null && cursor && (() => {
+              const a = getCenter(dragFrom);
+              const x1 = a.x;
+              const y1 = a.y;
+              const x2 = hoverTarget != null ? getCenter(hoverTarget).x : cursor.x;
+              const y2 = hoverTarget != null ? getCenter(hoverTarget).y : cursor.y;
+              const mx = (x1 + x2) / 2;
+              const path = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+              return <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%"><path d={path} stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 4" strokeLinecap="round" fill="none" /></svg>;
+            })()}
+
+            {nodes.map((s: any) => (
+              <div
+                id={`node-${s.id}`}
+                key={s.id}
+                className={`absolute rounded-lg border shadow-sm bg-background select-none ${moving ? 'cursor-move' : (selectedGroupId ? 'cursor-crosshair' : 'cursor-default')} ${dragFrom != null && hoverTarget === s.id ? (transitionsSet.has(`${dragFrom}->${s.id}`) ? 'ring-2 ring-red-400' : 'ring-2 ring-blue-400') : ''}`}
+                style={{ left: s.x, top: s.y, width: nodeWidth, height: nodeHeight, borderColor: s.color || '#e5e7eb' }}
+                onMouseDown={(ev) => {
+                  if (ev.shiftKey && selectedGroupId) {
+                    setDragFrom(s.id);
+                    const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
+                    setCursor({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+                  } else {
+                    const rect = (ev.currentTarget as HTMLDivElement).getBoundingClientRect();
+                    const offsetX = ev.clientX - rect.left;
+                    const offsetY = ev.clientY - rect.top;
+                    setMoving({ id: s.id, offsetX, offsetY });
+                  }
+                }}
+                onMouseUp={() => {
+                  if (!selectedGroupId) return;
+                  if (dragFrom != null && dragFrom !== s.id) {
+                    onToggle(dragFrom, s.id);
+                  }
+                  stopDrag();
+                }}
+                onMouseEnter={() => { if (dragFrom != null) setHoverTarget(s.id); }}
+                onMouseLeave={() => { if (dragFrom != null) setHoverTarget(null); }}
+              >
+                <div className="h-full w-full flex items-center justify-center relative">
+                  <div className="text-center p-2">
+                    <div className="font-semibold">{s.name}</div>
+                    <div className="text-xs text-muted-foreground">{s.initial ? 'Initial' : (s.system ? 'System' : '')}</div>
+                  </div>
+                  {selectedGroupId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveStatus(s.id);
+                      }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors"
+                      title="Remove from workflow"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+        </Xwrapper>
         </div>
       </div>
-      </div>
+    </div>
   );
 });
 

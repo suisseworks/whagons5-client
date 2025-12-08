@@ -28,3 +28,5 @@ export function updateSettingsLocal<T>(namespace: string, updater: (current: T) 
 	writeSettingsLocal(namespace, next);
 	return next;
 }
+
+
