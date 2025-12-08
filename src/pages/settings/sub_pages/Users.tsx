@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
+import { faUser, faChartBar, faEnvelope, faUsers } from "@fortawesome/free-solid-svg-icons";
 import { Check, Copy as CopyIcon } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
@@ -138,6 +138,8 @@ function Users() {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [isTeamsDialogOpen, setIsTeamsDialogOpen] = useState(false);
+  const [teamsDialogUser, setTeamsDialogUser] = useState<UserData | null>(null);
 
   // Create form state
   const [createFormData, setCreateFormData] = useState<{
@@ -196,6 +198,16 @@ function Users() {
     }
   }, [isCreateDialogOpen]);
 
+  const handleOpenTeamsDialog = (user: UserData) => {
+    setTeamsDialogUser(user);
+    setIsTeamsDialogOpen(true);
+  };
+
+  const handleCloseTeamsDialog = () => {
+    setIsTeamsDialogOpen(false);
+    setTeamsDialogUser(null);
+  };
+
   const columnDefs = useMemo<ColDef[]>(() => {
     const columnLabels = {
       id: tu('grid.columns.id', 'ID'),
@@ -213,6 +225,7 @@ function Users() {
     const userLabel = tu('grid.values.user', 'User');
     const activeLabel = tu('grid.values.active', 'Active');
     const inactiveLabel = tu('grid.values.inactive', 'Inactive');
+    const manageTeamsLabel = tu('grid.actions.manageTeams', 'Teams');
 
     return [
       {
@@ -233,8 +246,8 @@ function Users() {
       {
         field: 'email',
         headerName: columnLabels.email,
-        flex: 2.5,
-        minWidth: 220
+        flex: 1.8,
+        minWidth: 180
       },
       {
         field: 'teams',
@@ -303,8 +316,8 @@ function Users() {
       {
         field: 'job_position_id',
         headerName: columnLabels.jobPosition,
-        flex: 2,
-        minWidth: 220,
+        flex: 1.6,
+        minWidth: 160,
         cellRenderer: (params: ICellRendererParams) => {
           const idVal = params.value as number | string | undefined;
           if (idVal == null || idVal === '') return <span className="text-muted-foreground">{noJobPositionLabel}</span>;
@@ -332,10 +345,19 @@ function Users() {
       {
         field: 'actions',
         headerName: columnLabels.actions,
-        width: 100,
+        width: 220,
         cellRenderer: createActionsCellRenderer({
           onEdit: handleEdit,
-          onDelete: handleDelete
+          onDelete: handleDelete,
+          customActions: [
+            {
+              icon: faUsers,
+              label: manageTeamsLabel,
+              variant: "secondary",
+              className: "p-1 h-7",
+              onClick: (data: UserData) => handleOpenTeamsDialog(data)
+            }
+          ]
         }),
         sortable: false,
         filter: false,
@@ -343,7 +365,7 @@ function Users() {
         pinned: 'right'
       }
     ];
-  }, [teams, jobPositions, userTeams, handleEdit, handleDelete, t]);
+  }, [teams, jobPositions, userTeams, handleEdit, handleDelete, handleOpenTeamsDialog, t]);
 
   // Copy button component for table cells
   const CopyButton = ({ text }: { text: string }) => {
@@ -391,7 +413,6 @@ function Users() {
       actions: tu('invitations.columns.actions', 'Actions')
     };
     const noEmailLabel = tu('invitations.values.noEmail', 'No email');
-    const noTokenLabel = tu('invitations.values.noToken', 'No token');
     const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
 
     return [
@@ -966,6 +987,31 @@ function Users() {
         basePath="/settings/users"
         className="h-full flex flex-col"
       />
+
+      {/* Manage Teams Dialog (placeholder) */}
+      <SettingsDialog
+        open={isTeamsDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseTeamsDialog();
+          } else {
+            setIsTeamsDialogOpen(true);
+          }
+        }}
+        type="custom"
+        title={tu('dialogs.manageTeams.title', 'Manage user teams')}
+        description={tu('dialogs.manageTeams.description', 'Assign or remove teams for this user. (Coming soon)')}
+        submitText={tu('dialogs.manageTeams.save', 'Save')}
+        submitDisabled
+        cancelText={tu('dialogs.manageTeams.close', 'Close')}
+        contentClassName="max-w-xl"
+      >
+        <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+          {teamsDialogUser
+            ? tu('dialogs.manageTeams.placeholder', `Team management for ${teamsDialogUser.name} will be available soon.`)
+            : tu('dialogs.manageTeams.noUser', 'Select a user to manage teams.')}
+        </div>
+      </SettingsDialog>
 
       {/* Create User Dialog */}
       <SettingsDialog
