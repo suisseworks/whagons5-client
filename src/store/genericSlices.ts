@@ -26,7 +26,7 @@ const genericSliceConfigs = [
     { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','role_id','job_position_id','spots','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
     { name: 'roles', table: 'wh_roles', endpoint: '/roles', store: 'roles', hashFields: ['id','name','description','updated_at'] },
     { name: 'permissions', table: 'wh_permissions', endpoint: '/permissions', store: 'permissions', hashFields: ['id','name','key','group','type','updated_at'] },
-    { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','updated_at'] },
+  { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','role_id','updated_at'] },
     { name: 'userPermissions', table: 'wh_user_permission', endpoint: '/user-permissions', store: 'user_permissions', hashFields: ['id','user_id','permission_id','updated_at'] },
     { name: 'rolePermissions', table: 'wh_role_permission', endpoint: '/role-permissions', store: 'role_permissions', hashFields: ['id','role_id','permission_id','updated_at'] },
 

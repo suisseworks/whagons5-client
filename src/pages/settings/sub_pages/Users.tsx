@@ -6,18 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faChartBar, faEnvelope, faUsers } from "@fortawesome/free-solid-svg-icons";
-import { Check, Copy as CopyIcon } from "lucide-react";
+import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
-import { Team } from "@/store/types";
-import { UserTeam } from "@/store/types";
-import { Invitation } from "@/store/types";
+import { Team, UserTeam, Invitation, Role } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
+
+const getUserTeamRoleId = (ut: UserTeam | any) => {
+  const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
+  return val == null ? null : Number(val);
+};
 
 // Extended User type based on actual API data structure
 interface UserData {
@@ -62,7 +65,8 @@ function Users() {
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
   const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
-  
+  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
   // Use shared state management
@@ -105,8 +109,9 @@ function Users() {
     // Load job positions (needed for dropdown/labels)
     dispatch((genericActions as any).jobPositions.getFromIndexedDB());
     
-    // Load roles (needed for invitation form)
+    // Load roles (needed for team-role selector and invitation form)
     dispatch((genericActions as any).roles.getFromIndexedDB());
+    dispatch((genericActions as any).roles.fetchFromAPI?.());
     
     // Load user-teams pivot table (needed for team assignments)
     dispatch((genericActions as any).userTeams.getFromIndexedDB());
@@ -140,6 +145,8 @@ function Users() {
   const [isCreating, setIsCreating] = useState(false);
   const [isTeamsDialogOpen, setIsTeamsDialogOpen] = useState(false);
   const [teamsDialogUser, setTeamsDialogUser] = useState<UserData | null>(null);
+  const [teamAssignments, setTeamAssignments] = useState<Array<{ id?: number; teamId: string; roleId: string; key: string }>>([]);
+  const [isSavingTeams, setIsSavingTeams] = useState(false);
 
   // Create form state
   const [createFormData, setCreateFormData] = useState<{
@@ -200,12 +207,123 @@ function Users() {
 
   const handleOpenTeamsDialog = (user: UserData) => {
     setTeamsDialogUser(user);
+    const related = userTeams.filter((ut: UserTeam) => ut.user_id === user.id);
+    const assignments: Array<{ id?: number; teamId: string; roleId: string; key: string }> = related.map((ut) => ({
+      id: ut.id,
+      teamId: String(ut.team_id),
+      roleId: getUserTeamRoleId(ut) != null ? String(getUserTeamRoleId(ut)) : '',
+      key: `existing-${ut.id}`
+    }));
+    if (assignments.length === 0 && teams.length > 0) {
+      assignments.push({
+        id: undefined,
+        teamId: String(teams[0].id),
+        roleId: '',
+        key: `new-${Date.now()}`
+      });
+    }
+    setTeamAssignments(assignments);
     setIsTeamsDialogOpen(true);
   };
 
   const handleCloseTeamsDialog = () => {
     setIsTeamsDialogOpen(false);
     setTeamsDialogUser(null);
+    setTeamAssignments([]);
+    setIsSavingTeams(false);
+  };
+
+  const addTeamAssignment = () => {
+    const usedTeamIds = new Set(teamAssignments.map((a) => a.teamId));
+    const firstAvailable = teams.find((t) => !usedTeamIds.has(String(t.id)));
+    setTeamAssignments((prev) => [
+      ...prev,
+      {
+        teamId: firstAvailable ? String(firstAvailable.id) : '',
+        roleId: '',
+        key: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      }
+    ]);
+  };
+
+  const updateAssignment = (key: string, patch: Partial<{ teamId: string; roleId: string }>) => {
+    setTeamAssignments((prev) =>
+      prev.map((a) => (a.key === key ? { ...a, ...patch } : a))
+    );
+  };
+
+  const removeAssignment = (key: string) => {
+    setTeamAssignments((prev) => prev.filter((a) => a.key !== key));
+  };
+
+  const handleSaveTeams = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamsDialogUser) return;
+    setIsSavingTeams(true);
+    setFormError(null);
+    try {
+      const existing = userTeams.filter((ut) => ut.user_id === teamsDialogUser.id);
+      const current = teamAssignments.filter((a) => a.teamId).map((a) => ({
+        ...a,
+        teamIdNum: Number(a.teamId),
+        roleIdNum: a.roleId ? Number(a.roleId) : null
+      }));
+
+      if (current.some((c) => !c.teamId || Number.isNaN(c.teamIdNum))) {
+        setFormError(tu('dialogs.manageTeams.errors.teamRequired', 'Selecciona un equipo para cada fila.'));
+        setIsSavingTeams(false);
+        return;
+      }
+      if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
+        setFormError(tu('dialogs.manageTeams.errors.roleRequired', 'Selecciona un rol para cada equipo.'));
+        setIsSavingTeams(false);
+        return;
+      }
+      const duplicate = current.find((c, idx) => current.findIndex((d) => d.teamIdNum === c.teamIdNum) !== idx);
+      if (duplicate) {
+        setFormError(tu('dialogs.manageTeams.errors.duplicateTeam', 'No puedes repetir el mismo equipo.'));
+        setIsSavingTeams(false);
+        return;
+      }
+
+      const toAdd = current.filter((c) => c.id == null);
+      const toUpdate = current.filter((c) => {
+        const match = existing.find((ex) => ex.id === c.id);
+        if (!match) return false;
+        return match.team_id !== c.teamIdNum || getUserTeamRoleId(match) !== c.roleIdNum;
+      });
+      const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
+
+      for (const add of toAdd) {
+        await dispatch((genericActions as any).userTeams.addAsync({
+          user_id: teamsDialogUser.id,
+          team_id: add.teamIdNum,
+          role_id: add.roleIdNum
+        })).unwrap();
+      }
+
+      for (const upd of toUpdate) {
+        await dispatch((genericActions as any).userTeams.updateAsync({
+          id: upd.id,
+          updates: {
+            team_id: upd.teamIdNum,
+            role_id: upd.roleIdNum
+          }
+        })).unwrap();
+      }
+
+      for (const del of toRemove) {
+        await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+      }
+
+      // Refresh local cache
+      dispatch((genericActions as any).userTeams.getFromIndexedDB());
+      handleCloseTeamsDialog();
+    } catch (err: any) {
+      setFormError(err?.message || 'Error updating teams');
+    } finally {
+      setIsSavingTeams(false);
+    }
   };
 
   const columnDefs = useMemo<ColDef[]>(() => {
@@ -988,7 +1106,7 @@ function Users() {
         className="h-full flex flex-col"
       />
 
-      {/* Manage Teams Dialog (placeholder) */}
+      {/* Manage Teams Dialog */}
       <SettingsDialog
         open={isTeamsDialogOpen}
         onOpenChange={(open) => {
@@ -1000,17 +1118,99 @@ function Users() {
         }}
         type="custom"
         title={tu('dialogs.manageTeams.title', 'Manage user teams')}
-        description={tu('dialogs.manageTeams.description', 'Assign or remove teams for this user. (Coming soon)')}
+        description={tu('dialogs.manageTeams.description', 'Assign or remove teams and set the user role for each team.')}
+        onSubmit={handleSaveTeams}
+        isSubmitting={isSavingTeams}
         submitText={tu('dialogs.manageTeams.save', 'Save')}
-        submitDisabled
+        submitDisabled={!teamsDialogUser || teamAssignments.length === 0 || isSavingTeams}
         cancelText={tu('dialogs.manageTeams.close', 'Close')}
-        contentClassName="max-w-xl"
+        contentClassName="max-w-3xl"
       >
-        <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          {teamsDialogUser
-            ? tu('dialogs.manageTeams.placeholder', `Team management for ${teamsDialogUser.name} will be available soon.`)
-            : tu('dialogs.manageTeams.noUser', 'Select a user to manage teams.')}
-        </div>
+        {!teamsDialogUser ? (
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            {tu('dialogs.manageTeams.noUser', 'Select a user to manage teams.')}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted-foreground">
+                  {tu('dialogs.manageTeams.userLabel', 'User')}
+                </div>
+                <div className="font-semibold">{teamsDialogUser.name} ({teamsDialogUser.email})</div>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addTeamAssignment}>
+                <Plus className="h-4 w-4 mr-1" />
+                {tu('dialogs.manageTeams.add', 'Add team')}
+              </Button>
+            </div>
+
+            {teamAssignments.length === 0 ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                {tu('dialogs.manageTeams.empty', 'No teams assigned. Add one to get started.')}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {teamAssignments.map((assignment) => {
+                  const usedIds = teamAssignments
+                    .filter((a) => a.key !== assignment.key)
+                    .map((a) => a.teamId);
+                  const baseTeamOptions = teams
+                    .filter((t) => assignment.teamId === String(t.id) || !usedIds.includes(String(t.id)))
+                    .map((t) => ({ value: String(t.id), label: t.name }));
+                  const hasCurrentTeam = assignment.teamId && baseTeamOptions.some((opt) => opt.value === assignment.teamId);
+                  const teamOptions = hasCurrentTeam || !assignment.teamId
+                    ? baseTeamOptions
+                    : [{ value: assignment.teamId, label: tu('dialogs.manageTeams.unknownTeam', `Team ${assignment.teamId}`) }, ...baseTeamOptions];
+
+                  const baseRoleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+                  const hasCurrentRole = assignment.roleId && baseRoleOptions.some((opt) => opt.value === assignment.roleId);
+                  const roleOptions = hasCurrentRole || !assignment.roleId
+                    ? baseRoleOptions
+                    : [{ value: assignment.roleId, label: tu('dialogs.manageTeams.unknownRole', `Role ${assignment.roleId}`) }, ...baseRoleOptions];
+
+                  return (
+                    <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
+                      <div className="col-span-5">
+                        <SelectField
+                          id={`team-${assignment.key}`}
+                          label={tu('dialogs.manageTeams.team', 'Team')}
+                          value={assignment.teamId}
+                          onChange={(value) => updateAssignment(assignment.key, { teamId: value })}
+                          options={teamOptions}
+                          placeholder={teamsLoading ? tu('dialogs.manageTeams.loadingTeams', 'Loading teams...') : tu('dialogs.manageTeams.selectTeam', 'Select a team')}
+                          required
+                        />
+                      </div>
+                  <div className="col-span-5">
+                    <SelectField
+                      id={`role-${assignment.key}`}
+                      label={tu('dialogs.manageTeams.role', 'Role')}
+                      value={assignment.roleId}
+                      onChange={(value) => updateAssignment(assignment.key, { roleId: value })}
+                      options={roleOptions}
+                      placeholder={tu('dialogs.manageTeams.selectRole', 'Select a role')}
+                      required
+                    />
+                  </div>
+                      <div className="col-span-2 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeAssignment(assignment.key)}
+                          aria-label={tu('dialogs.manageTeams.remove', 'Remove')}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </SettingsDialog>
 
       {/* Create User Dialog */}
