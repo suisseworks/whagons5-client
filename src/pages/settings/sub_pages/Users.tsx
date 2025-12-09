@@ -1129,12 +1129,18 @@ function Users() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-muted-foreground">
-                  {tu('dialogs.manageTeams.userLabel', 'User')}
+            <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                  {teamsDialogUser.name?.charAt(0)?.toUpperCase?.() || 'U'}
                 </div>
-                <div className="font-semibold">{teamsDialogUser.name} ({teamsDialogUser.email})</div>
+                <div className="flex flex-col leading-tight">
+                  <span className="font-semibold text-sm">{teamsDialogUser.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <FontAwesomeIcon icon={faUsers} className="w-3 h-3 mr-1" />
+                    {teamAssignments.length} {tu('dialogs.manageTeams.count', 'teams')}
+                  </span>
+                </div>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addTeamAssignment}>
                 <Plus className="h-4 w-4 mr-1" />

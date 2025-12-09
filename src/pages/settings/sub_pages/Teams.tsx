@@ -16,7 +16,8 @@ import {
   faToggleOn,
   faPen,
   faLayerGroup,
-  faCheckCircle
+  faCheckCircle,
+  faUser
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { Team, Category, Task, Role, UserTeam } from "@/store/types";
@@ -777,12 +778,18 @@ function Teams() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-muted-foreground">
-                  {tt('dialogs.manageUsers.teamLabel', 'Team')}
+            <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                  {usersDialogTeam.name?.charAt(0)?.toUpperCase?.() || 'T'}
                 </div>
-                <div className="font-semibold">{usersDialogTeam.name}</div>
+                <div className="flex flex-col leading-tight">
+                  <span className="font-semibold text-sm">{usersDialogTeam.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <FontAwesomeIcon icon={faUser} className="w-3 h-3 mr-1" />
+                    {userAssignments.length} {tt('dialogs.manageUsers.count', 'users')}
+                  </span>
+                </div>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addUserAssignment}>
                 <Plus className="h-4 w-4 mr-1" />
