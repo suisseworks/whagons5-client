@@ -263,27 +263,32 @@ function Users() {
     setFormError(null);
     try {
       const existing = userTeams.filter((ut) => ut.user_id === teamsDialogUser.id);
-      const current = teamAssignments.filter((a) => a.teamId).map((a) => ({
-        ...a,
-        teamIdNum: Number(a.teamId),
-        roleIdNum: a.roleId ? Number(a.roleId) : null
-      }));
+      const isEmpty = teamAssignments.length === 0;
+      const current = isEmpty
+        ? []
+        : teamAssignments.map((a) => ({
+            ...a,
+            teamIdNum: Number(a.teamId),
+            roleIdNum: a.roleId ? Number(a.roleId) : null
+          }));
 
-      if (current.some((c) => !c.teamId || Number.isNaN(c.teamIdNum))) {
-        setFormError(tu('dialogs.manageTeams.errors.teamRequired', 'Selecciona un equipo para cada fila.'));
-        setIsSavingTeams(false);
-        return;
-      }
-      if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
-        setFormError(tu('dialogs.manageTeams.errors.roleRequired', 'Selecciona un rol para cada equipo.'));
-        setIsSavingTeams(false);
-        return;
-      }
-      const duplicate = current.find((c, idx) => current.findIndex((d) => d.teamIdNum === c.teamIdNum) !== idx);
-      if (duplicate) {
-        setFormError(tu('dialogs.manageTeams.errors.duplicateTeam', 'No puedes repetir el mismo equipo.'));
-        setIsSavingTeams(false);
-        return;
+      if (!isEmpty) {
+        if (current.some((c) => !c.teamId || Number.isNaN(c.teamIdNum))) {
+          setFormError(tu('dialogs.manageTeams.errors.teamRequired', 'Selecciona un equipo para cada fila.'));
+          setIsSavingTeams(false);
+          return;
+        }
+        if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
+          setFormError(tu('dialogs.manageTeams.errors.roleRequired', 'Selecciona un rol para cada equipo.'));
+          setIsSavingTeams(false);
+          return;
+        }
+        const duplicate = current.find((c, idx) => current.findIndex((d) => d.teamIdNum === c.teamIdNum) !== idx);
+        if (duplicate) {
+          setFormError(tu('dialogs.manageTeams.errors.duplicateTeam', 'No puedes repetir el mismo equipo.'));
+          setIsSavingTeams(false);
+          return;
+        }
       }
 
       const toAdd = current.filter((c) => c.id == null);
@@ -1122,7 +1127,7 @@ function Users() {
         onSubmit={handleSaveTeams}
         isSubmitting={isSavingTeams}
         submitText={tu('dialogs.manageTeams.save', 'Save')}
-        submitDisabled={!teamsDialogUser || teamAssignments.length === 0 || isSavingTeams}
+        submitDisabled={!teamsDialogUser || isSavingTeams}
         cancelText={tu('dialogs.manageTeams.close', 'Close')}
         contentClassName="max-w-3xl"
       >
