@@ -262,6 +262,8 @@ export interface SelectFieldProps {
   valueArray?: (string | number)[];
   defaultValueArray?: (string | number)[];
   onChangeArray?: (values: (string | number)[]) => void;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
 export function SelectField({
@@ -278,7 +280,9 @@ export function SelectField({
   multiple = false,
   valueArray,
   defaultValueArray,
-  onChangeArray
+  onChangeArray,
+  searchable = false,
+  searchPlaceholder = "Search..."
 }: SelectFieldProps) {
   const isControlled = value !== undefined && onChange !== undefined;
   const selectProps = isControlled
@@ -323,6 +327,15 @@ export function SelectField({
     );
   }
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredOptions = searchable
+    ? options.filter((option) => {
+        const q = searchTerm.trim().toLowerCase();
+        if (!q) return true;
+        return option.label.toLowerCase().includes(q) || String(option.value).toLowerCase().includes(q);
+      })
+    : options;
+
   return (
     <FormField id={id} label={label} required={required} className={className}>
       <Select {...selectProps}>
@@ -330,7 +343,17 @@ export function SelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => {
+          {searchable && (
+            <div className="p-2">
+              <Input
+                placeholder={searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8"
+              />
+            </div>
+          )}
+          {filteredOptions.map((option) => {
             const val = String(option.value);
             return (
               <SelectItem key={`${id}-${val}`} value={val} disabled={option.disabled}>

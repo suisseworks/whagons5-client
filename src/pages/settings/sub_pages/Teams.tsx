@@ -91,9 +91,6 @@ function Teams() {
     filteredItems,
     loading,
     error,
-    searchQuery,
-    setSearchQuery,
-    handleSearch,
     createItem,
     updateItem,
     deleteItem,
@@ -152,11 +149,6 @@ function Teams() {
     }
   }, [editingTeam]);
 
-  useEffect(() => {
-    dispatch((genericActions as any).roles.getFromIndexedDB?.());
-    dispatch((genericActions as any).roles.fetchFromAPI?.());
-  }, [dispatch]);
-
   // Helper functions for counts
   const getTeamCategoryCount = (teamId: number) => {
     return categories.filter((category: Category) => category.team_id === teamId).length;
@@ -204,6 +196,7 @@ function Teams() {
   const [userAssignments, setUserAssignments] = useState<Array<{ id?: number; userId: string; roleId: string; key: string }>>([]);
   const [isSavingUsers, setIsSavingUsers] = useState(false);
   const [usersFormError, setUsersFormError] = useState<string | null>(null);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
 
   const handleOpenUsersDialog = (team: Team) => {
     setUsersDialogTeam(team);
@@ -802,16 +795,51 @@ function Teams() {
                 {tt('dialogs.manageUsers.empty', 'No users assigned. Add one to get started.')}
               </div>
             ) : (
-              <div className="space-y-3">
-                {userAssignments.map((assignment) => {
+              <>
+                <TextField
+                  id="user-search"
+                  label={tt('dialogs.manageUsers.search', 'Buscar usuario')}
+                  value={userSearchTerm}
+                  onChange={setUserSearchTerm}
+                  placeholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
+                />
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                {(() => {
+                  const q = userSearchTerm.trim().toLowerCase();
+                  const visibleAssignments = q
+                    ? userAssignments.filter((assignment) => {
+                        const user = (users || []).find((u: any) => String(u.id) === assignment.userId);
+                        if (user) {
+                          const nameMatch = (user.name || '').toLowerCase().includes(q);
+                          const emailMatch = (user.email || '').toLowerCase().includes(q);
+                          if (nameMatch || emailMatch) return true;
+                        }
+                        return false;
+                      })
+                    : userAssignments;
+
+                  if (userAssignments.length > 0 && visibleAssignments.length === 0) {
+                    return (
+                      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                        {tt('dialogs.manageUsers.noMatches', 'No hay usuarios que coincidan con la búsqueda.')}
+                      </div>
+                    );
+                  }
+
+                  return visibleAssignments.map((assignment) => {
                   const usedUserIds = userAssignments
                     .filter((a) => a.key !== assignment.key)
                     .map((a) => a.userId);
                   const userOptions = (users || [])
                     .filter((u: any) => assignment.userId === String(u.id) || !usedUserIds.includes(String(u.id)))
-                    .map((u: any) => ({ value: String(u.id), label: u.name }));
+                    .filter((u: any) => {
+                      const q = userSearchTerm.trim().toLowerCase();
+                      if (!q) return true;
+                      return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+                    })
+                    .map((u: any) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
                   const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
-                  const hasCurrentUser = assignment.userId && userOptions.some((opt) => opt.value === assignment.userId);
+                  const hasCurrentUser = assignment.userId && userOptions.some((opt: { value: string }) => opt.value === assignment.userId);
                   const hasCurrentRole = assignment.roleId && roleOptions.some((opt) => opt.value === assignment.roleId);
                   return (
                     <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
@@ -823,6 +851,8 @@ function Teams() {
                           onChange={(value) => updateUserAssignment(assignment.key, { userId: value })}
                           options={hasCurrentUser || !assignment.userId ? userOptions : [{ value: assignment.userId, label: tt('dialogs.manageUsers.unknownUser', `User ${assignment.userId}`) }, ...userOptions]}
                           placeholder={tt('dialogs.manageUsers.selectUser', 'Select a user')}
+                          searchable
+                          searchPlaceholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
                           required
                         />
                       </div>
@@ -850,8 +880,10 @@ function Teams() {
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                  });
+                })()}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -905,7 +937,6 @@ interface TeamStatisticsProps {
 function TeamStatistics({ teams, categories, tasks, translate }: TeamStatisticsProps) {
   const totalTeams = teams.length;
   const totalCategories = categories.length;
-  const totalTasks = tasks.length;
 
   const activeTeams = useMemo(
     () => teams.filter((t: any) => t.is_active !== false).length,
