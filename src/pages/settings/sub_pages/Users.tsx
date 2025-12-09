@@ -228,10 +228,14 @@ function Users() {
   const addTeamAssignment = () => {
     const usedTeamIds = new Set(teamAssignments.map((a) => a.teamId));
     const firstAvailable = teams.find((t) => !usedTeamIds.has(String(t.id)));
+    if (!firstAvailable) {
+      setFormError(tu('dialogs.manageTeams.noAvailableTeams', 'No more teams available to add.'));
+      return;
+    }
     setTeamAssignments((prev) => [
       ...prev,
       {
-        teamId: firstAvailable ? String(firstAvailable.id) : '',
+        teamId: String(firstAvailable.id),
         roleId: '',
         key: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
       }
@@ -1142,7 +1146,13 @@ function Users() {
                   </span>
                 </div>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addTeamAssignment}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addTeamAssignment}
+                disabled={!teams.some((t) => !teamAssignments.find((a) => a.teamId === String(t.id)))}
+              >
                 <Plus className="h-4 w-4 mr-1" />
                 {tu('dialogs.manageTeams.add', 'Add team')}
               </Button>

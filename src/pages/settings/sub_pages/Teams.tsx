@@ -224,6 +224,10 @@ function Teams() {
   const addUserAssignment = () => {
     const used = new Set(userAssignments.map((a) => a.userId));
     const firstAvailable = (users || []).find((u: any) => !used.has(String(u.id)));
+    if (!firstAvailable) {
+      setUsersFormError(tt('dialogs.manageUsers.noAvailableUsers', 'No more users available to add.'));
+      return;
+    }
     setUserAssignments((prev) => [
       ...prev,
       {
@@ -791,7 +795,13 @@ function Teams() {
                   </span>
                 </div>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addUserAssignment}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addUserAssignment}
+                disabled={!((users || []).some((u: any) => !userAssignments.find((a) => a.userId === String(u.id))))}
+              >
                 <Plus className="h-4 w-4 mr-1" />
                 {tt('dialogs.manageUsers.add', 'Add user')}
               </Button>
