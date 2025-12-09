@@ -214,14 +214,6 @@ function Users() {
       roleId: getUserTeamRoleId(ut) != null ? String(getUserTeamRoleId(ut)) : '',
       key: `existing-${ut.id}`
     }));
-    if (assignments.length === 0 && teams.length > 0) {
-      assignments.push({
-        id: undefined,
-        teamId: String(teams[0].id),
-        roleId: '',
-        key: `new-${Date.now()}`
-      });
-    }
     setTeamAssignments(assignments);
     setIsTeamsDialogOpen(true);
   };
