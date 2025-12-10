@@ -17,7 +17,6 @@ interface Resource {
 interface SchedulerEvent {
   id: string;
   name: string;
-  resourceId: string;
   startDate: string;
   endDate: string;
   eventColor?: string;
@@ -34,21 +33,10 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
     return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 0, 0, 0);
   }, []);
 
-  const resources = useMemo<Resource[]>(
-    () => [
-      { id: "r1", name: "Alice Carter", role: "Maintenance Lead", department: "Mechanical", color: "#2563eb" },
-      { id: "r2", name: "Bob Nguyen", role: "Field Technician", department: "Electrical", color: "#10b981" },
-      { id: "r3", name: "Charlie Ramos", role: "QA Supervisor", department: "Quality", color: "#f59e0b" },
-      { id: "r4", name: "Diana Patel", role: "Special Projects", department: "R&D", color: "#a855f7" },
-    ],
-    [],
-  );
-
-  const events = useMemo<SchedulerEvent[]>(
+  const baseEvents = useMemo<SchedulerEvent[]>(
     () => [
       {
         id: "e1",
-        resourceId: "r1",
         name: "Preventive maintenance",
         startDate: toDateString(base, { dayOffset: 0, hour: 8, minute: 30 }),
         endDate: toDateString(base, { dayOffset: 0, hour: 10, minute: 15 }),
@@ -57,7 +45,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e2",
-        resourceId: "r1",
         name: "Site inspection",
         startDate: toDateString(base, { dayOffset: 0, hour: 14, minute: 0 }),
         endDate: toDateString(base, { dayOffset: 0, hour: 16, minute: 0 }),
@@ -65,7 +52,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e3",
-        resourceId: "r2",
         name: "Emergency response",
         startDate: toDateString(base, { dayOffset: 0, hour: 10, minute: 30 }),
         endDate: toDateString(base, { dayOffset: 0, hour: 12, minute: 30 }),
@@ -73,7 +59,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e4",
-        resourceId: "r2",
         name: "Calibration",
         startDate: toDateString(base, { dayOffset: 1, hour: 9, minute: 0 }),
         endDate: toDateString(base, { dayOffset: 1, hour: 11, minute: 30 }),
@@ -82,7 +67,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e5",
-        resourceId: "r3",
         name: "Supplier audit",
         startDate: toDateString(base, { dayOffset: 2, hour: 11, minute: 0 }),
         endDate: toDateString(base, { dayOffset: 2, hour: 13, minute: 0 }),
@@ -90,7 +74,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e6",
-        resourceId: "r3",
         name: "Client review",
         startDate: toDateString(base, { dayOffset: 2, hour: 15, minute: 0 }),
         endDate: toDateString(base, { dayOffset: 2, hour: 17, minute: 0 }),
@@ -98,7 +81,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e7",
-        resourceId: "r4",
         name: "Prototype rollout",
         startDate: toDateString(base, { dayOffset: 3, hour: 9, minute: 30 }),
         endDate: toDateString(base, { dayOffset: 3, hour: 12, minute: 0 }),
@@ -106,7 +88,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
       {
         id: "e8",
-        resourceId: "r4",
         name: "Safety workshop",
         startDate: toDateString(base, { dayOffset: 3, hour: 13, minute: 30 }),
         endDate: toDateString(base, { dayOffset: 3, hour: 15, minute: 0 }),
@@ -114,6 +95,26 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       },
     ],
     [base],
+  );
+
+  const resources = useMemo<Resource[]>(() => {
+    const names = Array.from(new Set(baseEvents.map((evt) => evt.name)));
+    return names.map((taskName, idx) => ({
+      id: taskName,
+      name: taskName,
+      role: "",
+      department: "",
+      color: taskColors[idx % taskColors.length],
+    }));
+  }, [baseEvents]);
+
+  const events = useMemo(
+    () =>
+      baseEvents.map((evt) => ({
+        ...evt,
+        resourceId: evt.name,
+      })),
+    [baseEvents],
   );
 
   const viewPresetConfig = viewPreset === "hourAndDay" ? "hourAndDay" : "dayAndWeek";
@@ -147,18 +148,26 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                 { id: 1, name: "Now", startDate: new Date(), cls: "b-sch-current-time" },
               ]}
               columns={[
-                { 
-                  text: "Technician", 
-                  field: "name", 
-                  width: 220, 
-                  renderer: ({ record }: any) => `${record.name}${record.role ? ` — ${record.role}` : ''}` 
+                {
+                  text: "Task",
+                  field: "name",
+                  width: 260,
+                  renderer: ({ record }: any) => {
+                    return record.name;
+                  },
                 },
-                { text: "Dept", field: "department", width: 120 },
               ]}
               features={{
                 stripe: true,
                 eventTooltip: true,
-                eventEdit: true,
+                eventEdit: {
+                  items: {
+                    recurrenceEditor: {
+                      type: "recurrenceeditor",
+                      title: "Recurrence",
+                    },
+                  },
+                },
                 timeRanges: true,
                 nonWorkingTime: true,
                 recurringEvents: true,
@@ -182,3 +191,5 @@ function addDays(date: Date, days: number) {
   copy.setDate(copy.getDate() + days);
   return copy;
 }
+
+const taskColors = ["#2563eb", "#10b981", "#f59e0b", "#a855f7", "#ef4444", "#0ea5e9"];

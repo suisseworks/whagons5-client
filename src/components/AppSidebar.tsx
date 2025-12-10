@@ -22,6 +22,8 @@ import {
   Users2,
   Globe,
   FileText, // Add FileText icon
+  MoreHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -29,6 +31,12 @@ import { RootState } from '@/store';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/animate-ui/primitives/radix/collapsible';
+import AssistantWidget from './AssistantWidget';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
@@ -362,296 +370,212 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       </SidebarContent>
 
       <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid var(--sidebar-border)', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
-        {/* Section: TeamConnect */}
-        <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px', marginTop: '4px' }}>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem style={{ marginBottom: '0' }}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
-                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
-                      ? `flex justify-center items-center ${pathname === '/teamconnect'
-                            ? 'text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                      : `${pathname === '/teamconnect'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                  }`}
-                  style={{
-                    height: '32px',
-                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
-                    gap: '8px',
-                    fontWeight: pathname === '/teamconnect' ? 600 : 500,
-                    fontSize: '13px',
-                    boxShadow: pathname === '/teamconnect' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                    borderTopLeftRadius: pathname === '/teamconnect' ? '4px' : undefined,
-                    borderBottomLeftRadius: pathname === '/teamconnect' ? '4px' : undefined
-                  }}
-                >
-                  <Link
-                    to="/teamconnect"
-                    className={`${isCollapsed && !isMobile
-                        ? 'grid place-items-center w-8 h-8 p-0'
-                        : 'flex items-center'
-                    } group relative`}
-                  >
-                    <IconBadge color="#8B5CF6">
-                      <Users2 size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                    </IconBadge>
-                    {isCollapsed && !isMobile ? (
-                      <span className="sr-only">TeamConnect</span>
-                    ) : (
-                      <span className="ml-1.5">TeamConnect</span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: 'var(--sidebar-border)', marginBottom: '4px' }} />
+        <Collapsible defaultOpen={false} className="w-full">
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton
+              asChild
+              tooltip={isCollapsed && !isMobile ? 'More' : undefined}
+              className="rounded-[8px] transition-opacity opacity-70 hover:opacity-100 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+              style={{
+                height: '30px',
+                padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                gap: '8px',
+                fontWeight: 500,
+                fontSize: '12px',
+              }}
+            >
+              <button
+                type="button"
+                className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center w-full'} text-[var(--sidebar-text-primary)]`}
+              >
+                <IconBadge color="var(--sidebar-border)" size={18}>
+                  <MoreHorizontal size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                </IconBadge>
+                {!isCollapsed && !isMobile && <span className="ml-1.5">More</span>}
+              </button>
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
 
-        {/* Section: Analytics & Plugins */}
-        <SidebarGroup style={{ flexShrink: 0, marginBottom: '4px' }}>
-          <SidebarGroupContent className="py-0">
-            <SidebarMenu className="space-y-0">
-              {/* Compliance Link */}
-              <SidebarMenuItem style={{ marginBottom: '1px' }}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={isCollapsed && !isMobile ? 'Compliance' : undefined}
-                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
-                      ? `flex justify-center items-center ${pathname.startsWith('/compliance')
-                            ? 'text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                      : `${pathname.startsWith('/compliance')
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                  }`}
-                  style={{
-                    height: '32px',
-                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
-                    gap: '8px',
-                    fontWeight: pathname.startsWith('/compliance') ? 600 : 500,
-                    fontSize: '13px',
-                    boxShadow: pathname.startsWith('/compliance') ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                    borderTopLeftRadius: pathname.startsWith('/compliance') ? '4px' : undefined,
-                    borderBottomLeftRadius: pathname.startsWith('/compliance') ? '4px' : undefined
-                  }}
-                >
-                  <Link
-                    to="/compliance/standards"
-                    className={`${isCollapsed && !isMobile
-                        ? 'grid place-items-center w-8 h-8 p-0'
-                        : 'flex items-center'
-                    } group relative`}
+          <CollapsibleContent className="mt-2 space-y-1 opacity-70 hover:opacity-100 transition-opacity">
+            <SidebarGroup style={{ flexShrink: 0 }}>
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
+                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                      style={{
+                        height: '30px',
+                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                        gap: '8px',
+                        fontWeight: pathname === '/teamconnect' ? 600 : 400,
+                        fontSize: '12px',
+                        boxShadow: pathname === '/teamconnect' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                      }}
                     >
-                      <IconBadge color="#10B981">
-                        <FileText size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                      </IconBadge>
-                    {isCollapsed && !isMobile ? (
-                      <span className="sr-only">Compliance</span>
-                    ) : (
-                      <span className="ml-1.5">Compliance</span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+                      <Link
+                        to="/teamconnect"
+                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                      >
+                        <IconBadge color="var(--sidebar-border)" size={18}>
+                          <Users2 size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        </IconBadge>
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">TeamConnect</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
 
-              <SidebarMenuItem style={{ marginBottom: '1px' }}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
-                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
-                      ? `flex justify-center items-center ${pathname === '/analytics'
-                            ? 'text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                      : `${pathname === '/analytics'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                  }`}
-                  style={{
-                    height: '32px',
-                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
-                    gap: '8px',
-                    fontWeight: pathname === '/analytics' ? 600 : 500,
-                    fontSize: '13px',
-                    boxShadow: pathname === '/analytics' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                    borderTopLeftRadius: pathname === '/analytics' ? '4px' : undefined,
-                    borderBottomLeftRadius: pathname === '/analytics' ? '4px' : undefined
-                  }}
-                >
-                  <Link
-                    to="/analytics"
-                    className={`${isCollapsed && !isMobile
-                        ? 'grid place-items-center w-8 h-8 p-0'
-                        : 'flex items-center'
-                    } group relative`}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed && !isMobile ? 'Compliance' : undefined}
+                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                      style={{
+                        height: '30px',
+                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                        gap: '8px',
+                        fontWeight: pathname.startsWith('/compliance') ? 600 : 400,
+                        fontSize: '12px',
+                        boxShadow: pathname.startsWith('/compliance') ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                      }}
                     >
-                      <IconBadge color="#0EA5E9">
-                        <BarChart3 size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                      </IconBadge>
-                    {isCollapsed && !isMobile ? (
-                      <span className="sr-only">Analytics</span>
-                    ) : (
-                      <span className="ml-1.5">Analytics</span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem style={{ marginBottom: '0' }}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={isCollapsed && !isMobile ? 'Plugins' : undefined}
-                  className={`rounded-[8px] relative transition-colors ${
-                    isCollapsed && !isMobile
-                      ? `flex justify-center items-center ${
-                          pathname === '/plugins'
-                            ? 'text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                      : `${
-                          pathname === '/plugins'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                  }`}
-                  style={{
-                    height: '32px',
-                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
-                    gap: '8px',
-                    fontWeight: pathname === '/plugins' ? 600 : 500,
-                    fontSize: '13px',
-                    boxShadow: pathname === '/plugins' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                    borderTopLeftRadius: pathname === '/plugins' ? '4px' : undefined,
-                    borderBottomLeftRadius: pathname === '/plugins' ? '4px' : undefined
-                  }}
-                >
-                  <Link
-                    to="/plugins"
-                    className={`${
-                      isCollapsed && !isMobile
-                        ? 'grid place-items-center w-8 h-8 p-0'
-                        : 'flex items-center'
-                    } group relative`}
-                    >
-                      <IconBadge color="#F59E0B">
-                        <Plug size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                      </IconBadge>
-                    {isCollapsed && !isMobile ? (
-                      <span className="sr-only">Plugins</span>
-                    ) : (
-                      <span className="ml-1.5">Plugins</span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                      <Link
+                        to="/compliance/standards"
+                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                      >
+                        <IconBadge color="var(--sidebar-border)" size={18}>
+                          <FileText size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        </IconBadge>
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">Compliance</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
 
-        <SidebarSeparator className="h-[1px]" style={{ backgroundColor: 'var(--sidebar-border)', marginBottom: '4px' }} />
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
+                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                      style={{
+                        height: '30px',
+                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                        gap: '8px',
+                        fontWeight: pathname === '/analytics' ? 600 : 400,
+                        fontSize: '12px',
+                        boxShadow: pathname === '/analytics' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                      }}
+                    >
+                      <Link
+                        to="/analytics"
+                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                      >
+                        <IconBadge color="var(--sidebar-border)" size={18}>
+                          <BarChart3 size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        </IconBadge>
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">Analytics</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
 
-        {/* Section: Settings */}
-        <SidebarGroup style={{ flexShrink: 0, paddingTop: '2px', marginTop: 'auto' }}>
-          <SidebarGroupContent className="py-0">
-            <SidebarMenu className="space-y-0">
-              <SidebarMenuItem style={{ marginBottom: '1px' }}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
-                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
-                      ? `flex justify-center items-center ${pathname === '/settings'
-                            ? 'text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                      : `${pathname === '/settings'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                  }`}
-                  style={{
-                    height: '32px',
-                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
-                    gap: '8px',
-                    fontWeight: pathname === '/settings' ? 600 : 500,
-                    fontSize: '13px',
-                    boxShadow: pathname === '/settings' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                    borderTopLeftRadius: pathname === '/settings' ? '4px' : undefined,
-                    borderBottomLeftRadius: pathname === '/settings' ? '4px' : undefined
-                  }}
-                >
-                  <Link
-                    to="/settings"
-                    className={`${isCollapsed && !isMobile
-                        ? 'grid place-items-center w-8 h-8 p-0'
-                        : 'flex items-center'
-                    } group relative`}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed && !isMobile ? 'Plugins' : undefined}
+                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                      style={{
+                        height: '30px',
+                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                        gap: '8px',
+                        fontWeight: pathname === '/plugins' ? 600 : 400,
+                        fontSize: '12px',
+                        boxShadow: pathname === '/plugins' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                      }}
                     >
-                      <IconBadge color="#64748B">
-                        <Settings size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                      </IconBadge>
-                    {isCollapsed && !isMobile ? (
-                      <span className="sr-only">Settings</span>
-                    ) : (
-                      <span className="ml-1.5">Settings</span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem style={{ marginBottom: '0' }}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
-                  className={`rounded-[8px] relative transition-colors ${isCollapsed && !isMobile
-                      ? `flex justify-center items-center ${pathname === '/settings/global'
-                            ? 'text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                      : `${pathname === '/settings/global'
-                            ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                            : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-                        }`
-                  }`}
-                  style={{
-                    height: '32px',
-                    padding: isCollapsed && !isMobile ? '6px' : '6px 10px',
-                    gap: '8px',
-                    fontWeight: pathname === '/settings/global' ? 600 : 500,
-                    fontSize: '13px',
-                    boxShadow: pathname === '/settings/global' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                    borderTopLeftRadius: pathname === '/settings/global' ? '4px' : undefined,
-                    borderBottomLeftRadius: pathname === '/settings/global' ? '4px' : undefined
-                  }}
-                >
-                  <Link
-                    to="/settings/global"
-                    className={`${isCollapsed && !isMobile
-                        ? 'grid place-items-center w-8 h-8 p-0'
-                        : 'flex items-center'
-                    } group relative`}
+                      <Link
+                        to="/plugins"
+                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                      >
+                        <IconBadge color="var(--sidebar-border)" size={18}>
+                          <Plug size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        </IconBadge>
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">Plugins</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
+                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                      style={{
+                        height: '30px',
+                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                        gap: '8px',
+                        fontWeight: pathname === '/settings' ? 600 : 400,
+                        fontSize: '12px',
+                        boxShadow: pathname === '/settings' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                      }}
                     >
-                      <IconBadge color="#64748B">
-                        <Globe size={14} className="w-4 h-4 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                      </IconBadge>
-                    {isCollapsed && !isMobile ? (
-                      <span className="sr-only">Global Settings</span>
-                    ) : (
-                      <span className="ml-1.5">Global Settings</span>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                      <Link
+                        to="/settings"
+                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                      >
+                        <IconBadge color="var(--sidebar-border)" size={18}>
+                          <Settings size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        </IconBadge>
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">Settings</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
+                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                      style={{
+                        height: '30px',
+                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                        gap: '8px',
+                        fontWeight: pathname === '/settings/global' ? 600 : 400,
+                        fontSize: '12px',
+                        boxShadow: pathname === '/settings/global' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                      }}
+                    >
+                      <Link
+                        to="/settings/global"
+                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                      >
+                        <IconBadge color="var(--sidebar-border)" size={18}>
+                          <Globe size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        </IconBadge>
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">Global Settings</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <div className="flex justify-center pt-2 pb-1">
+          <AssistantWidget
+            floating={false}
+            renderTrigger={(open) => (
+              <button
+                type="button"
+                onClick={open}
+                title="Copilot"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[var(--sidebar-border)]/80 text-[var(--sidebar-text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+              </button>
+            )}
+          />
+        </div>
 
         {/* Messages create board dialog removed */}
 

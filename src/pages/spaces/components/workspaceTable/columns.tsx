@@ -323,7 +323,7 @@ export function buildWorkspaceColumns(opts: any) {
           {pill}
         </PopoverTrigger>
         <PopoverContent side="right" className="max-w-[320px] p-0">
-          <div className="rounded-lg overflow-hidden border border-border/60 shadow-sm bg-white">
+          <div className="rounded-lg overflow-hidden border border-border/60 shadow-sm bg-card">
             <div className="bg-purple-600 text-white px-3 py-2 flex items-center gap-2">
               <Clock className="w-4 h-4" />
               <div className="text-sm font-semibold truncate">{sla.name || 'SLA'}</div>
@@ -607,7 +607,7 @@ export function buildWorkspaceColumns(opts: any) {
                 <Clock className="w-4 h-4 text-white" />
                 <div className="text-sm font-semibold">Approval required</div>
               </div>
-              <div className="p-3 space-y-2 text-xs text-muted-foreground bg-white">
+              <div className="p-3 space-y-2 text-xs text-muted-foreground bg-card">
                 <div className="text-sm text-foreground font-semibold flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                   Awaiting approval details
@@ -626,7 +626,7 @@ export function buildWorkspaceColumns(opts: any) {
       return (
         <Popover>
           <PopoverTrigger asChild>
-            <div className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-gray-200 bg-white text-xs font-medium max-w-[220px] cursor-pointer">
+            <div className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-gray-200 bg-card text-xs font-medium max-w-[220px] cursor-pointer">
               {approvalStatus === 'approved' ? (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
@@ -658,7 +658,7 @@ export function buildWorkspaceColumns(opts: any) {
                 <div className="text-sm font-semibold">{approval?.name || 'Approval required'}</div>
                 <span className="ml-auto text-[11px] font-medium capitalize">{approvalStatus || 'pending'}</span>
               </div>
-              <div className="p-3 bg-white space-y-3 text-xs">
+              <div className="p-3 bg-card space-y-3 text-xs">
                 <div className="text-sm text-foreground font-semibold flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                   Approval progress

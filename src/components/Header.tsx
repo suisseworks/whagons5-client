@@ -12,7 +12,7 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus, Layers, Sparkles, Search } from "lucide-react";
+import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
@@ -21,7 +21,6 @@ import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
-import AssistantWidget from '@/components/AssistantWidget';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Input } from '@/components/ui/input';
@@ -598,18 +597,6 @@ function Header() {
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
-                    <AssistantWidget
-                        floating={false}
-                        renderTrigger={(open) => (
-                            <button
-                                className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border/60 bg-background/90 text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/30 shadow-sm"
-                                title="Copilot"
-                                onClick={open}
-                            >
-                                <Sparkles className="h-5 w-5" />
-                            </button>
-                        )}
-                    />
 
                     {/* Notifications */}
                     <DropdownMenu>
