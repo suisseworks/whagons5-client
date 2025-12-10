@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTenant } from "@/api/whagonsApi";
 import { useTheme } from "@/providers/ThemeProvider";
 import { Button } from "@/components/ui/button";
-import Xarrow, { Xwrapper } from "react-xarrows";
+import Xarrow, { Xwrapper } from "@/lib/stubs/react-xarrows";
 
 const ACTION_COLUMN_ORDER = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
 const ACTION_COLUMN_MAP: Record<string, number> = ACTION_COLUMN_ORDER.reduce((acc, action, index) => {

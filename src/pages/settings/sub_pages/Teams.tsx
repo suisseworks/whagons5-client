@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
@@ -16,10 +16,11 @@ import {
   faToggleOn,
   faPen,
   faLayerGroup,
-  faCheckCircle
+  faCheckCircle,
+  faUser
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
-import { Team, Category, Task } from "@/store/types";
+import { RootState, AppDispatch } from "@/store/store";
+import { Team, Category, Task, Role, UserTeam } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,8 @@ import {
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { genericActions } from "@/store/genericSlices";
+import { Plus, Trash } from "lucide-react";
 
 // Custom cell renderer: show color avatar, name, and description stacked
 const TeamNameCellRenderer = (props: ICellRendererParams) => {
@@ -68,12 +71,20 @@ function Teams() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const tt = (key: string, fallback: string) => t(`settings.teams.${key}`, fallback);
+  const dispatch = useDispatch<AppDispatch>();
   const noneOptionLabel = tt('fields.none', 'None');
   const unassignedOptionLabel = tt('fields.unassigned', 'Unassigned');
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
+  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+  const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
+
+  useEffect(() => {
+    dispatch((genericActions as any).roles.getFromIndexedDB?.());
+    dispatch((genericActions as any).roles.fetchFromAPI?.());
+  }, [dispatch]);
   
   // Use shared state management
   const {
@@ -81,9 +92,6 @@ function Teams() {
     filteredItems,
     loading,
     error,
-    searchQuery,
-    setSearchQuery,
-    handleSearch,
     createItem,
     updateItem,
     deleteItem,
@@ -179,6 +187,142 @@ function Teams() {
     return map;
   }, [users]);
 
+  const getRoleId = (ut: UserTeam | any) => {
+    const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
+    return val == null ? null : Number(val);
+  };
+
+  const [isUsersDialogOpen, setIsUsersDialogOpen] = useState(false);
+  const [usersDialogTeam, setUsersDialogTeam] = useState<Team | null>(null);
+  const [userAssignments, setUserAssignments] = useState<Array<{ id?: number; userId: string; roleId: string; key: string }>>([]);
+  const [isSavingUsers, setIsSavingUsers] = useState(false);
+  const [usersFormError, setUsersFormError] = useState<string | null>(null);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  const handleOpenUsersDialog = (team: Team) => {
+    setUsersDialogTeam(team);
+    const related = userTeams.filter((ut) => ut.team_id === team.id);
+    const assignments = related.map((ut) => ({
+      id: ut.id,
+      userId: String(ut.user_id),
+      roleId: getRoleId(ut) != null ? String(getRoleId(ut)) : '',
+      key: `existing-${ut.id}`
+    }));
+    setUserAssignments(assignments);
+    setUsersFormError(null);
+    setIsUsersDialogOpen(true);
+  };
+
+  const handleCloseUsersDialog = () => {
+    setIsUsersDialogOpen(false);
+    setUsersDialogTeam(null);
+    setUserAssignments([]);
+    setIsSavingUsers(false);
+    setUsersFormError(null);
+  };
+
+  const addUserAssignment = () => {
+    const used = new Set(userAssignments.map((a) => a.userId));
+    const firstAvailable = (users || []).find((u: any) => !used.has(String(u.id)));
+    if (!firstAvailable) {
+      setUsersFormError(tt('dialogs.manageUsers.noAvailableUsers', 'No more users available to add.'));
+      return;
+    }
+    setUserAssignments((prev) => [
+      ...prev,
+      {
+        userId: firstAvailable ? String(firstAvailable.id) : '',
+        roleId: '',
+        key: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      }
+    ]);
+  };
+
+  const updateUserAssignment = (key: string, patch: Partial<{ userId: string; roleId: string }>) => {
+    setUserAssignments((prev) =>
+      prev.map((a) => (a.key === key ? { ...a, ...patch } : a))
+    );
+  };
+
+  const removeUserAssignment = (key: string) => {
+    setUserAssignments((prev) => prev.filter((a) => a.key !== key));
+  };
+
+  const handleSaveUsers = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usersDialogTeam) return;
+    setIsSavingUsers(true);
+    setUsersFormError(null);
+    try {
+      const existing = userTeams.filter((ut) => ut.team_id === usersDialogTeam.id);
+      const isEmpty = userAssignments.length === 0;
+      const current = isEmpty
+        ? []
+        : userAssignments.map((a) => ({
+            ...a,
+            userIdNum: Number(a.userId),
+            roleIdNum: a.roleId ? Number(a.roleId) : null
+          }));
+
+      if (!isEmpty) {
+        if (current.some((c) => !c.userId || Number.isNaN(c.userIdNum))) {
+          setUsersFormError(tt('dialogs.manageUsers.errors.userRequired', 'Selecciona un usuario para cada fila.'));
+          setIsSavingUsers(false);
+          return;
+        }
+        if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
+          setUsersFormError(tt('dialogs.manageUsers.errors.roleRequired', 'Selecciona un rol para cada usuario.'));
+          setIsSavingUsers(false);
+          return;
+        }
+        const duplicate = current.find((c, idx) => current.findIndex((d) => d.userIdNum === c.userIdNum) !== idx);
+        if (duplicate) {
+          setUsersFormError(tt('dialogs.manageUsers.errors.duplicateUser', 'No puedes repetir el mismo usuario.'));
+          setIsSavingUsers(false);
+          return;
+        }
+      }
+
+      const toAdd = current.filter((c) => c.id == null);
+      const toUpdate = current.filter((c) => {
+        const match = existing.find((ex) => ex.id === c.id);
+        if (!match) return false;
+        return match.user_id !== c.userIdNum || getRoleId(match) !== c.roleIdNum;
+      });
+      const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
+
+      for (const add of toAdd) {
+        await dispatch((genericActions as any).userTeams.addAsync({
+          user_id: add.userIdNum,
+          team_id: usersDialogTeam.id,
+          role_id: add.roleIdNum
+        })).unwrap();
+      }
+
+      for (const upd of toUpdate) {
+        await dispatch((genericActions as any).userTeams.updateAsync({
+          id: upd.id,
+          updates: {
+            user_id: upd.userIdNum,
+            team_id: usersDialogTeam.id,
+            role_id: upd.roleIdNum
+          }
+        })).unwrap();
+      }
+
+      for (const del of toRemove) {
+        await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+      }
+
+      dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
+      handleCloseUsersDialog();
+    } catch (err: any) {
+      setUsersFormError(err?.message || tt('dialogs.manageUsers.errors.generic', 'Error updating team users'));
+    } finally {
+      setIsSavingUsers(false);
+    }
+  };
+
   // Open edit with immediate form population to avoid flicker
   const handleQuickEdit = useCallback((item: Team) => {
     if (!item) return;
@@ -256,11 +400,18 @@ function Teams() {
     {
       field: 'actions',
       headerName: tt('grid.columns.actions', 'Actions'),
-      width: 110,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleQuickEdit,
-        onDelete: handleDeleteTeam
-      }),
+      width: 170,
+      cellRenderer: (p: ICellRendererParams) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => handleOpenUsersDialog(p.data)}>
+            {tt('grid.actions.manageUsers', 'Users')}
+          </Button>
+          {createActionsCellRenderer({
+            onEdit: handleQuickEdit,
+            onDelete: handleDeleteTeam
+          })(p)}
+        </div>
+      ),
       sortable: false,
       filter: false,
       resizable: false,
@@ -604,6 +755,157 @@ function Teams() {
         )}
       </SettingsDialog>
 
+      {/* Manage Team Users Dialog */}
+      <SettingsDialog
+        open={isUsersDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseUsersDialog();
+          } else {
+            setIsUsersDialogOpen(true);
+          }
+        }}
+        type="custom"
+        title={tt('dialogs.manageUsers.title', 'Manage team users')}
+        description={tt('dialogs.manageUsers.description', 'Assign or remove users and set their role for this team.')}
+        onSubmit={handleSaveUsers}
+        isSubmitting={isSavingUsers}
+        submitText={tt('dialogs.manageUsers.save', 'Save')}
+        submitDisabled={!usersDialogTeam || isSavingUsers}
+        cancelText={tt('dialogs.manageUsers.close', 'Close')}
+        contentClassName="max-w-3xl"
+        error={usersFormError || undefined}
+      >
+        {!usersDialogTeam ? (
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            {tt('dialogs.manageUsers.noTeam', 'Select a team to manage users.')}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                  {usersDialogTeam.name?.charAt(0)?.toUpperCase?.() || 'T'}
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="font-semibold text-sm">{usersDialogTeam.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <FontAwesomeIcon icon={faUser} className="w-3 h-3 mr-1" />
+                    {userAssignments.length} {tt('dialogs.manageUsers.count', 'users')}
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addUserAssignment}
+                disabled={!((users || []).some((u: any) => !userAssignments.find((a) => a.userId === String(u.id))))}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {tt('dialogs.manageUsers.add', 'Add user')}
+              </Button>
+            </div>
+
+            {userAssignments.length === 0 ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                {tt('dialogs.manageUsers.empty', 'No users assigned. Add one to get started.')}
+              </div>
+            ) : (
+              <>
+                <TextField
+                  id="user-search"
+                  label={tt('dialogs.manageUsers.search', 'Buscar usuario')}
+                  value={userSearchTerm}
+                  onChange={setUserSearchTerm}
+                  placeholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
+                />
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                {(() => {
+                  const q = userSearchTerm.trim().toLowerCase();
+                  const visibleAssignments = q
+                    ? userAssignments.filter((assignment) => {
+                        const user = (users || []).find((u: any) => String(u.id) === assignment.userId);
+                        if (user) {
+                          const nameMatch = (user.name || '').toLowerCase().includes(q);
+                          const emailMatch = (user.email || '').toLowerCase().includes(q);
+                          if (nameMatch || emailMatch) return true;
+                        }
+                        return false;
+                      })
+                    : userAssignments;
+
+                  if (userAssignments.length > 0 && visibleAssignments.length === 0) {
+                    return (
+                      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                        {tt('dialogs.manageUsers.noMatches', 'No hay usuarios que coincidan con la búsqueda.')}
+                      </div>
+                    );
+                  }
+
+                  return visibleAssignments.map((assignment) => {
+                  const usedUserIds = userAssignments
+                    .filter((a) => a.key !== assignment.key)
+                    .map((a) => a.userId);
+                  const userOptions = (users || [])
+                    .filter((u: any) => assignment.userId === String(u.id) || !usedUserIds.includes(String(u.id)))
+                    .filter((u: any) => {
+                      const q = userSearchTerm.trim().toLowerCase();
+                      if (!q) return true;
+                      return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+                    })
+                    .map((u: any) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
+                  const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+                  const hasCurrentUser = assignment.userId && userOptions.some((opt: { value: string }) => opt.value === assignment.userId);
+                  const hasCurrentRole = assignment.roleId && roleOptions.some((opt) => opt.value === assignment.roleId);
+                  return (
+                    <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
+                      <div className="col-span-5">
+                        <SelectField
+                          id={`user-${assignment.key}`}
+                          label={tt('dialogs.manageUsers.user', 'User')}
+                          value={assignment.userId}
+                          onChange={(value) => updateUserAssignment(assignment.key, { userId: value })}
+                          options={hasCurrentUser || !assignment.userId ? userOptions : [{ value: assignment.userId, label: tt('dialogs.manageUsers.unknownUser', `User ${assignment.userId}`) }, ...userOptions]}
+                          placeholder={tt('dialogs.manageUsers.selectUser', 'Select a user')}
+                          searchable
+                          searchPlaceholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
+                          required
+                        />
+                      </div>
+                      <div className="col-span-5">
+                        <SelectField
+                          id={`role-${assignment.key}`}
+                          label={tt('dialogs.manageUsers.role', 'Role')}
+                          value={assignment.roleId}
+                          onChange={(value) => updateUserAssignment(assignment.key, { roleId: value })}
+                          options={hasCurrentRole || !assignment.roleId ? roleOptions : [{ value: assignment.roleId, label: tt('dialogs.manageUsers.unknownRole', `Role ${assignment.roleId}`) }, ...roleOptions]}
+                          placeholder={tt('dialogs.manageUsers.selectRole', 'Select a role')}
+                          required
+                        />
+                      </div>
+                      <div className="col-span-2 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeUserAssignment(assignment.key)}
+                          aria-label={tt('dialogs.manageUsers.remove', 'Remove')}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                  });
+                })()}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </SettingsDialog>
+
       {/* Delete Team Dialog */}
       <SettingsDialog
         open={isDeleteDialogOpen}
@@ -652,7 +954,6 @@ interface TeamStatisticsProps {
 function TeamStatistics({ teams, categories, tasks, translate }: TeamStatisticsProps) {
   const totalTeams = teams.length;
   const totalCategories = categories.length;
-  const totalTasks = tasks.length;
 
   const activeTeams = useMemo(
     () => teams.filter((t: any) => t.is_active !== false).length,
