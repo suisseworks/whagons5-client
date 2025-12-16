@@ -11,7 +11,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 interface FormBuilderSchema {
   fields: Array<{
     id: number;
-    type: 'text' | 'textarea' | 'select' | 'checkbox';
+    type: 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number' | 'time' | 'datetime' | 'signature';
     label: string;
     placeholder?: string;
     required?: boolean;
@@ -45,7 +45,7 @@ import {
   useSettingsState,
   createActionsCellRenderer
 } from "../../components";
-import FormBuilder from "./components/FormBuilder";
+import { FormBuilder } from "./components";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UrlTabs } from "@/components/ui/url-tabs";
@@ -53,6 +53,11 @@ import { ShortAnswerField } from "./components/field-types/ShortAnswerField";
 import { ParagraphField } from "./components/field-types/ParagraphField";
 import { MultipleChoiceField } from "./components/field-types/MultipleChoiceField";
 import { CheckboxField } from "./components/field-types/CheckboxField";
+import { DateField } from "./components/field-types/DateField";
+import { TimeField } from "./components/field-types/TimeField";
+import { DateTimeField } from "./components/field-types/DateTimeField";
+import { NumberField } from "./components/field-types/NumberField";
+import { SignatureField } from "./components/field-types/SignatureField";
 import StatusButton from "@/components/ui/StatusButton";
 
 function Forms() {
@@ -632,6 +637,11 @@ function Forms() {
                       isEditing={false}
                     />
                   )}
+                  {f.type === 'date' && <DateField isEditing={false} />}
+                  {f.type === 'time' && <TimeField isEditing={false} />}
+                  {f.type === 'datetime' && <DateTimeField isEditing={false} />}
+                  {f.type === 'number' && <NumberField isEditing={false} />}
+                  {f.type === 'signature' && <SignatureField isEditing={false} />}
                 </div>
               ))}
             </div>

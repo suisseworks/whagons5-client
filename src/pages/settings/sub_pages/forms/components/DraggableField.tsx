@@ -20,7 +20,12 @@ import {
   ShortAnswerField,
   ParagraphField,
   MultipleChoiceField,
-  CheckboxField
+  CheckboxField,
+  DateField,
+  TimeField,
+  DateTimeField,
+  NumberField,
+  SignatureField
 } from "./field-types";
 
 interface DraggableFieldProps {
@@ -132,6 +137,11 @@ export function DraggableField({
               isEditing={false}
             />
           )}
+          {field.type === 'date' && <DateField isEditing={false} />}
+          {field.type === 'time' && <TimeField isEditing={false} />}
+          {field.type === 'datetime' && <DateTimeField isEditing={false} />}
+          {field.type === 'number' && <NumberField isEditing={false} />}
+          {field.type === 'signature' && <SignatureField isEditing={false} />}
         </div>
       </div>
 
@@ -155,7 +165,12 @@ export function DraggableField({
                   <SelectItem value="text">Short answer</SelectItem>
                   <SelectItem value="textarea">Paragraph</SelectItem>
                   <SelectItem value="select">Multiple choice</SelectItem>
-                  <SelectItem value="checkbox">Checkbox</SelectItem>
+                  <SelectItem value="checkbox">Multi-select</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="number">Number</SelectItem>
+                  <SelectItem value="time">Time</SelectItem>
+                  <SelectItem value="datetime">Date & Time</SelectItem>
+                  <SelectItem value="signature">Signature</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -180,6 +195,11 @@ export function DraggableField({
                 isEditing={true}
               />
             )}
+            {field.type === 'date' && <DateField isEditing={true} />}
+            {field.type === 'time' && <TimeField isEditing={true} />}
+            {field.type === 'datetime' && <DateTimeField isEditing={true} />}
+            {field.type === 'number' && <NumberField isEditing={true} />}
+            {field.type === 'signature' && <SignatureField isEditing={true} />}
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="flex items-center gap-2">
                 <Button
