@@ -100,6 +100,9 @@ export const Workspace = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStartX, setResizeStartX] = useState<number | null>(null);
   const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
+  const toggleRightPanel = (panel: 'chat' | 'resources') => {
+    setRightPanel((prev) => (prev === panel ? null : panel));
+  };
 
   // Display options - workspace-specific
   const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
@@ -789,24 +792,41 @@ export const Workspace = () => {
         )}
 
         <div className="ml-auto flex items-center gap-3 pr-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle Chat"
-            onClick={() => setRightPanel(prev => prev === 'chat' ? null : 'chat')}
-            title="Chat"
-          >
-            <MessageSquare className="w-6 h-6" strokeWidth={2.2} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle Resources"
-            onClick={() => setRightPanel(prev => prev === 'resources' ? null : 'resources')}
-            title="Resources"
-          >
-            <FolderPlus className="w-6 h-6" strokeWidth={2.2} />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={rightPanel ? 'secondary' : 'ghost'}
+                size="sm"
+                className="gap-2"
+                aria-label="Collaboration menu"
+              >
+                <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
+                <span className="hidden sm:inline">Collab</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel>Collaboration</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={rightPanel === 'chat'}
+                onCheckedChange={() => toggleRightPanel('chat')}
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Chat</span>
+                </div>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={rightPanel === 'resources'}
+                onCheckedChange={() => toggleRightPanel('resources')}
+              >
+                <div className="flex items-center gap-2">
+                  <FolderPlus className="w-4 h-4" />
+                  <span>Resources</span>
+                </div>
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       {/* Bulk actions toolbar */}
