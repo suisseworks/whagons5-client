@@ -324,9 +324,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`shadow-md bg-sidebar-header transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
+        className={`!p-0 bg-sidebar-header backdrop-blur-xl transition-colors duration-200 border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)] ${isCollapsed ? 'px-1' : ''
         }`}
-        style={{ paddingTop: '12px', paddingBottom: '10px', height: '52px', flexShrink: 0 }}
+        style={{
+          height: 'var(--app-header-height)',
+          flexShrink: 0,
+        }}
       >
         <div className="flex items-center justify-center w-full h-full">
           <Link

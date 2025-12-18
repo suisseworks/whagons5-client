@@ -301,8 +301,9 @@ function Header() {
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
         if (isDarkTheme) {
-            // Solid dark per spec with subtle bottom border
-            return { backgroundColor: '#0A0A0A', borderBottom: '1px solid #1F1F1F' } as React.CSSProperties;
+            // Solid dark per spec. Border/shadow are handled by the header class so we
+            // don't accidentally create an extra 1px border that misaligns with the sidebar header.
+            return { backgroundColor: '#0A0A0A' } as React.CSSProperties;
         }
         // Light mode: very soft neutral gradient
         const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
@@ -448,7 +449,7 @@ function Header() {
     if (!firebaseUser || userLoading) {
         return (
             <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
-                <div className="flex items-center space-x-3 px-6 h-16">
+                <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="animate-pulse bg-gray-300 rounded-full h-6 w-6"></div>
@@ -462,7 +463,7 @@ function Header() {
     if (!user) {
         return (
             <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
-                <div className="flex items-center space-x-3 px-6 h-16">
+                <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="bg-gray-300 rounded-full h-7 w-7"></div>
@@ -490,7 +491,7 @@ function Header() {
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-6 h-16 relative z-10">
+            <div className="flex items-center justify-between px-6 h-[var(--app-header-height)] relative z-10">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
