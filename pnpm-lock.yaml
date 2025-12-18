@@ -11,6 +11,12 @@ importers:
       '@base-ui-components/react':
         specifier: 1.0.0-beta.3
         version: 1.0.0-beta.3(@types/react@18.3.20)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@bryntum/scheduler':
+        specifier: npm:@bryntum/scheduler-trial@^7.0.1
+        version: '@bryntum/scheduler-trial@7.0.1'
+      '@bryntum/scheduler-react':
+        specifier: ^7.0.1
+        version: 7.0.1
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -167,6 +173,9 @@ importers:
       react-router-dom:
         specifier: ^6.22.3
         version: 6.30.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react-xarrows:
+        specifier: ^2.0.2
+        version: 2.0.2(react@18.3.1)
       redux-persist:
         specifier: ^6.0.0
         version: 6.0.0(react@18.3.1)(redux@5.0.1)
@@ -821,6 +830,18 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  '@bryntum/scheduler-react@7.0.1':
+    resolution: {integrity: sha512-IWCEjy6JybcSYOG8YzDxC12ihfY6KkqtXUg8DdgKnXRCnUSru7ESfd+Zeq/Ac6yIjkHXYdvp++jsLCI4AthoXg==}
+    engines: {node: '>=0.10.0'}
+
+  '@bryntum/scheduler-trial-lib@1.0.0':
+    resolution: {integrity: sha512-Q8uQiQNtRxYCUcIrlKDIauFhkhpLjiGNgqGJJ7KOFtm7eTiObSO6HHgb533qY6WqmZYm82yUegQkwHWTxzCNxA==}
+    engines: {node: '>=0.10.0'}
+
+  '@bryntum/scheduler-trial@7.0.1':
+    resolution: {integrity: sha512-z9BvaEXY9XlZAsr4kQSiE5M1WoQXNHDrCF6wZ/HCYr21PKT/BTVTVIywDSgyYmCmcqbFp5kxO1z7dOUL98uaBw==}
+    engines: {node: '>=0.10.0'}
 
   '@cypress/request@3.0.9':
     resolution: {integrity: sha512-I3l7FdGRXluAS44/0NguwWlO83J18p0vlr2FYHrJkWdNYhgVoiYo61IXPqaOsL+vNxU1ZqMACzItGK3/KKDsdw==}
@@ -4412,6 +4433,11 @@ packages:
       '@types/react':
         optional: true
 
+  react-xarrows@2.0.2:
+    resolution: {integrity: sha512-tDlAqaxHNmy0vegW/6NdhoWyXJq1LANX/WUAlHyzoHe9BwFVnJPPDghmDjYeVr7XWFmBrVTUrHsrW7GKYI6HtQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+
   react@18.3.1:
     resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
     engines: {node: '>=0.10.0'}
@@ -5891,6 +5917,14 @@ snapshots:
       use-sync-external-store: 1.5.0(react@18.3.1)
     optionalDependencies:
       '@types/react': 18.3.20
+
+  '@bryntum/scheduler-react@7.0.1': {}
+
+  '@bryntum/scheduler-trial-lib@1.0.0': {}
+
+  '@bryntum/scheduler-trial@7.0.1':
+    dependencies:
+      '@bryntum/scheduler-trial-lib': 1.0.0
 
   '@cypress/request@3.0.9':
     dependencies:
@@ -9962,6 +9996,13 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@types/react': 18.3.20
+
+  react-xarrows@2.0.2(react@18.3.1):
+    dependencies:
+      '@types/prop-types': 15.7.14
+      lodash: 4.17.21
+      prop-types: 15.8.1
+      react: 18.3.1
 
   react@18.3.1:
     dependencies:
