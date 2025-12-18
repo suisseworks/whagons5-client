@@ -44,3 +44,11 @@ Look at existing subpages (e.g., Categories.tsx) for code patterns.
 - Define YourEntity type in store/types.ts.
 - Add custom fields/validators as needed.
 - Use separate selectors for related data.
+
+## Workflows UI Audit
+
+- `Workflows.tsx` currently stores drafts exclusively in `localStorage`, so nothing persists to the API or Redux store. Reloading another device loses work, and the Settings card count cannot reflect real data.
+- Node palette only exposes static `trigger/condition/action/branch/delay` stubs with a single `label` field. There is no schema-driven inspector to configure triggers (e.g., task status change) or actions (send email, create task, notify team).
+- There are no controls to activate/deactivate workflows, run tests, or view execution history. The validation banner only checks for graph basics (missing trigger, dead ends) and cannot surface backend validation errors.
+- Canvas interactions never save revisions/versions, cannot duplicate nodes with configuration, and do not support run guards (throttling, max concurrency).
+- Because everything is local-only, other settings pages (e.g., `Settings.tsx` counts, search) treat workflows as `0`, and real-time listeners/cache registry are unaware of workflow entities.

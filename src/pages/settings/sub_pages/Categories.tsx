@@ -7,7 +7,9 @@ import {
   faTags,
   faPlus,
   faCubes,
-  faChartBar
+  faChartBar,
+  faTrash,
+  faPen
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
@@ -22,15 +24,16 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer,
   IconPicker,
   CategoryFieldsManager,
   TextField,
   SelectField,
   CheckboxField
 } from "../components";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -93,22 +96,82 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
   );
 };
 
-// Custom cell renderer for enabled status
-const EnabledCellRenderer = (props: ICellRendererParams) => {
-  const isEnabled = props.value;
-  
+// Simple badge renderer to show whether a category is enabled
+const EnabledCellRenderer = ({ value }: ICellRendererParams) => {
+  const isEnabled = Boolean(value);
+
   return (
-    <Badge 
-      variant={isEnabled ? "default" : "secondary"} 
-      className={isEnabled ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-gray-100 text-gray-800 hover:bg-gray-100"}
+    <Badge
+      variant={isEnabled ? "default" : "secondary"}
+      className={`text-xs ${isEnabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
     >
       {isEnabled ? "Enabled" : "Disabled"}
     </Badge>
   );
 };
 
+type CategoryActionsRendererParams = {
+  onManageFields: (category: Category) => void;
+  onEdit: (category: Category) => void;
+  onDelete: (category: Category) => void;
+  getFieldCount: (categoryId: number) => number;
+};
+
+const CategoryActionsCellRenderer = (
+  props: ICellRendererParams & CategoryActionsRendererParams
+) => {
+  const { data, onManageFields, onEdit, onDelete, getFieldCount } = props;
+  if (!data) return null;
+  const category = data as Category;
+  const id = Number(category.id);
+  const count = getFieldCount(id);
+  const label = count > 0 ? `Fields (${count})` : 'Fields';
+
+  const handleClick = (
+    handler: (category: Category) => void,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation();
+    handler(category);
+  };
+
+  return (
+    <div className="flex w-full justify-end">
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={(event) => handleClick(onManageFields, event)}
+          className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+        >
+          <FontAwesomeIcon icon={faCubes} className="h-3 w-3 text-slate-500" />
+          {label}
+        </button>
+
+        <button
+          type="button"
+          aria-label="Edit category"
+          onClick={(event) => handleClick(onEdit, event)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.12)] transition hover:bg-slate-50"
+        >
+          <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          aria-label="Delete category"
+          onClick={(event) => handleClick(onDelete, event)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff4d4f] text-white shadow-[0_1px_3px_rgba(244,67,54,0.35)] transition hover:bg-[#ea3b3d]"
+        >
+          <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 function Categories() {
   const dispatch = useDispatch();
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
   const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: any[] };
@@ -243,6 +306,12 @@ function Categories() {
     } else {
       handleDelete(category);
     }
+  };
+
+  const handleDeleteFromEdit = () => {
+    if (!editingCategory) return;
+    setIsEditDialogOpen(false);
+    handleDeleteCategory(editingCategory);
   };
 
   // Derived statistics for charts
@@ -384,7 +453,7 @@ function Categories() {
       field: 'status_transition_group_id',
       headerName: 'Status Transition Group',
       flex: 1.5,
-      minWidth: 240,
+      minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
         const groupId = params.value as number | null | undefined;
         if (!groupId) {
@@ -408,22 +477,14 @@ function Categories() {
     {
       headerName: 'Actions',
       colId: 'actions',
-      minWidth: 200,
+      minWidth: 240,
       suppressSizeToFit: true,
-      cellRenderer: createActionsCellRenderer({
-        customActions: [{
-          icon: faCubes,
-          label: (row: any) => {
-            const count = assignmentCountByCategory[Number(row?.id)] || 0;
-            return count > 0 ? `Fields (${count})` : 'Fields';
-          },
-          variant: 'outline',
-          onClick: openManageFields,
-          className: 'p-1 h-7 relative flex items-center justify-center'
-        }],
+      cellRenderer: CategoryActionsCellRenderer,
+      cellRendererParams: {
+        onManageFields: openManageFields,
         onEdit: handleEdit,
-        onDelete: handleDeleteCategory
-      }),
+        getFieldCount: (id: number) => assignmentCountByCategory[Number(id)] || 0
+      },
       sortable: false,
       filter: false,
       resizable: false,
@@ -562,13 +623,13 @@ function Categories() {
 
   return (
     <SettingsLayout
-      title="Categories"
-      description="Manage task categories and labels for better organization"
+      title={tc('title', 'Categories')}
+      description={tc('description', 'Manage task categories and labels for better organization')}
       icon={faTags}
       iconColor="#ef4444"
       loading={{
         isLoading: loading,
-        message: "Loading categories..."
+        message: tc('loading', 'Loading categories...')
       }}
       error={error ? {
         message: error,
@@ -578,14 +639,14 @@ function Categories() {
         <div className="flex items-center space-x-2">
           <Link to="/settings/categories/custom-fields">
             <Button variant="outline" className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
-              Manage custom fields
+              {tc('header.manageFields', 'Manage custom fields')}
             </Button>
           </Link>
           <Button 
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-            <span>Add Category</span>
+            <span>{tc('header.addCategory', 'Add Category')}</span>
           </Button>
         </div>
       }
@@ -597,7 +658,7 @@ function Categories() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faTags} className="w-4 h-4" />
-                <span>Categories</span>
+                <span>{tc('tabs.categories', 'Categories')}</span>
               </div>
             ),
             content: (
@@ -606,7 +667,7 @@ function Categories() {
                   <SettingsGrid
                     rowData={filteredItems}
                     columnDefs={colDefs}
-                    noRowsMessage="No categories found"
+                    noRowsMessage={tc('grid.noRows', 'No categories found')}
                     rowSelection="single"
                     onRowDoubleClicked={(row: any) => handleEdit(row)}
                     gridOptions={{
@@ -628,7 +689,7 @@ function Categories() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-                <span>Statistics</span>
+                <span>{tc('tabs.statistics', 'Statistics')}</span>
               </div>
             ),
             content: (
@@ -641,7 +702,7 @@ function Categories() {
                         <div className="text-center">
                           <div className="text-2xl font-bold">{categories.length}</div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Total Categories
+                            {tc('stats.cards.total', 'Total Categories')}
                           </div>
                         </div>
                       </CardContent>
@@ -653,7 +714,7 @@ function Categories() {
                             {enabledCategoriesCount}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Enabled Categories
+                            {tc('stats.cards.enabled', 'Enabled Categories')}
                           </div>
                         </div>
                       </CardContent>
@@ -665,7 +726,7 @@ function Categories() {
                             {disabledCategoriesCount}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            Disabled Categories
+                            {tc('stats.cards.disabled', 'Disabled Categories')}
                           </div>
                         </div>
                       </CardContent>
@@ -677,10 +738,10 @@ function Categories() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">
-                          Tasks by Category
+                          {tc('stats.charts.tasksByCategory.title', 'Tasks by Category')}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          Distribution of tasks across categories
+                          {tc('stats.charts.tasksByCategory.description', 'Distribution of tasks across categories')}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -698,7 +759,7 @@ function Categories() {
                               },
                               series: [
                                 {
-                                  name: "Tasks",
+                                  name: tc('stats.charts.tasksByCategory.series', 'Tasks'),
                                   type: "pie",
                                   radius: ["40%", "70%"],
                                   avoidLabelOverlap: false,
@@ -732,7 +793,7 @@ function Categories() {
                           />
                         ) : (
                           <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                            No task data available
+                            {tc('stats.charts.tasksByCategory.empty', 'No task data available')}
                           </div>
                         )}
                       </CardContent>
@@ -741,10 +802,10 @@ function Categories() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">
-                          Categories by Team
+                          {tc('stats.charts.categoriesByTeam.title', 'Categories by Team')}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          How categories are distributed across teams
+                          {tc('stats.charts.categoriesByTeam.description', 'How categories are distributed across teams')}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -763,7 +824,7 @@ function Categories() {
                               },
                               xAxis: {
                                 type: "value",
-                                name: "Categories"
+                                name: tc('stats.charts.categoriesByTeam.axis', 'Categories')
                               },
                               yAxis: {
                                 type: "category",
@@ -797,7 +858,7 @@ function Categories() {
                           />
                         ) : (
                           <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                            No team data available
+                            {tc('stats.charts.categoriesByTeam.empty', 'No team data available')}
                           </div>
                         )}
                       </CardContent>
@@ -809,10 +870,10 @@ function Categories() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">
-                          Tasks Created Over Time
+                          {tc('stats.charts.tasksOverTime.title', 'Tasks Over Time')}
                         </CardTitle>
                         <CardDescription className="text-xs">
-                          Last 30 days of task creation across categories
+                          {tc('stats.charts.tasksOverTime.description', 'Last 30 days of task creation across categories')}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -843,11 +904,11 @@ function Categories() {
                             },
                             yAxis: {
                               type: "value",
-                              name: "Tasks"
+                              name: tc('stats.charts.tasksOverTime.axis', 'Tasks')
                             },
                             series: [
                               {
-                                name: "Tasks Created",
+                                name: tc('stats.charts.tasksOverTime.series', 'Tasks Created'),
                                 type: "line",
                                 smooth: true,
                                 data: tasksOverTime.map(
@@ -925,89 +986,112 @@ function Categories() {
         error={formError}
         submitDisabled={isSubmitting}
       >
-        <div className="grid gap-4">
-          <TextField
-            id="name"
-            label="Name"
-            value={createFormData.name}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
-            required
-          />
-          <TextField
-            id="description"
-            label="Description"
-            value={createFormData.description}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, description: value }))}
-          />
-          <TextField
-            id="color"
-            label="Color"
-            type="color"
-            value={createFormData.color}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
-          />
-          <IconPicker
-            id="icon"
-            label="Icon"
-            value={createFormData.icon}
-            onChange={(iconClass) => setCreateFormData(prev => ({ ...prev, icon: iconClass }))}
-            color={createFormData.color}
-            required
-          />
-          <SelectField
-            id="team"
-            label="Team"
-            value={createFormData.team_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, team_id: value }))}
-            placeholder="No Team"
-            options={teams.map((team: Team) => ({
-              value: team.id.toString(),
-              label: team.name
-            }))}
-            required
-          />
-          <SelectField
-            id="sla"
-            label="SLA"
-            value={createFormData.sla_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-            placeholder="Select SLA…"
-            options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
-              value: s.id.toString(),
-              label: s.name
-            }))]}
-          />
-          <SelectField
-            id="approval"
-            label="Approval"
-            value={createFormData.approval_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-            placeholder="Select approval…"
-            options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
-              value: a.id.toString(),
-              label: a.name
-            }))]}
-          />
-          <SelectField
-            id="status-group"
-            label="Status Transition Group"
-            value={createFormData.status_transition_group_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, status_transition_group_id: value }))}
-            placeholder="Select group…"
-            options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
-              value: g.id.toString(),
-              label: g.name
-            }))}
-            required
-          />
-          <CheckboxField
-            id="enabled"
-            label="Status"
-            checked={createFormData.enabled}
-            onChange={(checked) => setCreateFormData(prev => ({ ...prev, enabled: checked }))}
-            description="Enabled"
-          />
+        <div className="rounded-xl bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-sky-900/30 dark:via-slate-900 dark:to-emerald-900/20 border border-sky-100 dark:border-slate-800 px-4 py-3 mb-4 flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-sky-100 dark:border-slate-700 flex items-center justify-center">
+            <FontAwesomeIcon icon={faTags} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground">Create category</p>
+            <p className="text-xs text-muted-foreground">
+              Set general details and rules (SLA, approval, transitions) across two tabs.
+            </p>
+          </div>
         </div>
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="rules">Rules</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
+            <div className="grid gap-4 min-h-[320px]">
+              <TextField
+                id="name"
+                label="Name"
+                value={createFormData.name}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
+                required
+              />
+              <TextField
+                id="description"
+                label="Description"
+                value={createFormData.description}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, description: value }))}
+              />
+              <TextField
+                id="color"
+                label="Color"
+                type="color"
+                value={createFormData.color}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
+              />
+              <IconPicker
+                id="icon"
+                label="Icon"
+                value={createFormData.icon}
+                onChange={(iconClass) => setCreateFormData(prev => ({ ...prev, icon: iconClass }))}
+                color={createFormData.color}
+                required
+              />
+              <SelectField
+                id="team"
+                label="Team"
+                value={createFormData.team_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, team_id: value }))}
+                placeholder="No Team"
+                options={teams.map((team: Team) => ({
+                  value: team.id.toString(),
+                  label: team.name
+                }))}
+                required
+              />
+              <CheckboxField
+                id="enabled"
+                label="Status"
+                checked={createFormData.enabled}
+                onChange={(checked) => setCreateFormData(prev => ({ ...prev, enabled: checked }))}
+                description="Enabled"
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="rules">
+            <div className="grid gap-4 min-h-[320px]">
+              <SelectField
+                id="sla"
+                label="SLA"
+                value={createFormData.sla_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
+                placeholder="Select SLA…"
+                options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
+                  value: s.id.toString(),
+                  label: s.name
+                }))]}
+              />
+              <SelectField
+                id="approval"
+                label="Approval"
+                value={createFormData.approval_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+                placeholder="Select approval…"
+                options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
+                  value: a.id.toString(),
+                  label: a.name
+                }))]}
+              />
+              <SelectField
+                id="status-group"
+                label="Status Transition Group"
+                value={createFormData.status_transition_group_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, status_transition_group_id: value }))}
+                placeholder="Select group…"
+                options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
+                  value: g.id.toString(),
+                  label: g.name
+                }))}
+                required
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
       </SettingsDialog>
 
       {/* Edit Category Dialog */}
@@ -1021,89 +1105,123 @@ function Categories() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingCategory}
+        footerActions={
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDeleteFromEdit}
+            disabled={!editingCategory}
+          >
+            <FontAwesomeIcon icon={faTrash} className="mr-2" />
+            Delete
+          </Button>
+        }
       >
-        <div className="grid gap-4">
-          <TextField
-            id="edit-name"
-            label="Name"
-            value={editFormData.name}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
-            required
-          />
-          <TextField
-            id="edit-description"
-            label="Description"
-            value={editFormData.description}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
-          />
-          <TextField
-            id="edit-color"
-            label="Color"
-            type="color"
-            value={editFormData.color}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
-          />
-          <IconPicker
-            id="edit-icon"
-            label="Icon"
-            value={editFormData.icon}
-            onChange={(iconClass) => setEditFormData(prev => ({ ...prev, icon: iconClass }))}
-            color={editFormData.color}
-            required
-          />
-          <SelectField
-            id="edit-team"
-            label="Team"
-            value={editFormData.team_id}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, team_id: value }))}
-            placeholder="No Team"
-            options={teams.map((team: Team) => ({
-              value: team.id.toString(),
-              label: team.name
-            }))}
-          />
-          <SelectField
-            id="edit-sla"
-            label="SLA"
-            value={editFormData.sla_id}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-            placeholder="Select SLA…"
-            options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
-              value: s.id.toString(),
-              label: s.name
-            }))]}
-          />
-          <SelectField
-            id="edit-approval"
-            label="Approval"
-            value={editFormData.approval_id}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-            placeholder="Select approval…"
-            options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
-              value: a.id.toString(),
-              label: a.name
-            }))]}
-          />
-          <SelectField
-            id="edit-status-group"
-            label="Status Transition Group"
-            value={editFormData.status_transition_group_id}
-            onChange={(value) => setEditFormData(prev => ({ ...prev, status_transition_group_id: value }))}
-            placeholder="Select group…"
-            options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
-              value: g.id.toString(),
-              label: g.name
-            }))}
-            required
-          />
-          <CheckboxField
-            id="edit-enabled"
-            label="Status"
-            checked={editFormData.enabled}
-            onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
-            description="Enabled"
-          />
+        <div className="rounded-xl bg-gradient-to-r from-sky-50 via-white to-emerald-50 dark:from-sky-900/30 dark:via-slate-900 dark:to-emerald-900/20 border border-sky-100 dark:border-slate-800 px-4 py-3 mb-4 flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-sky-100 dark:border-slate-700 flex items-center justify-center">
+            <FontAwesomeIcon icon={faTags} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground">Edit category</p>
+            <p className="text-xs text-muted-foreground">
+              Update details and rules. SLA, approval, and transitions live in the Rules tab.
+            </p>
+          </div>
         </div>
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="rules">Rules</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general">
+            <div className="grid gap-4 min-h-[320px]">
+              <TextField
+                id="edit-name"
+                label="Name"
+                value={editFormData.name}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+                required
+              />
+              <TextField
+                id="edit-description"
+                label="Description"
+                value={editFormData.description}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
+              />
+              <TextField
+                id="edit-color"
+                label="Color"
+                type="color"
+                value={editFormData.color}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
+              />
+              <IconPicker
+                id="edit-icon"
+                label="Icon"
+                value={editFormData.icon}
+                onChange={(iconClass) => setEditFormData(prev => ({ ...prev, icon: iconClass }))}
+                color={editFormData.color}
+                required
+              />
+              <SelectField
+                id="edit-team"
+                label="Team"
+                value={editFormData.team_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, team_id: value }))}
+                placeholder="No Team"
+                options={teams.map((team: Team) => ({
+                  value: team.id.toString(),
+                  label: team.name
+                }))}
+              />
+              <CheckboxField
+                id="edit-enabled"
+                label="Status"
+                checked={editFormData.enabled}
+                onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
+                description="Enabled"
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="rules">
+            <div className="grid gap-4 min-h-[320px]">
+              <SelectField
+                id="edit-sla"
+                label="SLA"
+                value={editFormData.sla_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
+                placeholder="Select SLA…"
+                options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
+                  value: s.id.toString(),
+                  label: s.name
+                }))]}
+              />
+              <SelectField
+                id="edit-approval"
+                label="Approval"
+                value={editFormData.approval_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
+                placeholder="Select approval…"
+                options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
+                  value: a.id.toString(),
+                  label: a.name
+                }))]}
+              />
+              <SelectField
+                id="edit-status-group"
+                label="Status Transition Group"
+                value={editFormData.status_transition_group_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, status_transition_group_id: value }))}
+                placeholder="Select group…"
+                options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
+                  value: g.id.toString(),
+                  label: g.name
+                }))}
+                required
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
       </SettingsDialog>
 
       {/* Delete Category Dialog */}

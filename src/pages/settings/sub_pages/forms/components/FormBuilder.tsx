@@ -16,7 +16,7 @@ import { AddFieldToolbar } from "./AddFieldToolbar";
 
 export interface BuilderSchemaField {
   id: number;
-  type: 'text' | 'textarea' | 'select' | 'checkbox';
+  type: 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number' | 'time' | 'datetime' | 'signature';
   label: string;
   placeholder?: string;
   required?: boolean;
@@ -98,12 +98,13 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
   };
 
   const addField = (type: BuilderSchemaField['type'], insertAfterIndex?: number) => {
+    const needsOptions = type === 'select' || type === 'checkbox';
     const newField: BuilderSchemaField = {
       id: Date.now(),
       type,
       label: '',
       required: false,
-      options: type === 'select' ? [''] : undefined,
+      options: needsOptions ? [''] : undefined,
       placeholder: undefined
     };
 
@@ -390,7 +391,4 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
     </div>
   );
 }
-
-export default FormBuilder;
-
 

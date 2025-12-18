@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
-import { ChevronUp, Plus } from 'lucide-react';
+import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
 
@@ -43,6 +43,9 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
   const { value: tags = [] } = useSelector((s: RootState) => (s as any).tags || { value: [] });
   const { value: taskTags = [] } = useSelector((s: RootState) => (s as any).taskTags || { value: [] });
+  const { value: customFields = [] } = useSelector((s: RootState) => (s as any).customFields || { value: [] });
+  const { value: categoryCustomFields = [] } = useSelector((s: RootState) => (s as any).categoryCustomFields || { value: [] });
+  const { value: taskCustomFieldValues = [] } = useSelector((s: RootState) => (s as any).taskCustomFieldValues || { value: [] });
   
   const { user } = useAuth();
 
@@ -111,6 +114,222 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const [activeTab, setActiveTab] = useState('basic');
   const [showDescription, setShowDescription] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
+
+  const customFieldValuesRef = useRef<Record<number, any>>({});
+  const lastCustomFieldCategoryRef = useRef<number | null>(null);
+
+  const approvalMap = useMemo(() => {
+    const map: Record<number, any> = {};
+    for (const a of approvals || []) {
+      const id = Number((a as any)?.id);
+      if (Number.isFinite(id)) map[id] = a;
+    }
+    return map;
+  }, [approvals]);
+
+  const normalizeDefaultUserIds = (ids: any): number[] => {
+    if (!Array.isArray(ids)) return [];
+    return ids
+      .map((id: any) => Number(id))
+      .filter((n) => Number.isFinite(n));
+  };
+
+  const normalizeFieldType = (field: any): string => {
+    return String((field as any)?.field_type ?? (field as any)?.type ?? '').toLowerCase();
+  };
+
+  const coerceBoolean = (v: any): boolean => {
+    if (typeof v === 'boolean') return v;
+    if (v == null) return false;
+    const s = String(v).toLowerCase();
+    return s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === 'on';
+  };
+
+  const parseFieldOptions = (field?: any): Array<{ value: string; label: string }> => {
+    if (!field) return [];
+    const raw = (field as any).options;
+    try {
+      if (Array.isArray(raw)) {
+        return raw.map((o: any) => {
+          if (typeof o === 'string') return { value: o, label: o };
+          if (o && typeof o === 'object') {
+            const value = String((o as any).value ?? (o as any).id ?? (o as any).name ?? '');
+            const label = String((o as any).label ?? (o as any).name ?? value);
+            return { value, label };
+          }
+          return { value: String(o), label: String(o) };
+        });
+      }
+      if (typeof raw === 'string' && raw.trim().length) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed.map((o: any) => {
+              if (typeof o === 'string') return { value: o, label: o };
+              const value = String((o as any).value ?? (o as any).id ?? (o as any).name ?? '');
+              const label = String((o as any).label ?? (o as any).name ?? value);
+              return { value, label };
+            });
+          }
+        } catch {}
+        const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+        return parts.map((p) => ({ value: p, label: p }));
+      }
+    } catch {}
+    return [];
+  };
+
+  const parseMultiValue = (val: any): string[] => {
+    if (Array.isArray(val)) return val.map((v) => String(v));
+    if (val == null) return [];
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed.map((v: any) => String(v));
+    } catch {}
+    return String(val)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
+
+  const formatDateValueForInput = (val: any, type: string): string => {
+    if (!val) return '';
+    const t = (type || '').toLowerCase();
+    if (t === 'time') {
+      return String(val);
+    }
+    const d = new Date(val);
+    if (!Number.isNaN(d.getTime())) {
+      if (t === 'date') return d.toISOString().slice(0, 10);
+      if (t.startsWith('datetime')) return d.toISOString().slice(0, 16);
+    }
+    return String(val);
+  };
+
+  const deserializeCustomFieldValue = (row: any, field: any) => {
+    const type = normalizeFieldType(field);
+    const value = (row as any)?.value ?? (row as any)?.value_text;
+    const valueNumeric = (row as any)?.value_numeric ?? (row as any)?.valueNumber;
+    const valueDate = (row as any)?.value_date ?? (row as any)?.valueDate;
+    const valueJson = (row as any)?.value_json ?? (row as any)?.valueJson;
+
+    if (type === 'multi_select' || type === 'multi-select' || type === 'multi select') {
+      if (Array.isArray(valueJson)) return valueJson.map((v: any) => String(v));
+      if (value != null) return parseMultiValue(value);
+      return [];
+    }
+    if (type === 'checkbox') {
+      if (value != null) return coerceBoolean(value);
+      if (valueNumeric != null) return Number(valueNumeric) === 1;
+      return false;
+    }
+    if (type === 'number') {
+      if (valueNumeric != null && Number.isFinite(Number(valueNumeric))) return Number(valueNumeric);
+      if (value != null && String(value).length) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : '';
+      }
+      return '';
+    }
+    if (type === 'date' || type.startsWith('datetime')) {
+      return formatDateValueForInput(valueDate ?? value, type);
+    }
+    if (type === 'time') {
+      return value ?? '';
+    }
+    return value ?? '';
+  };
+
+  const parseDefaultCustomFieldValue = (defaultValue: any, field: any) => {
+    const type = normalizeFieldType(field);
+    if (type === 'multi_select' || type === 'multi-select' || type === 'multi select') {
+      return parseMultiValue(defaultValue);
+    }
+    if (type === 'checkbox') {
+      if (defaultValue == null) return false;
+      return coerceBoolean(defaultValue);
+    }
+    if (type === 'number') {
+      if (defaultValue == null || defaultValue === '') return '';
+      const num = Number(defaultValue);
+      return Number.isFinite(num) ? num : '';
+    }
+    if (type === 'date' || type.startsWith('datetime')) {
+      return formatDateValueForInput(defaultValue, type);
+    }
+    if (type === 'time') {
+      return defaultValue ?? '';
+    }
+    return defaultValue ?? '';
+  };
+
+  const isCustomFieldValueFilled = (field: any, raw: any): boolean => {
+    const type = normalizeFieldType(field);
+    if (type === 'multi_select' || type === 'multi-select' || type === 'multi select') {
+      if (Array.isArray(raw)) return raw.length > 0;
+      return String(raw ?? '').trim().length > 0;
+    }
+    if (type === 'checkbox') {
+      return raw === true || raw === false || raw === 'true' || raw === 'false' || raw === 1 || raw === 0 || raw === '1' || raw === '0';
+    }
+    if (type === 'number') {
+      if (raw === '' || raw == null) return false;
+      return Number.isFinite(Number(raw));
+    }
+    return raw != null && String(raw).trim().length > 0;
+  };
+
+  const serializeCustomFieldPayload = (field: any, raw: any) => {
+    const type = normalizeFieldType(field);
+    const base = { value: null as any, value_numeric: null as any, value_date: null as any, value_json: null as any };
+
+    if (type === 'multi_select' || type === 'multi-select' || type === 'multi select') {
+      const arr = Array.isArray(raw) ? raw.map((v) => String(v)).filter(Boolean) : parseMultiValue(raw);
+      return {
+        ...base,
+        value: arr.length ? arr.join(',') : null,
+        value_json: arr.length ? arr : [],
+      };
+    }
+    if (type === 'checkbox') {
+      if (raw == null || raw === '') return base;
+      const bool = coerceBoolean(raw);
+      return {
+        ...base,
+        value: bool ? 'true' : 'false',
+        value_numeric: bool ? 1 : 0,
+      };
+    }
+    if (type === 'number') {
+      if (raw == null || raw === '') return base;
+      const num = Number(raw);
+      return {
+        ...base,
+        value: Number.isFinite(num) ? String(num) : null,
+        value_numeric: Number.isFinite(num) ? num : null,
+      };
+    }
+    if (type === 'date' || type.startsWith('datetime')) {
+      if (!raw) return base;
+      return {
+        ...base,
+        value: String(raw),
+        value_date: String(raw),
+      };
+    }
+    if (type === 'time') {
+      return {
+        ...base,
+        value: raw == null || raw === '' ? null : String(raw),
+      };
+    }
+    // TEXT, TEXTAREA, LIST, RADIO or fallback
+    return {
+      ...base,
+      value: raw == null || String(raw).trim() === '' ? null : String(raw),
+    };
+  };
 
   const derivedTeamId = useMemo(() => {
     if (!categoryId) return null;
@@ -121,6 +340,24 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const currentCategory = useMemo(() => {
     return categories.find((c: any) => c.id === categoryId);
   }, [categories, categoryId]);
+
+  const categoryFields = useMemo(() => {
+    if (!categoryId) return [] as Array<{ assignment: any; field: any }>;
+    const fieldById = new Map<number, any>();
+    for (const f of customFields || []) {
+      const id = Number((f as any)?.id);
+      if (Number.isFinite(id)) fieldById.set(id, f);
+    }
+    return (categoryCustomFields || [])
+      .filter((ccf: any) => Number((ccf as any)?.category_id ?? (ccf as any)?.categoryId) === Number(categoryId))
+      .sort((a: any, b: any) => ((a as any)?.order ?? 0) - ((b as any)?.order ?? 0))
+      .map((assignment: any) => {
+        const fieldId = Number((assignment as any)?.field_id ?? (assignment as any)?.custom_field_id ?? (assignment as any)?.fieldId);
+        const field = fieldById.get(fieldId);
+        return { assignment, field };
+      })
+      .filter((row) => !!row.field);
+  }, [categoryId, categoryCustomFields, customFields]);
 
   const categoryInitialStatusId = useMemo(() => {
     if (mode === 'edit') return null; // Edit mode uses existing status
@@ -201,6 +438,17 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     return found || null;
   }, [templateId, templates]);
 
+  const selectedApprovalId = useMemo(() => {
+    if (approvalId != null) return Number(approvalId);
+    if (selectedTemplate?.approval_id != null) return Number(selectedTemplate.approval_id);
+    return null;
+  }, [approvalId, selectedTemplate]);
+
+  const selectedApproval = useMemo(() => {
+    if (selectedApprovalId == null) return null;
+    return approvalMap[selectedApprovalId] || null;
+  }, [selectedApprovalId, approvalMap]);
+
   const spotsApplicable = useMemo(() => {
     if (!selectedTemplate) return true;
     const spotsNotApplicableValue = selectedTemplate.spots_not_applicable;
@@ -219,7 +467,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     const seen = new Set();
     return filtered.filter((u: any) => {
       const id = u.id || String(u.id);
-      if (seen.has(id)) {https://whagons-ybrywmmd5i.whagons.com/auth/invitation/31385943-6da4-44e1-86b7-6a7b9093514c
+      if (seen.has(id)) {
         return false;
       }
       seen.add(id);
@@ -245,13 +493,30 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       .map((tt: any) => Number(tt.tag_id));
   }, [taskTags, task?.id, mode]);
 
-  // Load tags when dialog opens
+  const taskCustomFieldValueMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const row of taskCustomFieldValues || []) {
+      const tId = Number((row as any)?.task_id ?? (row as any)?.taskId);
+      const fId = Number((row as any)?.field_id ?? (row as any)?.custom_field_id ?? (row as any)?.fieldId);
+      if (!Number.isFinite(tId) || !Number.isFinite(fId)) continue;
+      m.set(`${tId}:${fId}`, row);
+    }
+    return m;
+  }, [taskCustomFieldValues]);
+
   useEffect(() => {
-    if (open && (mode === 'create' || mode === 'edit')) {
-      dispatch(genericActions.tags.getFromIndexedDB());
-      if (mode === 'edit') {
-        dispatch(genericActions.taskTags.getFromIndexedDB());
-      }
+    customFieldValuesRef.current = customFieldValues;
+  }, [customFieldValues]);
+
+  // Load related data when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    dispatch(genericActions.tags.getFromIndexedDB());
+    dispatch(genericActions.customFields.getFromIndexedDB());
+    dispatch(genericActions.categoryCustomFields.getFromIndexedDB());
+    dispatch(genericActions.taskCustomFieldValues.getFromIndexedDB());
+    if (mode === 'edit') {
+      dispatch(genericActions.taskTags.getFromIndexedDB());
     }
   }, [open, mode, dispatch]);
 
@@ -307,7 +572,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       if (firstTemplate) {
         setTemplateId(firstTemplate.id);
         setCategoryId(firstTemplate.category_id || null);
-        setPriorityId(firstTemplate.default_priority || null);
+        const tplPriority = firstTemplate.priority_id ?? firstTemplate.default_priority ?? null;
+        setPriorityId(tplPriority);
         setName(firstTemplate.name || '');
         setSlaId(firstTemplate.sla_id || null);
         setApprovalId(firstTemplate.approval_id || null);
@@ -317,6 +583,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         } else if (firstTemplate.default_spot_id) {
           setSpotId(firstTemplate.default_spot_id);
         }
+        const defaultsUsers = normalizeDefaultUserIds((firstTemplate as any).default_user_ids);
+        setSelectedUserIds(defaultsUsers);
       } else {
         setTemplateId(null);
         setName('');
@@ -342,6 +610,51 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       setPriorityId(null);
     }
   }, [open, mode, task?.id, taskTags]);
+
+  // Initialize custom field values based on category, defaults, and existing values
+  useEffect(() => {
+    if (!open) {
+      setCustomFieldValues({});
+      lastCustomFieldCategoryRef.current = null;
+      return;
+    }
+    if (!categoryId || categoryFields.length === 0) {
+      setCustomFieldValues({});
+      lastCustomFieldCategoryRef.current = categoryId ?? null;
+      return;
+    }
+
+    const sameCategory = lastCustomFieldCategoryRef.current === categoryId;
+    const prevValues = customFieldValuesRef.current;
+    const next: Record<number, any> = {};
+
+    for (const { assignment, field } of categoryFields) {
+      const fieldId = Number((field as any)?.id);
+      if (!Number.isFinite(fieldId)) continue;
+
+      const existing = (mode === 'edit' && task?.id)
+        ? taskCustomFieldValueMap.get(`${task.id}:${fieldId}`)
+        : null;
+
+      if (existing) {
+        next[fieldId] = deserializeCustomFieldValue(existing, field);
+        continue;
+      }
+
+      if (sameCategory && prevValues[fieldId] !== undefined) {
+        next[fieldId] = prevValues[fieldId];
+        continue;
+      }
+
+      next[fieldId] = parseDefaultCustomFieldValue(
+        (assignment as any)?.default_value ?? (assignment as any)?.defaultValue,
+        field
+      );
+    }
+
+    setCustomFieldValues(next);
+    lastCustomFieldCategoryRef.current = categoryId;
+  }, [open, categoryId, categoryFields, mode, task?.id, taskCustomFieldValueMap]);
   
   // Separate effect for create mode to prefill defaults when workspaceTemplates/workspaceCategories become available
   useEffect(() => {
@@ -353,7 +666,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       if (firstTemplate) {
         setTemplateId(firstTemplate.id);
         setCategoryId(firstTemplate.category_id || null);
-        setPriorityId(firstTemplate.default_priority || null);
+        const tplPriority = firstTemplate.priority_id ?? firstTemplate.default_priority ?? null;
+        setPriorityId(tplPriority);
         setName(firstTemplate.name || '');
         setSlaId(firstTemplate.sla_id || null);
         setApprovalId(firstTemplate.approval_id || null);
@@ -363,6 +677,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         } else if (firstTemplate.default_spot_id) {
           setSpotId(firstTemplate.default_spot_id);
         }
+        const defaultsUsers = normalizeDefaultUserIds((firstTemplate as any).default_user_ids);
+        setSelectedUserIds(defaultsUsers);
       }
     } else if (!categoryId && workspaceCategories.length > 0) {
       const defaultCategory = workspaceCategories[0];
@@ -387,8 +703,9 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     if (selectedTemplate && (mode === 'create' || mode === 'create-all')) {
       const t = selectedTemplate;
       setCategoryId(t.category_id || categoryId);
-      if (t.default_priority) {
-        setPriorityId(t.default_priority);
+      const tplPriority = t.priority_id ?? t.default_priority;
+      if (tplPriority) {
+        setPriorityId(tplPriority);
       } else {
         const lowPriority = categoryPriorities.find((p: any) => 
           p.name?.toLowerCase() === 'low'
@@ -403,6 +720,12 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         setSpotId(null);
       } else if (t.default_spot_id) {
         setSpotId(t.default_spot_id);
+      }
+      const defaultsUsers = normalizeDefaultUserIds((t as any).default_user_ids);
+      if (defaultsUsers.length > 0) {
+        setSelectedUserIds(defaultsUsers);
+      } else {
+        setSelectedUserIds([]);
       }
     }
   }, [selectedTemplate, categoryPriorities, categoryId, mode]);
@@ -425,6 +748,20 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     }
   }, [categoryId, categoryPriorities, priorityId, mode]);
 
+  const handleCustomFieldValueChange = (fieldId: number, value: any) => {
+    setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
+  const customFieldRequirementMissing = useMemo(() => {
+    if (!categoryFields.length) return false;
+    return categoryFields.some(({ assignment, field }) => {
+      if (!(assignment as any)?.is_required) return false;
+      const fid = Number((field as any)?.id);
+      const currentValue = customFieldValues[fid];
+      return !isCustomFieldValueFilled(field, currentValue);
+    });
+  }, [categoryFields, customFieldValues]);
+
   const canSubmit = useMemo(() => {
     if (mode === 'edit') {
       return Boolean(
@@ -434,7 +771,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         derivedTeamId &&
         statusId &&
         (priorityId || categoryPriorities.length === 0) &&
-        task?.id
+        task?.id &&
+        !customFieldRequirementMissing
       );
     } else {
       return Boolean(
@@ -443,10 +781,205 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         categoryId &&
         derivedTeamId &&
         categoryInitialStatusId &&
-        (priorityId || categoryPriorities.length === 0)
+        (priorityId || categoryPriorities.length === 0) &&
+        !customFieldRequirementMissing
       );
     }
-  }, [name, workspaceId, categoryId, derivedTeamId, statusId, categoryInitialStatusId, priorityId, categoryPriorities.length, task?.id, mode]);
+  }, [name, workspaceId, categoryId, derivedTeamId, statusId, categoryInitialStatusId, priorityId, categoryPriorities.length, task?.id, mode, customFieldRequirementMissing]);
+
+  const syncTaskCustomFields = async (taskId: number) => {
+    if (!taskId || categoryFields.length === 0) return;
+    let didChange = false;
+    const validFieldIds = new Set<number>();
+    for (const { field } of categoryFields) {
+      const fid = Number((field as any)?.id);
+      if (Number.isFinite(fid)) validFieldIds.add(fid);
+    }
+
+    const existingByField = new Map<number, any>();
+    for (const row of taskCustomFieldValues || []) {
+      const tId = Number((row as any)?.task_id ?? (row as any)?.taskId);
+      const fId = Number((row as any)?.field_id ?? (row as any)?.custom_field_id ?? (row as any)?.fieldId);
+      if (tId === Number(taskId) && Number.isFinite(fId)) {
+        existingByField.set(fId, row);
+      }
+    }
+
+    // Remove values that no longer belong to the current category
+    for (const [fieldId, row] of existingByField.entries()) {
+      if (!validFieldIds.has(fieldId)) {
+        await dispatch(genericActions.taskCustomFieldValues.removeAsync((row as any)?.id ?? fieldId)).unwrap();
+        didChange = true;
+      }
+    }
+
+    for (const { field } of categoryFields) {
+      const fieldId = Number((field as any)?.id);
+      if (!Number.isFinite(fieldId)) continue;
+
+      const rawValue = customFieldValues[fieldId];
+      const hasValue = isCustomFieldValueFilled(field, rawValue);
+      const existing = existingByField.get(fieldId);
+
+      if (!hasValue) {
+        if (existing) {
+          await dispatch(genericActions.taskCustomFieldValues.removeAsync((existing as any)?.id ?? fieldId)).unwrap();
+          didChange = true;
+        }
+        continue;
+      }
+
+      const payload = serializeCustomFieldPayload(field, rawValue);
+      const body = {
+        task_id: Number(taskId),
+        field_id: fieldId,
+        name: (field as any)?.name ?? '',
+        type: String((field as any)?.field_type ?? (field as any)?.type ?? '').toUpperCase(),
+        ...payload,
+      };
+
+      if (existing) {
+        await dispatch(genericActions.taskCustomFieldValues.updateAsync({ id: (existing as any)?.id, updates: body } as any)).unwrap();
+        didChange = true;
+      } else {
+        await dispatch(genericActions.taskCustomFieldValues.addAsync(body as any)).unwrap();
+        didChange = true;
+      }
+    }
+
+    // If any custom field changed, refresh the task to pick up approval_status immediately
+    if (didChange) {
+      try {
+        await dispatch(updateTaskAsync({ id: taskId, updates: {} } as any)).unwrap();
+      } catch (err) {
+        console.warn('Failed to refresh task after custom field sync', err);
+      }
+    }
+  };
+
+  const renderCustomFieldInput = (field: any, value: any, onChange: (v: any) => void) => {
+    const type = normalizeFieldType(field);
+    const options = parseFieldOptions(field);
+
+    if (type === 'textarea') {
+      return (
+        <Textarea
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Ingresa un valor..."
+          className="min-h-[100px] px-4 py-3 rounded-[10px] text-sm focus:border-[#00BFA5] focus:ring-[3px] focus:ring-[#00BFA5]/10 transition-all duration-150"
+        />
+      );
+    }
+
+    if (type === 'number') {
+      return (
+        <Input
+          type="number"
+          value={value === undefined || value === null ? '' : String(value)}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Ingresa un número"
+          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+        />
+      );
+    }
+
+    if (type === 'checkbox') {
+      return (
+        <label className="inline-flex items-center gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={coerceBoolean(value)}
+            onChange={(e) => onChange(e.target.checked)}
+            className="h-4 w-4 rounded border border-border"
+          />
+          <span>Marcar</span>
+        </label>
+      );
+    }
+
+    if (type === 'list' || type === 'radio' || type === 'select') {
+      return (
+        <Select
+          value={value ? String(value) : ""}
+          onValueChange={(v) => onChange(v)}
+        >
+          <SelectTrigger 
+            className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+          >
+            <SelectValue placeholder="Selecciona una opción" />
+          </SelectTrigger>
+          <SelectContent>
+            {options.length ? options.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            )) : (
+              <div className="px-2 py-1.5 text-sm text-[#6B7280]">Sin opciones</div>
+            )}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (type === 'multi_select' || type === 'multi-select' || type === 'multi select') {
+      const values = Array.isArray(value) ? value.map(String) : parseMultiValue(value);
+      return (
+        <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+          <MultiSelectCombobox
+            options={options}
+            value={values}
+            onValueChange={(vals) => onChange(vals)}
+            placeholder="Selecciona opciones"
+            searchPlaceholder="Buscar..."
+            emptyText="Sin opciones"
+            className="w-full"
+          />
+        </div>
+      );
+    }
+
+    if (type === 'date') {
+      return (
+        <Input
+          type="date"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+        />
+      );
+    }
+
+    if (type.startsWith('datetime')) {
+      return (
+        <Input
+          type="datetime-local"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+        />
+      );
+    }
+
+    if (type === 'time') {
+      return (
+        <Input
+          type="time"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+        />
+      );
+    }
+
+    // TEXT or fallback
+    return (
+      <Input
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Ingresa un valor..."
+        className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+      />
+    );
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit || !categoryId || !derivedTeamId || !user?.id) return;
@@ -501,6 +1034,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             await dispatch(genericActions.taskTags.removeAsync(taskTag.id)).unwrap();
           }
         }
+
+        await syncTaskCustomFields(Number(task.id));
       } else {
         // Create modes: add task
         const payload: any = {
@@ -546,6 +1081,10 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             })).unwrap();
           }
         }
+
+        if (newTaskId) {
+          await syncTaskCustomFields(Number(newTaskId));
+        }
       }
       
       onOpenChange(false);
@@ -577,7 +1116,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             e.preventDefault();
           }
         }}
-        className={`w-full ${mode === 'create-all' ? 'sm:w-[800px] max-w-[800px]' : 'sm:w-[1120px] max-w-[1120px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
+        className={`w-full ${mode === 'create-all' ? 'sm:w-[900px] max-w-[900px]' : 'sm:w-[1240px] max-w-[1240px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
       >
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
@@ -610,12 +1149,21 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           {/* Tabs Navigation */}
           <div className="px-4 sm:px-6 pt-4 sm:pt-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="inline-flex h-auto p-0 bg-transparent border-b border-border/40 rounded-none gap-0 w-full">
+              <TabsList className="inline-flex h-auto p-0 pr-6 bg-transparent border-b border-border/40 rounded-none gap-0 w-full overflow-x-auto">
                 <TabsTrigger 
                   value="basic" 
                   className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
                 >
                   Basic Details
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="customFields" 
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                >
+                  Campos personalizados
+                  {customFieldRequirementMissing && (
+                    <span className="ml-2 text-[11px] text-red-500 font-semibold align-middle">●</span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="additional" 
@@ -730,6 +1278,38 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     </p>
                   )}
                 </div>
+
+                {/* Template summary / approvals */}
+                {(mode === 'create' || mode === 'create-all' || mode === 'edit') && selectedApprovalId && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50 text-sm text-blue-900">
+                    <div className="mt-0.5">
+                      {selectedApproval ? (
+                        <ShieldCheck className="w-4 h-4 text-blue-600" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-blue-600 animate-spin" />
+                      )}
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs uppercase tracking-wide font-semibold text-blue-700">Approval required</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-blue-700 border border-blue-100 font-semibold">Pending</span>
+                      </div>
+                      <div className="font-semibold truncate">
+                        {selectedApproval?.name || `Approval #${selectedApprovalId}`}
+                      </div>
+                      <div className="text-xs text-blue-800 truncate">
+                        {selectedApproval?.trigger_type
+                          ? `Trigger: ${String(selectedApproval.trigger_type).replace(/_/g, ' ').toLowerCase()}`
+                          : 'Will start once the task is created'}
+                      </div>
+                      {selectedApproval?.deadline_value && (
+                        <div className="text-xs text-blue-800 truncate">
+                          Deadline: {selectedApproval.deadline_value} {selectedApproval.deadline_type || 'hours'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Description - Collapsible */}
                 {!showDescription && !description.trim() ? (
@@ -881,6 +1461,41 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                         className="w-full"
                       />
                     </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Custom Fields Tab */}
+              <TabsContent value="customFields" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
+                {!categoryId ? (
+                  <p className="text-sm text-[#6B7280]">Selecciona una categoría para ver los campos personalizados.</p>
+                ) : categoryFields.length === 0 ? (
+                  <p className="text-sm text-[#6B7280]">Esta categoría no tiene campos personalizados asignados.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {categoryFields.map(({ assignment, field }) => {
+                      const fieldId = Number((field as any)?.id);
+                      const required = (assignment as any)?.is_required;
+                      const currentValue = customFieldValues[fieldId];
+                      const showError = required && !isCustomFieldValueFilled(field, currentValue);
+
+                      return (
+                        <div key={fieldId} className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium font-[500] text-foreground">
+                              {(field as any)?.name ?? 'Campo'}
+                            </Label>
+                            {required && (
+                              <span className="text-[11px] text-red-500 font-semibold">Requerido</span>
+                            )}
+                          </div>
+                          {renderCustomFieldInput(field, currentValue, (v) => handleCustomFieldValueChange(fieldId, v))}
+                          {showError && (
+                            <p className="text-xs text-red-500">Completa este campo para continuar.</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </TabsContent>

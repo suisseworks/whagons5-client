@@ -1,8 +1,15 @@
 import ReactDOM from 'react-dom/client';
 import './index.css';
+// Bryntum Scheduler styles deshabilitados temporalmente hasta tener licencia/paquete
+// import '@bryntum/scheduler/scheduler.css';
+// import '@bryntum/scheduler/stockholm-light.css';
+// import '@bryntum/scheduler/fontawesome/css/fontawesome.css';
+// import '@bryntum/scheduler/fontawesome/css/solid.css';
 import App from './App';
 import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
+import { BrandingProvider } from './providers/BrandingProvider';
+import { LanguageProvider } from './providers/LanguageProvider';
 import { Provider } from 'react-redux';
 import {store } from './store';
 import { registerSW } from 'virtual:pwa-register';
@@ -18,9 +25,13 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
     <Provider store={store}>
         <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <LanguageProvider>
+            <BrandingProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </BrandingProvider>
+          </LanguageProvider>
         </ThemeProvider>
     </Provider>
   // {/* </React.StrictMode>, */}

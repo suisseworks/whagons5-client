@@ -5,18 +5,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
-import { Check, Copy as CopyIcon } from "lucide-react";
+import { faUser, faChartBar, faEnvelope, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
-import { Team } from "@/store/types";
-import { UserTeam } from "@/store/types";
-import { Invitation } from "@/store/types";
+import { Team, UserTeam, Invitation, Role } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
+import { useLanguage } from "@/providers/LanguageProvider";
+
+const getUserTeamRoleId = (ut: UserTeam | any) => {
+  const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
+  return val == null ? null : Number(val);
+};
 
 // Extended User type based on actual API data structure
 interface UserData {
@@ -54,12 +58,15 @@ import dayjs from "dayjs";
 function Users() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const tu = (key: string, fallback: string) => t(`settings.users.${key}`, fallback);
   // Redux state for related data
   const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
   const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
   const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
-  
+  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+
   // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
   // Use shared state management
@@ -102,8 +109,9 @@ function Users() {
     // Load job positions (needed for dropdown/labels)
     dispatch((genericActions as any).jobPositions.getFromIndexedDB());
     
-    // Load roles (needed for invitation form)
+    // Load roles (needed for team-role selector and invitation form)
     dispatch((genericActions as any).roles.getFromIndexedDB());
+    dispatch((genericActions as any).roles.fetchFromAPI?.());
     
     // Load user-teams pivot table (needed for team assignments)
     dispatch((genericActions as any).userTeams.getFromIndexedDB());
@@ -135,6 +143,10 @@ function Users() {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [isTeamsDialogOpen, setIsTeamsDialogOpen] = useState(false);
+  const [teamsDialogUser, setTeamsDialogUser] = useState<UserData | null>(null);
+  const [teamAssignments, setTeamAssignments] = useState<Array<{ id?: number; teamId: string; roleId: string; key: string }>>([]);
+  const [isSavingTeams, setIsSavingTeams] = useState(false);
 
   // Create form state
   const [createFormData, setCreateFormData] = useState<{
@@ -193,141 +205,292 @@ function Users() {
     }
   }, [isCreateDialogOpen]);
 
-  const columnDefs = useMemo<ColDef[]>(() => ([
-    {
-      field: 'id',
-      headerName: 'ID',
-      width: 90,
-      hide: true
-    },
-    {
-      field: 'name',
-      headerName: 'Name',
-      flex: 2,
-      minWidth: 180,
-      cellRenderer: (params: ICellRendererParams) => (
-        <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
-      )
-    },
-    {
-      field: 'email',
-      headerName: 'Email',
-      flex: 2.5,
-      minWidth: 220
-    },
-    {
-      field: 'teams',
-      headerName: 'Teams',
-      flex: 2,
-      minWidth: 240,
-      cellRenderer: (params: ICellRendererParams) => {
-        const userId = params.data?.id;
-        if (!userId) return <span className="text-muted-foreground">No Teams</span>;
+  const handleOpenTeamsDialog = (user: UserData) => {
+    setTeamsDialogUser(user);
+    const related = userTeams.filter((ut: UserTeam) => ut.user_id === user.id);
+    const assignments: Array<{ id?: number; teamId: string; roleId: string; key: string }> = related.map((ut) => ({
+      id: ut.id,
+      teamId: String(ut.team_id),
+      roleId: getUserTeamRoleId(ut) != null ? String(getUserTeamRoleId(ut)) : '',
+      key: `existing-${ut.id}`
+    }));
+    setTeamAssignments(assignments);
+    setIsTeamsDialogOpen(true);
+  };
 
-        // Get user-team relationships from reducer
-        const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userId);
-        
-        if (!userTeamRelationships || userTeamRelationships.length === 0) {
-          return <span className="text-muted-foreground">No Teams</span>;
-        }
+  const handleCloseTeamsDialog = () => {
+    setIsTeamsDialogOpen(false);
+    setTeamsDialogUser(null);
+    setTeamAssignments([]);
+    setIsSavingTeams(false);
+  };
 
-        // Map relationships to team objects
-        const userTeamObjects = userTeamRelationships
-          .map((ut: UserTeam) => {
-            const team = teams.find((t: Team) => t.id === ut.team_id);
-            return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
-          })
-          .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
-
-        if (userTeamObjects.length === 0) {
-          return <span className="text-muted-foreground">No Teams</span>;
-        }
-
-        return (
-          <div className="flex flex-wrap gap-1">
-            {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
-              const initial = (team.name || '').charAt(0).toUpperCase();
-              const hex = String(team.color || '').trim();
-              let bg = hex;
-              let fg = '#fff';
-              try {
-                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
-                  const h = hex.length === 4
-                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
-                    : hex;
-                  const r = parseInt(h.slice(1, 3), 16);
-                  const g = parseInt(h.slice(3, 5), 16);
-                  const b = parseInt(h.slice(5, 7), 16);
-                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-                  fg = brightness > 180 ? '#111827' : '#ffffff';
-                } else if (!hex) {
-                  bg = '';
-                }
-              } catch { /* ignore */ }
-              return (
-                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
-                  <div
-                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
-                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
-                    title={team.name}
-                  >
-                    {initial || 'T'}
-                  </div>
-                  {team.name}
-                </Badge>
-              );
-            })}
-          </div>
-        );
-      }
-    },
-    {
-      field: 'job_position_id',
-      headerName: 'Job Position',
-      flex: 2,
-      minWidth: 220,
-      cellRenderer: (params: ICellRendererParams) => {
-        const idVal = params.value as number | string | undefined;
-        if (idVal == null || idVal === '') return <span className="text-muted-foreground">No Job Position</span>;
-        const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
-        const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
-        return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
-      }
-    },
-    {
-      field: 'is_admin',
-      headerName: 'Role',
-      flex: 0.8,
-      minWidth: 130,
-      cellRenderer: (params: ICellRendererParams) =>
-        params.value ? <Badge variant="default">Admin</Badge> : <Badge variant="outline">User</Badge>
-    },
-    {
-      field: 'has_active_subscription',
-      headerName: 'Subscription',
-      flex: 1,
-      minWidth: 150,
-      cellRenderer: (params: ICellRendererParams) =>
-        params.value ? <Badge variant="default" className="bg-green-500">Active</Badge> : <Badge variant="destructive">Inactive</Badge>
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 100,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
-        onDelete: handleDelete
-      }),
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
+  const addTeamAssignment = () => {
+    const usedTeamIds = new Set(teamAssignments.map((a) => a.teamId));
+    const firstAvailable = teams.find((t) => !usedTeamIds.has(String(t.id)));
+    if (!firstAvailable) {
+      setFormError(tu('dialogs.manageTeams.noAvailableTeams', 'No more teams available to add.'));
+      return;
     }
-  ]), [teams, jobPositions, userTeams, handleEdit, handleDelete]);
+    setTeamAssignments((prev) => [
+      ...prev,
+      {
+        teamId: String(firstAvailable.id),
+        roleId: '',
+        key: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      }
+    ]);
+  };
+
+  const updateAssignment = (key: string, patch: Partial<{ teamId: string; roleId: string }>) => {
+    setTeamAssignments((prev) =>
+      prev.map((a) => (a.key === key ? { ...a, ...patch } : a))
+    );
+  };
+
+  const removeAssignment = (key: string) => {
+    setTeamAssignments((prev) => prev.filter((a) => a.key !== key));
+  };
+
+  const handleSaveTeams = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teamsDialogUser) return;
+    setIsSavingTeams(true);
+    setFormError(null);
+    try {
+      const existing = userTeams.filter((ut) => ut.user_id === teamsDialogUser.id);
+      const isEmpty = teamAssignments.length === 0;
+      const current = isEmpty
+        ? []
+        : teamAssignments.map((a) => ({
+            ...a,
+            teamIdNum: Number(a.teamId),
+            roleIdNum: a.roleId ? Number(a.roleId) : null
+          }));
+
+      if (!isEmpty) {
+        if (current.some((c) => !c.teamId || Number.isNaN(c.teamIdNum))) {
+          setFormError(tu('dialogs.manageTeams.errors.teamRequired', 'Selecciona un equipo para cada fila.'));
+          setIsSavingTeams(false);
+          return;
+        }
+        if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
+          setFormError(tu('dialogs.manageTeams.errors.roleRequired', 'Selecciona un rol para cada equipo.'));
+          setIsSavingTeams(false);
+          return;
+        }
+        const duplicate = current.find((c, idx) => current.findIndex((d) => d.teamIdNum === c.teamIdNum) !== idx);
+        if (duplicate) {
+          setFormError(tu('dialogs.manageTeams.errors.duplicateTeam', 'No puedes repetir el mismo equipo.'));
+          setIsSavingTeams(false);
+          return;
+        }
+      }
+
+      const toAdd = current.filter((c) => c.id == null);
+      const toUpdate = current.filter((c) => {
+        const match = existing.find((ex) => ex.id === c.id);
+        if (!match) return false;
+        return match.team_id !== c.teamIdNum || getUserTeamRoleId(match) !== c.roleIdNum;
+      });
+      const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
+
+      for (const add of toAdd) {
+        await dispatch((genericActions as any).userTeams.addAsync({
+          user_id: teamsDialogUser.id,
+          team_id: add.teamIdNum,
+          role_id: add.roleIdNum
+        })).unwrap();
+      }
+
+      for (const upd of toUpdate) {
+        await dispatch((genericActions as any).userTeams.updateAsync({
+          id: upd.id,
+          updates: {
+            team_id: upd.teamIdNum,
+            role_id: upd.roleIdNum
+          }
+        })).unwrap();
+      }
+
+      for (const del of toRemove) {
+        await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+      }
+
+      // Refresh local cache
+      dispatch((genericActions as any).userTeams.getFromIndexedDB());
+      handleCloseTeamsDialog();
+    } catch (err: any) {
+      setFormError(err?.message || 'Error updating teams');
+    } finally {
+      setIsSavingTeams(false);
+    }
+  };
+
+  const columnDefs = useMemo<ColDef[]>(() => {
+    const columnLabels = {
+      id: tu('grid.columns.id', 'ID'),
+      name: tu('grid.columns.name', 'Name'),
+      email: tu('grid.columns.email', 'Email'),
+      teams: tu('grid.columns.teams', 'Teams'),
+      jobPosition: tu('grid.columns.jobPosition', 'Job Position'),
+      role: tu('grid.columns.role', 'Role'),
+      subscription: tu('grid.columns.subscription', 'Subscription'),
+      actions: tu('grid.columns.actions', 'Actions')
+    };
+    const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
+    const noJobPositionLabel = tu('grid.values.noJobPosition', 'No Job Position');
+    const adminLabel = tu('grid.values.admin', 'Admin');
+    const userLabel = tu('grid.values.user', 'User');
+    const activeLabel = tu('grid.values.active', 'Active');
+    const inactiveLabel = tu('grid.values.inactive', 'Inactive');
+    const manageTeamsLabel = tu('grid.actions.manageTeams', 'Teams');
+
+    return [
+      {
+        field: 'id',
+        headerName: columnLabels.id,
+        width: 90,
+        hide: true
+      },
+      {
+        field: 'name',
+        headerName: columnLabels.name,
+        flex: 2,
+        minWidth: 180,
+        cellRenderer: (params: ICellRendererParams) => (
+          <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
+        )
+      },
+      {
+        field: 'email',
+        headerName: columnLabels.email,
+        flex: 1.8,
+        minWidth: 180
+      },
+      {
+        field: 'teams',
+        headerName: columnLabels.teams,
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: ICellRendererParams) => {
+          const userId = params.data?.id;
+          if (!userId) return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+
+          const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userId);
+          
+          if (!userTeamRelationships || userTeamRelationships.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          const userTeamObjects = userTeamRelationships
+            .map((ut: UserTeam) => {
+              const team = teams.find((t: Team) => t.id === ut.team_id);
+              return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+            })
+            .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+          if (userTeamObjects.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          return (
+            <div className="flex flex-wrap gap-1">
+              {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
+                const initial = (team.name || '').charAt(0).toUpperCase();
+                const hex = String(team.color || '').trim();
+                let bg = hex;
+                let fg = '#fff';
+                try {
+                  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                    const h = hex.length === 4
+                      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                      : hex;
+                    const r = parseInt(h.slice(1, 3), 16);
+                    const g = parseInt(h.slice(3, 5), 16);
+                    const b = parseInt(h.slice(5, 7), 16);
+                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                    fg = brightness > 180 ? '#111827' : '#ffffff';
+                  } else if (!hex) {
+                    bg = '';
+                  }
+                } catch { /* ignore */ }
+                return (
+                  <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
+                    <div
+                      className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                      style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                      title={team.name}
+                    >
+                      {initial || 'T'}
+                    </div>
+                    {team.name}
+                  </Badge>
+                );
+              })}
+            </div>
+          );
+        }
+      },
+      {
+        field: 'job_position_id',
+        headerName: columnLabels.jobPosition,
+        flex: 1.6,
+        minWidth: 160,
+        cellRenderer: (params: ICellRendererParams) => {
+          const idVal = params.value as number | string | undefined;
+          if (idVal == null || idVal === '') return <span className="text-muted-foreground">{noJobPositionLabel}</span>;
+          const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
+          const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
+          return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
+        }
+      },
+      {
+        field: 'is_admin',
+        headerName: columnLabels.role,
+        flex: 0.8,
+        minWidth: 130,
+        cellRenderer: (params: ICellRendererParams) =>
+          params.value ? <Badge variant="default">{adminLabel}</Badge> : <Badge variant="outline">{userLabel}</Badge>
+      },
+      {
+        field: 'has_active_subscription',
+        headerName: columnLabels.subscription,
+        flex: 1,
+        minWidth: 150,
+        cellRenderer: (params: ICellRendererParams) =>
+          params.value ? <Badge variant="default" className="bg-green-500">{activeLabel}</Badge> : <Badge variant="destructive">{inactiveLabel}</Badge>
+      },
+      {
+        field: 'actions',
+        headerName: columnLabels.actions,
+        width: 220,
+        cellRenderer: createActionsCellRenderer({
+          onEdit: handleEdit,
+          onDelete: handleDelete,
+          customActions: [
+            {
+              icon: faUsers,
+              label: manageTeamsLabel,
+              variant: "secondary",
+              className: "p-1 h-7",
+              onClick: (data: UserData) => handleOpenTeamsDialog(data)
+            }
+          ]
+        }),
+        sortable: false,
+        filter: false,
+        resizable: false,
+        pinned: 'right'
+      }
+    ];
+  }, [teams, jobPositions, userTeams, handleEdit, handleDelete, handleOpenTeamsDialog, t]);
 
   // Copy button component for table cells
   const CopyButton = ({ text }: { text: string }) => {
     const [copied, setCopied] = useState(false);
+    const copyText = tu('copyButton.copy', 'Copy');
+    const copiedText = tu('copyButton.copied', 'Copied');
 
     const handleCopy = () => {
       navigator.clipboard.writeText(text);
@@ -346,12 +509,12 @@ function Users() {
         {copied ? (
           <>
             <Check className="h-4 w-4 mr-1" />
-            Copied
+            {copiedText}
           </>
         ) : (
           <>
             <CopyIcon className="h-4 w-4 mr-1" />
-            Copy
+            {copyText}
           </>
         )}
       </Button>
@@ -359,43 +522,55 @@ function Users() {
   };
 
   // Invitation column definitions
-  const invitationColumnDefs = useMemo<ColDef[]>(() => ([
-    {
-      field: 'id',
-      headerName: 'ID',
-      width: 90,
-      hide: true
-    },
-    {
-      field: 'user_email',
-      headerName: 'Email',
-      flex: 2,
-      minWidth: 220,
-      cellRenderer: (params: ICellRendererParams) => {
-        return params.value || <span className="text-muted-foreground">No email</span>;
-      }
-    },
-    {
-      field: 'team_ids',
-      headerName: 'Teams',
-      flex: 2,
-      minWidth: 240,
-      cellRenderer: (params: ICellRendererParams) => {
-        const teamIds = params.value as number[] | null | undefined;
-        if (!teamIds || teamIds.length === 0) {
-          return <span className="text-muted-foreground">No Teams</span>;
-        }
+  const invitationColumnDefs: ColDef[] = useMemo(() => {
+    const columnLabels = {
+      id: tu('invitations.columns.id', 'ID'),
+      email: tu('invitations.columns.email', 'Email'),
+      teams: tu('invitations.columns.teams', 'Teams'),
+      link: tu('invitations.columns.link', 'Invitation Link'),
+      created: tu('invitations.columns.created', 'Created'),
+      actions: tu('invitations.columns.actions', 'Actions')
+    };
+    const noEmailLabel = tu('invitations.values.noEmail', 'No email');
+    const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
 
-        const invitationTeams = teamIds
-          .map((teamId: number) => {
-            const team = teams.find((t: Team) => t.id === teamId);
-            return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
-          })
-          .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
-
-        if (invitationTeams.length === 0) {
-          return <span className="text-muted-foreground">No Teams</span>;
+    return [
+      {
+        field: 'id',
+        headerName: columnLabels.id,
+        width: 90,
+        hide: true
+      },
+      {
+        field: 'user_email',
+        headerName: columnLabels.email,
+        flex: 2,
+        minWidth: 220,
+        cellRenderer: (params: ICellRendererParams) => {
+          return params.value || <span className="text-muted-foreground">{noEmailLabel}</span>;
         }
+      },
+      {
+        field: 'team_ids',
+        headerName: columnLabels.teams,
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: ICellRendererParams) => {
+          const teamIds = params.value as number[] | null | undefined;
+          if (!teamIds || teamIds.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          const invitationTeams = teamIds
+            .map((teamId: number) => {
+              const team = teams.find((t: Team) => t.id === teamId);
+              return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+            })
+            .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+          if (invitationTeams.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
 
         return (
           <div className="flex flex-wrap gap-1">
@@ -497,7 +672,8 @@ function Users() {
       resizable: false,
       pinned: 'right'
     }
-  ]), [teams, dispatch]);
+  ];
+  }, [teams, dispatch]);
 
   // Handle invitation deletion
   const handleDeleteInvitation = async () => {
@@ -548,13 +724,13 @@ function Users() {
       <div className="space-y-2">
         {invitation.user_email && (
           <div>
-            <div className="text-sm font-medium">Email</div>
+            <div className="text-sm font-medium">{tu('previews.invitation.email', 'Email')}</div>
             <div className="text-sm text-muted-foreground">{invitation.user_email}</div>
           </div>
         )}
         {invitationTeams.length > 0 && (
           <div>
-            <div className="text-sm font-medium">Teams</div>
+            <div className="text-sm font-medium">{tu('previews.invitation.teams', 'Teams')}</div>
             <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
               {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
                 const initial = (team.name || '').charAt(0).toUpperCase();
@@ -592,7 +768,7 @@ function Users() {
           </div>
         )}
         <div>
-          <div className="text-sm font-medium">Invitation Link</div>
+          <div className="text-sm font-medium">{tu('dialogs.invitation.linkLabel', 'Invitation Link')}</div>
           <div className="text-xs text-muted-foreground break-all mt-1">{invitationLink}</div>
         </div>
       </div>
@@ -601,6 +777,11 @@ function Users() {
 
   // Render entity preview for delete dialog
   const renderUserPreview = (user: UserData) => {
+    const adminLabel = tu('preview.admin', 'Admin');
+    const userLabel = tu('preview.user', 'User');
+    const activeLabel = tu('preview.active', 'Active');
+    const inactiveLabel = tu('preview.inactive', 'Inactive');
+
     // Get user-team relationships from reducer
     const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === user.id);
     const userTeamObjects = userTeamRelationships
@@ -625,13 +806,13 @@ function Users() {
               </Badge>
             ))}
             <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
-              {user.is_admin ? "Admin" : "User"}
+              {user.is_admin ? adminLabel : userLabel}
             </Badge>
             <Badge 
               variant={user.has_active_subscription ? "default" : "destructive"} 
               className="text-xs"
             >
-              {user.has_active_subscription ? "Active" : "Inactive"}
+              {user.has_active_subscription ? activeLabel : inactiveLabel}
             </Badge>
           </div>
         </div>
@@ -703,7 +884,7 @@ function Users() {
       const backendMessage = error?.response?.data?.message;
       const errorMessage = backendErrors
         ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
-        : (backendMessage || error?.message || 'Failed to create invitation');
+        : (backendMessage || error?.message || tu('errors.createInvitation', 'Failed to create invitation'));
       setFormError(errorMessage);
     } finally {
       setIsSendingInvitation(false);
@@ -754,7 +935,7 @@ function Users() {
       const backendMessage = error?.response?.data?.message;
       const errorMessage = backendErrors
         ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
-        : (backendMessage || error?.message || 'Failed to create user');
+        : (backendMessage || error?.message || tu('errors.createUser', 'Failed to create user'));
       setFormError(errorMessage);
     } finally {
       setIsCreating(false);
@@ -818,12 +999,12 @@ function Users() {
 
   return (
     <SettingsLayout
-      title="Users"
-      description="User accounts and permissions"
+      title={tu('title', 'Users')}
+      description={tu('description', 'User accounts and permissions')}
       icon={faUser}
       iconColor="#6366f1"
       search={{
-        placeholder: "Search users...",
+        placeholder: tu('search.placeholder', 'Search users...'),
         value: searchQuery,
         onChange: (value: string) => {
           setSearchQuery(value);
@@ -832,7 +1013,7 @@ function Users() {
       }}
       loading={{
         isLoading: loading,
-        message: "Loading users..."
+        message: tu('loading', 'Loading users...')
       }}
       error={error ? {
         message: error,
@@ -841,16 +1022,19 @@ function Users() {
       headerActions={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/teams')}>
-            Manage Teams
+            {tu('header.manageTeams', 'Manage Teams')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
-            Manage Job Positions
+            {tu('header.manageJobPositions', 'Manage Job Positions')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/settings/roles-and-permissions')}>
+            {tu('header.rolesAndPermissions', 'Roles and Permissions')}
           </Button>
           <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
-            Create User
+            {tu('header.createUser', 'Create User')}
           </Button>
           <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
-            Create Invitation
+            {tu('header.createInvitation', 'Create Invitation')}
           </Button>
         </div>
       }
@@ -862,7 +1046,7 @@ function Users() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faUser} className="w-4 h-4" />
-                <span>Users</span>
+                <span>{tu('tabs.users', 'Users')}</span>
               </div>
             ),
             content: (
@@ -871,7 +1055,7 @@ function Users() {
                   <SettingsGrid
                     rowData={filteredItems}
                     columnDefs={columnDefs}
-                    noRowsMessage="No users found"
+                    noRowsMessage={tu('grid.noUsers', 'No users found')}
                     onRowDoubleClicked={(row: UserData) => handleEdit(row)}
                   />
                 </div>
@@ -883,7 +1067,7 @@ function Users() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-                <span>Statistics</span>
+                <span>{tu('tabs.statistics', 'Statistics')}</span>
               </div>
             ),
             content: (
@@ -893,6 +1077,7 @@ function Users() {
                 userTeams={userTeams}
                 jobPositions={jobPositions}
                 invitations={invitations}
+                translate={tu}
               />
             )
           },
@@ -901,7 +1086,7 @@ function Users() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faEnvelope} className="w-4 h-4" />
-                <span>Invitations</span>
+                <span>{tu('tabs.invitations', 'Invitations')}</span>
               </div>
             ),
             content: (
@@ -910,7 +1095,7 @@ function Users() {
                   <SettingsGrid
                     rowData={invitations}
                     columnDefs={invitationColumnDefs}
-                    noRowsMessage="No invitations found"
+                    noRowsMessage={tu('invitations.noRows', 'No invitations found')}
                   />
                 </div>
               </div>
@@ -922,13 +1107,132 @@ function Users() {
         className="h-full flex flex-col"
       />
 
+      {/* Manage Teams Dialog */}
+      <SettingsDialog
+        open={isTeamsDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseTeamsDialog();
+          } else {
+            setIsTeamsDialogOpen(true);
+          }
+        }}
+        type="custom"
+        title={tu('dialogs.manageTeams.title', 'Manage user teams')}
+        description={tu('dialogs.manageTeams.description', 'Assign or remove teams and set the user role for each team.')}
+        onSubmit={handleSaveTeams}
+        isSubmitting={isSavingTeams}
+        submitText={tu('dialogs.manageTeams.save', 'Save')}
+        submitDisabled={!teamsDialogUser || isSavingTeams}
+        cancelText={tu('dialogs.manageTeams.close', 'Close')}
+        contentClassName="max-w-3xl"
+      >
+        {!teamsDialogUser ? (
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            {tu('dialogs.manageTeams.noUser', 'Select a user to manage teams.')}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                  {teamsDialogUser.name?.charAt(0)?.toUpperCase?.() || 'U'}
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="font-semibold text-sm">{teamsDialogUser.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <FontAwesomeIcon icon={faUsers} className="w-3 h-3 mr-1" />
+                    {teamAssignments.length} {tu('dialogs.manageTeams.count', 'teams')}
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addTeamAssignment}
+                disabled={!teams.some((t) => !teamAssignments.find((a) => a.teamId === String(t.id)))}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {tu('dialogs.manageTeams.add', 'Add team')}
+              </Button>
+            </div>
+
+            {teamAssignments.length === 0 ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                {tu('dialogs.manageTeams.empty', 'No teams assigned. Add one to get started.')}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {teamAssignments.map((assignment) => {
+                  const usedIds = teamAssignments
+                    .filter((a) => a.key !== assignment.key)
+                    .map((a) => a.teamId);
+                  const baseTeamOptions = teams
+                    .filter((t) => assignment.teamId === String(t.id) || !usedIds.includes(String(t.id)))
+                    .map((t) => ({ value: String(t.id), label: t.name }));
+                  const hasCurrentTeam = assignment.teamId && baseTeamOptions.some((opt) => opt.value === assignment.teamId);
+                  const teamOptions = hasCurrentTeam || !assignment.teamId
+                    ? baseTeamOptions
+                    : [{ value: assignment.teamId, label: tu('dialogs.manageTeams.unknownTeam', `Team ${assignment.teamId}`) }, ...baseTeamOptions];
+
+                  const baseRoleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+                  const hasCurrentRole = assignment.roleId && baseRoleOptions.some((opt) => opt.value === assignment.roleId);
+                  const roleOptions = hasCurrentRole || !assignment.roleId
+                    ? baseRoleOptions
+                    : [{ value: assignment.roleId, label: tu('dialogs.manageTeams.unknownRole', `Role ${assignment.roleId}`) }, ...baseRoleOptions];
+
+                  return (
+                    <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
+                      <div className="col-span-5">
+                        <SelectField
+                          id={`team-${assignment.key}`}
+                          label={tu('dialogs.manageTeams.team', 'Team')}
+                          value={assignment.teamId}
+                          onChange={(value) => updateAssignment(assignment.key, { teamId: value })}
+                          options={teamOptions}
+                          placeholder={teamsLoading ? tu('dialogs.manageTeams.loadingTeams', 'Loading teams...') : tu('dialogs.manageTeams.selectTeam', 'Select a team')}
+                          required
+                        />
+                      </div>
+                  <div className="col-span-5">
+                    <SelectField
+                      id={`role-${assignment.key}`}
+                      label={tu('dialogs.manageTeams.role', 'Role')}
+                      value={assignment.roleId}
+                      onChange={(value) => updateAssignment(assignment.key, { roleId: value })}
+                      options={roleOptions}
+                      placeholder={tu('dialogs.manageTeams.selectRole', 'Select a role')}
+                      required
+                    />
+                  </div>
+                      <div className="col-span-2 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeAssignment(assignment.key)}
+                          aria-label={tu('dialogs.manageTeams.remove', 'Remove')}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </SettingsDialog>
+
       {/* Create User Dialog */}
       <SettingsDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         type="create"
-        title="Create User"
-        description="Create a new user account."
+        title={tu('dialogs.createUser.title', 'Create User')}
+        description={tu('dialogs.createUser.description', 'Create a new user account.')}
         onSubmit={handleCreateSubmit}
         isSubmitting={isCreating}
         error={formError}
@@ -937,14 +1241,14 @@ function Users() {
         <div className="grid gap-4">
           <TextField
             id="create-name"
-            label="Name"
+            label={tu('dialogs.createUser.fields.name', 'Name')}
             value={createFormData.name}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
           <TextField
             id="create-email"
-            label="Email"
+            label={tu('dialogs.createUser.fields.email', 'Email')}
             type="email"
             value={createFormData.email}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
@@ -952,17 +1256,21 @@ function Users() {
           />
           <TextField
             id="create-color"
-            label="Color"
+            label={tu('dialogs.createUser.fields.color', 'Color')}
             type="color"
             value={createFormData.color}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
           />
           <SelectField
             id="create-job_position_id"
-            label="Job Position"
+            label={tu('dialogs.createUser.fields.jobPosition', 'Job Position')}
             value={createFormData.job_position_id}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
-            placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+            placeholder={
+              jobPositionsLoading && jobPositions.length === 0
+                ? tu('fields.loading', 'Loading…')
+                : tu('fields.noJobPosition', 'No Job Position')
+            }
             options={jobPositions.map((jp: any) => ({
               value: jp.id?.toString?.() ?? String(jp.id),
               label: jp.title
@@ -970,26 +1278,26 @@ function Users() {
           />
           <TextField
             id="create-organization_name"
-            label="Organization"
+            label={tu('dialogs.createUser.fields.organization', 'Organization')}
             value={createFormData.organization_name}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
           />
           <CheckboxField
             id="create-is_admin"
-            label="Admin"
+            label={tu('dialogs.createUser.fields.admin', 'Admin')}
             checked={createFormData.is_admin}
             onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
-            description="Grant admin role"
+            description={tu('dialogs.createUser.fields.adminDescription', 'Grant admin role')}
           />
           <CheckboxField
             id="create-has_active_subscription"
-            label="Subscription"
+            label={tu('dialogs.createUser.fields.subscription', 'Subscription')}
             checked={createFormData.has_active_subscription}
             onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-            description="Active subscription"
+            description={tu('dialogs.createUser.fields.subscriptionDescription', 'Active subscription')}
           />
           <div className="grid grid-cols-4 items-start gap-4">
-            <Label className="text-right pt-2">Teams</Label>
+            <Label className="text-right pt-2">{tu('dialogs.createUser.fields.teams', 'Teams')}</Label>
             <div className="col-span-3">
               <MultiSelect
                 options={teams.map((team: Team) => ({
@@ -998,7 +1306,11 @@ function Users() {
                 }))}
                 onValueChange={setCreateSelectedTeams}
                 defaultValue={createSelectedTeams}
-                placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                placeholder={
+                  teamsLoading && teams.length === 0
+                    ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                    : tu('multiSelect.selectTeams', 'Select teams...')
+                }
                 maxCount={10}
                 className="w-full"
               />
@@ -1012,18 +1324,24 @@ function Users() {
         open={isInviteDialogOpen}
         onOpenChange={setIsInviteDialogOpen}
         type="create"
-        title="Create Invitation"
-        description={showInvitationLink ? "Invitation created successfully!" : "Create an invitation link. Users who sign up will be automatically added to the selected teams."}
+        title={tu('dialogs.invitation.title', 'Create Invitation')}
+        description={
+          showInvitationLink
+            ? tu('dialogs.invitation.success', 'Invitation created successfully!')
+            : tu('dialogs.invitation.description', 'Create an invitation link. Users who sign up will be automatically added to the selected teams.')
+        }
         onSubmit={showInvitationLink ? undefined : handleInviteSubmit}
         isSubmitting={isSendingInvitation}
         error={formError}
         submitDisabled={isSendingInvitation || showInvitationLink}
-        submitText={showInvitationLink ? undefined : "Create Invitation"}
+        submitText={showInvitationLink ? undefined : tu('dialogs.invitation.submit', 'Create Invitation')}
       >
         {showInvitationLink ? (
           <div className="grid gap-4">
             <div className="p-4 bg-muted rounded-lg">
-              <Label className="text-sm font-medium mb-2 block">Invitation Link</Label>
+              <Label className="text-sm font-medium mb-2 block">
+                {tu('dialogs.invitation.linkLabel', 'Invitation Link')}
+              </Label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -1045,18 +1363,18 @@ function Users() {
                   {copiedDialogLink ? (
                     <>
                       <Check className="h-4 w-4 mr-1" />
-                      Copied
+                      {tu('dialogs.invitation.copied', 'Copied')}
                     </>
                   ) : (
                     <>
                       <CopyIcon className="h-4 w-4 mr-1" />
-                      Copy
+                      {tu('dialogs.invitation.copy', 'Copy')}
                     </>
                   )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Share this link with the user. They will be added to the selected teams when they sign up.
+                {tu('dialogs.invitation.instructions', 'Share this link with the user. They will be added to the selected teams when they sign up.')}
               </p>
             </div>
             <Button
@@ -1064,29 +1382,29 @@ function Users() {
               onClick={() => setIsInviteDialogOpen(false)}
               className="w-full"
             >
-              Close
+              {tu('dialogs.invitation.close', 'Close')}
             </Button>
           </div>
         ) : (
           <div className="grid gap-4">
             <TextField
               id="invite-email"
-              label="Email (Optional)"
+              label={tu('dialogs.invitation.emailLabel', 'Email (Optional)')}
               type="email"
               value={inviteEmail}
               onChange={(value) => setInviteEmail(value)}
-              placeholder="user@example.com"
+              placeholder={tu('dialogs.invitation.emailPlaceholder', 'user@example.com')}
             />
             <CheckboxField
               id="invite-send-email"
               label=""
               checked={sendEmail}
               onChange={(checked) => setSendEmail(checked)}
-              description="Send invitation email to the address above"
+              description={tu('dialogs.invitation.sendEmailDescription', 'Send invitation email to the address above')}
               disabled={!inviteEmail}
             />
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">Teams</Label>
+              <Label className="text-right pt-2">{tu('dialogs.invitation.teamsLabel', 'Teams')}</Label>
               <div className="col-span-3">
                 <MultiSelect
                   options={teams.map((team: Team) => ({
@@ -1095,7 +1413,11 @@ function Users() {
                   }))}
                   onValueChange={setInviteSelectedTeams}
                   defaultValue={inviteSelectedTeams}
-                  placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                  placeholder={
+                    teamsLoading && teams.length === 0
+                      ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                      : tu('multiSelect.selectTeams', 'Select teams...')
+                  }
                   maxCount={10}
                   className="w-full"
                 />
@@ -1110,8 +1432,8 @@ function Users() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         type="edit"
-        title="Edit User"
-        description="Update the user information."
+        title={tu('dialogs.editUser.title', 'Edit User')}
+        description={tu('dialogs.editUser.description', 'Update the user information.')}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -1121,14 +1443,14 @@ function Users() {
           <div className="grid gap-4">
             <TextField
               id="edit-name"
-              label="Name"
+              label={tu('dialogs.editUser.fields.name', 'Name')}
               value={editFormData.name}
               onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <TextField
               id="edit-email"
-              label="Email"
+              label={tu('dialogs.editUser.fields.email', 'Email')}
               type="email"
               value={editFormData.email}
               onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
@@ -1136,17 +1458,21 @@ function Users() {
             />
             <TextField
               id="edit-color"
-              label="Color"
+              label={tu('dialogs.editUser.fields.color', 'Color')}
               type="color"
               value={editFormData.color}
               onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
             />
             <SelectField
               id="edit-job_position_id"
-              label="Job Position"
+              label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
               value={editFormData.job_position_id}
               onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
-              placeholder={jobPositionsLoading && jobPositions.length === 0 ? "Loading…" : "No Job Position"}
+              placeholder={
+                jobPositionsLoading && jobPositions.length === 0
+                  ? tu('fields.loading', 'Loading…')
+                  : tu('fields.noJobPosition', 'No Job Position')
+              }
               options={jobPositions.map((jp: any) => ({
                 value: jp.id?.toString?.() ?? String(jp.id),
                 label: jp.title
@@ -1154,26 +1480,26 @@ function Users() {
             />
             <TextField
               id="edit-organization_name"
-              label="Organization"
+              label={tu('dialogs.editUser.fields.organization', 'Organization')}
               value={editFormData.organization_name}
               onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
             />
             <CheckboxField
               id="edit-is_admin"
-              label="Admin"
+              label={tu('dialogs.editUser.fields.admin', 'Admin')}
               checked={editFormData.is_admin}
               onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
-              description="Grant admin role"
+              description={tu('dialogs.editUser.fields.adminDescription', 'Grant admin role')}
             />
             <CheckboxField
               id="edit-has_active_subscription"
-              label="Subscription"
+              label={tu('dialogs.editUser.fields.subscription', 'Subscription')}
               checked={editFormData.has_active_subscription}
               onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-              description="Active subscription"
+              description={tu('dialogs.editUser.fields.subscriptionDescription', 'Active subscription')}
             />
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">Teams</Label>
+              <Label className="text-right pt-2">{tu('dialogs.editUser.fields.teams', 'Teams')}</Label>
               <div className="col-span-3">
                 <MultiSelect
                   options={teams.map((team: Team) => ({
@@ -1182,7 +1508,11 @@ function Users() {
                   }))}
                   onValueChange={setSelectedTeams}
                   defaultValue={selectedTeams}
-                  placeholder={teamsLoading && teams.length === 0 ? "Loading teams..." : "Select teams..."}
+                  placeholder={
+                    teamsLoading && teams.length === 0
+                      ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                      : tu('multiSelect.selectTeams', 'Select teams...')
+                  }
                   maxCount={10}
                   className="w-full"
                 />
@@ -1197,16 +1527,18 @@ function Users() {
         open={isDeleteDialogOpen}
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
-        title="Delete User"
+        title={tu('dialogs.deleteUser.title', 'Delete User')}
         description={
           deletingUser 
-            ? `Are you sure you want to delete ${deletingUser.name} (${deletingUser.email})? This action cannot be undone.`
+            ? tu('dialogs.deleteUser.description', 'Are you sure you want to delete {name} ({email})? This action cannot be undone.')
+                .replace('{name}', deletingUser.name)
+                .replace('{email}', deletingUser.email ?? '')
             : undefined
         }
         onConfirm={() => deletingUser ? deleteItem(deletingUser.id) : undefined}
         isSubmitting={isSubmitting}
         error={formError}
-        entityName="user"
+        entityName={tu('entityName', 'user')}
         entityData={deletingUser}
         renderEntityPreview={renderUserPreview}
       />
@@ -1221,14 +1553,20 @@ function Users() {
           }
         }}
         type="delete"
-        title="Delete Invitation"
+        title={tu('dialogs.deleteInvitation.title', 'Delete Invitation')}
         description={
           deletingInvitation
-            ? `Are you sure you want to delete this invitation${deletingInvitation.user_email ? ` for ${deletingInvitation.user_email}` : ''}? This action cannot be undone.`
+            ? tu('dialogs.deleteInvitation.description', 'Are you sure you want to delete this invitation{emailSuffix}? This action cannot be undone.')
+                .replace(
+                  '{emailSuffix}',
+                  deletingInvitation.user_email
+                    ? tu('dialogs.deleteInvitation.emailSuffix', ' for {email}').replace('{email}', deletingInvitation.user_email)
+                    : ''
+                )
             : undefined
         }
         onConfirm={handleDeleteInvitation}
-        entityName="invitation"
+        entityName={tu('dialogs.deleteInvitation.entityName', 'invitation')}
         entityData={deletingInvitation}
         renderEntityPreview={renderInvitationPreview}
       />
@@ -1242,6 +1580,7 @@ interface UserStatisticsProps {
   userTeams: UserTeam[];
   jobPositions: any[];
   invitations: Invitation[];
+  translate: (key: string, fallback: string) => string;
 }
 
 function UserStatistics({
@@ -1249,7 +1588,8 @@ function UserStatistics({
   teams,
   userTeams,
   jobPositions,
-  invitations
+  invitations,
+  translate
 }: UserStatisticsProps) {
   const totalUsers = users.length;
   const adminCount = users.filter((u) => u.is_admin).length;
@@ -1309,6 +1649,28 @@ function UserStatistics({
       .slice(-30);
   }, [invitations]);
 
+  const summaryLabels = {
+    total: translate('stats.cards.total', 'Total Users'),
+    admins: translate('stats.cards.admins', 'Admins'),
+    subscriptions: translate('stats.cards.subscriptions', 'Active Subscriptions'),
+    invitations: translate('stats.cards.invitations', 'Pending Invitations')
+  };
+  const charts = {
+    usersPerTeamTitle: translate('stats.charts.usersPerTeam.title', 'Users per Team'),
+    usersPerTeamDescription: translate('stats.charts.usersPerTeam.description', 'Distribution of users across teams'),
+    usersPerTeamAxis: translate('stats.charts.usersPerTeam.axis', 'Users'),
+    usersByJobTitle: translate('stats.charts.usersByJob.title', 'Users by Job Position'),
+    usersByJobDescription: translate('stats.charts.usersByJob.description', 'Distribution across job positions'),
+    usersByJobSeries: translate('stats.charts.usersByJob.series', 'Users'),
+    invitationsOverTimeTitle: translate('stats.charts.invitationsOverTime.title', 'Invitations Over Time'),
+    invitationsOverTimeDescription: translate('stats.charts.invitationsOverTime.description', 'Last 30 days of invitation creation'),
+    invitationsAxis: translate('stats.charts.invitationsOverTime.axis', 'Invitations')
+  };
+  const emptyStates = {
+    noTeamAssignments: translate('stats.empty.noTeamAssignments', 'No team assignment data available'),
+    noJobPositions: translate('stats.empty.noJobPositions', 'No job position data available')
+  };
+
   return (
     <div className="flex-1 min-h-0 overflow-auto p-4">
       <div className="space-y-4">
@@ -1319,7 +1681,7 @@ function UserStatistics({
               <div className="text-center">
                 <div className="text-2xl font-bold">{totalUsers}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Total Users
+                  {summaryLabels.total}
                 </div>
               </div>
             </CardContent>
@@ -1330,7 +1692,7 @@ function UserStatistics({
                 <div className="text-2xl font-bold text-indigo-600">
                   {adminCount}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Admins</div>
+                <div className="text-xs text-muted-foreground mt-1">{summaryLabels.admins}</div>
               </div>
             </CardContent>
           </Card>
@@ -1341,7 +1703,7 @@ function UserStatistics({
                   {activeSubPercent}%
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Active Subscriptions
+                  {summaryLabels.subscriptions}
                 </div>
               </div>
             </CardContent>
@@ -1353,7 +1715,7 @@ function UserStatistics({
                   {invitations.length}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Pending Invitations
+                  {summaryLabels.invitations}
                 </div>
               </div>
             </CardContent>
@@ -1364,9 +1726,9 @@ function UserStatistics({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Users per Team</CardTitle>
+              <CardTitle className="text-sm">{charts.usersPerTeamTitle}</CardTitle>
               <CardDescription className="text-xs">
-                Distribution of users across teams
+                {charts.usersPerTeamDescription}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1385,7 +1747,7 @@ function UserStatistics({
                     },
                     xAxis: {
                       type: "value",
-                      name: "Users"
+                      name: charts.usersPerTeamAxis
                     },
                     yAxis: {
                       type: "category",
@@ -1401,7 +1763,7 @@ function UserStatistics({
                     },
                     series: [
                       {
-                        name: "Users",
+                        name: charts.usersPerTeamAxis,
                         type: "bar",
                         data: usersByTeam
                           .map((item) => ({
@@ -1418,7 +1780,7 @@ function UserStatistics({
                 />
               ) : (
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No team assignment data available
+                  {emptyStates.noTeamAssignments}
                 </div>
               )}
             </CardContent>
@@ -1426,9 +1788,9 @@ function UserStatistics({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Users by Job Position</CardTitle>
+              <CardTitle className="text-sm">{charts.usersByJobTitle}</CardTitle>
               <CardDescription className="text-xs">
-                Distribution across job positions
+                {charts.usersByJobDescription}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1446,7 +1808,7 @@ function UserStatistics({
                     },
                     series: [
                       {
-                        name: "Users",
+                        name: charts.usersByJobSeries,
                         type: "pie",
                         radius: ["40%", "70%"],
                         avoidLabelOverlap: false,
@@ -1477,7 +1839,7 @@ function UserStatistics({
                 />
               ) : (
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No job position data available
+                  {emptyStates.noJobPositions}
                 </div>
               )}
             </CardContent>
@@ -1488,9 +1850,9 @@ function UserStatistics({
         {invitationsOverTime.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Invitations Over Time</CardTitle>
+              <CardTitle className="text-sm">{charts.invitationsOverTimeTitle}</CardTitle>
               <CardDescription className="text-xs">
-                Last 30 days of invitation creation
+                {charts.invitationsOverTimeDescription}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1521,11 +1883,11 @@ function UserStatistics({
                   },
                   yAxis: {
                     type: "value",
-                    name: "Invitations"
+                    name: charts.invitationsAxis
                   },
                   series: [
                     {
-                      name: "Invitations",
+                      name: charts.invitationsAxis,
                       type: "line",
                       smooth: true,
                       data: invitationsOverTime.map((item) => item.count),

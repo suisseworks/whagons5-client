@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger
+  CollapsibleTrigger,
+  useCollapsible
 } from '@/components/animate-ui/primitives/radix/collapsible';
 import {
   SidebarGroup,
@@ -118,6 +119,18 @@ const WorkspaceIconBadge = ({
     {children}
   </div>
 );
+
+const KeepCollapsibleOpenOnCollapse = ({ forceOpen }: { forceOpen: boolean }) => {
+  const { setIsOpen } = useCollapsible();
+
+  useEffect(() => {
+    if (forceOpen) {
+      setIsOpen(true);
+    }
+  }, [forceOpen, setIsOpen]);
+
+  return null;
+};
 
 function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon }: SortableWorkspaceItemProps) {
   const {
@@ -340,21 +353,9 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     }
   };
 
-  // When sidebar is collapsed, always keep workspace section open so icons are visible
-  const [collapsibleOpen, setCollapsibleOpen] = useState(true);
-
-  const handleCollapsibleChange = (open: boolean) => {
-    // Don't allow closing when sidebar is collapsed - icons need to remain visible
-    if (!collapsed) {
-      setCollapsibleOpen(open);
-    }
-  };
-
-  // Always keep collapsible open - never allow it to close and hide workspaces
-  const isCollapsibleOpen = collapsed ? true : collapsibleOpen;
-
   return (
-    <Collapsible open={isCollapsibleOpen} onOpenChange={handleCollapsibleChange} className="group/collapsible">
+    <Collapsible defaultOpen className="group/collapsible">
+      <KeepCollapsibleOpenOnCollapse forceOpen={collapsed} />
       {/* Everything workspace - aligned above Spaces section */}
       {showEverythingButton && !collapsed && (
         <div style={{ marginBottom: '8px' }}>
@@ -421,6 +422,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             <>
               {collapsed ? (
                 <CollapsibleTrigger
+                  disabled={collapsed}
                   className="flex flex-col justify-center px-2 cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm"
                   style={{ padding: '8px', color: 'var(--sidebar-text-primary)' }}
                 >
@@ -429,6 +431,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
               ) : (
                 <>
                   <CollapsibleTrigger
+                    disabled={collapsed}
                     className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm justify-start flex-1"
                     style={{
                       padding: '4px 8px 4px 0',
@@ -607,7 +610,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           </div>
         </SidebarGroupLabel>
 
-        <CollapsibleContent keepRendered forceVisible={true}>
+        <CollapsibleContent keepRendered forceVisible={collapsed}>
           <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
               sensors={sensors}

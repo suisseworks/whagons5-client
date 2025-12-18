@@ -1,6 +1,15 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTenant } from "@/api/whagonsApi";
 import { useTheme } from "@/providers/ThemeProvider";
+import { Button } from "@/components/ui/button";
+import Xarrow, { Xwrapper } from "react-xarrows";
+
+const ACTION_COLUMN_ORDER = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
+const ACTION_COLUMN_MAP: Record<string, number> = ACTION_COLUMN_ORDER.reduce((acc, action, index) => {
+  acc[action] = index;
+  return acc;
+}, {} as Record<string, number>);
+const FALLBACK_ACTION_COLUMN = ACTION_COLUMN_ORDER.length;
 
 // Status Palette Component
 const StatusPalette = memo(function StatusPalette({
@@ -79,6 +88,7 @@ export const VisualTransitions = memo(function VisualTransitions({
   const nodeHeight = 70;
   const hGap = 80;
   const vGap = 30;
+  const EDGE_OFFSET_STEP = 22;
 
   const [posById, setPosById] = useState<Record<number, { x: number; y: number }>>({});
 
@@ -202,6 +212,43 @@ export const VisualTransitions = memo(function VisualTransitions({
     return set;
   }, [transitions]);
 
+  const edgeOrdering = useMemo(() => {
+    const outMap: Record<number, number[]> = {};
+    const inMap: Record<number, number[]> = {};
+
+    transitions.forEach((t: any) => {
+      if (!outMap[t.from_status]) outMap[t.from_status] = [];
+      if (!inMap[t.to_status]) inMap[t.to_status] = [];
+
+      if (!outMap[t.from_status].includes(t.to_status)) {
+        outMap[t.from_status].push(t.to_status);
+      }
+      if (!inMap[t.to_status].includes(t.from_status)) {
+        inMap[t.to_status].push(t.from_status);
+      }
+    });
+
+    const outIndex: Record<string, number> = {};
+    const outCount: Record<number, number> = {};
+    Object.entries(outMap).forEach(([from, list]) => {
+      list.forEach((to, idx) => {
+        outIndex[`${from}->${to}`] = idx;
+      });
+      outCount[Number(from)] = list.length;
+    });
+
+    const inIndex: Record<string, number> = {};
+    const inCount: Record<number, number> = {};
+    Object.entries(inMap).forEach(([to, list]) => {
+      list.forEach((from, idx) => {
+        inIndex[`${from}->${to}`] = idx;
+      });
+      inCount[Number(to)] = list.length;
+    });
+
+    return { outIndex, outCount, inIndex, inCount };
+  }, [transitions]);
+
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
 
@@ -225,6 +272,56 @@ export const VisualTransitions = memo(function VisualTransitions({
     !activeStatuses.find(active => active.id === status.id)
   );
 
+  const handleAutoOrganize = useCallback(() => {
+    if (!activeStatuses.length) return;
+
+    const columnBuckets: Record<number, Array<{ status: any; index: number }>> = {};
+    const columnByStatus: Record<number, number> = {};
+    activeStatuses.forEach((status: any, index: number) => {
+      const actionKey = String(status.action || '').toUpperCase();
+      const column = ACTION_COLUMN_MAP[actionKey] ?? FALLBACK_ACTION_COLUMN;
+      if (!columnBuckets[column]) columnBuckets[column] = [];
+      columnBuckets[column].push({ status, index });
+      columnByStatus[status.id] = column;
+    });
+
+    const sortedColumns = Object.keys(columnBuckets).map(Number).sort((a, b) => a - b);
+    const layoutPositions: Record<number, { x: number; y: number }> = {};
+    const rowSpacing = nodeHeight + vGap;
+    const columnSpacing = nodeWidth + hGap;
+
+    sortedColumns.forEach((columnValue, columnIndex) => {
+      const bucket = columnBuckets[columnValue];
+      bucket.sort((a, b) => {
+        if (a.status.initial && !b.status.initial) return -1;
+        if (!a.status.initial && b.status.initial) return 1;
+        return String(a.status.name || '').localeCompare(String(b.status.name || ''));
+      });
+      bucket.forEach((entry, rowIndex) => {
+        const diagonalShift = (columnIndex % 2 === 0 ? 0 : rowSpacing / 2);
+        layoutPositions[entry.status.id] = {
+          x: columnIndex * columnSpacing,
+          y: rowIndex * rowSpacing + diagonalShift
+        };
+      });
+    });
+
+    const paddingX = 80;
+    const paddingY = 60;
+    const minX = Math.min(...Object.values(layoutPositions).map((pos) => pos.x));
+    const minY = Math.min(...Object.values(layoutPositions).map((pos) => pos.y));
+
+    const normalizedPositions: Record<number, { x: number; y: number }> = {};
+    Object.entries(layoutPositions).forEach(([id, pos]) => {
+      normalizedPositions[Number(id)] = {
+        x: pos.x - minX + paddingX,
+        y: pos.y - minY + paddingY
+      };
+    });
+
+    setPosById(normalizedPositions);
+  }, [activeStatuses, hGap, nodeHeight, nodeWidth, transitions, vGap]);
+
   return (
     <div className={embedded ? "h-full w-full flex gap-4" : "border rounded-md p-5 overflow-auto flex gap-4"}>
       <StatusPalette
@@ -232,7 +329,15 @@ export const VisualTransitions = memo(function VisualTransitions({
         onDragStart={handlePaletteDragStart}
         onDragEnd={handlePaletteDragEnd}
       />
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            Drag statuses to reposition manually or auto-arrange for a clean baseline.
+          </p>
+          <Button size="sm" variant="outline" onClick={handleAutoOrganize} disabled={!activeStatuses.length}>
+            Auto arrange
+          </Button>
+        </div>
         <div
           className="relative"
           style={embedded ? { width: `max(100%, ${width}px)`, height: `${height}px`, ...checkerBackgroundStyle } : { width, height, ...checkerBackgroundStyle }}
@@ -256,177 +361,141 @@ export const VisualTransitions = memo(function VisualTransitions({
                 }
               }
             }
+            if (e.key === 'Escape') {
+              setSelectedEdge(null);
+            }
           }}
         >
-        <svg className="absolute inset-0 w-full h-full" shapeRendering="geometricPrecision">
-          <defs>
-            <marker id="arrow-blue" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
-            </marker>
-            <marker id="arrow-red" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
-            </marker>
-            <marker id="arrow-draft" viewBox="0 0 10 10" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa" />
-            </marker>
-          </defs>
-          {transitions.map((t: any, i: number) => {
-            const a = idToPos[t.from_status];
-            const b = idToPos[t.to_status];
-            if (!a || !b) return null;
+          <Xwrapper>
+            {transitions.map((t: any) => {
+              const from = idToPos[t.from_status];
+              const to = idToPos[t.to_status];
+              if (!from || !to) return null;
 
-            const srcCenter = { x: a.x + nodeWidth / 2, y: a.y + nodeHeight / 2 };
-            const dstCenter = { x: b.x + nodeWidth / 2, y: b.y + nodeHeight / 2 };
-            const dx = dstCenter.x - srcCenter.x;
-            const dy = dstCenter.y - srcCenter.y;
+              const key = `${t.from_status}->${t.to_status}`;
+              const dx = (to.x + nodeWidth / 2) - (from.x + nodeWidth / 2);
+              const dy = (to.y + nodeHeight / 2) - (from.y + nodeHeight / 2);
 
-            const margin = 8;
-
-            let x1 = srcCenter.x, y1 = srcCenter.y;
-            if (Math.abs(dy) > Math.abs(dx)) {
-              if (dy > 0) {
-                x1 = a.x + nodeWidth / 2; y1 = a.y + nodeHeight + margin;
+              let fromSide: 'top' | 'right' | 'bottom' | 'left';
+              let toSide: 'top' | 'right' | 'bottom' | 'left';
+              if (Math.abs(dy) > Math.abs(dx)) {
+                fromSide = dy > 0 ? 'bottom' : 'top';
+                toSide = dy > 0 ? 'top' : 'bottom';
               } else {
-                x1 = a.x + nodeWidth / 2; y1 = a.y - margin;
+                fromSide = dx > 0 ? 'right' : 'left';
+                toSide = dx > 0 ? 'left' : 'right';
               }
-            } else {
-              if (dx > 0) {
-                x1 = a.x + nodeWidth + margin; y1 = a.y + nodeHeight / 2;
-              } else {
-                x1 = a.x - margin; y1 = a.y + nodeHeight / 2;
-              }
-            }
 
-            let x2 = dstCenter.x, y2 = dstCenter.y;
-            if (Math.abs(dy) > Math.abs(dx)) {
-              if (dy > 0) {
-                x2 = b.x + nodeWidth / 2; y2 = b.y - margin;
-              } else {
-                x2 = b.x + nodeWidth / 2; y2 = b.y + nodeHeight + margin;
-              }
-            } else {
-              if (dx > 0) {
-                x2 = b.x - margin; y2 = b.y + nodeHeight / 2;
-              } else {
-                x2 = b.x + nodeWidth + margin; y2 = b.y + nodeHeight / 2;
-              }
-            }
+              const outCount = edgeOrdering.outCount[t.from_status] ?? 1;
+              const outIdx = edgeOrdering.outIndex[key] ?? 0;
+              const outOffset = (outIdx - (outCount - 1) / 2) * EDGE_OFFSET_STEP;
 
-            const verticalDominant = Math.abs(dy) > Math.abs(dx);
-            let c1x: number; let c1y: number; let c2x: number; let c2y: number;
-            if (verticalDominant) {
-              const k = dy > 0 ? 60 : -60;
-              c1x = x1; c1y = y1 + k;
-              c2x = x2; c2y = y2 - k;
-            } else {
-              const k = dx > 0 ? 60 : -60;
-              c1x = x1 + k; c1y = y1;
-              c2x = x2 - k; c2y = y2;
-            }
-            const segdx = x2 - x1; const segdy = y2 - y1;
-            const segLen2 = Math.max(1, segdx*segdx + segdy*segdy);
-            const corridor = 36;
-            const midX = (x1 + x2) / 2; const midY = (y1 + y2) / 2;
-            let bumpX = 0, bumpY = 0;
-            for (const n of nodes) {
-              if (n.id === t.from_status || n.id === t.to_status) continue;
-              const cx = n.x + nodeWidth / 2; const cy = n.y + nodeHeight / 2;
-              const tproj = ((cx - x1) * segdx + (cy - y1) * segdy) / segLen2;
-              if (tproj <= 0 || tproj >= 1) continue;
-              const px = x1 + tproj * segdx; const py = y1 + tproj * segdy;
-              const dist = Math.hypot(cx - px, cy - py);
-              if (dist < corridor) {
-                if (Math.abs(segdx) > Math.abs(segdy)) bumpY += cy > midY ? 60 : -60; else bumpX += cx > midX ? 60 : -60;
-              }
-            }
-            c1x += bumpX; c2x += bumpX; c1y += bumpY; c2y += bumpY;
-            if (verticalDominant) {
-              c1x = x1; c2x = x2;
-            } else {
-              c1y = y1; c2y = y2;
-            }
-            const path = `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
-            const key = `${t.from_status}->${t.to_status}`;
-            const hovered = hoverEdge === key;
-            const selected = selectedEdge === key;
-            return (
-              <path
-                key={`${key}-${i}`}
-                d={path}
-                stroke={hovered || selected ? '#ef4444' : '#3b82f6'}
-                strokeWidth={selected ? 4 : (hovered ? 3 : 2)}
-                strokeLinecap="round"
-                fill="none"
-                style={{ cursor: selectedGroupId ? 'pointer' : 'default' }}
-                onMouseEnter={() => setHoverEdge(key)}
-                onMouseLeave={() => setHoverEdge(null)}
-                onClick={(e) => { e.stopPropagation(); if (!selectedGroupId) return; setSelectedEdge((prev: string | null) => prev === key ? null : key); }}
-                markerEnd={`url(#${hovered ? 'arrow-red' : 'arrow-blue'})`}
-              />
-            );
-          })}
-          {dragFrom != null && cursor && (() => {
-            const a = getCenter(dragFrom);
-            const x1 = a.x;
-            const y1 = a.y;
-            const x2 = hoverTarget != null ? getCenter(hoverTarget).x : cursor.x;
-            const y2 = hoverTarget != null ? getCenter(hoverTarget).y : cursor.y;
-            const mx = (x1 + x2) / 2;
-            const path = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
-            return <path d={path} stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 4" strokeLinecap="round" fill="none" markerEnd="url(#arrow-draft)" />;
-          })()}
-        </svg>
+              const inCount = edgeOrdering.inCount[t.to_status] ?? 1;
+              const inIdx = edgeOrdering.inIndex[key] ?? 0;
+              const inOffset = (inIdx - (inCount - 1) / 2) * EDGE_OFFSET_STEP;
 
-        {nodes.map((s: any) => (
-          <div
-            key={s.id}
-            className={`absolute rounded-lg border shadow-sm bg-background select-none ${moving ? 'cursor-move' : (selectedGroupId ? 'cursor-crosshair' : 'cursor-default')} ${dragFrom != null && hoverTarget === s.id ? (transitionsSet.has(`${dragFrom}->${s.id}`) ? 'ring-2 ring-red-400' : 'ring-2 ring-blue-400') : ''}`}
-            style={{ left: s.x, top: s.y, width: nodeWidth, height: nodeHeight, borderColor: s.color || '#e5e7eb' }}
-            onMouseDown={(ev) => {
-              if (ev.shiftKey && selectedGroupId) {
-                setDragFrom(s.id);
-                const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
-                setCursor({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
-              } else {
-                const rect = (ev.currentTarget as HTMLDivElement).getBoundingClientRect();
-                const offsetX = ev.clientX - rect.left;
-                const offsetY = ev.clientY - rect.top;
-                setMoving({ id: s.id, offsetX, offsetY });
-              }
-            }}
-            onMouseUp={() => {
-              if (!selectedGroupId) return;
-              if (dragFrom != null && dragFrom !== s.id) {
-                onToggle(dragFrom, s.id);
-              }
-              stopDrag();
-            }}
-            onMouseEnter={() => { if (dragFrom != null) setHoverTarget(s.id); }}
-            onMouseLeave={() => { if (dragFrom != null) setHoverTarget(null); }}
-          >
-            <div className="h-full w-full flex items-center justify-center relative">
-              <div className="text-center p-2">
-                <div className="font-semibold">{s.name}</div>
-                <div className="text-xs text-muted-foreground">{s.initial ? 'Initial' : (s.system ? 'System' : '')}</div>
-              </div>
-              {selectedGroupId && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveStatus(s.id);
+              const anchorFor = (side: 'top' | 'bottom' | 'left' | 'right', offset: number) => {
+                const offsetObj = side === 'top' || side === 'bottom'
+                  ? { x: offset, y: 0 }
+                  : { x: 0, y: offset };
+                return { position: side, offset: offsetObj };
+              };
+
+              const startAnchor = anchorFor(fromSide, outOffset);
+              const endAnchor = anchorFor(toSide, inOffset);
+
+              const hovered = hoverEdge === key;
+              const selected = selectedEdge === key;
+
+              return (
+                <Xarrow
+                  key={`${key}-x`}
+                  start={`node-${t.from_status}`}
+                  end={`node-${t.to_status}`}
+                  startAnchor={startAnchor as any}
+                  endAnchor={endAnchor as any}
+                  path="smooth"
+                  curveness={0.25}
+                  showHead
+                  color={hovered || selected ? "#ef4444" : "#3b82f6"}
+                  strokeWidth={selected ? 4 : (hovered ? 3 : 2)}
+                  headSize={6}
+                  passProps={{
+                    onMouseEnter: () => setHoverEdge(key),
+                    onMouseLeave: () => setHoverEdge(null),
+                    onClick: (e: any) => {
+                      e.stopPropagation();
+                      if (!selectedGroupId) return;
+                      setSelectedEdge(prev => prev === key ? null : key);
+                    }
                   }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors"
-                  title="Remove from workflow"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+                />
+              );
+            })}
+
+            {dragFrom != null && cursor && (() => {
+              const a = getCenter(dragFrom);
+              const x1 = a.x;
+              const y1 = a.y;
+              const x2 = hoverTarget != null ? getCenter(hoverTarget).x : cursor.x;
+              const y2 = hoverTarget != null ? getCenter(hoverTarget).y : cursor.y;
+              const mx = (x1 + x2) / 2;
+              const path = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+              return <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%"><path d={path} stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 4" strokeLinecap="round" fill="none" /></svg>;
+            })()}
+
+            {nodes.map((s: any) => (
+              <div
+                id={`node-${s.id}`}
+                key={s.id}
+                className={`absolute rounded-lg border shadow-sm bg-background select-none ${moving ? 'cursor-move' : (selectedGroupId ? 'cursor-crosshair' : 'cursor-default')} ${dragFrom != null && hoverTarget === s.id ? (transitionsSet.has(`${dragFrom}->${s.id}`) ? 'ring-2 ring-red-400' : 'ring-2 ring-blue-400') : ''}`}
+                style={{ left: s.x, top: s.y, width: nodeWidth, height: nodeHeight, borderColor: s.color || '#e5e7eb' }}
+                onMouseDown={(ev) => {
+                  if (ev.shiftKey && selectedGroupId) {
+                    setDragFrom(s.id);
+                    const rect = (containerRef.current as HTMLDivElement).getBoundingClientRect();
+                    setCursor({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+                  } else {
+                    const rect = (ev.currentTarget as HTMLDivElement).getBoundingClientRect();
+                    const offsetX = ev.clientX - rect.left;
+                    const offsetY = ev.clientY - rect.top;
+                    setMoving({ id: s.id, offsetX, offsetY });
+                  }
+                }}
+                onMouseUp={() => {
+                  if (!selectedGroupId) return;
+                  if (dragFrom != null && dragFrom !== s.id) {
+                    onToggle(dragFrom, s.id);
+                  }
+                  stopDrag();
+                }}
+                onMouseEnter={() => { if (dragFrom != null) setHoverTarget(s.id); }}
+                onMouseLeave={() => { if (dragFrom != null) setHoverTarget(null); }}
+              >
+                <div className="h-full w-full flex items-center justify-center relative">
+                  <div className="text-center p-2">
+                    <div className="font-semibold">{s.name}</div>
+                    <div className="text-xs text-muted-foreground">{s.initial ? 'Initial' : (s.system ? 'System' : '')}</div>
+                  </div>
+                  {selectedGroupId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveStatus(s.id);
+                      }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors"
+                      title="Remove from workflow"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+        </Xwrapper>
         </div>
       </div>
-      </div>
+    </div>
   );
 });
 

@@ -4,9 +4,10 @@ import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense, forw
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
-import { updateTaskAsync } from '@/store/reducers/tasksSlice';
+import { updateTaskAsync, removeTaskAsync } from '@/store/reducers/tasksSlice';
 import { iconService } from '@/database/iconService';
 import { buildWorkspaceColumns } from './workspaceTable/columns';
+import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
 
 // Import abstracted utilities
@@ -150,6 +151,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => { searchRef.current = searchText; }, [searchText]);
   const workspaceRef = useRef<string>(workspaceId);
   useEffect(() => { workspaceRef.current = workspaceId; }, [workspaceId]);
+  const { user } = useAuth();
 
   // Load modules on component mount
   useEffect(() => {
@@ -180,6 +182,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     approvals,
     approvalApprovers,
     taskApprovalInstances,
+    slas,
     tags,
     taskTags,
     customFields,
@@ -190,6 +193,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   } = reduxState as any;
   const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
+  const slaMap = useMemo(() => {
+    const map: Record<number, any> = {};
+    (slas || []).forEach((s: any) => {
+      if (s?.id != null) map[Number(s.id)] = s;
+    });
+    return map;
+  }, [slas]);
 
   // Load default status icon
   useEffect(() => {
@@ -382,6 +392,23 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   const handleChangeStatus = useCallback(async (task: any, toStatusId: number): Promise<boolean> => {
     if (!task || Number(task.status_id) === Number(toStatusId)) return true;
+    // Block starting/progress changes when approval is required but not yet approved
+    const needsApproval = !!task?.approval_id;
+    const isApproved = String(task?.approval_status || '').toLowerCase() === 'approved';
+    if (needsApproval && !isApproved) {
+      try {
+        window.dispatchEvent(new CustomEvent('wh:notify', {
+          detail: {
+            type: 'warning',
+            title: 'Approval required',
+            message: 'This task cannot start until the approval is completed.',
+          }
+        }));
+      } catch {
+        console.warn('Task status change blocked: approval pending');
+      }
+      return false;
+    }
     try {
       await dispatch(updateTaskAsync({ id: Number(task.id), updates: { status_id: Number(toStatusId) } })).unwrap();
       return true;
@@ -431,7 +458,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     run();
   }, [workspaceId, searchText, groupBy, onModeChange, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
-  // Load taskTags, tags, notes, attachments on mount so they're available for display
+  // Load taskTags, tags, notes, attachments, custom field values on mount so they're available for display
   useEffect(() => {
     dispatch(genericActions.taskTags.getFromIndexedDB());
     dispatch(genericActions.tags.getFromIndexedDB());
@@ -439,6 +466,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     dispatch(genericActions.taskAttachments.getFromIndexedDB());
     dispatch(genericActions.approvalApprovers.getFromIndexedDB());
     dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
+    dispatch(genericActions.taskCustomFieldValues.getFromIndexedDB());
+    // Fetch custom field values from API to ensure we have the latest data (needed for cost column display)
+    dispatch(genericActions.taskCustomFieldValues.fetchFromAPI());
     // Optionally fetch from API to ensure we have the latest data
     // dispatch(genericActions.taskTags.fetchFromAPI());
     // dispatch(genericActions.tags.fetchFromAPI());
@@ -471,6 +501,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
   }, [taskNotes, taskAttachments]);
 
+  // Refresh config column when approval metadata changes so pending/active badges update
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.refreshCells({ columns: ['config'], force: true, suppressFlash: true });
+    }
+  }, [approvalMap, approvalApprovers, stableTaskApprovalInstances]);
+
   // Refresh other columns when their metadata resolves
   useEffect(() => {
     if (gridRef.current?.api) {
@@ -490,9 +527,37 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
   }, [spotMap]);
 
+  // Refresh custom field columns when taskCustomFieldValues change
+  useEffect(() => {
+    if (gridRef.current?.api && taskCustomFieldValues && taskCustomFieldValues.length > 0) {
+      // Refresh all columns that start with 'cf_' (custom field columns)
+      const allColumns = gridRef.current.api.getAllColumns?.() || [];
+      const customFieldColumns = allColumns
+        .filter((col: any) => col?.getColId?.()?.startsWith('cf_'))
+        .map((col: any) => col.getColId());
+      if (customFieldColumns.length > 0) {
+        gridRef.current.api.refreshCells({ columns: customFieldColumns, force: true, suppressFlash: true });
+      }
+    }
+  }, [taskCustomFieldValues]);
+
   // Determine current density to decide whether to show row descriptions
   const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
     try { return (localStorage.getItem('wh_workspace_density') as any) || 'comfortable'; } catch { return 'comfortable'; }
+  });
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    try {
+      const key = `wh_workspace_column_order_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return [];
   });
 
   // Listen for density changes
@@ -507,15 +572,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Column visibility preferences (per-workspace, persisted in localStorage)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['id', 'name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
       if (!raw) return allDefault;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        // Always ensure "name" column stays visible
-        return Array.from(new Set(['name', ...parsed]));
+        // Always ensure "name" and "id" columns stay visible
+        return Array.from(new Set(['name', 'id', ...parsed]));
       }
     } catch {
       // ignore
@@ -525,22 +590,40 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Reload preferences when workspace changes
   useEffect(() => {
-    const allDefault = ['name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    try {
+      const key = `wh_workspace_column_order_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+          const normalized = Array.from(new Set(parsed));
+          setColumnOrder(['id', ...normalized.filter((c) => c !== 'id')]);
+        } else {
+          setColumnOrder([]);
+        }
+      } else {
+        setColumnOrder([]);
+      }
+    } catch {
+      setColumnOrder([]);
+    }
+
+    const allDefault = ['id', 'name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
       if (!raw) {
-        setVisibleColumns(allDefault);
+        setVisibleColumns(['id', ...allDefault.filter((c) => c !== 'id')]);
         return;
       }
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        setVisibleColumns(Array.from(new Set(['name', ...parsed])));
+        setVisibleColumns(Array.from(new Set(['name', 'id', ...parsed])));
       } else {
-        setVisibleColumns(allDefault);
+        setVisibleColumns(['id', ...allDefault.filter((c) => c !== 'id')]);
       }
     } catch {
-      setVisibleColumns(allDefault);
+      setVisibleColumns(['id', ...allDefault.filter((c) => c !== 'id')]);
     }
   }, [workspaceId]);
 
@@ -557,7 +640,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       if (Array.isArray(detail.visibleColumns)) {
         const next = detail.visibleColumns.filter((x: any) => typeof x === 'string');
         if (next.length > 0) {
-          setVisibleColumns(Array.from(new Set(['name', ...next])));
+          setVisibleColumns(Array.from(new Set(['name', 'id', ...next])));
         }
       }
     };
@@ -577,50 +660,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     };
   }, []);
 
-  const columnDefs = useMemo(() => buildWorkspaceColumns({
-    getUserDisplayName,
-    getStatusIcon,
-    getAllowedNextStatuses,
-    handleChangeStatus,
-    statusesLoaded: metadataLoadedFlags.statusesLoaded,
-    priorityMap,
-    prioritiesLoaded: metadataLoadedFlags.prioritiesLoaded,
-    filteredPriorities,
-    statusMap,
-    usersLoaded: metadataLoadedFlags.usersLoaded,
-    getUsersFromIds,
-    formatDueDate,
-    spotMap,
-    spotsLoaded: metadataLoadedFlags.spotsLoaded,
-    userMap,
-    getDoneStatusId,
-    groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
-    categoryMap,
-    showDescriptions: rowDensity !== 'compact',
-    density: rowDensity,
-    approvalMap,
-    taskApprovalInstances: stableTaskApprovalInstances,
-    tagMap,
-    taskTags,
-    taskTagsMap,
-    tagDisplayMode,
-    visibleColumns,
-    workspaceCustomFields,
-    taskCustomFieldValueMap,
-    taskNotes,
-    taskAttachments,
-    approvalApprovers,
-  } as any), [
-    statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
-    getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
-    metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
-    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
-    approvalMap, approvalApprovers, stableTaskApprovalInstances,
-    visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, taskNotes, taskAttachments,
-  ]);
-  const defaultColDef = useMemo(() => createDefaultColDef(), []);
-
   // Initialize filter persistence helpers
   const suppressPersistRef = useRef(false);
 
@@ -638,74 +677,49 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return undefined;
   }, []);
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    const colApi = gridRef.current?.columnApi;
-    if (!api) return;
-
-    const currentFilterModel = api.getFilterModel?.() || {};
-
-    // In infinite mode, ensure grouping is cleared visually
-    if (!useClientSide) {
-      try {
-        api.setGridOption('autoGroupColumnDef', undefined as any);
-        colApi?.setRowGroupColumns([]);
-        api.setColumnDefs(columnDefs as any);
-        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
-          api.setFilterModel(currentFilterModel);
-          externalFilterModelRef.current = currentFilterModel;
-        }
-        // If grid lost filters, re-apply from saved external model
-        const saved = externalFilterModelRef.current || {};
-        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
-          api.setFilterModel(saved);
-        }
-      } catch {}
-      return;
-    }
-
-    // Client-side mode: apply or clear
+  const persistColumnOrder = useCallback((orderedIds: string[]) => {
+    if (!orderedIds || orderedIds.length === 0) return;
+    const normalized = Array.from(new Set(orderedIds));
+    const withIdFirst = ['id', ...normalized.filter((c) => c !== 'id')];
+    setColumnOrder(withIdFirst);
     try {
-      if (groupBy === 'none') {
-        api.setGridOption('autoGroupColumnDef', undefined as any);
-        colApi?.setRowGroupColumns([]);
-        // show hidden group columns if previously hidden
-        colApi?.setColumnVisible('spot_id', true);
-        colApi?.setColumnVisible('status_id', true);
-        colApi?.setColumnVisible('priority_id', true);
-        api.setColumnDefs(columnDefs as any);
-        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
-          api.setFilterModel(currentFilterModel);
-          externalFilterModelRef.current = currentFilterModel;
-        }
-        const saved = externalFilterModelRef.current || {};
-        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
-          api.setFilterModel(saved);
-        }
-        api.refreshClientSideRowModel?.('everything');
-      } else {
-        api.setGridOption('autoGroupColumnDef', autoGroupColumnDef);
-        api.setGridOption('groupDefaultExpanded', collapseGroups ? 0 : 1);
-        // Explicitly set the grouped column to ensure switch takes effect
-        const field = groupBy;
-        colApi?.setRowGroupColumns([field]);
-        // hide the grouped column to avoid duplication
-        colApi?.setColumnVisible('spot_id', field !== 'spot_id');
-        colApi?.setColumnVisible('status_id', field !== 'status_id');
-        colApi?.setColumnVisible('priority_id', field !== 'priority_id');
-        api.setColumnDefs(columnDefs as any);
-        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
-          api.setFilterModel(currentFilterModel);
-          externalFilterModelRef.current = currentFilterModel;
-        }
-        const saved = externalFilterModelRef.current || {};
-        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
-          api.setFilterModel(saved);
-        }
-        api.refreshClientSideRowModel?.('everything');
-      }
-    } catch {}
-  }, [autoGroupColumnDef, collapseGroups, groupBy, columnDefs, useClientSide]);
+      const key = `wh_workspace_column_order_${workspaceRef.current || 'all'}`;
+      localStorage.setItem(key, JSON.stringify(withIdFirst));
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  const applyStoredColumnOrder = useCallback((colApi?: any) => {
+    const api = colApi || gridRef.current?.columnApi;
+    if (!api) return;
+    const order = (columnOrder || []);
+    if (!order || order.length === 0) return;
+    try {
+      const ordered = ['id', ...order.filter((c) => c !== 'id')];
+      const state = ordered.map((colId, idx) => ({ colId, order: idx }));
+      api.applyColumnState({ state, applyOrder: true });
+    } catch {
+      // ignore apply errors
+    }
+  }, [columnOrder]);
+
+  const handleColumnOrderChanged = useCallback((colApi?: any) => {
+    const api = colApi || gridRef.current?.columnApi;
+    if (!api) return;
+    try {
+      const state = api.getColumnState?.() || [];
+      if (!Array.isArray(state)) return;
+      const ordered = state
+        .filter((s: any) => s?.colId)
+        .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+        .map((s: any) => String(s.colId));
+      if (ordered.length === 0) return;
+      persistColumnOrder(ordered);
+    } catch {
+      // ignore
+    }
+  }, [persistColumnOrder]);
 
   const getRows = useMemo(
     () =>
@@ -780,6 +794,182 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }, 0);
   }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
+  // Refresh approvals when a decision is recorded
+  useEffect(() => {
+    const handler = () => {
+      dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
+      dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
+      // Also refresh tasks so approval_status reflects latest decision
+      refreshGrid();
+      try { gridRef.current?.api?.refreshCells({ force: true }); } catch {}
+      try { gridRef.current?.api?.refreshInfiniteCache(); } catch {}
+    };
+    window.addEventListener('wh:approvalDecision:success' as any, handler as any);
+    return () => window.removeEventListener('wh:approvalDecision:success' as any, handler as any);
+  }, [dispatch, refreshGrid]);
+
+  // Delete handler used by action menus (placed after refreshGrid to avoid TDZ)
+  const handleDeleteTask = useCallback(async (taskId: number) => {
+    if (!Number.isFinite(taskId)) return;
+    try {
+      await dispatch(removeTaskAsync(taskId)).unwrap();
+    } catch (error) {
+      console.error('Failed to delete task', error);
+    } finally {
+      refreshGrid();
+    }
+  }, [dispatch, refreshGrid]);
+
+  const columnDefs = useMemo(() => buildWorkspaceColumns({
+    getUserDisplayName,
+    getStatusIcon,
+    getAllowedNextStatuses,
+    handleChangeStatus,
+    statusesLoaded: metadataLoadedFlags.statusesLoaded,
+    priorityMap,
+    prioritiesLoaded: metadataLoadedFlags.prioritiesLoaded,
+    filteredPriorities,
+    statusMap,
+    usersLoaded: metadataLoadedFlags.usersLoaded,
+    getUsersFromIds,
+    formatDueDate,
+    spotMap,
+    spotsLoaded: metadataLoadedFlags.spotsLoaded,
+    userMap,
+    getDoneStatusId,
+    groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
+    categoryMap,
+    showDescriptions: rowDensity !== 'compact',
+    density: rowDensity,
+    approvalMap,
+    taskApprovalInstances: stableTaskApprovalInstances,
+    tagMap,
+    taskTags,
+    taskTagsMap,
+    tagDisplayMode,
+    visibleColumns,
+    workspaceCustomFields,
+    taskCustomFieldValueMap,
+    customFields,
+    taskNotes,
+    taskAttachments,
+    approvalApprovers,
+    currentUserId: user?.id,
+    onDeleteTask: handleDeleteTask,
+    onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
+    slaMap,
+  } as any), [
+    statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
+    getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
+    metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
+    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
+    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap,
+    visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
+  ]);
+  const defaultColDef = useMemo(() => createDefaultColDef(), []);
+
+  // Re-apply stored order when column definitions change (e.g., toggling visibility)
+  useEffect(() => {
+    applyStoredColumnOrder();
+  }, [columnDefs, applyStoredColumnOrder]);
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    const colApi = gridRef.current?.columnApi;
+    if (!api) return;
+
+    const currentFilterModel = api.getFilterModel?.() || {};
+
+    // In infinite mode, ensure grouping is cleared visually
+    if (!useClientSide) {
+      try {
+        api.setGridOption('autoGroupColumnDef', undefined as any);
+        colApi?.setRowGroupColumns([]);
+        api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        // If grid lost filters, re-apply from saved external model
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
+      } catch {}
+      return;
+    }
+
+    // Client-side mode: apply or clear
+    try {
+      if (groupBy === 'none') {
+        api.setGridOption('autoGroupColumnDef', undefined as any);
+        colApi?.setRowGroupColumns([]);
+        // show hidden group columns if previously hidden
+        colApi?.setColumnVisible('spot_id', true);
+        colApi?.setColumnVisible('status_id', true);
+        colApi?.setColumnVisible('priority_id', true);
+        api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
+        api.refreshClientSideRowModel?.('everything');
+      } else {
+        api.setGridOption('autoGroupColumnDef', autoGroupColumnDef);
+        api.setGridOption('groupDefaultExpanded', collapseGroups ? 0 : 1);
+        // Explicitly set the grouped column to ensure switch takes effect
+        const field = groupBy;
+        colApi?.setRowGroupColumns([field]);
+        // hide the grouped column to avoid duplication
+        colApi?.setColumnVisible('spot_id', field !== 'spot_id');
+        colApi?.setColumnVisible('status_id', field !== 'status_id');
+        colApi?.setColumnVisible('priority_id', field !== 'priority_id');
+        api.setColumnDefs(columnDefs as any);
+        if (currentFilterModel && Object.keys(currentFilterModel).length > 0) {
+          api.setFilterModel(currentFilterModel);
+          externalFilterModelRef.current = currentFilterModel;
+        }
+        const saved = externalFilterModelRef.current || {};
+        if (!api.isAnyFilterPresent?.() && saved && Object.keys(saved).length > 0) {
+          api.setFilterModel(saved);
+        }
+        api.refreshClientSideRowModel?.('everything');
+      }
+    } catch {}
+  }, [autoGroupColumnDef, collapseGroups, groupBy, columnDefs, useClientSide]);
+
+  const getContextMenuItems = useCallback((params: any) => {
+    const row = params?.node?.data;
+    const id = Number(row?.id);
+    const items: any[] = [];
+
+    if (row && Number.isFinite(id)) {
+      items.push({
+        name: 'Delete task',
+        action: () => handleDeleteTask(id),
+        cssClasses: ['wh-context-danger'],
+      });
+      items.push({
+        name: 'Log (placeholder)',
+        action: () => console.info('Log action selected (placeholder) for task', id),
+      });
+      items.push('separator');
+    }
+
+    if (params?.defaultItems) {
+      items.push(...params.defaultItems);
+    } else {
+      items.push('copy', 'copyWithHeaders', 'paste');
+    }
+
+    return items;
+  }, [handleDeleteTask]);
+
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {
     if (gridRef.current?.api && modulesLoaded) {
@@ -845,6 +1035,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       } catch {}
       refreshGrid();
     }
+
+    applyStoredColumnOrder(params.columnApi);
 
     setTimeout(() => {
       suppressPersistRef.current = false;
@@ -939,6 +1131,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
         rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
         {...gridOptions}
+        suppressContextMenu={false}
+        getContextMenuItems={getContextMenuItems}
         autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
         rowSelection={'multiple'}
         suppressRowClickSelection={true}
@@ -1007,6 +1201,16 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           if (onRowDoubleClicked && e?.data) {
             onRowDoubleClicked(e.data);
           }
+        }}
+        onColumnMoved={(e: any) => {
+          if (e?.finished === false) return;
+          handleColumnOrderChanged(e?.columnApi);
+        }}
+        onColumnPinned={(e: any) => {
+          handleColumnOrderChanged(e?.columnApi);
+        }}
+        onColumnVisible={(e: any) => {
+          handleColumnOrderChanged(e?.columnApi);
         }}
         onCellDoubleClicked={(e: any) => {
           // Fallback: handle double click at cell level if row-level doesn't work

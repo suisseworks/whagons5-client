@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "@/store";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
 import { TaskRow } from "@/components/TaskList/TaskRow";
 import { motion } from "motion/react";
+import { removeTaskAsync } from "@/store/reducers/tasksSlice";
 
 function createStatusMap(statuses: any[]) {
   const m: Record<number, any> = {};
@@ -42,8 +43,10 @@ export default function TaskListTab({
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
+  const dispatch = useDispatch<AppDispatch>();
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   
   // Get row density from localStorage and listen for changes
   const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
@@ -89,6 +92,22 @@ export default function TaskListTab({
   // status icon resolver is provided in WorkspaceTable; here we pass undefined so StatusBadge shows dot by color
   const getStatusIcon = undefined as any;
 
+  const handleDeleteTask = async (taskId: number) => {
+    const numericId = Number(taskId);
+    if (!Number.isFinite(numericId)) {
+      console.warn("Invalid task id for delete", taskId);
+      return;
+    }
+    setActionError(null);
+    try {
+      await dispatch(removeTaskAsync(numericId)).unwrap();
+      setRows((prev) => prev ? prev.filter((t) => Number(t?.id) !== numericId) : prev);
+    } catch (e: any) {
+      console.error("Failed to delete task", e);
+      setActionError(e?.message || "Failed to delete task");
+    }
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -120,6 +139,11 @@ export default function TaskListTab({
 
   return (
     <motion.div className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      {actionError ? (
+        <div className="text-sm text-destructive" role="alert">
+          {actionError}
+        </div>
+      ) : null}
       {rows.map((task) => (
         <TaskRow
           key={task.id}
@@ -130,6 +154,8 @@ export default function TaskListTab({
           categoryMap={categoryMap}
           getStatusIcon={getStatusIcon}
           density={density}
+          onDelete={() => handleDeleteTask(Number(task?.id))}
+          onLog={() => console.info("Log action selected (placeholder) for task", task?.id)}
         />
       ))}
     </motion.div>

@@ -29,9 +29,8 @@ export function ActionsCellRenderer({
   onDelete,
   customActions = []
 }: ActionsCellRendererProps) {
-  // Default actions if not provided
   const defaultActions: ActionButton[] = [];
-  
+
   if (onEdit) {
     defaultActions.push({
       icon: faEdit,
@@ -40,7 +39,7 @@ export function ActionsCellRenderer({
       className: "p-1 h-7 w-7"
     });
   }
-  
+
   if (onDelete) {
     defaultActions.push({
       icon: faTrash,
@@ -50,7 +49,6 @@ export function ActionsCellRenderer({
     });
   }
 
-  // If caller provided explicit actions, render them as-is
   const hasExplicitActions = Array.isArray(actions) && actions.length > 0;
   const leftActions = hasExplicitActions ? (actions as ActionButton[]) : customActions;
   const rightActions = hasExplicitActions ? [] : defaultActions;
@@ -60,61 +58,38 @@ export function ActionsCellRenderer({
     action.onClick(data);
   };
 
+  const renderActionButton = (action: ActionButton, key: React.Key, keyPrefix = '') => {
+    const computedLabel = typeof action.label === 'function' ? action.label(data) : action.label;
+    const titleText = typeof computedLabel === 'string' ? computedLabel : undefined;
+    return (
+      <Button
+        key={`${keyPrefix}${key}`}
+        size="sm"
+        variant={action.variant || "outline"}
+        onClick={(e) => handleAction(action, e)}
+        className={action.className}
+        disabled={action.disabled ? action.disabled(data) : false}
+        title={titleText}
+      >
+        <FontAwesomeIcon icon={action.icon} className="w-3 h-3" />
+        {computedLabel ? <span className="ml-1">{computedLabel}</span> : null}
+        {action.renderExtra ? (
+          <span className="ml-2">{action.renderExtra(data)}</span>
+        ) : null}
+      </Button>
+    );
+  };
+
   return (
-    <div className="flex items-center h-full w-full justify-between" style={{ width: '100%' }}>
-      <div className="flex items-center space-x-2">
-        {leftActions.map((action, index) => {
-        const computedLabel = typeof action.label === 'function' ? action.label(data) : action.label;
-        const titleText = typeof computedLabel === 'string' ? computedLabel : undefined;
-        return (
-          <Button
-            key={index}
-            size="sm"
-            variant={action.variant || "outline"}
-            onClick={(e) => handleAction(action, e)}
-            className={action.className}
-            disabled={action.disabled ? action.disabled(data) : false}
-            title={titleText}
-          >
-            <FontAwesomeIcon icon={action.icon} className="w-3 h-3" />
-            {computedLabel ? <span className="ml-1">{computedLabel}</span> : null}
-            {action.renderExtra ? (
-              <span className="ml-2">{action.renderExtra(data)}</span>
-            ) : null}
-          </Button>
-        );
-        })}
+    <div className="flex h-full w-full items-center justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {leftActions.map((action, index) => renderActionButton(action, index))}
+        {rightActions.map((action, index) => renderActionButton(action, index, 'r-'))}
       </div>
-      {rightActions.length > 0 ? (
-        <div className="flex items-center space-x-2">
-          {rightActions.map((action, index) => {
-            const computedLabel = typeof action.label === 'function' ? action.label(data) : action.label;
-            const titleText = typeof computedLabel === 'string' ? computedLabel : undefined;
-            return (
-              <Button
-                key={`r-${index}`}
-                size="sm"
-                variant={action.variant || "outline"}
-                onClick={(e) => handleAction(action, e)}
-                className={action.className}
-                disabled={action.disabled ? action.disabled(data) : false}
-                title={titleText}
-              >
-                <FontAwesomeIcon icon={action.icon} className="w-3 h-3" />
-                {computedLabel ? <span className="ml-1">{computedLabel}</span> : null}
-                {action.renderExtra ? (
-                  <span className="ml-2">{action.renderExtra(data)}</span>
-                ) : null}
-              </Button>
-            );
-          })}
-        </div>
-      ) : null}
     </div>
   );
 }
 
-// Helper function to create actions cell renderer
 export function createActionsCellRenderer(props: Omit<ActionsCellRendererProps, keyof ICellRendererParams>) {
   return (params: ICellRendererParams) => <ActionsCellRenderer {...params} {...props} />;
 }

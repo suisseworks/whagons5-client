@@ -3,12 +3,12 @@ import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
-import { RowGroupingModule, TreeDataModule, LicenseManager } from 'ag-grid-enterprise';
+import { RowGroupingModule, TreeDataModule, SetFilterModule, LicenseManager } from 'ag-grid-enterprise';
 
 export const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
 
-// Register AG Grid modules (community + enterprise needed for grouping/tree)
-ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataModule]);
+// Register AG Grid modules (community + enterprise needed for grouping/tree/set filter)
+ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataModule, SetFilterModule]);
 
 // Set license if available
 if (AG_GRID_LICENSE) {
@@ -21,6 +21,8 @@ export interface SettingsGridProps<T = any> {
   rowData: T[];
   columnDefs: ColDef[];
   onGridReady?: (params: GridReadyEvent) => void;
+  onRowDragEnd?: (event: any) => void;
+  getRowId?: (params: any) => string;
   height?: string;
   className?: string;
   noRowsMessage?: string;
@@ -42,6 +44,8 @@ export function SettingsGrid<T = any>({
   rowData,
   columnDefs,
   onGridReady,
+  onRowDragEnd,
+  getRowId,
   height,
   className,
   noRowsMessage = "No data found",
@@ -104,6 +108,8 @@ export function SettingsGrid<T = any>({
           resizable: true
         }}
         onCellValueChanged={onCellValueChanged}
+        onRowDragEnd={onRowDragEnd}
+        getRowId={getRowId}
         autoGroupColumnDef={autoGroupColumnDef}
         {...(gridOptions || {})}
         quickFilterText={quickFilterText}

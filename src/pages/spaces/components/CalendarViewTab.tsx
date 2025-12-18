@@ -39,7 +39,7 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
     <div className="h-full w-full flex flex-col gap-4">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Calendar className="w-4 h-4" />
-        <span>Calendar (Bryntum mock)</span>
+        <span>Calendar</span>
         <span className="text-xs ml-auto">space {workspaceId ?? ""}</span>
       </div>
 

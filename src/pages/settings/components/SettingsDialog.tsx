@@ -25,6 +25,8 @@ export interface SettingsDialogProps {
   entityName?: string; // For delete dialogs
   entityData?: any; // The item being deleted
   renderEntityPreview?: (data: any) => ReactNode; // Custom preview for delete dialog
+  footerActions?: ReactNode; // Optional extra buttons rendered near submit
+  contentClassName?: string; // Optional className to adjust DialogContent width
 }
 
 export function SettingsDialog({
@@ -44,7 +46,9 @@ export function SettingsDialog({
   submitIcon,
   entityName,
   entityData,
-  renderEntityPreview
+  renderEntityPreview,
+  footerActions,
+  contentClassName
 }: SettingsDialogProps) {
   const formRef = useRef<HTMLFormElement | null>(null);
   const submitNow = () => {
@@ -114,7 +118,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"}>
+      <DialogContent className={`${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
         <DialogHeader>
           <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
             {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
@@ -159,6 +163,7 @@ export function SettingsDialog({
                 )}
                 {getDefaultSubmitText()}
               </Button>
+              {footerActions ? footerActions : null}
             </DialogFooter>
           </>
         ) : (
@@ -184,6 +189,7 @@ export function SettingsDialog({
               )}
               {getDefaultSubmitText()}
             </Button>
+            {footerActions ? footerActions : null}
           </DialogFooter>
         )}
       </DialogContent>

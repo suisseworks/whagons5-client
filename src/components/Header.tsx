@@ -12,7 +12,7 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus, Layers, Sparkles, Search } from "lucide-react";
+import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector } from "react-redux";
@@ -21,7 +21,6 @@ import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
-import AssistantWidget from '@/components/AssistantWidget';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Input } from '@/components/ui/input';
@@ -30,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
+import { useLanguage } from "@/providers/LanguageProvider";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -49,12 +49,13 @@ function Header() {
 
     const isSettings = useMemo(() => location.pathname.startsWith('/settings'), [location.pathname]);
     const isAnalytics = useMemo(() => location.pathname.startsWith('/analytics'), [location.pathname]);
+    const { t } = useLanguage();
 
 
 
     const breadcrumbs = useMemo(() => {
         const parts = location.pathname.split('/').filter(Boolean);
-        const labelMap: Record<string, string> = {
+        const labelDefaults: Record<string, string> = {
             tasks: 'Tasks',
             workspace: 'Workspace',
             settings: 'Settings',
@@ -66,6 +67,22 @@ function Header() {
             profile: 'Profile',
             analytics: 'Analytics',
             stripe: 'Stripe',
+            tags: 'Tags',
+            priorities: 'Priorities',
+            global: 'Global',
+            forms: 'Forms',
+            approvals: 'Approvals',
+            slas: 'SLAs',
+            workflows: 'Workflows',
+            invitations: 'Invitations',
+            'job-positions': 'Job Positions',
+            statuses: 'Statuses',
+            status: 'Status',
+            'spot-types': 'Spot Types',
+        };
+        const getLabel = (seg: string) => {
+            const fallback = labelDefaults[seg] ?? seg.charAt(0).toUpperCase() + seg.slice(1);
+            return t(`breadcrumbs.${seg}`, fallback);
         };
         const acc: Array<{ label: string; to?: string }> = [];
         let path = '';
@@ -73,23 +90,23 @@ function Header() {
         // Special handling for settings subpages
         if (parts[0] === 'settings' && parts.length > 1) {
             // For settings subpages, create breadcrumbs like: Settings > Subpage
-            acc.push({ label: 'Settings', to: '/settings' });
+            acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
             for (let i = 1; i < parts.length; i++) {
                 const seg = parts[i];
                 path += `/${seg}`;
-                const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+                const label = getLabel(seg);
                 acc.push({ label, to: `/settings${path}` });
             }
         } else {
             // Regular breadcrumbs for non-settings pages
             for (const seg of parts) {
                 path += `/${seg}`;
-                const label = labelMap[seg] || seg.charAt(0).toUpperCase() + seg.slice(1);
+                const label = getLabel(seg);
                 acc.push({ label, to: path });
             }
         }
         return acc;
-    }, [location.pathname]);
+    }, [location.pathname, t]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
@@ -284,8 +301,9 @@ function Header() {
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
         if (isDarkTheme) {
-            // Solid dark per spec with subtle bottom border
-            return { backgroundColor: '#0A0A0A', borderBottom: '1px solid #1F1F1F' } as React.CSSProperties;
+            // Solid dark per spec. Border/shadow are handled by the header class so we
+            // don't accidentally create an extra 1px border that misaligns with the sidebar header.
+            return { backgroundColor: '#0A0A0A' } as React.CSSProperties;
         }
         // Light mode: very soft neutral gradient
         const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
@@ -431,7 +449,7 @@ function Header() {
     if (!firebaseUser || userLoading) {
         return (
             <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
-                <div className="flex items-center space-x-3 px-6 h-16">
+                <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="animate-pulse bg-gray-300 rounded-full h-6 w-6"></div>
@@ -445,7 +463,7 @@ function Header() {
     if (!user) {
         return (
             <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
-                <div className="flex items-center space-x-3 px-6 h-16">
+                <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
                         <div className="bg-gray-300 rounded-full h-7 w-7"></div>
@@ -473,7 +491,7 @@ function Header() {
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
             
-            <div className="flex items-center justify-between px-6 h-16 relative z-10">
+            <div className="flex items-center justify-between px-6 h-[var(--app-header-height)] relative z-10">
                 {/* Left: Workspace name (if in workspace), Settings/Analytics (if in those pages), otherwise breadcrumbs */}
                 <div className="flex items-center space-x-2 min-w-0">
                     {currentWorkspaceName ? (
@@ -526,7 +544,7 @@ function Header() {
                             <BreadcrumbList className="gap-1.5 sm:gap-2">
                                 <BreadcrumbItem>
                                     <BreadcrumbLink asChild className="font-medium text-foreground/80 hover:text-foreground">
-                                        <Link to="/welcome" className="truncate max-w-[6rem]">Home</Link>
+                                        <Link to="/welcome" className="truncate max-w-[6rem]">{t('breadcrumbs.home', 'Home')}</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 {breadcrumbs.map((bc, idx) => (
@@ -580,18 +598,6 @@ function Header() {
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
-                    <AssistantWidget
-                        floating={false}
-                        renderTrigger={(open) => (
-                            <button
-                                className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent/50 text-foreground transition-colors bg-gradient-to-br from-[#0078D4] via-[#00B4D8] to-[#00D4AA] hover:from-[#006BB3] hover:via-[#0099B8] hover:to-[#00B899]"
-                                title="Copilot"
-                                onClick={open}
-                            >
-                                <Sparkles className="h-5 w-5 text-white" />
-                            </button>
-                        )}
-                    />
 
                     {/* Notifications */}
                     <DropdownMenu>

@@ -14,16 +14,29 @@ export interface FormFieldProps {
   required?: boolean;
   className?: string;
   children: React.ReactNode;
+  hideLabel?: boolean;
 }
 
-export function FormField({ id, label, required = false, className = "", children }: FormFieldProps) {
+export function FormField({
+  id,
+  label,
+  required = false,
+  className = "",
+  children,
+  hideLabel = false,
+}: FormFieldProps) {
+  const gridColumnsClass = hideLabel ? "grid-cols-1" : "grid-cols-4";
+  const contentSpanClass = hideLabel ? "col-span-1" : "col-span-3";
+
   return (
-    <div className={`grid grid-cols-4 items-center gap-4 ${className}`}>
-      <Label htmlFor={id} className="text-right">
-        {label}
-        {required && <span className="text-destructive ml-1">*</span>}
-      </Label>
-      <div className="col-span-3">
+    <div className={`grid ${gridColumnsClass} items-center gap-4 ${className}`}>
+      {!hideLabel && (
+        <Label htmlFor={id} className="text-right">
+          {label}
+          {required && <span className="text-destructive ml-1">*</span>}
+        </Label>
+      )}
+      <div className={contentSpanClass}>
         {children}
       </div>
     </div>
@@ -249,6 +262,8 @@ export interface SelectFieldProps {
   valueArray?: (string | number)[];
   defaultValueArray?: (string | number)[];
   onChangeArray?: (values: (string | number)[]) => void;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
 export function SelectField({
@@ -265,7 +280,9 @@ export function SelectField({
   multiple = false,
   valueArray,
   defaultValueArray,
-  onChangeArray
+  onChangeArray,
+  searchable = false,
+  searchPlaceholder = "Search..."
 }: SelectFieldProps) {
   const isControlled = value !== undefined && onChange !== undefined;
   const selectProps = isControlled
@@ -310,6 +327,15 @@ export function SelectField({
     );
   }
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredOptions = searchable
+    ? options.filter((option) => {
+        const q = searchTerm.trim().toLowerCase();
+        if (!q) return true;
+        return option.label.toLowerCase().includes(q) || String(option.value).toLowerCase().includes(q);
+      })
+    : options;
+
   return (
     <FormField id={id} label={label} required={required} className={className}>
       <Select {...selectProps}>
@@ -317,7 +343,17 @@ export function SelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => {
+          {searchable && (
+            <div className="p-2">
+              <Input
+                placeholder={searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8"
+              />
+            </div>
+          )}
+          {filteredOptions.map((option) => {
             const val = String(option.value);
             return (
               <SelectItem key={`${id}-${val}`} value={val} disabled={option.disabled}>
@@ -350,6 +386,7 @@ export interface CheckboxFieldProps {
   description?: string;
   className?: string;
   disabled?: boolean;
+  hideFieldLabel?: boolean;
 }
 
 export function CheckboxField({
@@ -361,7 +398,8 @@ export function CheckboxField({
   onChange,
   description,
   className = "",
-  disabled = false
+  disabled = false,
+  hideFieldLabel = false
 }: CheckboxFieldProps) {
   const isControlled = checked !== undefined && onChange !== undefined;
 
@@ -373,7 +411,7 @@ export function CheckboxField({
   };
 
   return (
-    <FormField id={id} label={label} className={className}>
+    <FormField id={id} label={label} className={className} hideLabel={hideFieldLabel}>
       <div className="flex items-center space-x-2">
         <Checkbox
           id={id}
