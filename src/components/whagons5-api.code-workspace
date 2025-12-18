@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../../../whagons5_app"
+		},
+		{
+			"path": "../../../whagonsRTE"
 		}
 	],
 	"settings": {}

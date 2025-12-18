@@ -16,11 +16,15 @@ import { AddFieldToolbar } from "./AddFieldToolbar";
 
 export interface BuilderSchemaField {
   id: number;
-  type: 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number' | 'time' | 'datetime' | 'signature';
+  type: 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number' | 'time' | 'datetime' | 'signature' | 'image' | 'fixed-image';
   label: string;
   placeholder?: string;
   required?: boolean;
   options?: string[];
+  properties?: {
+    imageId?: string | null; // Asset ID for fixed-image fields
+    [key: string]: any; // Allow other properties
+  };
 }
 
 export interface BuilderSchema {

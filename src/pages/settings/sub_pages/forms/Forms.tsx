@@ -11,7 +11,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 interface FormBuilderSchema {
   fields: Array<{
     id: number;
-    type: 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number' | 'time' | 'datetime' | 'signature';
+    type: 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number' | 'time' | 'datetime' | 'signature' | 'image' | 'fixed-image';
     label: string;
     placeholder?: string;
     required?: boolean;
@@ -38,6 +38,7 @@ import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { useAuthUser } from "@/providers/AuthProvider";
+import { api } from "@/api/whagonsApi";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -58,6 +59,8 @@ import { TimeField } from "./components/field-types/TimeField";
 import { DateTimeField } from "./components/field-types/DateTimeField";
 import { NumberField } from "./components/field-types/NumberField";
 import { SignatureField } from "./components/field-types/SignatureField";
+import { ImageField } from "./components/field-types/ImageField";
+import { FixedImageField } from "./components/field-types/FixedImageField";
 import StatusButton from "@/components/ui/StatusButton";
 
 function Forms() {
@@ -165,13 +168,8 @@ function Forms() {
       if (activeVersionId) {
         setCurrentVersionId(activeVersionId);
         try {
-          const res = await fetch(`/api/form-versions/${activeVersionId}/usages`);
-          if (res.ok) {
-            const data = await res.json();
-            setIsVersionUsed(data.task_count > 0);
-          } else {
-            setIsVersionUsed(false);
-          }
+          const response = await api.get(`/form-versions/${activeVersionId}/usages`);
+          setIsVersionUsed(response.data.task_count > 0);
         } catch (e) {
           console.error('Failed to fetch version usages:', e);
           setIsVersionUsed(false);
@@ -642,6 +640,13 @@ function Forms() {
                   {f.type === 'datetime' && <DateTimeField isEditing={false} />}
                   {f.type === 'number' && <NumberField isEditing={false} />}
                   {f.type === 'signature' && <SignatureField isEditing={false} />}
+                  {f.type === 'image' && <ImageField isEditing={false} />}
+                  {f.type === 'fixed-image' && (
+                    <FixedImageField 
+                      isEditing={false}
+                      imageId={(f as any).properties?.imageId}
+                    />
+                  )}
                 </div>
               ))}
             </div>

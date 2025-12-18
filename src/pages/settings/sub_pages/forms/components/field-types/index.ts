@@ -7,4 +7,6 @@ export { TimeField } from './TimeField';
 export { DateTimeField } from './DateTimeField';
 export { NumberField } from './NumberField';
 export { SignatureField } from './SignatureField';
+export { ImageField } from './ImageField';
+export { FixedImageField } from './FixedImageField';
 
