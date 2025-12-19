@@ -5,6 +5,8 @@ WORKDIR /app
 
 # Accept build arguments for environment variables
 ARG FONTAWESOME_PACKAGE_TOKEN
+ARG BRYNTUM_USERNAME
+ARG BRYNTUM_PASSWORD
 ARG VITE_AG_GRID_LICENSE_KEY
 ARG VITE_API_URL
 ARG VITE_DEVELOPMENT=false
@@ -26,15 +28,20 @@ ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
 # Copy package files
 COPY package.json bun.lockb* package-lock.json* pnpm-lock.yaml* ./
 
-# Create .npmrc with FontAwesome token (Docker doesn't substitute vars in COPY)
+# Create .npmrc with FontAwesome token and Bryntum registry (Docker doesn't substitute vars in COPY)
 # Use $FONTAWESOME_PACKAGE_TOKEN from ARG (available in RUN commands)
 RUN if [ -z "$FONTAWESOME_PACKAGE_TOKEN" ]; then \
       echo "ERROR: FONTAWESOME_PACKAGE_TOKEN is not set!" && exit 1; \
     fi && \
+    if [ -z "$BRYNTUM_USERNAME" ] || [ -z "$BRYNTUM_PASSWORD" ]; then \
+      echo "ERROR: BRYNTUM_USERNAME and BRYNTUM_PASSWORD must be set!" && exit 1; \
+    fi && \
     echo "@fortawesome:registry=https://npm.fontawesome.com/" > .npmrc && \
     echo "@awesome.me:registry=https://npm.fontawesome.com/" >> .npmrc && \
     echo "//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" >> .npmrc && \
-    echo "Created .npmrc with FontAwesome token"
+    echo "@bryntum:registry=https://npm.bryntum.com" >> .npmrc && \
+    echo "//npm.bryntum.com/:_authToken=$(echo -n \"$BRYNTUM_USERNAME:$BRYNTUM_PASSWORD\" | base64)" >> .npmrc && \
+    echo "Created .npmrc with FontAwesome token and Bryntum registry"
 
 # Install dependencies (Bun reads package-lock.json or creates bun.lockb)
 # Bun respects .npmrc for registry authentication
