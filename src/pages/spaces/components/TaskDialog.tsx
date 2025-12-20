@@ -359,6 +359,12 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       .filter((row) => !!row.field);
   }, [categoryId, categoryCustomFields, customFields]);
 
+  useEffect(() => {
+    if (activeTab === 'customFields' && categoryFields.length === 0) {
+      setActiveTab('basic');
+    }
+  }, [activeTab, categoryFields.length]);
+
   const categoryInitialStatusId = useMemo(() => {
     if (mode === 'edit') return null; // Edit mode uses existing status
     const initial = (statuses || []).find((s: any) => s.initial === true);
@@ -1116,7 +1122,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             e.preventDefault();
           }
         }}
-        className={`w-full ${mode === 'create-all' ? 'sm:w-[900px] max-w-[900px]' : 'sm:w-[1240px] max-w-[1240px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
+        className={`w-full ${mode === 'create-all' ? 'sm:w-[1050px] max-w-[1050px]' : 'sm:w-[1400px] max-w-[1400px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
       >
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
@@ -1137,17 +1143,12 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               </span>
             )}
           </div>
-          {mode === 'edit' && (
-            <SheetDescription className="text-sm text-[#6B7280] mt-1">
-              Update task details and configuration.
-            </SheetDescription>
-          )}
         </SheetHeader>
 
         {/* Content Area - Scrollable */}
         <div className="flex flex-col flex-1 min-h-0 overflow-auto">
           {/* Tabs Navigation */}
-          <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+          <div className="px-4 sm:px-6 pt-2 sm:pt-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="inline-flex h-auto p-0 pr-6 bg-transparent border-b border-border/40 rounded-none gap-0 w-full overflow-x-auto">
                 <TabsTrigger 
@@ -1156,15 +1157,17 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                 >
                   Basic Details
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="customFields" 
-                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
-                >
-                  Campos personalizados
-                  {customFieldRequirementMissing && (
-                    <span className="ml-2 text-[11px] text-red-500 font-semibold align-middle">●</span>
-                  )}
-                </TabsTrigger>
+                {categoryFields.length > 0 && (
+                  <TabsTrigger 
+                    value="customFields" 
+                    className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  >
+                    Fields
+                    {customFieldRequirementMissing && (
+                      <span className="ml-2 text-[11px] text-red-500 font-semibold align-middle">●</span>
+                    )}
+                  </TabsTrigger>
+                )}
                 <TabsTrigger 
                   value="additional" 
                   className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
@@ -1312,14 +1315,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                 )}
 
                 {/* Description - Collapsible */}
-                {!showDescription && !description.trim() ? (
+                {!showDescription ? (
                   <button
                     type="button"
                     onClick={() => setShowDescription(true)}
                     className="flex items-center gap-2 text-sm text-[#6B7280] hover:text-foreground transition-colors duration-150 py-2"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Add description</span>
+                    <span>{description.trim() ? 'Show description' : 'Add description'}</span>
                   </button>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -1442,30 +1445,10 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </Select>
                 </div>
 
-                {/* Tags - Only for create and edit modes */}
-                {(mode === 'create' || mode === 'edit') && (
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium font-[500] text-foreground">
-                      Tags
-                    </Label>
-                    <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
-                      <TagMultiSelect
-                        tags={tags}
-                        value={selectedTagIds}
-                        onValueChange={(values) => {
-                          setSelectedTagIds(values);
-                        }}
-                        placeholder="Select tags..."
-                        searchPlaceholder="Search tags..."
-                        emptyText="No tags found."
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                )}
               </TabsContent>
 
               {/* Custom Fields Tab */}
+              {categoryFields.length > 0 && (
               <TabsContent value="customFields" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
                 {!categoryId ? (
                   <p className="text-sm text-[#6B7280]">Selecciona una categoría para ver los campos personalizados.</p>
@@ -1499,23 +1482,32 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </div>
                 )}
               </TabsContent>
+              )}
+
 
               {/* Additional Info Tab */}
               <TabsContent value="additional" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
-                {/* Due Date */}
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="due" className="text-sm font-medium font-[500] text-foreground">
-                    Due Date
-                  </Label>
-                  <Input 
-                    id="due" 
-                    type="date" 
-                    value={dueDate} 
-                    onChange={(e) => setDueDate(e.target.value)} 
-                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
-                  />
-                </div>
-
+                {/* Tags - Only for create and edit modes */}
+                {(mode === 'create' || mode === 'edit') && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium font-[500] text-foreground">
+                      Tags
+                    </Label>
+                    <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <TagMultiSelect
+                        tags={tags}
+                        value={selectedTagIds}
+                        onValueChange={(values) => {
+                          setSelectedTagIds(values);
+                        }}
+                        placeholder="Select tags..."
+                        searchPlaceholder="Search tags..."
+                        emptyText="No tags found."
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                )}
                 {/* SLA */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium font-[500] text-foreground">
@@ -1559,6 +1551,21 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Due Date */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="due" className="text-sm font-medium font-[500] text-foreground">
+                    Due Date
+                  </Label>
+                  <Input 
+                    id="due" 
+                    type="date" 
+                    value={dueDate} 
+                    onChange={(e) => setDueDate(e.target.value)} 
+                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
+                  />
+                </div>
+
               </TabsContent>
             </Tabs>
           </div>

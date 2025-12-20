@@ -298,17 +298,12 @@ function Header() {
     }, []);
 
     // Subtle gradient background for workspace headers
+    const headerSurfaceColor = isDarkTheme ? '#0F0F0F' : 'var(--sidebar-header)';
+
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
-        if (isDarkTheme) {
-            // Solid dark per spec. Border/shadow are handled by the header class so we
-            // don't accidentally create an extra 1px border that misaligns with the sidebar header.
-            return { backgroundColor: '#0A0A0A' } as React.CSSProperties;
-        }
-        // Light mode: very soft neutral gradient
-        const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
-        return { backgroundImage: `linear-gradient(180deg, ${grayTop} 0%, var(--color-card) 70%)` } as React.CSSProperties;
-    }, [currentWorkspaceName, isDarkTheme]);
+        return { backgroundColor: headerSurfaceColor } as React.CSSProperties;
+    }, [currentWorkspaceName, headerSurfaceColor]);
 
     // Track API GET requests for syncing indicator (debounced to prevent flickering)
     useEffect(() => {
@@ -440,15 +435,12 @@ function Header() {
 
     // Loading/error header gradient style
     const loadingHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        if (isDarkTheme) {
-            return { background: 'linear-gradient(90deg, #000000 0%, #1a5d52 100%)' };
-        }
-        return { background: 'linear-gradient(90deg, #ffffff 0%, #27C1A7 100%)' };
-    }, [isDarkTheme]);
+        return { backgroundColor: headerSurfaceColor };
+    }, [headerSurfaceColor]);
 
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
+            <header className="sticky top-0 z-50 w-full backdrop-blur-xl" style={loadingHeaderGradientStyle}>
                 <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -462,7 +454,7 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
+            <header className="sticky top-0 z-50 w-full backdrop-blur-xl" style={loadingHeaderGradientStyle}>
                 <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -476,17 +468,12 @@ function Header() {
 
     // Main header gradient style - soft gradient for settings pages
     const mainHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        if (isDarkTheme) {
-            // Very soft dark gradient: black to subtle dark teal
-            return { background: 'linear-gradient(90deg, #000000 0%, #0a1f1c 100%)' };
-        }
-        // Very soft light gradient: white to very light teal tint
-        return { background: 'linear-gradient(90deg, #ffffff 0%, #f0fdfa 100%)' };
-    }, [isDarkTheme]);
+        return { backgroundColor: headerSurfaceColor };
+    }, [headerSurfaceColor]);
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
+        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}

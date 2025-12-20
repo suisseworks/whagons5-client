@@ -634,7 +634,9 @@ function Templates() {
           return category?.name || `Category ${categoryId}`;
         },
         searchType: 'match',
-        suppressSorting: true
+        suppressSorting: true,
+        suppressSelectAll: true,
+        defaultToNothingSelected: true
       }
     },
     {

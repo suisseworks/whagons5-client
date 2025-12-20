@@ -392,20 +392,24 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   const handleChangeStatus = useCallback(async (task: any, toStatusId: number): Promise<boolean> => {
     if (!task || Number(task.status_id) === Number(toStatusId)) return true;
-    // Block starting/progress changes when approval is required but not yet approved
+    // Block status changes only when an approval exists and is pending or rejected
     const needsApproval = !!task?.approval_id;
-    const isApproved = String(task?.approval_status || '').toLowerCase() === 'approved';
-    if (needsApproval && !isApproved) {
+    const normalizedApprovalStatus = String(task?.approval_status || '').toLowerCase().trim();
+    const isPendingApproval = needsApproval && normalizedApprovalStatus === 'pending';
+    const isRejectedApproval = needsApproval && normalizedApprovalStatus === 'rejected';
+    if (isPendingApproval || isRejectedApproval) {
       try {
         window.dispatchEvent(new CustomEvent('wh:notify', {
           detail: {
             type: 'warning',
             title: 'Approval required',
-            message: 'This task cannot start until the approval is completed.',
+            message: isRejectedApproval
+              ? 'Status cannot be changed because the approval was rejected.'
+              : 'This task cannot start until the approval is completed.',
           }
         }));
       } catch {
-        console.warn('Task status change blocked: approval pending');
+        console.warn('Task status change blocked: approval pending or rejected');
       }
       return false;
     }

@@ -50,10 +50,15 @@ export const updateTaskAsync = createAsyncThunk(
             // Call API to update task using PATCH (only send updated fields)
             const response = await api.patch(`/tasks/${id}`, updates);
             const payload = (response.data?.data ?? response.data?.row ?? response.data?.rows?.[0] ?? response.data) as any;
+            // Merge with cached task and submitted updates to avoid dropping fields the API might omit (e.g., user_ids)
+            const cachedTask = await TasksCache.getTask(id.toString());
             const updatedTask = ensureTaskDefaults({
+                ...cachedTask,
                 ...payload,
+                // Ensure the fields we sent (like user_ids) are preserved even if API omits them
+                ...updates,
                 id: payload?.id ?? id,
-                created_at: payload?.created_at ?? response.data?.created_at ?? undefined,
+                created_at: payload?.created_at ?? response.data?.created_at ?? cachedTask?.created_at ?? undefined,
                 updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
             });
             

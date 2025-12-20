@@ -10,6 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import api from '@/api/whagonsApi';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
+import { iconService } from '@/database/iconService';
+import { useEffect, useState } from 'react';
 
 // ---------------------------------------------------------------------------
 type MetricAgg = { count: number; total: number; max: number };
@@ -252,21 +254,49 @@ export function buildWorkspaceColumns(opts: any) {
   const CategoryIconSmall = (props: { iconClass?: string; color?: string }) => {
     const iconColor = props.color || '#6b7280';
     const iconCls = (props.iconClass || '').trim();
-    const iconNode = iconCls ? (
-      <i className={`${iconCls} text-white text-[12px] leading-none`} aria-hidden />
-    ) : (
-      <FontAwesomeIcon 
-        icon={faTags} 
-        style={{ color: '#ffffff', fontSize: '12px' }}
-        className="text-white"
-      />
-    );
+    const [iconDef, setIconDef] = useState<any>(faTags);
+
+    useEffect(() => {
+      let cancelled = false;
+      const loadIcon = async () => {
+        if (!iconCls) {
+          setIconDef(faTags);
+          return;
+        }
+
+        // Normalize FontAwesome class formats to the raw icon name
+        let parsed = iconCls;
+        const faClassMatch = iconCls.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
+        if (faClassMatch) {
+          parsed = faClassMatch[2];
+        } else if (iconCls.startsWith('fa-')) {
+          parsed = iconCls.substring(3);
+        }
+
+        try {
+          const icon = await iconService.getIcon(parsed);
+          if (!cancelled && icon) {
+            setIconDef(icon);
+          }
+        } catch {
+          if (!cancelled) setIconDef(faTags);
+        }
+      };
+
+      loadIcon();
+      return () => { cancelled = true; };
+    }, [iconCls]);
+
     return (
       <div 
         className="w-6 h-6 min-w-[1.5rem] rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: iconColor }}
       >
-        {iconNode}
+        <FontAwesomeIcon 
+          icon={iconDef} 
+          style={{ color: '#ffffff', fontSize: '12px' }}
+          className="text-white"
+        />
       </div>
     );
   };
@@ -283,11 +313,39 @@ export function buildWorkspaceColumns(opts: any) {
   };
 
   // Always render initials instead of profile pictures
+  const getContrastingTextColor = (hexColor?: string | null): string | undefined => {
+    if (!hexColor) return undefined;
+    const hex = hexColor.replace('#', '');
+    const normalized = hex.length === 3
+      ? hex.split('').map(ch => ch + ch).join('')
+      : hex;
+    if (normalized.length !== 6) return undefined;
+    const r = parseInt(normalized.substring(0, 2), 16);
+    const g = parseInt(normalized.substring(2, 4), 16);
+    const b = parseInt(normalized.substring(4, 6), 16);
+    if ([r, g, b].some((v) => Number.isNaN(v))) return undefined;
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    // Dark text on light backgrounds, white text on dark backgrounds
+    return luminance > 0.7 ? '#111827' : '#ffffff';
+  };
+
+  const getUserColorStyle = (color?: string | null) => {
+    if (!color) return {};
+    return {
+      backgroundColor: color,
+      color: getContrastingTextColor(color),
+    };
+  };
+
   const UserInitial = ({ user }: { user: any }) => {
     const name: string = getUserDisplayName(user) || '';
     const initial = (name.trim().charAt(0) || '?').toUpperCase();
+    const colorStyle = getUserColorStyle(user?.color);
     return (
-      <AvatarFallback className="text-[11px] font-semibold">
+      <AvatarFallback
+        className="text-[11px] font-semibold"
+        style={colorStyle}
+      >
         {initial}
       </AvatarFallback>
     );
@@ -401,6 +459,7 @@ export function buildWorkspaceColumns(opts: any) {
       isRequired: boolean;
       step: number;
       respondedAt?: string | null;
+      comment?: string | null;
       approverUserId?: number | null;
     }> = [];
     
@@ -1061,10 +1120,10 @@ export function buildWorkspaceColumns(opts: any) {
         const meta: any = statusMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const approvalRequired = !!row.approval_id;
-        const normalizedApprovalStatus = String(row.approval_status || '').toLowerCase();
+        const normalizedApprovalStatus = String(row.approval_status || '').toLowerCase().trim();
         const approvalApproved = normalizedApprovalStatus === 'approved';
         const approvalPending = approvalRequired && normalizedApprovalStatus === 'pending';
-        const approvalRejected = normalizedApprovalStatus === 'rejected';
+        const approvalRejected = approvalRequired && normalizedApprovalStatus === 'rejected';
         const allowedNext = getAllowedNextStatuses(row);
         const node = (approvalPending || approvalRejected) ? (
           <div
@@ -1219,13 +1278,20 @@ export function buildWorkspaceColumns(opts: any) {
               {displayUsers.map((user: any) => (
                 <HoverPopover key={user.id} content={(
                   <div className="flex flex-col items-center gap-3">
-                    <Avatar className="h-16 w-16 border-2 border-background bg-muted text-foreground">
+                    <Avatar
+                      className="h-16 w-16 border-2 border-background"
+                      style={getUserColorStyle(user?.color)}
+                    >
                       <UserInitial user={user} />
                     </Avatar>
                     <span className="text-base font-medium text-popover-foreground text-center">{getCachedUserName(user)}</span>
                   </div>
                 )}>
-                  <Avatar className="h-6 w-6 border transition-colors cursor-pointer bg-muted text-foreground" title={getCachedUserName(user)} style={{ borderColor: '#e5e7eb' }}>
+                  <Avatar
+                    className="h-6 w-6 border transition-colors cursor-pointer"
+                    title={getCachedUserName(user)}
+                    style={{ borderColor: '#e5e7eb', ...getUserColorStyle(user?.color) }}
+                  >
                     <UserInitial user={user} />
                   </Avatar>
                 </HoverPopover>
