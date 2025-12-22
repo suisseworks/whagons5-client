@@ -458,7 +458,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     run();
   }, [workspaceId, searchText, groupBy, onModeChange, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
-  // Load taskTags, tags, notes, attachments on mount so they're available for display
+  // Load taskTags, tags, notes, attachments, custom field values on mount so they're available for display
   useEffect(() => {
     dispatch(genericActions.taskTags.getFromIndexedDB());
     dispatch(genericActions.tags.getFromIndexedDB());
@@ -466,6 +466,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     dispatch(genericActions.taskAttachments.getFromIndexedDB());
     dispatch(genericActions.approvalApprovers.getFromIndexedDB());
     dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
+    dispatch(genericActions.taskCustomFieldValues.getFromIndexedDB());
+    // Fetch custom field values from API to ensure we have the latest data (needed for cost column display)
+    dispatch(genericActions.taskCustomFieldValues.fetchFromAPI());
     // Optionally fetch from API to ensure we have the latest data
     // dispatch(genericActions.taskTags.fetchFromAPI());
     // dispatch(genericActions.tags.fetchFromAPI());
@@ -473,21 +476,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     // dispatch(genericActions.taskAttachments.fetchFromAPI());
     // dispatch(genericActions.approvalApprovers.fetchFromAPI());
     // dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
-  }, [dispatch]);
-
-  // Refresh approvals when a decision is recorded
-  useEffect(() => {
-    const handler = () => {
-      dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
-      dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
-      // Also refresh tasks so approval_status reflects latest decision
-      dispatch(genericActions.tasks.fetchFromAPI());
-      dispatch(genericActions.tasks.getFromIndexedDB());
-      try { gridRef.current?.api?.refreshCells({ force: true }); } catch {}
-      try { gridRef.current?.api?.refreshInfiniteCache(); } catch {}
-    };
-    window.addEventListener('wh:approvalDecision:success' as any, handler as any);
-    return () => window.removeEventListener('wh:approvalDecision:success' as any, handler as any);
   }, [dispatch]);
 
   // Removed on-mount loads; AuthProvider hydrates core slices
@@ -538,6 +526,20 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       gridRef.current.api.refreshCells({ columns: ['spot_id'], force: true, suppressFlash: true });
     }
   }, [spotMap]);
+
+  // Refresh custom field columns when taskCustomFieldValues change
+  useEffect(() => {
+    if (gridRef.current?.api && taskCustomFieldValues && taskCustomFieldValues.length > 0) {
+      // Refresh all columns that start with 'cf_' (custom field columns)
+      const allColumns = gridRef.current.api.getAllColumns?.() || [];
+      const customFieldColumns = allColumns
+        .filter((col: any) => col?.getColId?.()?.startsWith('cf_'))
+        .map((col: any) => col.getColId());
+      if (customFieldColumns.length > 0) {
+        gridRef.current.api.refreshCells({ columns: customFieldColumns, force: true, suppressFlash: true });
+      }
+    }
+  }, [taskCustomFieldValues]);
 
   // Determine current density to decide whether to show row descriptions
   const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
@@ -792,6 +794,20 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }, 0);
   }, [modulesLoaded, rowCache, useClientSide, searchRef, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]);
 
+  // Refresh approvals when a decision is recorded
+  useEffect(() => {
+    const handler = () => {
+      dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
+      dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
+      // Also refresh tasks so approval_status reflects latest decision
+      refreshGrid();
+      try { gridRef.current?.api?.refreshCells({ force: true }); } catch {}
+      try { gridRef.current?.api?.refreshInfiniteCache(); } catch {}
+    };
+    window.addEventListener('wh:approvalDecision:success' as any, handler as any);
+    return () => window.removeEventListener('wh:approvalDecision:success' as any, handler as any);
+  }, [dispatch, refreshGrid]);
+
   // Delete handler used by action menus (placed after refreshGrid to avoid TDZ)
   const handleDeleteTask = useCallback(async (taskId: number) => {
     if (!Number.isFinite(taskId)) return;
@@ -834,6 +850,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     visibleColumns,
     workspaceCustomFields,
     taskCustomFieldValueMap,
+    customFields,
     taskNotes,
     taskAttachments,
     approvalApprovers,
@@ -848,7 +865,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
     filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
     approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap,
-    visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, taskNotes, taskAttachments, handleDeleteTask,
+    visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
   ]);
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
 

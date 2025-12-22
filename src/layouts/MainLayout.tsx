@@ -41,6 +41,7 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
           "--sidebar-width": `${CUSTOM_SIDEBAR_WIDTH}rem`,
           "--sidebar-width-mobile": `${CUSTOM_SIDEBAR_WIDTH_MOBILE}rem`,
           "--sidebar-width-icon": `${CUSTOM_SIDEBAR_WIDTH_ICON}rem`,
+          "--app-header-height": "64px",
         } as React.CSSProperties}
       >
         <div className="flex h-screen w-full overflow-hidden bg-background">

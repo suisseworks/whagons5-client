@@ -127,6 +127,8 @@ export function buildWorkspaceColumns(opts: any) {
     visibleColumns,
     workspaceCustomFields,
     taskCustomFieldValueMap,
+    customFields,
+    categoryMap,
     taskNotes,
     taskAttachments,
     approvalApprovers,
@@ -841,44 +843,44 @@ export function buildWorkspaceColumns(opts: any) {
 
         const jsxStart = dbg ? performance.now() : 0;
         const node = (
-          <div className="flex flex-col gap-1 py-1.5 min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+          <div className="flex flex-col gap-1.5 py-1.5 min-w-0">
+            {/* Name row with category icon */}
+            <div className="flex items-center gap-2.5 min-w-0">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
               <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1 truncate">{name}</div>
-              {/* Tags - inline with name, wrap naturally if needed */}
-              {(taskTagsData && taskTagsData.length > 0) && (
-                <>
-                  {taskTagsData.map((tag: any, idx: number) => {
-                    if (!tag || !tag.name) return null;
-                    const bgColor = tag.color || '#6B7280';
-                    const textColor = getContrastTextColor(bgColor);
-                    return (
-                      <div
-                        key={tag.id || `tag-${idx}`}
-                        className={`inline-flex items-center ${tagDisplayMode === 'icon' ? 'gap-0 px-1.5' : 'gap-1.5 px-2'} py-1 rounded text-xs font-medium leading-none flex-shrink-0`}
-                        style={{
-                          backgroundColor: bgColor,
-                          color: textColor,
-                        }}
-                        title={tag.name}
-                      >
-                        <TagIconSmall iconClass={tag.icon} color={textColor} />
-                        {tagDisplayMode === 'icon-text' && (
-                          <span className="whitespace-nowrap">{tag.name}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                  
-                </>
-              )}
             </div>
+            {/* Tags row - separate line below name for better visual separation */}
+            {(taskTagsData && taskTagsData.length > 0) && (
+              <div className="flex items-center gap-1.5 flex-wrap pl-[34px] min-w-0">
+                {taskTagsData.map((tag: any, idx: number) => {
+                  if (!tag || !tag.name) return null;
+                  const bgColor = tag.color || '#6B7280';
+                  const textColor = getContrastTextColor(bgColor);
+                  return (
+                    <div
+                      key={tag.id || `tag-${idx}`}
+                      className={`inline-flex items-center ${tagDisplayMode === 'icon' ? 'gap-0 px-1.5' : 'gap-1.5 px-2'} py-0.5 rounded-md text-[11px] font-medium leading-none flex-shrink-0 shadow-sm`}
+                      style={{
+                        backgroundColor: bgColor,
+                        color: textColor,
+                      }}
+                      title={tag.name}
+                    >
+                      <TagIconSmall iconClass={tag.icon} color={textColor} />
+                      {tagDisplayMode === 'icon-text' && (
+                        <span className="whitespace-nowrap">{tag.name}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {showDescriptions && description && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="wh-task-desc mt-0.5 pl-7 text-[12px] leading-relaxed text-[#6b7280] dark:text-muted-foreground"
+                      className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-[#6b7280] dark:text-muted-foreground"
                       style={{
                         whiteSpace: 'normal',
                         display: '-webkit-box',
@@ -908,7 +910,7 @@ export function buildWorkspaceColumns(opts: any) {
               </TooltipProvider>
             )}
             {density !== 'compact' && latestComment && (
-              <div className="flex items-start gap-1.5 pl-7 text-[12px] text-muted-foreground">
+              <div className="flex items-start gap-1.5 pl-[34px] text-[12px] text-muted-foreground">
                 <MessageSquare className="w-3.5 h-3.5 mt-[1px]" />
                 <span
                   className="leading-relaxed min-w-0"
@@ -1062,11 +1064,12 @@ export function buildWorkspaceColumns(opts: any) {
         const normalizedApprovalStatus = String(row.approval_status || '').toLowerCase();
         const approvalApproved = normalizedApprovalStatus === 'approved';
         const approvalPending = approvalRequired && normalizedApprovalStatus === 'pending';
+        const approvalRejected = normalizedApprovalStatus === 'rejected';
         const allowedNext = getAllowedNextStatuses(row);
-        const node = approvalPending ? (
+        const node = (approvalPending || approvalRejected) ? (
           <div
             className="flex items-center h-full py-2 opacity-50 cursor-not-allowed"
-            title="Awaiting approval before starting"
+            title={approvalRejected ? "Status cannot be changed after approval rejection" : "Awaiting approval before starting"}
             style={{ pointerEvents: 'none' }}
           >
             <StatusCell
@@ -1345,11 +1348,16 @@ export function buildWorkspaceColumns(opts: any) {
       minWidth: 180,
     },
     {
-      field: 'created_at',
+      field: 'updated_at',
       colId: 'created_at',
       headerName: 'Last modified',
       sortable: true,
       filter: false,
+      // Explicitly use valueGetter to ensure we read from the correct field and avoid conflicts with custom fields
+      valueGetter: (p: any) => {
+        // Always read from updated_at field (last modified), never from custom fields
+        return p.data?.updated_at || p.data?.created_at;
+      },
       comparator: (valueA: any, valueB: any) => {
         // Proper date comparison for AG Grid client-side sorting
         if (!valueA && !valueB) return 0;
@@ -1371,15 +1379,16 @@ export function buildWorkspaceColumns(opts: any) {
         const dbg = isRowDebugEnabled();
         let t0 = 0;
         if (dbg) t0 = performance.now();
-        const createdAt = p.data?.created_at;
-        if (!createdAt) {
+        // Explicitly read from updated_at field (last modified), not from p.value which might be corrupted
+        const updatedAt = p.data?.updated_at || p.data?.created_at;
+        if (!updatedAt) {
           return (
             <div className="flex items-center h-full py-2">
               <span className="text-[12px] text-muted-foreground">—</span>
             </div>
           );
         }
-        const d = dayjs(createdAt);
+        const d = dayjs(updatedAt);
         const inner = (
           <div className="flex items-center h-full py-2">
             <span className="inline-flex items-center text-muted-foreground">
@@ -1406,6 +1415,9 @@ export function buildWorkspaceColumns(opts: any) {
 
   // Append dynamic custom-field columns (per-workspace)
   const customFieldCols: any[] = [];
+  const processedFieldIds = new Set<number>();
+  
+  // First, process fields from workspaceCustomFields (preferred source with category info)
   if (Array.isArray(workspaceCustomFields) && workspaceCustomFields.length > 0) {
     for (const cf of workspaceCustomFields as any[]) {
       const fieldId = Number((cf as any).fieldId);
@@ -1416,6 +1428,8 @@ export function buildWorkspaceColumns(opts: any) {
       const colKey = `cf_${fieldId}`;
       // Only render if this custom field is selected in visibleColumns
       if (!isVisible(colKey)) continue;
+
+      processedFieldIds.add(fieldId);
 
       const headerName = (() => {
         const base = String(field.name || `Field #${fieldId}`);
@@ -1441,15 +1455,35 @@ export function buildWorkspaceColumns(opts: any) {
           const key = `${taskId}:${fieldId}`;
           const row = taskCustomFieldValueMap.get(key);
           if (!row) return null;
-          // Prefer typed value based on field_type if present
-          const t = String(row.type || row.field_type || '').toLowerCase();
-          if (t === 'number' || t === 'numeric') return row.value_numeric ?? row.value;
-          if (t === 'date' || t === 'datetime') return row.value_date ?? row.value;
-          if (t === 'json') return row.value_json ?? row.value;
-          return row.value;
+          // Get field type from row, field metadata, or fallback
+          const fieldType = String(row.type || row.field_type || field.type || '').toLowerCase();
+          
+          // Try typed value fields first based on field type
+          if (fieldType === 'number' || fieldType === 'numeric') {
+            if (row.value_numeric != null) return row.value_numeric;
+            if (row.value != null) return Number(row.value);
+          }
+          if (fieldType === 'date' || fieldType === 'datetime') {
+            if (row.value_date != null) return row.value_date;
+            if (row.value != null) return row.value;
+          }
+          if (fieldType === 'json') {
+            if (row.value_json != null) return row.value_json;
+            if (row.value != null) return row.value;
+          }
+          
+          // Fallback: try all value fields in order of preference
+          if (row.value_numeric != null) return row.value_numeric;
+          if (row.value_date != null) return row.value_date;
+          if (row.value_json != null) return row.value_json;
+          if (row.value_text != null) return row.value_text;
+          if (row.value != null) return row.value;
+          
+          return null;
         },
         cellRenderer: (p: any) => {
           const v = p.value;
+          // Check for null/undefined/empty string, but allow 0 and false
           if (v === null || v === undefined || v === '') {
             return (
               <div className="flex items-center h-full py-2">
@@ -1457,7 +1491,128 @@ export function buildWorkspaceColumns(opts: any) {
               </div>
             );
           }
-          // Simple text rendering for now
+          // Format numeric values appropriately
+          if (typeof v === 'number') {
+            return (
+              <div className="flex items-center h-full py-2">
+                <span className="text-[12px] truncate max-w-full">{v.toLocaleString()}</span>
+              </div>
+            );
+          }
+          // Simple text rendering for other types
+          return (
+            <div className="flex items-center h-full py-2">
+              <span className="text-[12px] truncate max-w-full">{String(v)}</span>
+            </div>
+          );
+        },
+      });
+    }
+  }
+  
+  // Also check taskCustomFieldValueMap for fields with values that might not be in workspaceCustomFields
+  // This ensures columns persist even when workspaceCustomFields is temporarily empty
+  // BUT only create columns for fields that are actually assigned to categories in the current workspace
+  if (taskCustomFieldValueMap && taskCustomFieldValueMap.size > 0 && Array.isArray(customFields) && customFields.length > 0 && workspaceCustomFields) {
+    // Build a set of field IDs that are actually assigned to workspace categories
+    const allowedFieldIds = new Set<number>();
+    for (const cf of workspaceCustomFields as any[]) {
+      const fieldId = Number((cf as any).fieldId);
+      if (Number.isFinite(fieldId)) {
+        allowedFieldIds.add(fieldId);
+      }
+    }
+    
+    const fieldIdsWithValues = new Set<number>();
+    // Extract all field IDs that have values
+    for (const [key] of taskCustomFieldValueMap) {
+      const parts = String(key).split(':');
+      if (parts.length === 2) {
+        const fieldId = Number(parts[1]);
+        if (Number.isFinite(fieldId)) {
+          fieldIdsWithValues.add(fieldId);
+        }
+      }
+    }
+    
+    // Create columns for fields with values that are visible but not yet processed
+    // AND that are actually assigned to workspace categories
+    for (const fieldId of fieldIdsWithValues) {
+      if (processedFieldIds.has(fieldId)) continue; // Already processed
+      
+      // Only create column if field is assigned to a category in this workspace
+      if (!allowedFieldIds.has(fieldId)) continue; // Skip fields not assigned to workspace categories
+      
+      const colKey = `cf_${fieldId}`;
+      // Only render if this custom field is selected in visibleColumns
+      if (!isVisible(colKey)) continue;
+      
+      // Find field metadata
+      const field = (customFields as any[]).find((f: any) => Number(f.id) === fieldId);
+      if (!field) continue; // Skip if we can't find field metadata
+      
+      // Use field name only (category info not available in fallback case)
+      const headerName = String(field.name || `Field #${fieldId}`);
+      
+      customFieldCols.push({
+        field: colKey,
+        colId: colKey,
+        headerName,
+        sortable: false,
+        filter: false,
+        minWidth: 160,
+        flex: 2,
+        valueGetter: (p: any) => {
+          const taskId = Number(p.data?.id);
+          if (!Number.isFinite(taskId) || !taskCustomFieldValueMap) return null;
+          const key = `${taskId}:${fieldId}`;
+          const row = taskCustomFieldValueMap.get(key);
+          if (!row) return null;
+          // Get field type from row, field metadata, or fallback
+          const fieldType = String(row.type || row.field_type || field.type || '').toLowerCase();
+          
+          // Try typed value fields first based on field type
+          if (fieldType === 'number' || fieldType === 'numeric') {
+            if (row.value_numeric != null) return row.value_numeric;
+            if (row.value != null) return Number(row.value);
+          }
+          if (fieldType === 'date' || fieldType === 'datetime') {
+            if (row.value_date != null) return row.value_date;
+            if (row.value != null) return row.value;
+          }
+          if (fieldType === 'json') {
+            if (row.value_json != null) return row.value_json;
+            if (row.value != null) return row.value;
+          }
+          
+          // Fallback: try all value fields in order of preference
+          if (row.value_numeric != null) return row.value_numeric;
+          if (row.value_date != null) return row.value_date;
+          if (row.value_json != null) return row.value_json;
+          if (row.value_text != null) return row.value_text;
+          if (row.value != null) return row.value;
+          
+          return null;
+        },
+        cellRenderer: (p: any) => {
+          const v = p.value;
+          // Check for null/undefined/empty string, but allow 0 and false
+          if (v === null || v === undefined || v === '') {
+            return (
+              <div className="flex items-center h-full py-2">
+                <span className="text-[12px] text-muted-foreground">—</span>
+              </div>
+            );
+          }
+          // Format numeric values appropriately
+          if (typeof v === 'number') {
+            return (
+              <div className="flex items-center h-full py-2">
+                <span className="text-[12px] truncate max-w-full">{v.toLocaleString()}</span>
+              </div>
+            );
+          }
+          // Simple text rendering for other types
           return (
             <div className="flex items-center h-full py-2">
               <span className="text-[12px] truncate max-w-full">{String(v)}</span>
