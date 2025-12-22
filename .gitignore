@@ -1,4 +1,5 @@
 .env
+bunfig.toml
 
 # Logs
 logs
