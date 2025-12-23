@@ -644,6 +644,7 @@ function Forms() {
                   {f.type === 'fixed-image' && (
                     <FixedImageField 
                       isEditing={false}
+                      imageUrl={(f as any).properties?.imageUrl}
                       imageId={(f as any).properties?.imageId}
                     />
                   )}

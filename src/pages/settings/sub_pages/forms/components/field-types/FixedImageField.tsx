@@ -7,13 +7,14 @@ import { Label } from "@/components/ui/label";
 
 interface FixedImageFieldProps {
   isEditing?: boolean;
-  // Asset ID for the fixed image
+  imageUrl?: string | null;
   imageId?: string | null;
-  onImageChange?: (assetId: string | null) => void;
+  onImageChange?: (value: { imageUrl: string | null; imageId?: string | null }) => void;
 }
 
 export function FixedImageField({ 
   isEditing = true,
+  imageUrl,
   imageId,
   onImageChange
 }: FixedImageFieldProps) {
@@ -24,12 +25,14 @@ export function FixedImageField({
 
   // Load preview for the fixed image
   useEffect(() => {
-    if (imageId) {
+    if (imageUrl) {
+      setPreview(getAssetDisplayUrl(imageUrl));
+    } else if (imageId) {
       setPreview(getAssetDisplayUrl(imageId));
     } else {
       setPreview(null);
     }
-  }, [imageId]);
+  }, [imageUrl, imageId]);
 
   // Handle image upload for form builder
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,8 +58,10 @@ export function FixedImageField({
         maxSize: 10 * 1024 * 1024, // 10MB
       });
 
-      // Store the asset ID
-      onImageChange?.(uploadedFile.id);
+      onImageChange?.({
+        imageUrl: uploadedFile.url || null,
+        imageId: uploadedFile.id
+      });
     } catch (error: any) {
       setUploadError(error.message || 'Failed to upload image');
       setPreview(null);
@@ -70,7 +75,7 @@ export function FixedImageField({
 
   const handleRemove = () => {
     setPreview(null);
-    onImageChange?.(null);
+    onImageChange?.({ imageUrl: null, imageId: null });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -78,7 +83,7 @@ export function FixedImageField({
 
   // Form response view - display the fixed image
   if (!isEditing) {
-    if (!imageId) {
+    if (!imageUrl && !imageId) {
       return (
         <div className="py-2 text-sm text-muted-foreground">
           No image set
@@ -89,7 +94,7 @@ export function FixedImageField({
     return (
       <div className="py-2">
         <img
-          src={getAssetDisplayUrl(imageId)}
+          src={getAssetDisplayUrl(imageUrl || imageId!)}
           alt="Form image"
           className="max-w-full h-auto rounded-lg border border-border"
           style={{ maxHeight: '400px' }}
@@ -158,12 +163,6 @@ export function FixedImageField({
         </div>
       )}
 
-      {/* Asset ID Display (for debugging/reference) */}
-      {imageId && (
-        <div className="text-xs text-muted-foreground">
-          Asset ID: <code className="bg-muted px-1 py-0.5 rounded">{imageId}</code>
-        </div>
-      )}
     </div>
   );
 }

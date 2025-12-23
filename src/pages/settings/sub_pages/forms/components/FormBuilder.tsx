@@ -22,7 +22,8 @@ export interface BuilderSchemaField {
   required?: boolean;
   options?: string[];
   properties?: {
-    imageId?: string | null; // Asset ID for fixed-image fields
+    imageUrl?: string | null;
+    imageId?: string | null;
     [key: string]: any; // Allow other properties
   };
 }

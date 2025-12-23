@@ -2,14 +2,12 @@ import api from './whagonsApi';
 
 export interface UploadedFile {
   id: string;
-  filename: string;
+  url?: string;
+  key?: string;
+  bucket?: string;
   size: number;
-  mime_type: string;
-  created_at: string;
-  project_id: number;
-  user_firebase_uid: string;
-  storage_path: string;
-  content_hash: string;
+  content_type?: string;
+  imgproxy_url?: string;
 }
 
 export interface UploadResponse {

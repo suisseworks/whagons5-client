@@ -148,6 +148,7 @@ export function DraggableField({
           {field.type === 'fixed-image' && (
             <FixedImageField 
               isEditing={false} 
+              imageUrl={field.properties?.imageUrl}
               imageId={field.properties?.imageId}
             />
           )}
@@ -215,12 +216,18 @@ export function DraggableField({
             {field.type === 'fixed-image' && (
               <FixedImageField 
                 isEditing={true}
+                imageUrl={field.properties?.imageUrl}
                 imageId={field.properties?.imageId}
-                onImageChange={(assetId) => {
+                onImageChange={({ imageUrl, imageId }) => {
+                  // Important: `null` means "clear it".
+                  // Only keep existing values when the incoming value is `undefined` (not provided).
+                  const nextImageId =
+                    imageId !== undefined ? imageId : (field.properties?.imageId ?? null);
                   onUpdate({
                     properties: {
                       ...field.properties,
-                      imageId: assetId
+                      imageUrl,
+                      imageId: nextImageId
                     }
                   });
                 }}

@@ -246,7 +246,6 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--sidebar-accent': darkSidebarAccent,
     '--sidebar-accent-foreground': darkSidebarAccentForeground,
     '--sidebar-selected-bg': mixColors(darkSidebar, '#ffffff', 0.04),
-    '--sidebar-primary-hover': darkPrimaryHover,
     '--gradient-primary': gradient,
     '--gradient-secondary': gradient,
     '--gradient-accent': gradient,
