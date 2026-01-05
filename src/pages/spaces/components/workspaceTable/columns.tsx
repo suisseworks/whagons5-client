@@ -11,7 +11,12 @@ import api from '@/api/whagonsApi';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 import { iconService } from '@/database/iconService';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
+
+// ---------------------------------------------------------------------------
+// Icon cache to prevent reloading icons when components remount
+const iconCache = new Map<string, any>();
+const iconLoadingPromises = new Map<string, Promise<any>>();
 
 // ---------------------------------------------------------------------------
 type MetricAgg = { count: number; total: number; max: number };
@@ -140,6 +145,13 @@ export function buildWorkspaceColumns(opts: any) {
     slaMap = {},
   } = opts;
 
+  const appendCellClass = (existing: any, cls: string) => {
+    if (!existing) return cls;
+    if (typeof existing === 'string') return `${existing} ${cls}`;
+    if (Array.isArray(existing)) return [...existing, cls];
+    return existing;
+  };
+
   // Precompute the latest note per task for quick lookup in cell renderers
   const latestNoteByTaskId = new Map<number, { text: string; ts: number }>();
   if (Array.isArray(taskNotes) && taskNotes.length > 0) {
@@ -251,16 +263,49 @@ export function buildWorkspaceColumns(opts: any) {
     return visibilitySet.has(id);
   };
 
-  const CategoryIconSmall = (props: { iconClass?: string; color?: string }) => {
+  const CategoryIconSmall = memo((props: { iconClass?: string; color?: string }) => {
     const iconColor = props.color || '#6b7280';
     const iconCls = (props.iconClass || '').trim();
-    const [iconDef, setIconDef] = useState<any>(faTags);
+    const [iconDef, setIconDef] = useState<any>(() => {
+      // Check cache immediately on mount
+      if (iconCls && iconCache.has(iconCls)) {
+        return iconCache.get(iconCls);
+      }
+      return null;
+    });
 
     useEffect(() => {
       let cancelled = false;
+      
       const loadIcon = async () => {
+        // Don't set anything if iconClass is not available yet - wait for it to load
         if (!iconCls) {
-          setIconDef(faTags);
+          if (!cancelled) {
+            setIconDef(null);
+          }
+          return;
+        }
+
+        // Check cache first - instant return if already loaded
+        if (iconCache.has(iconCls)) {
+          if (!cancelled) {
+            setIconDef(iconCache.get(iconCls));
+          }
+          return;
+        }
+
+        // Check if already loading this icon
+        if (iconLoadingPromises.has(iconCls)) {
+          try {
+            const icon = await iconLoadingPromises.get(iconCls);
+            if (!cancelled) {
+              setIconDef(icon);
+            }
+          } catch {
+            if (!cancelled) {
+              setIconDef(faTags);
+            }
+          }
           return;
         }
 
@@ -273,19 +318,45 @@ export function buildWorkspaceColumns(opts: any) {
           parsed = iconCls.substring(3);
         }
 
+        // Create loading promise and cache it
+        const loadPromise = (async () => {
+          try {
+            const icon = await iconService.getIcon(parsed);
+            const finalIcon = icon || faTags;
+            iconCache.set(iconCls, finalIcon);
+            iconLoadingPromises.delete(iconCls);
+            return finalIcon;
+          } catch {
+            iconCache.set(iconCls, faTags);
+            iconLoadingPromises.delete(iconCls);
+            return faTags;
+          }
+        })();
+
+        iconLoadingPromises.set(iconCls, loadPromise);
+
         try {
-          const icon = await iconService.getIcon(parsed);
-          if (!cancelled && icon) {
+          const icon = await loadPromise;
+          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
             setIconDef(icon);
           }
         } catch {
-          if (!cancelled) setIconDef(faTags);
+          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
+            setIconDef(faTags);
+          }
         }
       };
 
       loadIcon();
-      return () => { cancelled = true; };
-    }, [iconCls]);
+      return () => { 
+        cancelled = true;
+      };
+    }, [iconCls, props.iconClass]);
+
+    // Don't render anything until we have an iconClass prop and icon is loaded
+    if (!iconCls || !iconDef) {
+      return null;
+    }
 
     return (
       <div 
@@ -299,13 +370,89 @@ export function buildWorkspaceColumns(opts: any) {
         />
       </div>
     );
-  };
+  });
+  
+  CategoryIconSmall.displayName = 'CategoryIconSmall';
 
   // Tag icon component for inline use in tag badges
   const TagIconSmall = (props: { iconClass?: string | null; color?: string }) => {
+    const iconCls = (props.iconClass || '').trim();
+    const [iconDef, setIconDef] = useState<any>(() => {
+      if (iconCls && iconCache.has(iconCls)) {
+        return iconCache.get(iconCls);
+      }
+      return faTags;
+    });
+
+    useEffect(() => {
+      let cancelled = false;
+
+      const loadIcon = async () => {
+        if (!iconCls) {
+          if (!cancelled) setIconDef(faTags);
+          return;
+        }
+
+        if (iconCache.has(iconCls)) {
+          if (!cancelled) setIconDef(iconCache.get(iconCls));
+          return;
+        }
+
+        if (iconLoadingPromises.has(iconCls)) {
+          try {
+            const icon = await iconLoadingPromises.get(iconCls);
+            if (!cancelled) setIconDef(icon || faTags);
+          } catch {
+            if (!cancelled) setIconDef(faTags);
+          }
+          return;
+        }
+
+        let parsed = iconCls;
+        const faClassMatch = iconCls.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
+        if (faClassMatch) {
+          parsed = faClassMatch[2];
+        } else if (iconCls.startsWith('fa-')) {
+          parsed = iconCls.substring(3);
+        }
+
+        const loadPromise = (async () => {
+          try {
+            const icon = await iconService.getIcon(parsed);
+            const finalIcon = icon || faTags;
+            iconCache.set(iconCls, finalIcon);
+            iconLoadingPromises.delete(iconCls);
+            return finalIcon;
+          } catch {
+            iconCache.set(iconCls, faTags);
+            iconLoadingPromises.delete(iconCls);
+            return faTags;
+          }
+        })();
+
+        iconLoadingPromises.set(iconCls, loadPromise);
+
+        try {
+          const icon = await loadPromise;
+          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
+            setIconDef(icon || faTags);
+          }
+        } catch {
+          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
+            setIconDef(faTags);
+          }
+        }
+      };
+
+      loadIcon();
+      return () => {
+        cancelled = true;
+      };
+    }, [iconCls, props.iconClass]);
+
     return (
       <FontAwesomeIcon 
-        icon={faTags} 
+        icon={iconDef || faTags} 
         className="w-3 h-3 flex-shrink-0"
         style={{ color: props.color || '#ffffff' }}
       />
@@ -340,11 +487,38 @@ export function buildWorkspaceColumns(opts: any) {
   const UserInitial = ({ user }: { user: any }) => {
     const name: string = getUserDisplayName(user) || '';
     const initial = (name.trim().charAt(0) || '?').toUpperCase();
-    const colorStyle = getUserColorStyle(user?.color);
+    const userColor = user?.color;
+    
+    // Check if user has a valid color (non-empty string that's not just whitespace)
+    // Also handle cases where color might be '#000000' or similar dark colors
+    const hasColor = !!userColor && 
+                     typeof userColor === 'string' && 
+                     userColor.trim() !== '' && 
+                     userColor.trim() !== 'null' && 
+                     userColor.trim() !== 'undefined';
+    
+    const colorStyle = hasColor ? getUserColorStyle(userColor) : {};
+
+    // Debug once: surface the first few user colors used in cells
+    try {
+      if (!(window as any).__whUserColorLog) (window as any).__whUserColorLog = { count: 0, seen: new Set() as Set<any> };
+      const logState = (window as any).__whUserColorLog as { count: number; seen: Set<any> };
+      const uid = user?.id ?? user?.name;
+      if (logState.count < 5 && uid != null && !logState.seen.has(uid)) {
+        console.log('[wh:user-cell-color]', { id: user?.id, name: user?.name, color: userColor, hasColor, colorStyle });
+        logState.count += 1;
+        logState.seen.add(uid);
+      }
+    } catch { /* ignore */ }
+    
+    // Match settings behavior: stored color when present; primary fallback otherwise
+    const fallbackClass = hasColor ? 'text-[11px] font-semibold' : 'text-[11px] font-semibold bg-primary text-primary-foreground';
+    const fallbackStyle = hasColor ? colorStyle : undefined;
+
     return (
       <AvatarFallback
-        className="text-[11px] font-semibold"
-        style={colorStyle}
+        className={fallbackClass}
+        style={fallbackStyle}
       >
         {initial}
       </AvatarFallback>
@@ -792,10 +966,10 @@ export function buildWorkspaceColumns(opts: any) {
   const cols = ([
     {
       field: 'id',
-      headerName: 'Task ID',
-      width: 90,
-      minWidth: 80,
-      maxWidth: 120,
+      headerName: 'ID',
+      width: 80,
+      minWidth: 70,
+      maxWidth: 100,
       pinned: 'left',
       sortable: true,
       filter: 'agNumberColumnFilter',
@@ -804,7 +978,7 @@ export function buildWorkspaceColumns(opts: any) {
       cellRenderer: (p: any) => {
         const id = p?.value;
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted/60 border border-border text-[12px] font-mono text-muted-foreground">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
             {id ?? ''}
           </span>
         );
@@ -857,7 +1031,7 @@ export function buildWorkspaceColumns(opts: any) {
     {
       field: 'name',
       headerName: 'Name',
-      flex: 3,
+      flex: 3.8,
       filter: false,
       cellRenderer: (p: any) => {
         // Loading placeholder when row data isn't ready (infinite row model)
@@ -1018,7 +1192,7 @@ export function buildWorkspaceColumns(opts: any) {
         }
         return node;
       },
-      minWidth: 280,
+      minWidth: 320,
     },
     {
       colId: 'config',
@@ -1235,7 +1409,27 @@ export function buildWorkspaceColumns(opts: any) {
       field: 'user_ids',
       headerName: 'Owner',
       width: 140,
-      filter: false,
+      filter: 'agSetColumnFilter',
+      filterValueGetter: (p: any) => {
+        const ids = p.data?.user_ids;
+        if (!Array.isArray(ids)) return null;
+        return ids
+          .map((id: any) => Number(id))
+          .filter((n: number) => Number.isFinite(n));
+      },
+      filterParams: {
+        values: (params: any) => {
+          const ids = Object.keys(userMap || {})
+            .map((k: any) => Number(k))
+            .filter((n: number) => Number.isFinite(n));
+          params.success(ids);
+        },
+        suppressMiniFilter: false,
+        valueFormatter: (p: any) => {
+          const user = userMap[p.value as number];
+          return getUserDisplayName(user) || user?.name || `#${p.value}`;
+        },
+      },
       cellRenderer: (p: any) => {
         if (!p.data) {
           return (
@@ -1278,19 +1472,18 @@ export function buildWorkspaceColumns(opts: any) {
               {displayUsers.map((user: any) => (
                 <HoverPopover key={user.id} content={(
                   <div className="flex flex-col items-center gap-3">
-                    <Avatar
-                      className="h-16 w-16 border-2 border-background"
-                      style={getUserColorStyle(user?.color)}
-                    >
-                      <UserInitial user={user} />
-                    </Avatar>
+                  <Avatar
+                    className="h-16 w-16 border-2 border-background"
+                  >
+                    <UserInitial user={user} />
+                  </Avatar>
                     <span className="text-base font-medium text-popover-foreground text-center">{getCachedUserName(user)}</span>
                   </div>
                 )}>
                   <Avatar
                     className="h-6 w-6 border transition-colors cursor-pointer"
                     title={getCachedUserName(user)}
-                    style={{ borderColor: '#e5e7eb', ...getUserColorStyle(user?.color) }}
+                    style={{ borderColor: '#e5e7eb' }}
                   >
                     <UserInitial user={user} />
                   </Avatar>
@@ -1309,6 +1502,34 @@ export function buildWorkspaceColumns(opts: any) {
       },
       minWidth: 140,
       maxWidth: 200,
+    },
+    {
+      field: 'tag_ids',
+      headerName: 'Tags (filter)',
+      hide: true,
+      filter: 'agSetColumnFilter',
+      filterValueGetter: (p: any) => {
+        const taskId = Number(p.data?.id);
+        if (!Number.isFinite(taskId)) return [];
+        const ids = (taskTagsMap && taskTagsMap.get(taskId)) || [];
+        return (ids || []).map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+      },
+      filterParams: {
+        values: (params: any) => {
+          const ids = Object.keys(tagMap || {})
+            .map((k: any) => Number(k))
+            .filter((n: number) => Number.isFinite(n));
+          params.success(ids);
+        },
+        suppressMiniFilter: false,
+        valueFormatter: (p: any) => {
+          const tag = tagMap?.[p.value as number];
+          return tag?.name || `#${p.value}`;
+        },
+      },
+      width: 120,
+      minWidth: 100,
+      maxWidth: 140,
     },
     {
       field: 'due_date',
@@ -1703,9 +1924,12 @@ export function buildWorkspaceColumns(opts: any) {
     if (c) { c.rowGroup = true; c.hide = true; }
   }
 
-  // Apply visibility to non-group columns that don't already have an explicit hide set
+  // Apply compact styling to secondary columns + visibility handling
   for (const col of cols as any[]) {
     const id = (col.colId as string) || (col.field as string) || '';
+    if (id && !['name', 'priority_id', 'user_ids', '__actions'].includes(id)) {
+      col.cellClass = appendCellClass(col.cellClass, 'wh-compact-col');
+    }
     if (id === 'name') continue;
     // Skip if grouping logic already forced hide
     if (col.rowGroup && col.hide === true) continue;

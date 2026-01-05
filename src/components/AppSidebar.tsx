@@ -507,6 +507,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
+                  <SidebarSeparator className="my-1 border-[var(--sidebar-border)]" />
+
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild

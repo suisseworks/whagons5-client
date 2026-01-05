@@ -34,7 +34,7 @@ import {
   createFilteredPriorities,
   createTagMap
 } from './workspaceTable/mappers';
-const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'name', 'description', 'due_date']);
+const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'user_ids', 'tag_ids', 'name', 'description', 'due_date']);
 
 const sanitizeFilterModel = (model: any): any => {
   if (!model || typeof model !== 'object') return {};
@@ -49,7 +49,7 @@ const sanitizeFilterModel = (model: any): any => {
 const normalizeFilterModelForGrid = (raw: any): any => {
   if (!raw || typeof raw !== 'object') return {};
   const fm = sanitizeFilterModel(raw);
-  for (const key of ['status_id', 'priority_id', 'spot_id']) {
+  for (const key of ['status_id', 'priority_id', 'spot_id', 'user_ids', 'tag_ids']) {
     if (fm[key]) {
       const st = { ...fm[key] } as any;
       if ((st as any).filterType === 'set') {
@@ -72,7 +72,7 @@ const normalizeFilterModelForQuery = (raw: any): any => {
     fm.status_id = st;
   }
   // Text/date filters pass through unchanged
-  for (const key of ['priority_id', 'spot_id']) {
+  for (const key of ['priority_id', 'spot_id', 'user_ids', 'tag_ids']) {
     if (fm[key]) {
       const st = { ...fm[key] } as any;
       const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
@@ -167,6 +167,32 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const reduxState = useGridReduxState();
   const derivedState = useDerivedGridState(reduxState, { workspaceId, searchText });
 
+  const userColorSyncOnce = useRef(false);
+
+  // Debug: surface user color coverage to help trace IndexedDB/API hydration
+  useEffect(() => {
+    if (Array.isArray(reduxState.users) && reduxState.users.length > 0) {
+      const withColor = reduxState.users.filter((u: any) => u?.color && String(u.color).trim() !== '');
+      const withoutColor = reduxState.users.filter((u: any) => !u?.color || String(u.color).trim() === '');
+      try {
+        console.log('[wh:user-colors]', {
+          total: reduxState.users.length,
+          withColor: withColor.length,
+          withoutColor: withoutColor.length,
+          sampleWithout: withoutColor.slice(0, 5).map((u: any) => ({ id: u?.id, name: u?.name, color: u?.color }))
+        });
+      } catch { /* ignore logging errors */ }
+
+      // If we detect users without color, force a fresh fetch to refresh IndexedDB/Redux
+      if (!userColorSyncOnce.current && withoutColor.length > 0) {
+        userColorSyncOnce.current = true;
+        try {
+          dispatch((genericActions as any).users.fetchFromAPI?.());
+        } catch { /* ignore */ }
+      }
+    }
+  }, [reduxState.users, dispatch]);
+
   // State for status icons
   const [statusIcons, setStatusIcons] = useState<{ [key: string]: any }>({});
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
@@ -193,6 +219,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   } = reduxState as any;
   const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
+  // Ensure user metadata is hydrated so owner avatars reflect configured colors
+  useEffect(() => {
+    dispatch((genericActions as any).users.getFromIndexedDB());
+    dispatch((genericActions as any).users.fetchFromAPI?.());
+  }, [dispatch]);
   const slaMap = useMemo(() => {
     const map: Record<number, any> = {};
     (slas || []).forEach((s: any) => {
@@ -517,7 +548,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     if (gridRef.current?.api) {
       gridRef.current.api.refreshCells({ columns: ['user_ids'], force: true, suppressFlash: true });
     }
-  }, [metadataLoadedFlags.usersLoaded]);
+  }, [metadataLoadedFlags.usersLoaded, users, userMap]);
 
   useEffect(() => {
     if (gridRef.current?.api) {

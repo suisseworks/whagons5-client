@@ -62,10 +62,16 @@ export function TaskRow({
 }) {
   // Priority color indicator removed per design feedback
   const CategoryIcon = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
-    const [iconEl, setIconEl] = useState<any>(faTags);
+    const [iconEl, setIconEl] = useState<any>(null);
     useEffect(() => {
       let cancelled = false;
       (async () => {
+        // Don't set anything if iconClass is not available yet - wait for it to load
+        if (!iconClass) {
+          setIconEl(null);
+          return;
+        }
+        
         try {
           const loaded = await iconService.getIcon(iconClass);
           if (!cancelled) setIconEl(loaded || faTags);
@@ -76,6 +82,12 @@ export function TaskRow({
       return () => { cancelled = true; };
     }, [iconClass]);
     const iconColor = color || '#6b7280';
+    
+    // Don't render anything until we have an iconClass prop and icon is loaded
+    if (!iconClass || !iconEl) {
+      return null;
+    }
+    
     return (
       <div 
         className="w-6 h-6 min-w-[1.5rem] rounded-lg flex items-center justify-center flex-shrink-0 mr-1"

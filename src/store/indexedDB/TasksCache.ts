@@ -589,6 +589,23 @@ export class TasksCache {
                 this._memTasksStamp = now;
             }
 
+            // Optional lookup for tag filters/search
+            const taskTagsParam: Array<{ task_id: number; tag_id: number }> = params.__taskTags || [];
+            let taskTagMapCache: Record<number, number[]> | null = null;
+            const getTaskTagMap = () => {
+                if (taskTagMapCache) return taskTagMapCache;
+                const m: Record<number, number[]> = {};
+                for (const tt of taskTagsParam) {
+                    const taskId = Number((tt as any).task_id);
+                    const tagId = Number((tt as any).tag_id);
+                    if (!Number.isFinite(taskId) || !Number.isFinite(tagId)) continue;
+                    if (!m[taskId]) m[taskId] = [];
+                    m[taskId].push(tagId);
+                }
+                taskTagMapCache = m;
+                return m;
+            };
+
             // Check if filterModel is present - if so, skip simple filters for columns that are in filterModel
             const hasFilterModel = params.filterModel && typeof params.filterModel === 'object' && Object.keys(params.filterModel).length > 0;
             const filterModelKeys = hasFilterModel ? new Set(Object.keys(params.filterModel)) : new Set();
@@ -626,18 +643,7 @@ export class TasksCache {
                 const spotMap: Record<number, { name?: string }> = params.__spotMap || {};
                 const userMap: Record<number, { name?: string; email?: string }> = params.__userMap || {};
                 const tagMap: Record<number, { name?: string }> = params.__tagMap || {};
-                const taskTags: Array<{ task_id: number; tag_id: number }> = params.__taskTags || [];
-
-                // Build a map of task_id -> tag_ids for efficient lookup
-                const taskTagMap: Record<number, number[]> = {};
-                for (const tt of taskTags) {
-                    const taskId = Number(tt.task_id);
-                    const tagId = Number(tt.tag_id);
-                    if (!taskTagMap[taskId]) {
-                        taskTagMap[taskId] = [];
-                    }
-                    taskTagMap[taskId].push(tagId);
-                }
+                const taskTagMap: Record<number, number[]> = getTaskTagMap();
 
                 const matches = (t: Task): boolean => {
                     // ID
@@ -701,6 +707,13 @@ export class TasksCache {
 
             // Apply complex filterModel
             if (params.filterModel && typeof params.filterModel === 'object') {
+                if ((params.filterModel as any).tag_ids && taskTagsParam && taskTagsParam.length > 0) {
+                    const map = getTaskTagMap();
+                    tasks = tasks.map((t: Task) => {
+                        const tagIds = map[t.id] || [];
+                        return { ...t, tag_ids: tagIds };
+                    });
+                }
                 tasks = this.applyFilterModel(tasks, params.filterModel);
             }
 
@@ -850,6 +863,21 @@ export class TasksCache {
                 if (v === undefined) return 'undefined';
                 return String(v);
             });
+
+            // If the task value is an array (e.g., multiple owners), match if any entry is selected
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    const vNum = Number(v);
+                    if (Number.isFinite(vNum) && normalizedSelectedNums.length > 0 && normalizedSelectedNums.includes(vNum)) {
+                        return true;
+                    }
+                    const vStr = v === null ? 'null' : v === undefined ? 'undefined' : String(v);
+                    if (normalizedSelectedStrs.includes(vStr)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
             // Try numeric comparison first (most reliable for IDs)
             const asNum = Number(value);

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addTaskAsync, updateTaskAsync } from '@/store/reducers/tasksSlice';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
@@ -33,6 +33,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
 
   const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
   const { value: priorities = [] } = useSelector((s: RootState) => (s as any).priorities || { value: [] });
+  const { value: categoryPriorityAssignments = [] } = useSelector((s: RootState) => (s as any).categoryPriorities || { value: [] });
   const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
   const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
   const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
@@ -356,7 +357,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         const field = fieldById.get(fieldId);
         return { assignment, field };
       })
-      .filter((row) => !!row.field);
+      .filter((row: { assignment: any; field: any }) => !!row.field);
   }, [categoryId, categoryCustomFields, customFields]);
 
   useEffect(() => {
@@ -390,21 +391,51 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     return () => { cancelled = true; };
   }, [categories, categoryId]);
 
+  const categoryPriorityIdsForCategory = useMemo(() => {
+    const ids = new Set<number>();
+    if (!categoryId) return ids;
+    const catIdNum = Number(categoryId);
+    for (const row of categoryPriorityAssignments || []) {
+      const rowCatId = Number((row as any)?.category_id ?? (row as any)?.categoryId);
+      const rowPriorityId = Number((row as any)?.priority_id ?? (row as any)?.priorityId);
+      if (Number.isFinite(rowCatId) && Number.isFinite(rowPriorityId) && rowCatId === catIdNum) {
+        ids.add(rowPriorityId);
+      }
+    }
+    return ids;
+  }, [categoryPriorityAssignments, categoryId]);
+
   const categoryPriorities = useMemo(() => {
-    if (!categoryId) {
+    const catIdNum = categoryId != null ? Number(categoryId) : null;
+    const matchesCategory = (p: any) => {
+      const catVal = (p as any)?.category_id ?? (p as any)?.categoryId;
+      const catValNum = catVal == null ? null : Number(catVal);
+      return catIdNum != null && catValNum === catIdNum;
+    };
+    const matchesViaAssignment = (p: any) => {
+      const pid = Number((p as any)?.id ?? (p as any)?.priority_id ?? (p as any)?.priorityId);
+      return Number.isFinite(pid) && categoryPriorityIdsForCategory.has(pid);
+    };
+    const globalPriorities = () =>
+      priorities.filter((p: any) => {
+        const catVal = (p as any)?.category_id ?? (p as any)?.categoryId;
+        return catVal === null || catVal === undefined;
+      });
+
+    if (catIdNum == null) {
       if (mode === 'create' || mode === 'create-all') {
-        return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
+        return globalPriorities();
       }
       return [];
     }
-    
-    const categorySpecific = priorities.filter((p: any) => p.category_id === categoryId);
-    if (categorySpecific.length > 0) {
-      return categorySpecific;
+
+    const matched = priorities.filter((p: any) => matchesCategory(p) || matchesViaAssignment(p));
+    if (matched.length > 0) {
+      return matched;
     }
-    
-    return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
-  }, [priorities, categoryId, mode]);
+
+    return globalPriorities();
+  }, [priorities, categoryId, mode, categoryPriorityIdsForCategory]);
 
   // For create-all mode: show all templates from all DEFAULT workspaces
   // For other modes: show templates filtered by current workspace
@@ -518,11 +549,13 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   useEffect(() => {
     if (!open) return;
     dispatch(genericActions.tags.getFromIndexedDB());
+    dispatch(genericActions.tags.fetchFromAPI());
     dispatch(genericActions.customFields.getFromIndexedDB());
     dispatch(genericActions.categoryCustomFields.getFromIndexedDB());
     dispatch(genericActions.taskCustomFieldValues.getFromIndexedDB());
     if (mode === 'edit') {
       dispatch(genericActions.taskTags.getFromIndexedDB());
+      dispatch(genericActions.taskTags.fetchFromAPI());
     }
   }, [open, mode, dispatch]);
 
@@ -760,7 +793,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
 
   const customFieldRequirementMissing = useMemo(() => {
     if (!categoryFields.length) return false;
-    return categoryFields.some(({ assignment, field }) => {
+    return categoryFields.some(({ assignment, field }: { assignment: any; field: any }) => {
       if (!(assignment as any)?.is_required) return false;
       const fid = Number((field as any)?.id);
       const currentValue = customFieldValues[fid];
@@ -1456,7 +1489,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   <p className="text-sm text-[#6B7280]">Esta categoría no tiene campos personalizados asignados.</p>
                 ) : (
                   <div className="space-y-4">
-                    {categoryFields.map(({ assignment, field }) => {
+                    {categoryFields.map(({ assignment, field }: { assignment: any; field: any }) => {
                       const fieldId = Number((field as any)?.id);
                       const required = (assignment as any)?.is_required;
                       const currentValue = customFieldValues[fieldId];

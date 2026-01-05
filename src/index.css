@@ -75,6 +75,10 @@
   --gradient-primary: linear-gradient(135deg, oklch(0.59 0.13 175) 0%, oklch(0.52 0.14 190) 100%);
   --gradient-secondary: linear-gradient(135deg, oklch(0.98 0.008 175) 0%, oklch(0.96 0.012 190) 100%);
   --gradient-accent: linear-gradient(135deg, oklch(0.55 0.11 175) 0%, oklch(0.48 0.12 190) 100%);
+  --surface-pattern: none;
+  --surface-pattern-size: 32px 32px;
+  --sidebar-pattern: none;
+  --sidebar-pattern-size: 24px 24px;
 }
 
 .dark {
@@ -222,6 +226,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: var(--surface-pattern);
+    background-size: var(--surface-pattern-size);
+    background-repeat: repeat;
+    background-attachment: fixed;
+    background-blend-mode: soft-light;
   }
   /* Smooth transitions for interactive elements - exclude grid cells for scroll performance */
   button, [role="button"], a, input, select, textarea {
@@ -311,6 +320,23 @@
   
   .bg-gradient-accent {
     background: var(--gradient-accent);
+  }
+
+  /* Patterns (set via branding) */
+  .bg-popover,
+  .bg-card {
+    background-image: var(--surface-pattern);
+    background-size: var(--surface-pattern-size);
+    background-repeat: repeat;
+    background-blend-mode: soft-light;
+  }
+
+  [data-sidebar="sidebar"],
+  .bg-sidebar {
+    background-image: var(--sidebar-pattern);
+    background-size: var(--sidebar-pattern-size);
+    background-repeat: repeat;
+    background-blend-mode: soft-light;
   }
   
   /* Orange theme enhancements */
@@ -723,6 +749,11 @@
   backface-visibility: hidden;
   /* No transitions during scroll */
   transition: none;
+}
+
+.wh-modern-grid .wh-compact-col {
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 /* Make status cells stand out slightly */

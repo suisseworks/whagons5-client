@@ -149,6 +149,10 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
   const defaultSidebarHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.sidebarColor, DEFAULT_BRANDING_CONFIG.sidebarColor);
   const defaultTextHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.textColor, DEFAULT_BRANDING_CONFIG.textColor);
   const defaultNeutralHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.neutralColor, DEFAULT_BRANDING_CONFIG.neutralColor);
+  const surfacePattern = config.surfacePattern?.trim() || 'none';
+  const sidebarPattern = config.sidebarPattern?.trim() || 'none';
+  const surfacePatternSize = config.surfacePatternSize || DEFAULT_BRANDING_CONFIG.surfacePatternSize;
+  const sidebarPatternSize = config.sidebarPatternSize || DEFAULT_BRANDING_CONFIG.sidebarPatternSize;
 
   const primaryHex = ensureHexColor(config.primaryColor, defaultPrimaryHex);
   const accentHex = ensureHexColor(config.accentColor, defaultAccentHex);
@@ -163,7 +167,12 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     backgroundHex === defaultBackgroundHex &&
     sidebarHex === defaultSidebarHex &&
     textHex === defaultTextHex &&
-    neutralHex === defaultNeutralHex;
+    neutralHex === defaultNeutralHex &&
+    surfacePattern === DEFAULT_BRANDING_CONFIG.surfacePattern &&
+    sidebarPattern === DEFAULT_BRANDING_CONFIG.sidebarPattern &&
+    surfacePatternSize === DEFAULT_BRANDING_CONFIG.surfacePatternSize &&
+    sidebarPatternSize === DEFAULT_BRANDING_CONFIG.sidebarPatternSize &&
+    (config.gradientAccent || '') === (DEFAULT_BRANDING_CONFIG.gradientAccent || '');
   const sidebarTextColor = getAccessibleTextColor(config.sidebarColor, config.textColor);
   const sidebarTextSecondary = rgba(sidebarTextColor, 0.75);
   const sidebarTextTertiary = rgba(sidebarTextColor, 0.55);
@@ -198,6 +207,10 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--gradient-primary': gradient,
     '--gradient-secondary': gradient,
     '--gradient-accent': gradient,
+    '--surface-pattern': surfacePattern,
+    '--surface-pattern-size': surfacePatternSize,
+    '--sidebar-pattern': sidebarPattern,
+    '--sidebar-pattern-size': sidebarPatternSize,
   };
 
   const darkBgPrimary = mixColors('#0F0F0F', backgroundHex, 0.18);
@@ -251,6 +264,10 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--gradient-secondary': gradient,
     '--gradient-accent': gradient,
     '--ring': mixColors(darkPrimary, '#ffffff', 0.25),
+    '--surface-pattern': surfacePattern,
+    '--surface-pattern-size': surfacePatternSize,
+    '--sidebar-pattern': sidebarPattern,
+    '--sidebar-pattern-size': sidebarPatternSize,
     '--bg-primary': darkBgPrimary,
     '--bg-secondary': darkBgSecondary,
     '--bg-hover': darkBgHover,

@@ -51,7 +51,18 @@ type ThemePreset = {
   };
   badge?: string;
   sidebarTone?: 'light' | 'dark';
+  patterns?: {
+    surface?: string;
+    sidebar?: string;
+    surfaceSize?: string;
+    sidebarSize?: string;
+  };
 };
+
+const RETRO_SURFACE_PATTERN =
+  "radial-gradient(circle at 12px 12px, rgba(0, 0, 0, 0.06) 2px, transparent 0), radial-gradient(circle at 4px 4px, rgba(255, 255, 255, 0.08) 2px, transparent 0)";
+const RETRO_SIDEBAR_PATTERN =
+  "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 6px, transparent 6px 12px), radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.08) 1.5px, transparent 0)";
 
 const PRESET_THEMES: ThemePreset[] = [
   {
@@ -128,6 +139,27 @@ const PRESET_THEMES: ThemePreset[] = [
     },
     badge: "Dark sidebar",
     sidebarTone: "dark"
+  },
+  {
+    id: "retro-grid",
+    label: "Retro Grid",
+    description: "80s neon palette with subtle pixel patterns on menus.",
+    gradient: "linear-gradient(130deg, #ff8fb1 0%, #7c3aed 45%, #22d3ee 100%)",
+    palette: {
+      primary: "#ff7f5f",
+      accent: "#22d3ee",
+      background: "#fff6e8",
+      text: "#20121f",
+      neutral: "#f2e4d2",
+      sidebar: "#2b1b34"
+    },
+    badge: "Retro",
+    patterns: {
+      surface: RETRO_SURFACE_PATTERN,
+      sidebar: RETRO_SIDEBAR_PATTERN,
+      surfaceSize: "30px 30px",
+      sidebarSize: "18px 18px"
+    }
   }
 ];
 
@@ -147,7 +179,15 @@ const getPresetIdForConfig = (config: BrandingConfig) => {
       theme.palette.background === config.backgroundColor &&
       getSidebarColorForTheme(theme) === config.sidebarColor &&
       theme.palette.text === config.textColor &&
-      theme.palette.neutral === config.neutralColor
+      theme.palette.neutral === config.neutralColor &&
+      (theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern) ===
+        (config.surfacePattern ?? DEFAULT_BRANDING_CONFIG.surfacePattern) &&
+      (theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern) ===
+        (config.sidebarPattern ?? DEFAULT_BRANDING_CONFIG.sidebarPattern) &&
+      (theme.patterns?.surfaceSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize) ===
+        (config.surfacePatternSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize) &&
+      (theme.patterns?.sidebarSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize) ===
+        (config.sidebarPatternSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize)
   );
   return preset?.id ?? CUSTOM_THEME_ID;
 };
@@ -272,6 +312,12 @@ function Global() {
     () => brand.gradientAccent || `linear-gradient(130deg, ${brand.primaryColor}, ${brand.accentColor})`,
     [brand.gradientAccent, brand.primaryColor, brand.accentColor]
   );
+  const surfacePattern = brand.surfacePattern ?? DEFAULT_BRANDING_CONFIG.surfacePattern;
+  const sidebarPattern = brand.sidebarPattern ?? DEFAULT_BRANDING_CONFIG.sidebarPattern;
+  const surfacePatternSize = brand.surfacePatternSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize;
+  const sidebarPatternSize = brand.sidebarPatternSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize;
+  const hasSurfacePattern = surfacePattern !== "none" && surfacePattern.trim() !== "";
+  const hasSidebarPattern = sidebarPattern !== "none" && sidebarPattern.trim() !== "";
 
   const handleBrandFieldChange =
     (field: keyof BrandingConfig) =>
@@ -299,7 +345,11 @@ function Global() {
       sidebarColor: getSidebarColorForTheme(theme),
       textColor: theme.palette.text,
       neutralColor: theme.palette.neutral,
-      gradientAccent: theme.gradient
+      gradientAccent: theme.gradient,
+      surfacePattern: theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern,
+      sidebarPattern: theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern,
+      surfacePatternSize: theme.patterns?.surfaceSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize,
+      sidebarPatternSize: theme.patterns?.sidebarSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize
     }));
   };
 
@@ -746,7 +796,11 @@ function Global() {
                         <div className="rounded-xl border overflow-hidden shadow-sm">
                           <div
                             className="p-5 text-white"
-                            style={{ background: previewGradient }}
+                            style={{
+                              backgroundImage: `${hasSurfacePattern ? `${surfacePattern}, ` : ""}${previewGradient}`,
+                              backgroundSize: hasSurfacePattern ? `${surfacePatternSize}, cover` : "cover",
+                              backgroundBlendMode: hasSurfacePattern ? "soft-light, normal" : undefined
+                            }}
                           >
                             <div className="flex items-center gap-3">
                               {assets.logoLight ? (
@@ -766,7 +820,14 @@ function Global() {
 
                           <div
                             className="p-5 space-y-4"
-                            style={{ backgroundColor: brand.backgroundColor, color: brand.textColor }}
+                            style={{
+                              backgroundColor: brand.backgroundColor,
+                              color: brand.textColor,
+                              backgroundImage: hasSurfacePattern ? surfacePattern : undefined,
+                              backgroundSize: hasSurfacePattern ? surfacePatternSize : undefined,
+                              backgroundRepeat: hasSurfacePattern ? "repeat" : undefined,
+                              backgroundBlendMode: hasSurfacePattern ? "soft-light" : undefined
+                            }}
                           >
                             <div className="flex items-center justify-between">
                               <div>
@@ -796,7 +857,13 @@ function Global() {
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div
                                 className="rounded-lg p-3 text-sm text-white"
-                                style={{ backgroundColor: brand.sidebarColor }}
+                                style={{
+                                  backgroundColor: brand.sidebarColor,
+                                  backgroundImage: hasSidebarPattern ? sidebarPattern : undefined,
+                                  backgroundSize: hasSidebarPattern ? sidebarPatternSize : undefined,
+                                  backgroundRepeat: hasSidebarPattern ? "repeat" : undefined,
+                                  backgroundBlendMode: hasSidebarPattern ? "soft-light" : undefined
+                                }}
                               >
                                 {t("settings.global.branding.designer.preview.sidebarSample", "Sidebar sample")}
                               </div>
