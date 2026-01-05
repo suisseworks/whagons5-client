@@ -34,6 +34,7 @@ import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
 import { ComplianceStandards } from '@/pages/compliance/ComplianceStandards';
 import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardDetail';
+import SharedWithMe from '@/pages/shared/SharedWithMe';
 
 
 const pages = [
@@ -66,6 +67,7 @@ export const HomeRoutes = () => {
           <Route path="/welcome" element={<Home />} />
           <Route path="/home" element={<Home />} />
           <Route path="/tasks" element={<Workspace />} />
+          <Route path="/shared-with-me" element={<SharedWithMe />} />
           {/* <Route path="/workspace/:id" element={<Workspace />} />
           <Route path="/workspace/all" element={<Workspace />} /> */}
           <Route path="/profile" element={<Profile />} />

@@ -46,6 +46,9 @@ export class TasksCache {
     private static _memTasksStamp = 0;
     private static readonly MEM_TTL_MS = 10000; // 10s TTL for in-memory decrypted cache
 
+    private static _memSharedTasks: Task[] | null = null;
+    private static _memSharedTasksStamp = 0;
+
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
         if (this.initPromise) {
@@ -97,9 +100,17 @@ export class TasksCache {
 
     public static async deleteTask(taskId: string) {
         if (!DB.inited) await DB.init();
-        await DB.delete('tasks', taskId);
+        // Delete from whichever store contains the task
+        const inTasks = await DB.get('tasks', taskId);
+        if (inTasks) {
+            await DB.delete('tasks', taskId);
+        } else {
+            await DB.delete('shared_tasks', taskId);
+        }
         this._memTasks = null;
         this._memTasksStamp = 0;
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_DELETED, { id: taskId });
@@ -110,8 +121,17 @@ export class TasksCache {
         await DB.clear('tasks');
         this._memTasks = null;
         this._memTasksStamp = 0;
+        // Note: shared_tasks are managed separately
         
         // Emit cache invalidate event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
+    }
+
+    public static async deleteSharedTasks() {
+        if (!DB.inited) await DB.init();
+        await DB.clear('shared_tasks');
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
         TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
     }
 
@@ -122,10 +142,19 @@ export class TasksCache {
         if (normalized.id === undefined || normalized.id === null) {
             normalized.id = Number.isFinite(idNum) ? idNum : id;
         }
-        await DB.delete('tasks', normalized.id);
-        await DB.put('tasks', normalized);
+        // Update in the correct store to avoid leaking shared tasks into the main workspace list
+        const existingInTasks = await DB.get('tasks', normalized.id);
+        if (existingInTasks) {
+            await DB.delete('tasks', normalized.id);
+            await DB.put('tasks', normalized);
+        } else {
+            await DB.delete('shared_tasks', normalized.id);
+            await DB.put('shared_tasks', normalized);
+        }
         this._memTasks = null;
         this._memTasksStamp = 0;
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, task);
@@ -158,12 +187,17 @@ export class TasksCache {
 
     public static async getTask(taskId: string) {
         if (!DB.inited) await DB.init();
-        return await DB.get('tasks', taskId);
+        return (await DB.get('tasks', taskId)) ?? (await DB.get('shared_tasks', taskId));
     }
 
     public static async getTasks() {
         if (!DB.inited) await DB.init();
         return (await DB.getAll('tasks')).filter(t => t != null);
+    }
+
+    public static async getSharedTasks() {
+        if (!DB.inited) await DB.init();
+        return (await DB.getAll('shared_tasks')).filter(t => t != null);
     }
 
     public static async getLastUpdated(): Promise<Date> {
@@ -193,8 +227,9 @@ export class TasksCache {
             
             // console.log("🚀 Starting to fetch all tasks with pagination...");
             
-            // Clear existing tasks first
-            await this.deleteTasks();
+            // Do NOT clear existing tasks at the start.
+            // Clearing triggers UI refresh events and causes the grid to “blink”.
+            // We'll replace the store atomically at the end of the fetch.
             
             // Loop through all pages
             while (hasNextPage) {
@@ -290,13 +325,17 @@ export class TasksCache {
                 }
             }
             
-            // Add all tasks to IndexedDB (this will emit TASKS_BULK_UPDATE event)
+            // Replace the tasks store once (single refresh)
+            await DB.clear('tasks');
+            this._memTasks = null;
+            this._memTasksStamp = 0;
+
             if (allTasks.length > 0) {
-                // console.log(`💾 Saving ${allTasks.length} tasks to IndexedDB...`);
-                await this.addTasks(allTasks);
-                // console.log(`✅ Successfully saved ${allTasks.length} tasks to IndexedDB`);
+                await DB.bulkPut('tasks', allTasks as any[]);
+                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
             } else {
-                console.warn(`⚠️  No tasks to save to IndexedDB`);
+                // Ensure stale tasks disappear if server returns none
+                TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
             }
             
             return true;
@@ -312,7 +351,77 @@ export class TasksCache {
         }
     }
 
+    public static async fetchSharedTasks() {
+        let allTasks: Task[] = [];
+        let currentPage = 1;
+        let totalApiCalls = 0;
+
+        try {
+            let hasNextPage = true;
+
+            // Do NOT clear at start to avoid UI blinking; replace at end.
+
+            while (hasNextPage) {
+                totalApiCalls++;
+                const apiParams = {
+                    page: currentPage,
+                    per_page: 500,
+                    sort_by: 'id',
+                    sort_direction: 'asc',
+                    shared_with_me: 1,
+                };
+
+                const response = await api.get('/tasks', { params: apiParams });
+                const pageData = response.data.data as Task[];
+                const pagination = response.data.pagination;
+
+                if (pageData && pageData.length > 0) {
+                    const existingIds = new Set(allTasks.map(task => task.id));
+                    const newTasks = pageData.filter(task => !existingIds.has(task.id));
+                    allTasks = [...allTasks, ...newTasks];
+                }
+
+                hasNextPage = pagination?.has_next_page || false;
+                currentPage = pagination?.next_page || currentPage + 1;
+                if (!hasNextPage) break;
+            }
+
+            if (allTasks.length > 0) {
+                await DB.clear('shared_tasks');
+                await DB.bulkPut('shared_tasks', allTasks as any[]);
+                this._memSharedTasks = null;
+                this._memSharedTasksStamp = 0;
+                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
+            } else {
+                await DB.clear('shared_tasks');
+                this._memSharedTasks = null;
+                this._memSharedTasksStamp = 0;
+                TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ fetchSharedTasks error:', error, { currentPage, totalApiCalls });
+            return false;
+        }
+    }
+
     public static async validateTasks(serverGlobalHash?: string | null, serverBlockCount?: number | null) {
+        // Tasks are now visibility-scoped (workspace access / shares), so comparing against global table hashes
+        // will cause false mismatches. Skip integrity validation for tasks by default.
+        const integrityEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('wh-enable-task-integrity') === 'true';
+        if (!integrityEnabled) {
+            // Still ensure we bootstrap the tasks cache when empty, otherwise users see no tasks after DB resets.
+            try {
+                const existingTasks = await this.getTasks();
+                if (existingTasks.length === 0) {
+                    return await this.fetchTasks();
+                }
+            } catch (e) {
+                console.warn('[TasksCache] validateTasks bootstrap (integrity disabled) failed:', e);
+            }
+            return true;
+        }
         try {
             if (this.validating) {
                 this.dlog('validateTasks: already running, skipping re-entry');
@@ -578,15 +687,32 @@ export class TasksCache {
         try {
             if (!DB.inited) await DB.init();
             
-            // Get all tasks from IndexedDB (reuse in-memory decrypted cache when fresh)
+            const sharedWithMe = !!params.shared_with_me;
+
+            // Get tasks from the appropriate store (tasks vs shared_tasks)
             let tasks: Task[];
             const now = Date.now();
-            if (this._memTasks && (now - this._memTasksStamp) < this.MEM_TTL_MS) {
-                tasks = this._memTasks;
+            if (sharedWithMe) {
+                if (this._memSharedTasks && (now - this._memSharedTasksStamp) < this.MEM_TTL_MS) {
+                    tasks = this._memSharedTasks;
+                } else {
+                    tasks = await this.getSharedTasks();
+                    // Bootstrap fetch if empty
+                    if (tasks.length === 0) {
+                        await this.fetchSharedTasks();
+                        tasks = await this.getSharedTasks();
+                    }
+                    this._memSharedTasks = tasks;
+                    this._memSharedTasksStamp = now;
+                }
             } else {
-                tasks = await this.getTasks();
-                this._memTasks = tasks;
-                this._memTasksStamp = now;
+                if (this._memTasks && (now - this._memTasksStamp) < this.MEM_TTL_MS) {
+                    tasks = this._memTasks;
+                } else {
+                    tasks = await this.getTasks();
+                    this._memTasks = tasks;
+                    this._memTasksStamp = now;
+                }
             }
 
             // Optional lookup for tag filters/search

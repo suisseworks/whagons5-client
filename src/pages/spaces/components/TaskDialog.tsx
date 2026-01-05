@@ -17,6 +17,7 @@ import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
+import api from '@/api/whagonsApi';
 
 type TaskDialogMode = 'create' | 'edit' | 'create-all';
 
@@ -37,6 +38,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
   const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
   const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
+  const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
   const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
   const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
@@ -116,6 +118,12 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const [showDescription, setShowDescription] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
+
+  // Sharing (phase 1)
+  const [shareTeamId, setShareTeamId] = useState<number | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareSuccess, setShareSuccess] = useState<string | null>(null);
 
   const customFieldValuesRef = useRef<Record<number, any>>({});
   const lastCustomFieldCategoryRef = useRef<number | null>(null);
@@ -1020,6 +1028,30 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     );
   };
 
+  const handleShareToTeam = async () => {
+    const taskId = Number(task?.id);
+    if (!Number.isFinite(taskId) || !shareTeamId) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareSuccess(null);
+    try {
+      await api.post(`/tasks/${taskId}/share`, {
+        shared_to_team_id: shareTeamId,
+        permission: 'STATUS_TRACKING',
+      });
+      setShareSuccess('Shared successfully');
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.errors?.share?.[0] ||
+        e?.message ||
+        'Failed to share';
+      setShareError(String(msg));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit || !categoryId || !derivedTeamId || !user?.id) return;
     if (mode === 'edit' && (!statusId || !task?.id)) return;
@@ -1598,6 +1630,52 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
                   />
                 </div>
+
+                {/* Sharing (phase 1) */}
+                {mode === 'edit' ? (
+                  <div className="pt-4 mt-2 border-t border-border/40 space-y-3">
+                    <div className="text-sm font-medium font-[500] text-foreground">Share</div>
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm font-medium font-[500] text-foreground">
+                        Share with team
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={shareTeamId ? String(shareTeamId) : ''}
+                          onValueChange={(v) => setShareTeamId(v ? parseInt(v, 10) : null)}
+                        >
+                          <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
+                            <SelectValue placeholder="Select a team" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.isArray(teams) && teams.length > 0 ? (
+                              teams
+                                .filter((t: any) => t?.is_active !== false)
+                                .map((t: any) => (
+                                  <SelectItem key={t.id} value={String(t.id)}>
+                                    {t.name || `Team ${t.id}`}
+                                  </SelectItem>
+                                ))
+                            ) : (
+                              <div className="px-2 py-1.5 text-sm text-[#6B7280]">No teams available</div>
+                            )}
+                          </SelectContent>
+                        </Select>
+
+                        <Button
+                          type="button"
+                          onClick={handleShareToTeam}
+                          disabled={!shareTeamId || shareBusy || !task?.id}
+                          className="h-10 px-4 rounded-[10px] font-medium bg-[#00BFA5] hover:bg-[#00BFA5]/90 text-white transition-all duration-150 disabled:opacity-50"
+                        >
+                          {shareBusy ? 'Sharing…' : 'Share'}
+                        </Button>
+                      </div>
+                      {shareError ? <div className="text-sm text-destructive">{shareError}</div> : null}
+                      {shareSuccess ? <div className="text-sm text-foreground">{shareSuccess}</div> : null}
+                    </div>
+                  </div>
+                ) : null}
 
               </TabsContent>
             </Tabs>

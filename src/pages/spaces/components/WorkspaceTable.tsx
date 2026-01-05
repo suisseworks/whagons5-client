@@ -127,6 +127,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const externalFilterModelRef = useRef<any>({});
   const debugFilters = useRef<boolean>(false);
   const lastDoubleClickRef = useRef<{ rowId: any; timestamp: number } | null>(null);
+  const [emptyOverlayVisible, setEmptyOverlayVisible] = useState(false);
+
+  // Overlay is controlled by the datasource (see workspaceTable/dataSource.ts)
   useEffect(() => {
     try { debugFilters.current = localStorage.getItem('wh-debug-filters') === 'true'; } catch { debugFilters.current = false; }
   }, []);
@@ -770,9 +773,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         taskTagsRef,
         externalFilterModelRef,
         normalizeFilterModelForQuery,
+        setEmptyOverlayVisible,
       }),
-    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]
+    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, setEmptyOverlayVisible]
   );
+
+  // Reset empty overlay when workspace/search changes; datasource will set it once it knows rowCount.
+  useEffect(() => {
+    setEmptyOverlayVisible(false);
+  }, [workspaceId, searchText]);
 
   // Function to refresh the grid
   const refreshGrid = useCallback(async () => {
@@ -1020,14 +1029,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
   }, [searchText, modulesLoaded, refreshGrid]);
 
-  // When reference data (statuses, priorities, spots, users, tags, categories, customFields) changes, refresh the grid
-  // This ensures that when someone updates a status/priority/etc in settings, the grid shows the updated data
-  useEffect(() => {
-    if (gridRef.current?.api && modulesLoaded) {
-      // Refresh the grid to pick up changes in reference data
-      refreshGrid();
-    }
-  }, [statuses, priorities, spots, users, tags, categories, customFields, categoryCustomFields, modulesLoaded, refreshGrid]);
+  // IMPORTANT: Do NOT call refreshGrid() on reference-data changes.
+  // That clears the row cache + refreshes infinite cache and can cause the grid to blink repeatedly during startup
+  // as reference tables hydrate. We already refresh specific columns via refreshCells() effects above.
 
   // Set up task event handlers using abstracted utility
   useEffect(() => {
@@ -1151,65 +1155,84 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return createLoadingSpinner();
   }
 
+  // We keep phantom rows in infinite model, so AG Grid's built-in "no rows" overlay cannot be relied on.
+  // Render our own overlay layer controlled by datasource rowCount instead.
+
   const gridOptions = createGridOptions(useClientSide, clientRows, collapseGroups);
 
   
 
   return createGridContainer(
     <Suspense fallback={createLoadingSpinner()}>
-      <AgGridReact
-        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
-        ref={gridRef}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        rowHeight={rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}
-        headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
-        rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
-        {...gridOptions}
-        suppressContextMenu={false}
-        getContextMenuItems={getContextMenuItems}
-        autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
-        rowSelection={'multiple'}
-        suppressRowClickSelection={true}
-        getRowStyle={getRowStyle}
-        onGridReady={onGridReady}
-        onFirstDataRendered={() => {
-          if (!gridRef.current?.api) return;
-          onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
-          const count = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
-          if (count === 0) gridRef.current.api.showNoRowsOverlay?.(); else gridRef.current.api.hideOverlay?.();
-        }}
-        onFilterChanged={(e: any) => {
-          if (suppressPersistRef.current) return;
-          onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
-          const count = e.api.getDisplayedRowCount?.() ?? 0;
-          if (count === 0) e.api.showNoRowsOverlay?.(); else e.api.hideOverlay?.();
-          try {
-            const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
-            const gm = e.api.getFilterModel?.() || {};
-            // Keep externalFilterModelRef in sync with AG Grid so datasource
-            // and modal both see the same canonical model.
-            externalFilterModelRef.current = gm;
-            if (debugFilters.current) {
-              console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+      <div className="relative h-full w-full">
+        {emptyOverlayVisible ? (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{ textAlign: 'center', maxWidth: 520 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <svg width="190" height="190" viewBox="0 0 24 24" style={{ opacity: 0.18 }}>
+                  <path fill="currentColor" d="M19 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4l3 3l3-3h4a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 12H16.17L12 19.17L7.83 15H5V5h14v10z"/>
+                  <path fill="currentColor" d="M7 7h10v2H7V7zm0 4h7v2H7v-2z"/>
+                </svg>
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 650, letterSpacing: '-0.01em', opacity: 0.9, marginBottom: 6 }}>
+                No tasks to show
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.4, opacity: 0.65 }}>
+                This workspace is empty, or you don’t have access to its tasks.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <AgGridReact
+          key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
+          ref={gridRef}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowHeight={rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}
+          headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
+          rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
+          {...gridOptions}
+          suppressContextMenu={false}
+          getContextMenuItems={getContextMenuItems}
+          autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
+          rowSelection={'multiple'}
+          suppressRowClickSelection={true}
+          getRowStyle={getRowStyle}
+          onGridReady={onGridReady}
+          onFirstDataRendered={() => {
+            if (!gridRef.current?.api) return;
+            onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+          }}
+          onFilterChanged={(e: any) => {
+            if (suppressPersistRef.current) return;
+            onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
+            try {
+              const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+              const gm = e.api.getFilterModel?.() || {};
+              externalFilterModelRef.current = gm;
+              if (debugFilters.current) {
+                console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+              }
+              if (gm && Object.keys(gm).length > 0) {
+                localStorage.setItem(key, JSON.stringify(gm));
+              }
+            } catch {}
+            if (!useClientSide) {
+              refreshGrid();
             }
-            // Persist only when there is an active model; do not remove the saved
-            // filter on incidental empty events (those can happen during grid resets).
-            if (gm && Object.keys(gm).length > 0) {
-              localStorage.setItem(key, JSON.stringify(gm));
-            }
-          } catch {}
-          // Only refresh if not in client-side mode (client-side mode handles filtering internally)
-          // or if suppressPersistRef is false (meaning this is a user-initiated filter change)
-          if (!useClientSide) {
-            refreshGrid();
-          }
-        }}
-        onModelUpdated={(e: any) => {
-          const api = e.api;
-          const count = api.getDisplayedRowCount?.() ?? 0;
-          if (count === 0) api.showNoRowsOverlay?.(); else api.hideOverlay?.();
-        }}
+          }}
         onSelectionChanged={(e: any) => {
           if (!onSelectionChanged) return;
           try {
@@ -1275,7 +1298,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         loading={false}
         suppressScrollOnNewData={true}
         suppressAnimationFrame={false}
-      />
+        />
+      </div>
     </Suspense>
   );
 });

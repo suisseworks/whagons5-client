@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.11';
+const CURRENT_DB_VERSION = '1.9.12';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -124,6 +124,10 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('tasks')) {
             db.createObjectStore('tasks', { keyPath: 'id' });
+          }
+          // Virtual workspace: tasks shared with the current user/teams
+          if (!db.objectStoreNames.contains('shared_tasks')) {
+            db.createObjectStore('shared_tasks', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('teams')) {
             db.createObjectStore('teams', { keyPath: 'id' });

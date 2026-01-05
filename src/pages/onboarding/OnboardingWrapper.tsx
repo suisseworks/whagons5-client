@@ -14,6 +14,8 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
 import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
+import RotatingBackground from '@/components/marketing/RotatingBackground';
+import { HERO_BACKGROUND_IMAGES } from '@/assets/marketing/heroBackgrounds';
 
 interface OnboardingWrapperProps {
   user: User;
@@ -33,21 +35,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     url_picture: user.url_picture,
   });
   const [loading, setLoading] = useState<boolean>(false);
-  const [bgIndex, setBgIndex] = useState<number>(0);
   const [quoteIndex, setQuoteIndex] = useState<number>(0);
-
-  const backgroundImages = useMemo(() => [
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1464822759844-d150f39ac1a2?auto=format&fit=crop&w=1920&q=80',
-    'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&w=1920&q=80'
-  ], []);
   const quotes = useMemo(() => [
     'Build momentum. One small step at a time.',
     'Clarity comes from action, not thought.',
@@ -84,9 +72,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   }, [user, navigate]);
 
   useEffect(() => {
-    setBgIndex(Math.floor(Math.random() * backgroundImages.length));
     setQuoteIndex(Math.floor(Math.random() * quotes.length));
-  }, [backgroundImages.length, quotes.length]);
+  }, [quotes.length]);
 
   const updateOnboardingData = (data: Partial<OnboardingData>) => {
     setOnboardingData(prev => ({ ...prev, ...data }));
@@ -254,23 +241,21 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
     <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2">
       {/* Left: photo with quote */}
       <div className="relative hidden lg:block">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${backgroundImages[bgIndex]})` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60" />
-        <div className="relative z-10 h-full flex flex-col justify-between p-10 lg:p-10 max-[900px]:p-6">
-          <div />
-          <div>
-            <div className="text-white/90 text-lg mb-1">Welcome to</div>
-            <h1 className="text-4xl font-semibold tracking-tight leading-none text-white">Whagons</h1>
-            <p className="mt-8 text-2xl leading-snug text-white max-w-xl">{quotes[quoteIndex]}</p>
+        <RotatingBackground images={HERO_BACKGROUND_IMAGES} intervalMs={10_000} className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60" />
+          <div className="relative z-10 h-full flex flex-col justify-between p-10 lg:p-10 max-[900px]:p-6">
+            <div />
+            <div>
+              <div className="text-white/90 text-lg mb-1">Welcome to</div>
+              <h1 className="text-4xl font-semibold tracking-tight leading-none text-white">Whagons</h1>
+              <p className="mt-8 text-2xl leading-snug text-white max-w-xl">{quotes[quoteIndex]}</p>
+            </div>
+            <div className="flex items-center gap-2 text-white/80">
+              <WhagonsCheck width={28} height={14} color="#27C1A7" />
+              <span className="text-sm font-semibold">Whagons</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-white/80">
-            <WhagonsCheck width={28} height={14} color="#27C1A7" />
-            <span className="text-sm font-semibold">Whagons</span>
-          </div>
-        </div>
+        </RotatingBackground>
       </div>
 
       {/* Right: form card */}

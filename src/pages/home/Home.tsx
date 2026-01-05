@@ -6,38 +6,13 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useLocation, useNavigate } from "react-router-dom";
 import WhagonsTitle from '@/assets/WhagonsTitle';
+import RotatingBackground from "@/components/marketing/RotatingBackground";
+import { HERO_BACKGROUND_IMAGES } from "@/assets/marketing/heroBackgrounds";
 
 function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showWelcome, setShowWelcome] = useState<boolean>(false);
-
-  const backgroundImages = useMemo(() => [
-    // Ocean waves at sunrise
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80',
-    // Golden mountains landscape
-    'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=1920&q=80',
-    // Modern workspace desk
-    'https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1920&q=80',
-    // City skyline at dusk
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80',
-    // Forest path in autumn
-    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1920&q=80',
-    // Mountain lake reflection
-    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
-    // Desert dunes at sunset
-    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1920&q=80',
-    // Northern lights aurora
-    'https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?auto=format&fit=crop&w=1920&q=80',
-    // Misty morning mountains
-    'https://images.unsplash.com/photo-1464822759844-d150f39ac1a2?auto=format&fit=crop&w=1920&q=80',
-    // Ocean waves crashing
-    'https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&w=1920&q=80',
-    // Starry night sky
-    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80',
-    // Zen garden stones
-    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1920&q=80',
-  ], []);
   const quotes = useMemo(() => [
     'Build momentum. One small step at a time.',
     'Clarity comes from action, not thought.',
@@ -60,19 +35,17 @@ function Home() {
     'Your only limit is you.',
     'Dream big. Start small. Act now.',
   ], []);
-  const [bgIndex, setBgIndex] = useState(0);
   const [quoteIndex, setQuoteIndex] = useState(0);
 
   useEffect(() => {
-    // Randomize background and quote on every page load
-    setBgIndex(Math.floor(Math.random() * backgroundImages.length));
+    // Randomize quote on every page load
     setQuoteIndex(Math.floor(Math.random() * quotes.length));
 
     const params = new URLSearchParams(location.search);
     if (params.has('welcome') || location.pathname === '/welcome') {
       setShowWelcome(true);
     }
-  }, [location.pathname, location.search, backgroundImages.length, quotes.length]);
+  }, [location.pathname, location.search, quotes.length]);
 
   // Keep the screen awake while the welcome view is visible (best-effort)
   useEffect(() => {
@@ -132,15 +105,7 @@ function Home() {
 
   if (showWelcome) {
     return (
-      <div
-        className="relative h-screen w-screen overflow-hidden"
-        style={{
-          backgroundImage: `url(${backgroundImages[bgIndex]})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
+      <RotatingBackground images={HERO_BACKGROUND_IMAGES} intervalMs={10_000} className="h-screen w-screen">
         {/* Dark gradient overlay for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60" />
 
@@ -152,15 +117,19 @@ function Home() {
         </div>
 
         {/* Center content */}
-        <div className="relative z-10 flex flex-col items-center justify-center text-center h-screen px-6">
+        <div className="relative z-10 flex flex-col items-center justify-center text-center h-full px-6">
           <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-white max-w-3xl">{quotes[quoteIndex]}</h1>
           <div className="mt-8">
-            <Button size="lg" className="bg-white text-gray-900 hover:bg-gray-100" onClick={() => navigate('/workspace/all', { replace: true })}>
+            <Button
+              size="lg"
+              className="cursor-pointer bg-primary text-white hover:bg-primary/90"
+              onClick={() => navigate('/workspace/all', { replace: true })}
+            >
               Get Started
             </Button>
           </div>
         </div>
-      </div>
+      </RotatingBackground>
     );
   }
 

@@ -9,6 +9,7 @@ import {
   Search,
   MoreHorizontal,
   Layers,
+  Inbox,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -384,6 +385,33 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
         </div>
       )}
 
+      {/* Shared with me - virtual workspace */}
+      {showEverythingButton && !collapsed && (
+        <div style={{ marginBottom: '10px' }}>
+          <Link
+            to={`/shared-with-me`}
+            className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/shared-with-me`
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+              }`}
+            style={{
+              padding: '8px 12px',
+              gap: '10px',
+              boxShadow: pathname === `/shared-with-me` ? '0 1px 3px rgba(0, 191, 165, 0.1)' : 'none',
+              fontWeight: pathname === `/shared-with-me` ? 600 : 500,
+              fontSize: '15px'
+            }}
+          >
+            <span className="flex items-center gap-3">
+              <WorkspaceIconBadge color="var(--sidebar-primary)">
+                <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+              </WorkspaceIconBadge>
+            </span>
+            <span>Shared with me</span>
+          </Link>
+        </div>
+      )}
+
       {showEverythingButton && collapsed && !isMobile && (
         <div className="px-2 flex justify-center" style={{ marginBottom: '8px' }}>
           <Link
@@ -403,6 +431,29 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
               <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
             </WorkspaceIconBadge>
             <span className="sr-only">Everything</span>
+          </Link>
+        </div>
+      )}
+
+      {showEverythingButton && collapsed && !isMobile && (
+        <div className="px-2 flex justify-center" style={{ marginBottom: '10px' }}>
+          <Link
+            to={`/shared-with-me`}
+            className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/shared-with-me`
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+              }`}
+            style={{
+              width: '32px',
+              height: '32px',
+              opacity: pathname === `/shared-with-me` ? 1 : 0.7
+            }}
+            title={'Shared with me'}
+          >
+            <WorkspaceIconBadge color="var(--sidebar-primary)">
+              <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+            </WorkspaceIconBadge>
+            <span className="sr-only">Shared with me</span>
           </Link>
         </div>
       )}
