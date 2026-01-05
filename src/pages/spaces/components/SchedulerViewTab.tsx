@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BryntumScheduler } from "@bryntum/scheduler-react";
@@ -24,7 +24,7 @@ interface SchedulerEvent {
   location?: string;
 }
 
-export default function SchedulerViewTab({ workspaceId }: { workspaceId: string | undefined }) {
+export default function SchedulerViewTab({ workspaceId: _workspaceId }: { workspaceId: string | undefined }) {
   const [viewPreset, setViewPreset] = useState<ViewPreset>("hourAndDay");
 
   const base = useMemo(() => {
@@ -156,7 +156,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                   },
                 },
               ]}
-              features={{
+              {...({ features: {
                 stripe: true,
                 eventTooltip: true,
                 eventEdit: {
@@ -170,7 +170,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                 timeRanges: true,
                 nonWorkingTime: true,
                 recurringEvents: true,
-              }}
+              } } as any)}
             />
           </div>
         </CardContent>

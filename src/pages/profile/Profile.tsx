@@ -7,9 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogClose } from '@/components/ui/dialog';
 import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
+import { ImageCropper } from '@/components/ImageCropper';
 
 function Profile() {
     const { user: userData, userLoading, refetchUser } = useAuth();
@@ -20,7 +24,12 @@ function Profile() {
         name: '',
         url_picture: ''
     });
-    const [previewImage, setPreviewImage] = useState<string>('');
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [showCropper, setShowCropper] = useState(false);
+    const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+    const [originalFile, setOriginalFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Initialize form when user data is available
@@ -30,7 +39,12 @@ function Profile() {
                 name: userData.name || '',
                 url_picture: userData.url_picture || ''
             });
-            setPreviewImage(userData.url_picture || '');
+            // Set preview using getAssetDisplayUrl to handle both URLs and asset IDs
+            if (userData.url_picture) {
+                setPreviewImage(getAssetDisplayUrl(userData.url_picture));
+            } else {
+                setPreviewImage(null);
+            }
         }
     }, [userData]);
 
@@ -42,13 +56,89 @@ function Profile() {
         }));
     };
 
-    // Handle image URL change
-    const handleImageUrlChange = (url: string) => {
+    // Handle image file selection - show cropper instead of uploading immediately
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate image type
+        if (!file.type.startsWith('image/')) {
+            setUploadError('Please select an image file');
+            return;
+        }
+
+        setUploadError(null);
+        
+        // Create preview and show cropper
+        try {
+            const previewUrl = await createImagePreview(file);
+            setImageToCrop(previewUrl);
+            setOriginalFile(file);
+            setShowCropper(true);
+        } catch (error: any) {
+            setUploadError('Failed to load image');
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    // Handle cropped image - convert to file and upload
+    const handleCropComplete = async (croppedImageUrl: string) => {
+        if (!originalFile) return;
+
+        setUploading(true);
+        setUploadError(null);
+        setShowCropper(false);
+
+        try {
+            // Convert data URL to File
+            const response = await fetch(croppedImageUrl);
+            const blob = await response.blob();
+            const croppedFile = new File([blob], originalFile.name, {
+                type: originalFile.type || 'image/png',
+                lastModified: Date.now(),
+            });
+
+            // Set preview
+            setPreviewImage(croppedImageUrl);
+
+            // Upload to asset service
+            const uploadedFile = await uploadImageAsset(croppedFile, {
+                maxSize: 10 * 1024 * 1024, // 10MB
+            });
+
+            // Store the uploaded file URL (this is what the backend expects to persist for `url_picture`)
+            setEditForm(prev => ({
+                ...prev,
+                url_picture: uploadedFile.url || ''
+            }));
+
+            // Clean up
+            URL.revokeObjectURL(croppedImageUrl);
+        } catch (error: any) {
+            setUploadError(error.message || 'Failed to upload image');
+            setPreviewImage(userData?.url_picture ? getAssetDisplayUrl(userData.url_picture) : null);
+        } finally {
+            setUploading(false);
+            setOriginalFile(null);
+            setImageToCrop(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    // Handle image removal
+    const handleRemoveImage = () => {
+        setPreviewImage(null);
         setEditForm(prev => ({
             ...prev,
-            url_picture: url
+            url_picture: ''
         }));
-        setPreviewImage(url);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     };
 
     // Handle profile update
@@ -58,24 +148,32 @@ function Profile() {
             const response = await api.patch('/users/me', editForm);
             
             if (response.status === 200) {
-                // Refresh user data through AuthContext
-                await refetchUser();
-                setIsEditing(false);
+                console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
                 
-                // Clear image cache if URL changed to force header to reload image
-                if (userData && editForm.url_picture !== userData.url_picture) {
-                    const firebaseUser = (window as any).firebase?.auth?.currentUser;
-                    if (firebaseUser?.uid) {
-                        localStorage.removeItem(`user_avatar_cache_${firebaseUser.uid}`);
-                        localStorage.removeItem(`user_avatar_timestamp_${firebaseUser.uid}`);
-                    }
+                // Clear avatar cache BEFORE refreshing to ensure fresh image loads
+                const { AvatarCache } = await import('@/store/indexedDB/AvatarCache');
+                const firebaseUser = (window as any).firebase?.auth?.currentUser;
+                if (firebaseUser?.uid && userData?.id) {
+                    console.log('Profile: Clearing cache for', [firebaseUser.uid, userData.google_uuid, userData.id]);
+                    await AvatarCache.deleteByAny([firebaseUser.uid, userData.google_uuid, userData.id]);
+                    console.log('Profile: Cache cleared');
                 }
                 
-                // Notify other components (like header) that profile was updated
-                // Use custom event for same-tab communication
+                // Notify other components (like header) that profile was updated WITH THE NEW URL
+                // Dispatch BEFORE refetchUser so Header can use the new URL immediately
                 window.dispatchEvent(new CustomEvent('profileUpdated', {
-                    detail: { timestamp: Date.now() }
+                    detail: { 
+                        timestamp: Date.now(),
+                        url_picture: editForm.url_picture 
+                    }
                 }));
+                console.log('Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
+                
+                // Refresh user data through AuthContext (this will update the user object)
+                await refetchUser();
+                console.log('Profile: User data refetched');
+                
+                setIsEditing(false);
                 
                 // Also set localStorage for cross-tab communication
                 localStorage.setItem('profile_updated', Date.now().toString());
@@ -95,8 +193,13 @@ function Profile() {
                 name: userData.name || '',
                 url_picture: userData.url_picture || ''
             });
-            setPreviewImage(userData.url_picture || '');
+            if (userData.url_picture) {
+                setPreviewImage(getAssetDisplayUrl(userData.url_picture));
+            } else {
+                setPreviewImage(null);
+            }
         }
+        setUploadError(null);
         setIsEditing(false);
     };
 
@@ -201,7 +304,11 @@ function Profile() {
                         <div className="flex items-center space-x-4">
                             <Avatar className="w-20 h-20">
                                 <AvatarImage 
-                                    src={isEditing ? previewImage : userData.url_picture} 
+                                    src={isEditing && previewImage 
+                                        ? previewImage 
+                                        : userData.url_picture 
+                                            ? getAssetDisplayUrl(userData.url_picture) 
+                                            : undefined} 
                                     alt={userData.name || 'Profile'} 
                                 />
                                 <AvatarFallback className="text-lg font-semibold">
@@ -329,24 +436,78 @@ function Profile() {
                         {/* Profile Picture Section */}
                         <div className="space-y-4">
                             <Label className="text-sm font-medium">Profile Picture</Label>
-                            <div className="flex items-center space-x-4">
-                                <Avatar className="w-16 h-16">
-                                    <AvatarImage src={previewImage} alt="Preview" />
-                                    <AvatarFallback>
-                                        {getUserInitials(editForm.name, userData.email)}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                    <Input
-                                        placeholder="Enter image URL..."
-                                        value={editForm.url_picture}
-                                        onChange={(e) => handleImageUrlChange(e.target.value)}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Enter a valid image URL (HTTPS recommended)
-                                    </p>
+                            {previewImage ? (
+                                <div className="space-y-3">
+                                    <div className="relative inline-block">
+                                        <img
+                                            src={previewImage}
+                                            alt="Profile preview"
+                                            className="w-32 h-32 rounded-full object-cover border-2 border-border"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-0 right-0 h-6 w-6 rounded-full"
+                                            onClick={handleRemoveImage}
+                                            disabled={uploading}
+                                        >
+                                            <FontAwesomeIcon icon={faXmark} className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            if (originalFile) {
+                                                createImagePreview(originalFile).then(url => {
+                                                    setImageToCrop(url);
+                                                    setShowCropper(true);
+                                                });
+                                            } else {
+                                                fileInputRef.current?.click();
+                                            }
+                                        }}
+                                        disabled={uploading}
+                                        className="w-full"
+                                    >
+                                        <Camera className="w-4 h-4 mr-2" />
+                                        Adjust & Center
+                                    </Button>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                        id="profile-image-upload"
+                                        disabled={uploading}
+                                    />
+                                    <label
+                                        htmlFor="profile-image-upload"
+                                        className={`cursor-pointer flex flex-col items-center gap-2 ${uploading ? 'opacity-50' : ''}`}
+                                    >
+                                        {uploading ? (
+                                            <>
+                                                <FontAwesomeIcon icon={faSpinner} className="h-6 w-6 text-muted-foreground animate-spin" />
+                                                <span className="text-sm text-muted-foreground">Uploading...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FontAwesomeIcon icon={faUpload} className="h-6 w-6 text-muted-foreground" />
+                                                <span className="text-sm text-muted-foreground">Click to upload an image</span>
+                                            </>
+                                        )}
+                                    </label>
+                                    {uploadError && (
+                                        <div className="mt-2 text-sm text-destructive">{uploadError}</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <Separator />
@@ -401,6 +562,25 @@ function Profile() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Image Cropper Dialog */}
+            {imageToCrop && (
+                <ImageCropper
+                    image={imageToCrop}
+                    open={showCropper}
+                    onClose={() => {
+                        setShowCropper(false);
+                        setImageToCrop(null);
+                        setOriginalFile(null);
+                        if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                        }
+                    }}
+                    onCropComplete={handleCropComplete}
+                    aspect={1}
+                    circularCrop={true}
+                />
+            )}
         </div>
     );
 }

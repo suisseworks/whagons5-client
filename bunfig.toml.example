@@ -1,0 +1,25 @@
+# Bun configuration file template
+# Copy this to bunfig.toml and fill in your actual credentials
+# 
+# For local development:
+#   1. Copy this file: cp bunfig.toml.example bunfig.toml
+#   2. Replace the placeholder tokens with your actual credentials
+#
+# For Docker builds:
+#   The Dockerfile will automatically create bunfig.toml from build arguments
+#   No manual bunfig.toml file is needed for Docker builds
+
+[install.scopes]
+# FontAwesome registry configuration
+# Get your token from: https://fontawesome.com/account/services
+"@fortawesome" = { url = "https://npm.fontawesome.com", token = "YOUR_FONTAWESOME_TOKEN_HERE" }
+"@awesome.me" = { url = "https://npm.fontawesome.com", token = "YOUR_FONTAWESOME_TOKEN_HERE" }
+
+# Bryntum registry configuration
+# For trial accounts:
+#   - Username: your email with @ replaced by .. (e.g., user..gmail.com)
+#   - Password: typically "trial"
+#   - Token: base64 encoded username:password
+#   Generate token: echo -n "your-email..domain.com:trial" | base64
+"@bryntum" = { url = "https://npm.bryntum.com", token = "YOUR_BRYNTUM_BASE64_TOKEN_HERE" }
+

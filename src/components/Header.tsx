@@ -9,7 +9,6 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    DropdownMenuCheckboxItem,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
@@ -19,6 +18,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
+import { getAssetDisplayUrl } from '@/lib/assetHelpers';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -42,7 +42,7 @@ function Header() {
     const location = useLocation();
     const [imageUrl, setImageUrl] = useState<string>('');
     const [imageError, setImageError] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [, setIsLoading] = useState(false);
 
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
@@ -370,38 +370,47 @@ function Header() {
 
 
 
-    const cacheImage = useCallback(async (url: string) => {
+    const cacheImage = useCallback(async (url: string, forceRefresh: boolean = false) => {
+        // IMPORTANT: Never block avatar rendering on the caching path.
+        // Always display the real url_picture directly, and only cache opportunistically.
         if (!url || !firebaseUser?.uid) return;
 
+        // Always show the real URL immediately (same behavior as Profile page)
+        setImageUrl(url);
+        setImageError(false);
+
+        // Opportunistic cache refresh (best effort)
         setIsLoading(true);
         try {
-            // Try IDB cache first
-            const cached = await AvatarCache.getByAny([firebaseUser.uid, user?.google_uuid, user?.id]);
-            if (cached) {
-                setImageUrl(cached);
-                setImageError(false);
-                return;
+            if (!forceRefresh) {
+                const cachedRow = await AvatarCache.getByAnyRow([firebaseUser.uid, user?.google_uuid, user?.id]);
+                if (cachedRow?.data && (!cachedRow.url || cachedRow.url === url)) {
+                    setImageUrl(cachedRow.data);
+                    setImageError(false);
+                    return;
+                }
             }
-            // Fetch and populate cache
-            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, [user?.google_uuid, user?.id]);
+
+            const aliases = [user?.google_uuid, user?.id].filter(Boolean) as Array<string | number>;
+            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, aliases);
             if (dataUrl) {
                 setImageUrl(dataUrl);
                 setImageError(false);
-            } else {
-                setImageError(true);
             }
-        } catch (error) {
-            setImageError(true);
+        } catch {
+            // ignore cache failures (CORS etc). UI already uses direct URL.
         } finally {
             setIsLoading(false);
         }
-    }, [firebaseUser?.uid]);
+    }, [firebaseUser?.uid, user?.google_uuid, user?.id]);
 
     // Update avatar when user data changes
     useEffect(() => {
         if (user?.id) {
             if (user.url_picture) {
-                cacheImage(user.url_picture);
+                // Convert asset ID to URL if needed
+                const displayUrl = getAssetDisplayUrl(user.url_picture);
+                cacheImage(displayUrl);
             } else {
                 setImageUrl('');
                 setImageError(true);
@@ -411,6 +420,48 @@ function Header() {
             setImageError(false);
         }
     }, [user, cacheImage]);
+
+    // Listen for profile updates and clear cache to force refresh
+    useEffect(() => {
+        const handleProfileUpdate = async (event?: CustomEvent) => {
+            if (firebaseUser?.uid && user?.id) {
+                // Clear avatar cache for all user identifiers FIRST
+                await AvatarCache.deleteByAny([String(firebaseUser.uid), String(user.google_uuid), String(user.id)]);
+                
+                // ALWAYS use the URL from event detail if available (it's the new one)
+                // Only fall back to user.url_picture if event detail doesn't have it
+                const newUrl = event?.detail?.url_picture ?? user.url_picture;
+                
+                // Reload avatar with force refresh to bypass any remaining cache
+                if (newUrl) {
+                    const displayUrl = getAssetDisplayUrl(newUrl);
+                    // Force refresh by passing true as second parameter
+                    await cacheImage(displayUrl, true);
+                } else {
+                    setImageUrl('');
+                    setImageError(true);
+                }
+            }
+        };
+
+        // Listen for custom event
+        const eventHandler = (e: Event) => handleProfileUpdate(e as CustomEvent);
+        window.addEventListener('profileUpdated', eventHandler);
+        
+        // Also check localStorage for cross-tab updates
+        const checkStorage = () => {
+            const lastUpdate = localStorage.getItem('profile_updated');
+            if (lastUpdate) {
+                handleProfileUpdate();
+            }
+        };
+        window.addEventListener('storage', checkStorage);
+        
+        return () => {
+            window.removeEventListener('profileUpdated', eventHandler);
+            window.removeEventListener('storage', checkStorage);
+        };
+    }, [firebaseUser?.uid, user?.id, user?.google_uuid, user?.url_picture, cacheImage]);
 
 
         
@@ -603,7 +654,7 @@ function Header() {
                         <DropdownMenuTrigger asChild>
                             <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
                                 <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
-                                    {!imageError && imageUrl && !isLoading && (
+                                    {!imageError && imageUrl && (
                                         <AvatarImage 
                                             src={imageUrl} 
                                             onError={handleImageError}
@@ -611,7 +662,7 @@ function Header() {
                                         />
                                     )}
                                     <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
-                                        {isLoading ? '...' : getInitials()}
+                                        {getInitials()}
                                     </AvatarFallback>
                                 </Avatar>
                             </button>
@@ -619,7 +670,6 @@ function Header() {
 
                         <DropdownMenuContent align="end" className="w-30">
                             <DropdownMenuItem onClick={() => {
-                                console.log('Profile clicked');
                                 navigate('/profile');
                             }}>
                                 <User className="mr-2 h-3 w-3" />
@@ -627,7 +677,6 @@ function Header() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => {
-                                console.log('Logout clicked');
                                 logout();
                             }}>
                                 <LogOut className="mr-2 h-3 w-3" />

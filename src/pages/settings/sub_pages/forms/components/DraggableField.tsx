@@ -25,7 +25,9 @@ import {
   TimeField,
   DateTimeField,
   NumberField,
-  SignatureField
+  SignatureField,
+  ImageField,
+  FixedImageField
 } from "./field-types";
 
 interface DraggableFieldProps {
@@ -142,6 +144,14 @@ export function DraggableField({
           {field.type === 'datetime' && <DateTimeField isEditing={false} />}
           {field.type === 'number' && <NumberField isEditing={false} />}
           {field.type === 'signature' && <SignatureField isEditing={false} />}
+          {field.type === 'image' && <ImageField isEditing={false} />}
+          {field.type === 'fixed-image' && (
+            <FixedImageField 
+              isEditing={false} 
+              imageUrl={field.properties?.imageUrl}
+              imageId={field.properties?.imageId}
+            />
+          )}
         </div>
       </div>
 
@@ -171,6 +181,8 @@ export function DraggableField({
                   <SelectItem value="time">Time</SelectItem>
                   <SelectItem value="datetime">Date & Time</SelectItem>
                   <SelectItem value="signature">Signature</SelectItem>
+                  <SelectItem value="image">Image Upload</SelectItem>
+                  <SelectItem value="fixed-image">Fixed Image</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -200,6 +212,27 @@ export function DraggableField({
             {field.type === 'datetime' && <DateTimeField isEditing={true} />}
             {field.type === 'number' && <NumberField isEditing={true} />}
             {field.type === 'signature' && <SignatureField isEditing={true} />}
+            {field.type === 'image' && <ImageField isEditing={true} />}
+            {field.type === 'fixed-image' && (
+              <FixedImageField 
+                isEditing={true}
+                imageUrl={field.properties?.imageUrl}
+                imageId={field.properties?.imageId}
+                onImageChange={({ imageUrl, imageId }) => {
+                  // Important: `null` means "clear it".
+                  // Only keep existing values when the incoming value is `undefined` (not provided).
+                  const nextImageId =
+                    imageId !== undefined ? imageId : (field.properties?.imageId ?? null);
+                  onUpdate({
+                    properties: {
+                      ...field.properties,
+                      imageUrl,
+                      imageId: nextImageId
+                    }
+                  });
+                }}
+              />
+            )}
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="flex items-center gap-2">
                 <Button
