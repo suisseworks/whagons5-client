@@ -1,6 +1,6 @@
 "use client";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import StatusInfoPopover from "./StatusInfoPopover";
 
 type StatusMeta = { id: number; name: string; color?: string; icon?: string };
 
@@ -9,11 +9,13 @@ export function StatusBadge({
   statusMap,
   getStatusIcon,
   className,
+  taskId,
 }: {
   statusId?: number | null;
   statusMap: Record<number, StatusMeta>;
   getStatusIcon?: (iconName?: string) => any;
   className?: string;
+  taskId?: number;
 }) {
   const meta = statusId != null ? statusMap[Number(statusId)] : undefined;
   if (!meta) {
@@ -26,7 +28,7 @@ export function StatusBadge({
 
   const inner = (
     <span
-      className={"inline-flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-[12px] font-medium leading-none border " + (className || "")}
+      className={"inline-flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-[12px] font-medium leading-none border cursor-pointer " + (className || "")}
       style={{
         background: `color-mix(in oklab, ${color} 12%, #101014 88%)`,
         borderColor: 'oklch(from var(--color-border) l c h / 0.45)',
@@ -43,14 +45,17 @@ export function StatusBadge({
     </span>
   );
 
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>{inner}</TooltipTrigger>
-        <TooltipContent side="top">{meta.name}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+  // If taskId is provided, show status info popover on hover
+  if (taskId && statusId) {
+    return (
+      <StatusInfoPopover taskId={taskId} statusId={statusId}>
+        {inner}
+      </StatusInfoPopover>
+    );
+  }
+
+  // Fallback to simple badge without popover
+  return inner;
 }
 
 export default StatusBadge;

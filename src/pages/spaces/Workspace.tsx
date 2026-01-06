@@ -621,16 +621,10 @@ export const Workspace = () => {
       value: 'statistics',
       label: (
         <div className="flex items-center gap-2" aria-label="Statistics">
-          <div
-            className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-            style={{
-              backgroundColor: '#3B82F6',
-              width: '20px',
-              height: '20px',
-            }}
-          >
-            <BarChart3 size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+          <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/40 text-muted-foreground">
+            <BarChart3 className="w-4 h-4" strokeWidth={2.2} />
           </div>
+          <span className="tab-label-text">Stats</span>
         </div>
       ),
       content: (
@@ -643,7 +637,10 @@ export const Workspace = () => {
       value: 'settings',
       label: (
         <div className="flex items-center gap-2" aria-label="Settings">
-          <Settings />
+          <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/30 text-muted-foreground">
+            <Settings className="w-4 h-4" strokeWidth={2.2} />
+          </div>
+          <span className="tab-label-text">Config</span>
         </div>
       ),
       content: (

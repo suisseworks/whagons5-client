@@ -138,8 +138,32 @@ export class GenericCache {
 	 * Create on server and return created row (tries common REST response shapes)
 	 */
 	async createRemote(row: any): Promise<any> {
-		const resp = await api.post(this.endpoint, row);
-		return (resp.data?.data ?? resp.data?.row ?? resp.data);
+		try {
+			console.log(`[GenericCache:${this.store}] createRemote: POST ${this.endpoint}`, row);
+			const resp = await api.post(this.endpoint, row);
+			console.log(`[GenericCache:${this.store}] createRemote response:`, {
+				status: resp.status,
+				dataKeys: Object.keys(resp.data || {}),
+				hasData: !!resp.data?.data,
+				rawData: resp.data
+			});
+			
+			const result = resp.data?.data ?? resp.data?.row ?? resp.data;
+			if (!result) {
+				console.error(`[GenericCache:${this.store}] createRemote: No data in response`, resp.data);
+				throw new Error(`Server response missing data for ${this.store}`);
+			}
+			return result;
+		} catch (error: any) {
+			console.error(`[GenericCache:${this.store}] createRemote error:`, {
+				message: error?.message,
+				response: error?.response?.data,
+				status: error?.response?.status,
+				endpoint: this.endpoint,
+				payload: row
+			});
+			throw error;
+		}
 	}
 
 	/**

@@ -1,14 +1,17 @@
 import { useEffect, useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Paperclip, File, X } from "lucide-react";
+import { MessageSquare, Send, Paperclip, File, X, Smile } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
 import dayjs from "dayjs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getUserDisplayName, getUserInitials } from "./workspaceTable/userUtils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
+import { uploadFile, getFileUrl } from "@/api/assetApi";
 
 interface TaskNotesModalProps {}
 
@@ -24,27 +27,37 @@ export default function TaskNotesModal() {
   const [taskId, setTaskId] = useState<number | null>(null);
   const [taskName, setTaskName] = useState<string>("");
   const [input, setInput] = useState("");
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const dispatch = useDispatch<any>();
   const endRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const { user } = useAuth();
   const users = useSelector((state: RootState) => (state.users as any).value);
   const taskNotes = useSelector((state: RootState) => (state.taskNotes as any).value);
   const taskAttachments = useSelector((state: RootState) => (state.taskAttachments as any).value);
 
-  // Listen for open event
+  // Listen for open event and load notes
   useEffect(() => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<any>;
       if (custom.detail) {
-        setTaskId(Number(custom.detail.taskId));
+        const newTaskId = Number(custom.detail.taskId);
+        setTaskId(newTaskId);
         setTaskName(custom.detail.taskName || "Task Notes");
         setIsOpen(true);
+        
+        // Load task notes and attachments for this task
+        dispatch(genericActions.taskNotes.getFromIndexedDB());
+        dispatch(genericActions.taskAttachments.getFromIndexedDB());
+        // Optionally fetch from API to ensure we have latest data
+        dispatch(genericActions.taskNotes.fetchFromAPI({ task_id: newTaskId }));
+        dispatch(genericActions.taskAttachments.fetchFromAPI({ task_id: newTaskId }));
       }
     };
     window.addEventListener('wh:openTaskNotes', handler);
     return () => window.removeEventListener('wh:openTaskNotes', handler);
-  }, []);
+  }, [dispatch]);
 
   // Combine and sort notes/attachments
   const items = taskId ? [
@@ -74,53 +87,146 @@ export default function TaskNotesModal() {
         return;
     }
     
+    const noteText = input.trim();
+    setInput(""); // Clear input immediately for better UX
+    
     try {
       const note: TaskNote = {
         uuid: crypto.randomUUID(),
         task_id: taskId,
-        note: input.trim(),
+        note: noteText,
         user_id: Number(user.id)
       };
       
       console.log("Sending note:", note);
-      await dispatch(genericActions.taskNotes.addAsync(note)).unwrap();
-      setInput("");
-    } catch (error) {
+      const result = await dispatch(genericActions.taskNotes.addAsync(note)).unwrap();
+      console.log("Note sent successfully:", result);
+      
+      // Refresh notes from IndexedDB to ensure UI updates
+      dispatch(genericActions.taskNotes.getFromIndexedDB());
+    } catch (error: any) {
       console.error("Failed to send note:", error);
+      // Restore input on error
+      setInput(noteText);
+      
+      // Show user-friendly error message
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to send note. Please try again.";
+      alert(`Error: ${errorMessage}`);
     }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !taskId || !user) return;
+    if (!file || !taskId || !user) {
+      console.log("File upload blocked:", { file: !!file, taskId, user: !!user });
+      return;
+    }
 
-    // Mock upload for now (or use real upload service if available)
-    // For real implementation: Upload to S3/Storage, get URL, then save
+    // Check file size (limit to 100MB - same as backend)
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      alert(`File size exceeds the maximum limit of ${Math.round(maxSize / 1024 / 1024)}MB. Please choose a smaller file.`);
+      e.target.value = '';
+      return;
+    }
+
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+
+    // Determine file type
+    let fileType: 'IMAGE' | 'FILE' | 'VIDEO' | 'VOICE' = 'FILE';
+    if (file.type.startsWith('image/')) {
+      fileType = 'IMAGE';
+    } else if (file.type.startsWith('video/')) {
+      fileType = 'VIDEO';
+    } else if (file.type.startsWith('audio/')) {
+      fileType = 'VOICE';
+    }
+
+    // Get file extension
+    const fileExtension = file.name.split('.').pop() || '';
     
-    // Temporary mock using data URL for immediate feedback
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-        const result = ev.target?.result as string;
+    try {
+        console.log("Uploading file to asset storage:", {
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type
+        });
+
+        // Step 1: Upload file to asset storage (same as profile pictures)
+        const uploadedFile = await uploadFile(file);
+        console.log("File uploaded to asset storage:", uploadedFile);
+
+        // Step 2: Store the file URL/ID in the task attachment
+        const fileUrl = uploadedFile.url || getFileUrl(uploadedFile.id);
         
-        try {
-            await dispatch(genericActions.taskAttachments.addAsync({
-                uuid: crypto.randomUUID(),
-                task_id: taskId,
-                type: file.type.startsWith('image/') ? 'IMAGE' : 'FILE',
-                file_path: result, // storing base64 for now as placeholder
-                file_name: file.name,
-                file_extension: file.name.split('.').pop() || '',
-                file_size: file.size,
-                user_id: user.id
-            })).unwrap();
-        } catch (error) {
-            console.error("Failed to upload attachment:", error);
+        const attachment = {
+            uuid: crypto.randomUUID(),
+            task_id: taskId,
+            type: fileType,
+            file_path: fileUrl, // Store the asset URL instead of base64
+            file_name: file.name,
+            file_extension: fileExtension,
+            file_size: file.size,
+            user_id: Number(user.id)
+        };
+
+        console.log("Creating task attachment record:", attachment);
+        const result_data = await dispatch(genericActions.taskAttachments.addAsync(attachment)).unwrap();
+        console.log("Attachment created successfully:", result_data);
+        
+        // Refresh attachments from IndexedDB to ensure UI updates
+        dispatch(genericActions.taskAttachments.getFromIndexedDB());
+    } catch (error: any) {
+        console.error("Failed to upload attachment:", error);
+        console.error("Full error object:", JSON.stringify(error, null, 2));
+        console.error("Error details:", {
+            status: error?.response?.status,
+            statusText: error?.response?.statusText,
+            data: error?.response?.data,
+            message: error?.message,
+            code: error?.code,
+        });
+        
+        let errorMessage = "Failed to upload attachment. Please try again.";
+        if (error?.response) {
+            const response = error.response;
+            if (response.data) {
+                if (response.data.message) {
+                    errorMessage = response.data.message;
+                } else if (response.data.errors) {
+                    const errors = Object.entries(response.data.errors)
+                        .map(([key, value]: [string, any]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                        .join('\n');
+                    errorMessage = `Validation errors:\n${errors}`;
+                } else if (response.data.error) {
+                    errorMessage = response.data.error;
+                } else if (typeof response.data === 'string') {
+                    errorMessage = response.data;
+                }
+            }
+            if (response.status) {
+                errorMessage = `[${response.status}] ${errorMessage}`;
+            }
+        } else if (error?.message) {
+            errorMessage = error.message;
         }
-    };
-    reader.readAsDataURL(file);
+        
+        alert(`Error: ${errorMessage}`);
+    }
   };
 
   const getUser = (id: number) => users?.find((u: any) => Number(u.id) === Number(id));
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    const emoji = emojiData.emoji;
+    setInput(prev => prev + emoji);
+    // Focus back on input after selecting emoji
+    setTimeout(() => {
+      inputRef.current?.focus();
+      setEmojiPickerOpen(false);
+    }, 100);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -130,6 +236,9 @@ export default function TaskNotesModal() {
             <MessageSquare className="w-4 h-4" />
             <span className="truncate">{taskName}</span>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            View and add notes and attachments for this task
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/10">
@@ -195,7 +304,46 @@ export default function TaskNotesModal() {
                 <Paperclip className="w-4 h-4" />
                 <input type="file" className="hidden" onChange={handleFileUpload} />
             </label>
+            <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen} modal={false}>
+              <PopoverTrigger asChild>
+                <Button 
+                  type="button"
+                  variant="ghost" 
+                  size="icon"
+                  className="h-9 w-9 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                >
+                  <Smile className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent 
+                className="w-auto p-0 border-0" 
+                align="start" 
+                side="top"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                onPointerDownOutside={(e) => {
+                  // Allow closing when clicking outside
+                  const target = e.target as HTMLElement;
+                  // Don't prevent if clicking outside the popover
+                  if (!target.closest('[data-radix-popper-content-wrapper]')) {
+                    return;
+                  }
+                  // Prevent closing if clicking inside popover content
+                  e.preventDefault();
+                }}
+              >
+                <EmojiPicker 
+                  onEmojiClick={handleEmojiClick}
+                  autoFocusSearch={false}
+                  theme="light"
+                  width={350}
+                  height={400}
+                  previewConfig={{ showPreview: false }}
+                />
+              </PopoverContent>
+            </Popover>
             <Input 
+                ref={inputRef}
                 value={input} 
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => {

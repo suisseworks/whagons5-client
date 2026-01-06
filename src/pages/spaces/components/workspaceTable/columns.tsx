@@ -258,8 +258,8 @@ export function buildWorkspaceColumns(opts: any) {
   const isVisible = (id: string | undefined): boolean => {
     if (!visibilitySet) return true;
     if (!id) return true;
-    // "name" is always visible as the primary column
-    if (id === 'name' || id === 'notes' || id === 'id') return true;
+    // Always show key columns
+    if (id === '__actions' || id === 'name' || id === 'notes' || id === 'id') return true;
     return visibilitySet.has(id);
   };
 
@@ -997,34 +997,35 @@ export function buildWorkspaceColumns(opts: any) {
       suppressMovable: true,
       lockPinned: true,
       cellClass: 'wh-action-cell',
+      colId: '__actions',
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
       cellRenderer: (p: any) => {
         const id = Number(p?.data?.id);
         if (!Number.isFinite(id)) return null;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={(e) => e.stopPropagation()}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-white hover:bg-accent text-muted-foreground"
-                aria-label="Task actions"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={(e) => { e.stopPropagation(); onDeleteTask?.(id); }}
-              >
-                Delete
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(id); }}>
-                Log (placeholder)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center justify-center w-full h-full">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-white hover:bg-accent text-muted-foreground"
+                  aria-label="Task actions"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(id); }}>
+                  Log
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(id); }}>
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
@@ -1311,6 +1312,7 @@ export function buildWorkspaceColumns(opts: any) {
               getStatusIcon={getStatusIcon}
               allowedNext={[]}
               onChange={async () => false}
+              taskId={row?.id}
             />
           </div>
         ) : (
@@ -1320,6 +1322,7 @@ export function buildWorkspaceColumns(opts: any) {
             getStatusIcon={getStatusIcon}
             allowedNext={allowedNext}
             onChange={(to: number) => handleChangeStatus(row, to)}
+            taskId={row?.id}
           />
         );
         if (dbg) recordMetric('status:total', Number((performance.now() - t0).toFixed(2)));

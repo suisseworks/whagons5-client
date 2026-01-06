@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.12';
+const CURRENT_DB_VERSION = '1.9.14';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -181,6 +181,9 @@ export class DB {
           if (!db.objectStoreNames.contains('status_transition_groups')) {
             db.createObjectStore('status_transition_groups', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('status_transition_logs')) {
+            db.createObjectStore('status_transition_logs', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('task_tags')) {
             db.createObjectStore('task_tags', { keyPath: 'id' });
           }
@@ -272,6 +275,9 @@ export class DB {
           // File Management
           if (!db.objectStoreNames.contains('task_attachments')) {
             db.createObjectStore('task_attachments', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_notes')) {
+            db.createObjectStore('task_notes', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('task_recurrences')) {
             db.createObjectStore('task_recurrences', { keyPath: 'id' });

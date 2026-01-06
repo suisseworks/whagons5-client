@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { auth } from '../firebase/firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import {
@@ -8,8 +8,11 @@ import {
   initializeAuth,
 } from '../api/whagonsApi';
 import { User } from '../types/user';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '../store/store';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../store/store';
+import { genericActions } from '@/store/genericSlices';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
 
 // Custom caches with advanced features
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
@@ -160,6 +163,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [hydrating, setHydrating] = useState<boolean>(false);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  const userTeams = useSelector(
+    (state: RootState) => ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>
+  );
+  const teamKey = useMemo(() => {
+    const ids = Array.from(
+      new Set(
+        (userTeams || [])
+          .map((ut) => Number((ut as any)?.team_id))
+          .filter((n) => Number.isFinite(n))
+      )
+    ).sort((a, b) => a - b);
+    return ids.join(',');
+  }, [userTeams]);
+  const prevTeamKeyRef = useRef<string | null>(null);
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) {
@@ -366,6 +383,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       unsubscribe();
     };
   }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
+
+  // Always refresh userTeams from API after hydration so membership changes (e.g., leaving a team) propagate to the cache/state
+  useEffect(() => {
+    if (loading || userLoading || hydrating || !firebaseUser) return;
+    dispatch(genericActions.userTeams.fetchFromAPI?.() as any).catch((err: any) => {
+      console.warn('AuthProvider: failed to refresh userTeams from API', err);
+    });
+  }, [loading, userLoading, hydrating, firebaseUser, dispatch]);
+
+  // Refresh tasks when the user's team memberships change so stale team tasks disappear from local cache
+  useEffect(() => {
+    if (loading || userLoading || hydrating || !firebaseUser) {
+      prevTeamKeyRef.current = null;
+      return;
+    }
+
+    if (prevTeamKeyRef.current === null) {
+      prevTeamKeyRef.current = teamKey;
+      return;
+    }
+
+    if (prevTeamKeyRef.current === teamKey) {
+      return;
+    }
+
+    prevTeamKeyRef.current = teamKey;
+
+    (async () => {
+      try {
+        await TasksCache.init();
+        await TasksCache.fetchTasks();
+        await dispatch(getTasksFromIndexedDB());
+      } catch (err) {
+        console.warn('AuthProvider: failed to refresh tasks after team change', err);
+      }
+    })();
+  }, [teamKey, loading, userLoading, hydrating, firebaseUser, dispatch]);
 
   return (
     <AuthContext.Provider
