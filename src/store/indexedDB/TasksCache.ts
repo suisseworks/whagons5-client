@@ -48,6 +48,7 @@ export class TasksCache {
 
     private static _memSharedTasks: Task[] | null = null;
     private static _memSharedTasksStamp = 0;
+    private static _fetchingSharedTasks = false;
 
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
@@ -389,14 +390,18 @@ export class TasksCache {
             if (allTasks.length > 0) {
                 await DB.clear('shared_tasks');
                 await DB.bulkPut('shared_tasks', allTasks as any[]);
-                this._memSharedTasks = null;
-                this._memSharedTasksStamp = 0;
+                // Populate memory cache immediately to prevent repeated queries
+                this._memSharedTasks = allTasks;
+                this._memSharedTasksStamp = Date.now();
+                // Emit event to refresh grid - event handler will check workspaceId
                 TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
             } else {
                 await DB.clear('shared_tasks');
-                this._memSharedTasks = null;
-                this._memSharedTasksStamp = 0;
-                TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
+                // Set empty array in memory cache to prevent repeated fetches
+                this._memSharedTasks = [];
+                this._memSharedTasksStamp = Date.now();
+                // Emit event with empty array - event handler will check workspaceId
+                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, []);
             }
 
             return true;
@@ -697,11 +702,23 @@ export class TasksCache {
                     tasks = this._memSharedTasks;
                 } else {
                     tasks = await this.getSharedTasks();
-                    // Bootstrap fetch if empty
-                    if (tasks.length === 0) {
-                        await this.fetchSharedTasks();
-                        tasks = await this.getSharedTasks();
+                    // Bootstrap fetch if empty - fire and forget to avoid blocking the UI
+                    // Only fetch if cache is truly empty AND we're not already fetching
+                    if (tasks.length === 0 && !this._fetchingSharedTasks) {
+                        // Prevent multiple simultaneous fetches
+                        this._fetchingSharedTasks = true;
+                        // Trigger fetch in background without blocking
+                        this.fetchSharedTasks()
+                            .catch(err => {
+                                console.error('Background fetchSharedTasks failed:', err);
+                            })
+                            .finally(() => {
+                                this._fetchingSharedTasks = false;
+                            });
+                        // Return empty results immediately - grid will refresh when fetch completes
                     }
+                    // Always update memory cache with current results (even if empty)
+                    // This prevents repeated fetches when refreshGrid is called multiple times
                     this._memSharedTasks = tasks;
                     this._memSharedTasksStamp = now;
                 }
@@ -738,7 +755,13 @@ export class TasksCache {
             
             // Apply simple parameter filters (skip if column is in filterModel, as filterModel will handle it)
             if (params.workspace_id) {
-                tasks = tasks.filter(task => task.workspace_id === parseInt(params.workspace_id));
+                const wsId = typeof params.workspace_id === 'string' ? parseInt(params.workspace_id, 10) : Number(params.workspace_id);
+                if (Number.isFinite(wsId)) {
+                    tasks = tasks.filter(task => {
+                        const taskWsId = typeof task.workspace_id === 'string' ? parseInt(task.workspace_id, 10) : Number(task.workspace_id);
+                        return Number.isFinite(taskWsId) && taskWsId === wsId;
+                    });
+                }
             }
             if (params.status_id && !filterModelKeys.has('status_id')) {
                 tasks = tasks.filter(task => task.status_id === parseInt(params.status_id));

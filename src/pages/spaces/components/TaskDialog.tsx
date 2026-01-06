@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
-import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ChevronUp, Plus, ShieldCheck, Clock, GripVertical } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
 import api from '@/api/whagonsApi';
+import TaskShareManager from '@/components/tasks/TaskShareManager';
 
 type TaskDialogMode = 'create' | 'edit' | 'create-all';
 
@@ -29,8 +31,115 @@ interface TaskDialogProps {
   task?: any | null; // Required for 'edit' mode
 }
 
+const TASK_DIALOG_WIDTH_STORAGE_KEY = 'whagons_task_dialog_width';
+const DEFAULT_WIDTH = 600; // Default width in pixels (matches original Sheet default)
+const MIN_WIDTH = 400; // Minimum width in pixels
+const MAX_WIDTH = 2000; // Maximum width in pixels
+
 export default function TaskDialog({ open, onOpenChange, mode, workspaceId: propWorkspaceId, task }: TaskDialogProps) {
   const dispatch = useDispatch<AppDispatch>();
+
+  // Resize state with localStorage persistence
+  const [width, setWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(TASK_DIALOG_WIDTH_STORAGE_KEY);
+      const savedWidth = saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+      // Ensure width doesn't exceed viewport
+      const maxAllowedWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.95);
+      return Math.max(MIN_WIDTH, Math.min(maxAllowedWidth, savedWidth));
+    }
+    return DEFAULT_WIDTH;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<HTMLDivElement>(null);
+  const sheetContentRef = useRef<HTMLDivElement>(null);
+
+  // Ensure width is applied directly to the DOM element
+  useEffect(() => {
+    if (open) {
+      // Use requestAnimationFrame to ensure element is mounted
+      requestAnimationFrame(() => {
+        if (sheetContentRef.current) {
+          const element = sheetContentRef.current;
+          element.style.width = `${width}px`;
+          element.style.maxWidth = `${width}px`;
+          element.style.minWidth = `${MIN_WIDTH}px`;
+          element.style.right = '0px';
+          element.style.top = '0px';
+          element.style.bottom = '0px';
+          element.style.zIndex = '50';
+          element.style.position = 'fixed';
+          element.style.opacity = '1';
+          element.style.visibility = 'visible';
+          element.style.display = 'flex';
+        } else {
+          console.warn('[TaskDialog] sheetContentRef.current is null');
+        }
+      });
+    }
+  }, [open, width]);
+
+  // Save width to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && width !== DEFAULT_WIDTH) {
+      localStorage.setItem(TASK_DIALOG_WIDTH_STORAGE_KEY, width.toString());
+    }
+  }, [width]);
+
+  // Ensure width is within viewport bounds when dialog opens
+  useEffect(() => {
+    if (open && typeof window !== 'undefined') {
+      const maxAllowedWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.95);
+      const minAllowedWidth = Math.max(MIN_WIDTH, window.innerWidth * 0.3);
+      if (width > maxAllowedWidth) {
+        setWidth(maxAllowedWidth);
+      } else if (width < minAllowedWidth) {
+        setWidth(minAllowedWidth);
+      }
+    }
+  }, [open, width]);
+
+  // Handle resize mouse down
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  // Handle resize mouse move
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      e.preventDefault();
+      const newWidth = window.innerWidth - e.clientX;
+      const maxAllowedWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.95);
+      const clampedWidth = Math.max(MIN_WIDTH, Math.min(maxAllowedWidth, newWidth));
+      setWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
   const { value: priorities = [] } = useSelector((s: RootState) => (s as any).priorities || { value: [] });
@@ -121,9 +230,13 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
 
   // Sharing (phase 1)
   const [shareTeamId, setShareTeamId] = useState<number | null>(null);
+  const [shareUserId, setShareUserId] = useState<number | null>(null);
+  const [sharePermission, setSharePermission] = useState<'COMMENT_ATTACH' | 'STATUS_TRACKING'>('STATUS_TRACKING');
+  const [shareTargetType, setShareTargetType] = useState<'user' | 'team'>('team');
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
+  const [sharesRefreshKey, setSharesRefreshKey] = useState(0);
 
   const customFieldValuesRef = useRef<Record<number, any>>({});
   const lastCustomFieldCategoryRef = useRef<number | null>(null);
@@ -1037,9 +1150,13 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     try {
       await api.post(`/tasks/${taskId}/share`, {
         shared_to_team_id: shareTeamId,
-        permission: 'STATUS_TRACKING',
+        permission: sharePermission,
       });
       setShareSuccess('Shared successfully');
+      setShareTeamId(null);
+      setSharesRefreshKey(prev => prev + 1);
+      // Clear success message after 3 seconds
+      setTimeout(() => setShareSuccess(null), 3000);
     } catch (e: any) {
       const msg =
         e?.response?.data?.message ||
@@ -1050,6 +1167,46 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     } finally {
       setShareBusy(false);
     }
+  };
+
+  const handleShareToUser = async () => {
+    const taskId = Number(task?.id);
+    if (!Number.isFinite(taskId) || !shareUserId) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareSuccess(null);
+    try {
+      await api.post(`/tasks/${taskId}/share`, {
+        shared_to_user_id: shareUserId,
+        permission: sharePermission,
+      });
+      setShareSuccess('Shared successfully');
+      setShareUserId(null);
+      setSharesRefreshKey(prev => prev + 1);
+      // Clear success message after 3 seconds
+      setTimeout(() => setShareSuccess(null), 3000);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.errors?.share?.[0] ||
+        e?.message ||
+        'Failed to share';
+      setShareError(String(msg));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (shareTargetType === 'user') {
+      await handleShareToUser();
+    } else {
+      await handleShareToTeam();
+    }
+  };
+
+  const handleShareChange = () => {
+    setSharesRefreshKey(prev => prev + 1);
   };
 
   const handleSubmit = async () => {
@@ -1167,13 +1324,17 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   };
 
 
+
   // Early return for edit mode if no task
-  if (mode === 'edit' && !task) return null;
+  if (mode === 'edit' && !task) {
+    return null;
+  }
 
   // Main form (create, edit, or create-all after category selection)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
+        ref={sheetContentRef}
         side="right" 
         onInteractOutside={(e) => {
           if (isSubmitting) {
@@ -1187,8 +1348,37 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             e.preventDefault();
           }
         }}
-        className={`w-full ${mode === 'create-all' ? 'sm:w-[1050px] max-w-[1050px]' : 'sm:w-[1400px] max-w-[1400px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
+        style={{ 
+          width: `${width}px`,
+          maxWidth: `${width}px`,
+          minWidth: `${MIN_WIDTH}px`,
+          right: 0,
+          top: 0,
+          bottom: 0,
+        }}
+        className={`p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full relative bg-background`}
+        data-sheet-open={open}
+        data-testid="task-dialog-content"
+        data-custom-width={width}
       >
+        {/* Resize Handle */}
+        <div
+          ref={resizeRef}
+          onMouseDown={handleResizeStart}
+          className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-[#00BFA5]/20 transition-colors duration-150 z-50 group ${
+            isResizing ? 'bg-[#00BFA5]/40' : ''
+          }`}
+          style={{ 
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none'
+          }}
+          role="separator"
+          aria-label="Resize dialog"
+          aria-orientation="vertical"
+        >
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-20 bg-[#00BFA5] rounded-full opacity-0 group-hover:opacity-60 transition-opacity duration-150" />
+        </div>
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
           <div className={`flex items-center gap-3 flex-1 min-w-0 ${mode === 'edit' ? 'mb-2' : ''}`}>
@@ -1235,10 +1425,18 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                 )}
                 <TabsTrigger 
                   value="additional" 
-                  className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
                 >
                   Additional Info
                 </TabsTrigger>
+                {mode === 'edit' && (
+                  <TabsTrigger 
+                    value="share" 
+                    className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  >
+                    Share
+                  </TabsTrigger>
+                )}
               </TabsList>
               
               {/* Basic Details Tab */}
@@ -1631,53 +1829,163 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   />
                 </div>
 
-                {/* Sharing (phase 1) */}
-                {mode === 'edit' ? (
-                  <div className="pt-4 mt-2 border-t border-border/40 space-y-3">
-                    <div className="text-sm font-medium font-[500] text-foreground">Share</div>
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-sm font-medium font-[500] text-foreground">
-                        Share with team
-                      </Label>
-                      <div className="flex items-center gap-2">
+              </TabsContent>
+
+              {/* Share Tab - Only visible in edit mode */}
+              {mode === 'edit' && (
+                <TabsContent value="share" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
+                  <div className="space-y-6">
+                    {/* Existing Shares */}
+                    {task?.id && (
+                      <div className="flex flex-col gap-3">
+                        <div className="text-sm font-medium font-[500] text-foreground">
+                          Existing Shares
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Manage who has access to this task. You can revoke access at any time.
+                        </p>
+                        <TaskShareManager 
+                          key={sharesRefreshKey}
+                          taskId={task.id} 
+                          onShareChange={handleShareChange}
+                        />
+                      </div>
+                    )}
+
+                    {/* Share New */}
+                    <div className="flex flex-col gap-4 pt-4 border-t border-border/40">
+                      <div className="text-sm font-medium font-[500] text-foreground">
+                        Share New
+                      </div>
+                      
+                      {/* Target Type Selector */}
+                      <div className="flex flex-col gap-2">
+                        <Label className="text-sm text-muted-foreground">Share with</Label>
+                        <ToggleGroup
+                          type="single"
+                          value={shareTargetType}
+                          onValueChange={(value) => {
+                            if (value) {
+                              setShareTargetType(value as 'user' | 'team');
+                              setShareUserId(null);
+                              setShareTeamId(null);
+                            }
+                          }}
+                          className="justify-start"
+                        >
+                          <ToggleGroupItem value="user" aria-label="Share with user">
+                            User
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="team" aria-label="Share with team">
+                            Team
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
+
+                      {/* User Picker */}
+                      {shareTargetType === 'user' && (
+                        <div className="flex flex-col gap-2">
+                          <Label className="text-sm text-muted-foreground">Select User</Label>
+                          <Combobox
+                            options={users
+                              .filter((u: any) => u?.id !== user?.id && u?.is_active !== false)
+                              .map((u: any) => ({
+                                value: String(u.id),
+                                label: `${u.name || u.email || `User ${u.id}`}${u.email ? ` (${u.email})` : ''}`,
+                              }))}
+                            value={shareUserId ? String(shareUserId) : undefined}
+                            onValueChange={(v) => setShareUserId(v ? parseInt(v, 10) : null)}
+                            placeholder="Select a user"
+                            searchPlaceholder="Search users..."
+                            emptyText="No users available"
+                          />
+                        </div>
+                      )}
+
+                      {/* Team Picker */}
+                      {shareTargetType === 'team' && (
+                        <div className="flex flex-col gap-2">
+                          <Label className="text-sm text-muted-foreground">Select Team</Label>
+                          <Select
+                            value={shareTeamId ? String(shareTeamId) : ''}
+                            onValueChange={(v) => setShareTeamId(v ? parseInt(v, 10) : null)}
+                          >
+                            <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
+                              <SelectValue placeholder="Select a team" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(teams) && teams.length > 0 ? (
+                                teams
+                                  .filter((t: any) => t?.is_active !== false)
+                                  .map((t: any) => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                      {t.name || `Team ${t.id}`}
+                                    </SelectItem>
+                                  ))
+                              ) : (
+                                <div className="px-2 py-1.5 text-sm text-[#6B7280]">No teams available</div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* Permission Selector */}
+                      <div className="flex flex-col gap-2">
+                        <Label className="text-sm text-muted-foreground">Permission Level</Label>
                         <Select
-                          value={shareTeamId ? String(shareTeamId) : ''}
-                          onValueChange={(v) => setShareTeamId(v ? parseInt(v, 10) : null)}
+                          value={sharePermission}
+                          onValueChange={(v) => setSharePermission(v as 'COMMENT_ATTACH' | 'STATUS_TRACKING')}
                         >
                           <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
-                            <SelectValue placeholder="Select a team" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {Array.isArray(teams) && teams.length > 0 ? (
-                              teams
-                                .filter((t: any) => t?.is_active !== false)
-                                .map((t: any) => (
-                                  <SelectItem key={t.id} value={String(t.id)}>
-                                    {t.name || `Team ${t.id}`}
-                                  </SelectItem>
-                                ))
-                            ) : (
-                              <div className="px-2 py-1.5 text-sm text-[#6B7280]">No teams available</div>
-                            )}
+                            <SelectItem value="STATUS_TRACKING">
+                              Full Access (View, Comment, Update Status)
+                            </SelectItem>
+                            <SelectItem value="COMMENT_ATTACH">
+                              View & Comment Only
+                            </SelectItem>
                           </SelectContent>
                         </Select>
-
-                        <Button
-                          type="button"
-                          onClick={handleShareToTeam}
-                          disabled={!shareTeamId || shareBusy || !task?.id}
-                          className="h-10 px-4 rounded-[10px] font-medium bg-[#00BFA5] hover:bg-[#00BFA5]/90 text-white transition-all duration-150 disabled:opacity-50"
-                        >
-                          {shareBusy ? 'Sharing…' : 'Share'}
-                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {sharePermission === 'STATUS_TRACKING' 
+                            ? 'Recipients can view, comment, attach files, and update task status.'
+                            : 'Recipients can view, comment, and attach files, but cannot update status.'}
+                        </p>
                       </div>
-                      {shareError ? <div className="text-sm text-destructive">{shareError}</div> : null}
-                      {shareSuccess ? <div className="text-sm text-foreground">{shareSuccess}</div> : null}
+
+                      {/* Share Button */}
+                      <Button
+                        type="button"
+                        onClick={handleShare}
+                        disabled={
+                          (shareTargetType === 'user' && !shareUserId) ||
+                          (shareTargetType === 'team' && !shareTeamId) ||
+                          shareBusy ||
+                          !task?.id
+                        }
+                        className="h-10 px-4 rounded-[10px] font-medium bg-[#00BFA5] hover:bg-[#00BFA5]/90 text-white transition-all duration-150 disabled:opacity-50"
+                      >
+                        {shareBusy ? 'Sharing…' : 'Share'}
+                      </Button>
+
+                      {/* Feedback Messages */}
+                      {shareError ? (
+                        <div className="text-sm text-destructive p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                          {shareError}
+                        </div>
+                      ) : null}
+                      {shareSuccess ? (
+                        <div className="text-sm text-foreground text-[#00BFA5] p-2 rounded-md bg-[#00BFA5]/10 border border-[#00BFA5]/20">
+                          {shareSuccess}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
-                ) : null}
-
-              </TabsContent>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>

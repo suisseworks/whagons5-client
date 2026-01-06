@@ -1,10 +1,10 @@
 import ReactDOM from 'react-dom/client';
 import './index.css';
 // Bryntum Scheduler styles deshabilitados temporalmente hasta tener licencia/paquete
-import '@bryntum/scheduler/scheduler.css';
+/* import '@bryntum/scheduler/scheduler.css';
 import '@bryntum/scheduler/stockholm-light.css';
 import '@bryntum/scheduler/fontawesome/css/fontawesome.css';
-import '@bryntum/scheduler/fontawesome/css/solid.css';
+import '@bryntum/scheduler/fontawesome/css/solid.css'; */
 import App from './App';
 import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
