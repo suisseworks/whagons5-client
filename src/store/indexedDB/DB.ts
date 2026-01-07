@@ -282,6 +282,9 @@ export class DB {
           if (!db.objectStoreNames.contains('task_recurrences')) {
             db.createObjectStore('task_recurrences', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('workspace_chat')) {
+            db.createObjectStore('workspace_chat', { keyPath: 'id' });
+          }
 
           // Error Tracking
           if (!db.objectStoreNames.contains('exceptions')) {
@@ -500,7 +503,9 @@ export class DB {
       | 'session_logs'
       | 'config_logs'
       | 'task_attachments'
+      | 'task_notes'
       | 'task_recurrences'
+      | 'workspace_chat'
       | 'exceptions'
       | 'avatars',
     mode: IDBTransactionMode = 'readonly'
@@ -557,7 +562,9 @@ export class DB {
       | 'session_logs'
       | 'config_logs'
       | 'task_attachments'
+      | 'task_notes'
       | 'task_recurrences'
+      | 'workspace_chat'
       | 'exceptions'
       | 'avatars',
     mode: IDBTransactionMode = 'readwrite'

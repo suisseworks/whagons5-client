@@ -6,8 +6,10 @@ import WhagonsTitle from '@/assets/WhagonsTitle';
 import { api, updateAuthToken, setSubdomain } from '@/api/whagonsApi';
 import { auth } from '@/firebase/firebaseConfig';
 import { signOut } from 'firebase/auth';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 const InvitationSignUp: React.FC = () => {
+  const { t } = useLanguage();
   const { token } = useParams<{ token: string }>();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
@@ -246,16 +248,16 @@ const InvitationSignUp: React.FC = () => {
                 <WhagonsTitle />
               </Link>
               <p className="text-muted-foreground 2xl:px-20">
-                You've been invited to join a team on Whagons. Create your account to get started.
+                {t('home.invitationMessage', 'You\'ve been invited to join a team on Whagons. Create your account to get started.')}
               </p>
             </div>
           </div>
 
           <div className="w-full border-l border-border xl:w-1/2">
             <div className="w-full p-8 sm:p-12 xl:p-16">
-              <span className="mb-2 block font-medium text-muted-foreground">Join your team</span>
+              <span className="mb-2 block font-medium text-muted-foreground">{t('home.joinTeam', 'Join your team')}</span>
               <h2 className="mb-9 text-2xl font-bold text-foreground sm:text-3xl">
-                Sign Up to Whagons
+                {t('home.signUp', 'Sign Up to Whagons')}
               </h2>
 
               {error && (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/api/whagonsApi';
 import { User, OnboardingData, InitializationStage } from '@/types/user';
 import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import EmailVerificationStep from '@/pages/onboarding/steps/EmailVerificationStep';
 import NameStep from '@/pages/onboarding/steps/NameStep';
 import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep';
@@ -24,6 +25,7 @@ interface OnboardingWrapperProps {
 const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const navigate = useNavigate();
   const { refetchUser } = useAuth();
+  const { language, t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
@@ -36,17 +38,35 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [quoteIndex, setQuoteIndex] = useState<number>(0);
-  const quotes = useMemo(() => [
-    'Build momentum. One small step at a time.',
-    'Clarity comes from action, not thought.',
-    'Start where you are. Use what you have. Do what you can.',
-    'Focus on progress, not perfection.',
-    'The journey of a thousand miles begins with a single step.',
-    'Done is better than perfect.',
-    'Your future self will thank you for starting today.',
-    'Success is the sum of small efforts, repeated day in and day out.',
-    'Dream big. Start small. Act now.'
-  ], []);
+  
+  const isSpanish = language === 'es-ES' || language.startsWith('es');
+  
+  const quotes = useMemo(() => {
+    if (isSpanish) {
+      return [
+        'Construye impulso. Un pequeño paso a la vez.',
+        'La claridad viene de la acción, no del pensamiento.',
+        'Empieza donde estás. Usa lo que tienes. Haz lo que puedas.',
+        'Enfócate en el progreso, no en la perfección.',
+        'El viaje de mil millas comienza con un solo paso.',
+        'Es mejor completar que perfeccionar.',
+        'Tu yo futuro te agradecerá por empezar hoy.',
+        'El éxito es la suma de pequeños esfuerzos, repetidos día tras día.',
+        'Sueña en grande. Empieza pequeño. Actúa ahora.'
+      ];
+    }
+    return [
+      'Build momentum. One small step at a time.',
+      'Clarity comes from action, not thought.',
+      'Start where you are. Use what you have. Do what you can.',
+      'Focus on progress, not perfection.',
+      'The journey of a thousand miles begins with a single step.',
+      'Done is better than perfect.',
+      'Your future self will thank you for starting today.',
+      'Success is the sum of small efforts, repeated day in and day out.',
+      'Dream big. Start small. Act now.'
+    ];
+  }, [isSpanish]);
 
   const syncCachesAndStore = async () => {
     // Ensure tasks cache is ready only; core slices are hydrated by AuthProvider
@@ -161,7 +181,12 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             dataToUse.organization_name,
             dataToUse.tenant_domain_prefix
           );
-          if (success) setCurrentStep(2);
+          if (success) {
+            // Immediately refetch user data to ensure tenant_domain_prefix is updated
+            // This prevents redirect issues where user data hasn't been refreshed yet
+            await refetchUser();
+            setCurrentStep(2);
+          }
         }
         break;
       case 2: // Optional step
@@ -246,7 +271,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           <div className="relative z-10 h-full flex flex-col justify-between p-10 lg:p-10 max-[900px]:p-6">
             <div />
             <div>
-              <div className="text-white/90 text-lg mb-1">Welcome to</div>
+              <div className="text-white/90 text-lg mb-1">{t('onboarding.welcomeTo', 'Welcome to')}</div>
               <h1 className="text-4xl font-semibold tracking-tight leading-none text-white">Whagons</h1>
               <p className="mt-8 text-2xl leading-snug text-white max-w-xl">{quotes[quoteIndex]}</p>
             </div>
@@ -259,17 +284,17 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       </div>
 
       {/* Right: form card */}
-      <div className="relative flex items-center justify-center px-6 py-10 lg:py-10 max-[900px]:py-4 bg-[url('/images/onboarding/gradient-waves.svg')] bg-cover bg-center">
+      <div className="relative overflow-y-auto h-screen px-6 py-6 lg:py-8 bg-[url('/images/onboarding/gradient-waves.svg')] bg-cover bg-center">
         <div className="absolute inset-0 pointer-events-none bg-white/65 dark:bg-gray-900/70 backdrop-blur-sm" />
-        <div className="relative w-full max-w-md z-10">
-          <div className="text-center mb-10 lg:mb-10 max-[900px]:mb-4">
-            <div className="space-y-3">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Welcome to Whagons</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Let's get your account set up</p>
+        <div className="relative w-full max-w-md mx-auto z-10 pb-6">
+          <div className="text-center mb-6 lg:mb-6">
+            <div className="space-y-2">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">{t('onboarding.welcomeToWhagons', 'Welcome to Whagons')}</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('onboarding.letsGetAccountSetUp', 'Let\'s get your account set up')}</p>
             </div>
           </div>
 
-          <div className="mb-10 lg:mb-10 max-[900px]:mb-4">
+          <div className="mb-6 lg:mb-6">
             <div className="flex items-center justify-between">
               {[0, 1, 2].map((step) => (
                 <div key={step} className="flex items-center">
@@ -298,7 +323,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             </div>
           </div>
 
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-6 lg:p-8 max-[900px]:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-6 lg:p-6">
             {renderStep()}
           </div>
         </div>

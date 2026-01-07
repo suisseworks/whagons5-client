@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { OnboardingData } from '@/types/user';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface OptionalStepProps {
   data: OnboardingData;
@@ -9,6 +10,7 @@ interface OptionalStepProps {
 }
 
 const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loading }) => {
+  const { t } = useLanguage();
   const [photoUrl, setPhotoUrl] = useState(data.url_picture || '');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -19,13 +21,13 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
+      alert(t('onboarding.optionalStep.invalidFileType', 'Please select an image file.'));
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Please select an image smaller than 5MB.');
+      alert(t('onboarding.optionalStep.fileTooLarge', 'Please select an image smaller than 5MB.'));
       return;
     }
 
@@ -50,7 +52,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
       
     } catch (error) {
       console.error('Photo upload failed:', error);
-      alert('Failed to upload photo. Please try again.');
+      alert(t('onboarding.optionalStep.uploadFailed', 'Failed to upload photo. Please try again.'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -87,10 +89,10 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Add a profile photo
+          {t('onboarding.optionalStep.title', 'Add a profile photo')}
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
-          Help your team recognize you by adding a profile photo. This step is optional.
+          {t('onboarding.optionalStep.description', 'Help your team recognize you by adding a profile photo. This step is optional.')}
         </p>
       </div>
 
@@ -102,7 +104,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
               {photoUrl ? (
                 <img
                   src={photoUrl}
-                  alt="Profile"
+                  alt={t('onboarding.optionalStep.profile', 'Profile')}
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -146,12 +148,16 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
               disabled={uploadingPhoto}
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              {uploadingPhoto ? 'Uploading...' : photoUrl ? 'Change Photo' : 'Upload Photo'}
+              {uploadingPhoto 
+                ? t('onboarding.optionalStep.uploading', 'Uploading...') 
+                : photoUrl 
+                  ? t('onboarding.optionalStep.changePhoto', 'Change Photo') 
+                  : t('onboarding.optionalStep.uploadPhoto', 'Upload Photo')}
             </button>
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            Supported formats: JPG, PNG, GIF (max 5MB)
+            {t('onboarding.optionalStep.supportedFormats', 'Supported formats: JPG, PNG, GIF (max 5MB)')}
           </p>
         </div>
 
@@ -165,10 +171,10 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
             {loading ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Completing Setup...
+                {t('onboarding.optionalStep.completingSetup', 'Completing Setup...')}
               </div>
             ) : (
-              'Complete Setup'
+              t('onboarding.optionalStep.completeSetup', 'Complete Setup')
             )}
           </button>
         </div>
@@ -190,7 +196,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
             </div>
             <div className="ml-3">
               <p className="text-sm text-green-700 dark:text-green-300">
-                <strong>You're almost done!</strong> After this step, you'll have full access to your Whagons workspace.
+                <strong>{t('onboarding.optionalStep.almostDone', 'You\'re almost done!')}</strong> {t('onboarding.optionalStep.almostDoneDescription', 'After this step, you\'ll have full access to your Whagons workspace.')}
               </p>
             </div>
           </div>

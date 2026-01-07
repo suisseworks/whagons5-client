@@ -16,6 +16,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
@@ -418,7 +419,7 @@ function Users() {
                 return (
                   <div
                     key={team.id}
-                    className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default leading-none ${bg ? '' : 'bg-muted text-foreground/80'}`}
                     style={bg ? { backgroundColor: bg, color: fg } : undefined}
                     title={team.name}
                   >
@@ -1514,85 +1515,108 @@ function Users() {
         submitDisabled={isSubmitting || !editingUser}
       >
         {editingUser && (
-          <div className="grid gap-4">
-            <TextField
-              id="edit-name"
-              label={tu('dialogs.editUser.fields.name', 'Name')}
-              value={editFormData.name}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
-              required
-            />
-            <TextField
-              id="edit-email"
-              label={tu('dialogs.editUser.fields.email', 'Email')}
-              type="email"
-              value={editFormData.email}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
-              required
-            />
-            <TextField
-              id="edit-color"
-              label={tu('dialogs.editUser.fields.color', 'Color')}
-              type="color"
-              value={editFormData.color}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
-            />
-            <SelectField
-              id="edit-job_position_id"
-              label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
-              value={editFormData.job_position_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
-              placeholder={
-                jobPositionsLoading && jobPositions.length === 0
-                  ? tu('fields.loading', 'Loading…')
-                  : tu('fields.noJobPosition', 'No Job Position')
-              }
-              options={jobPositions.map((jp: any) => ({
-                value: jp.id?.toString?.() ?? String(jp.id),
-                label: jp.title
-              }))}
-            />
-            <TextField
-              id="edit-organization_name"
-              label={tu('dialogs.editUser.fields.organization', 'Organization')}
-              value={editFormData.organization_name}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
-            />
-            <CheckboxField
-              id="edit-is_admin"
-              label={tu('dialogs.editUser.fields.admin', 'Admin')}
-              checked={editFormData.is_admin}
-              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
-              description={tu('dialogs.editUser.fields.adminDescription', 'Grant admin role')}
-            />
-            <CheckboxField
-              id="edit-has_active_subscription"
-              label={tu('dialogs.editUser.fields.subscription', 'Subscription')}
-              checked={editFormData.has_active_subscription}
-              onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-              description={tu('dialogs.editUser.fields.subscriptionDescription', 'Active subscription')}
-            />
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">{tu('dialogs.editUser.fields.teams', 'Teams')}</Label>
-              <div className="col-span-3">
-                <MultiSelect
-                  options={teams.map((team: Team) => ({
-                    value: team.id.toString(),
-                    label: team.name
-                  }))}
-                  onValueChange={setSelectedTeams}
-                  defaultValue={selectedTeams}
-                  placeholder={
-                    teamsLoading && teams.length === 0
-                      ? tu('multiSelect.loadingTeams', 'Loading teams...')
-                      : tu('multiSelect.selectTeams', 'Select teams...')
-                  }
-                  maxCount={10}
-                  className="w-full"
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">
+                {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
+              </TabsTrigger>
+              <TabsTrigger value="professional">
+                {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
+              </TabsTrigger>
+              <TabsTrigger value="permissions">
+                {tu('dialogs.editUser.tabs.permissions', 'Permissions & Teams')}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic" className="mt-4">
+              <div className="grid gap-4">
+                <TextField
+                  id="edit-name"
+                  label={tu('dialogs.editUser.fields.name', 'Name')}
+                  value={editFormData.name}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+                  required
+                />
+                <TextField
+                  id="edit-email"
+                  label={tu('dialogs.editUser.fields.email', 'Email')}
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
+                  required
+                />
+                <TextField
+                  id="edit-color"
+                  label={tu('dialogs.editUser.fields.color', 'Color')}
+                  type="color"
+                  value={editFormData.color}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
                 />
               </div>
-            </div>
-          </div>
+            </TabsContent>
+            <TabsContent value="professional" className="mt-4">
+              <div className="grid gap-4">
+                <SelectField
+                  id="edit-job_position_id"
+                  label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
+                  value={editFormData.job_position_id}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
+                  placeholder={
+                    jobPositionsLoading && jobPositions.length === 0
+                      ? tu('fields.loading', 'Loading…')
+                      : tu('fields.noJobPosition', 'No Job Position')
+                  }
+                  options={jobPositions.map((jp: any) => ({
+                    value: jp.id?.toString?.() ?? String(jp.id),
+                    label: jp.title
+                  }))}
+                />
+                <TextField
+                  id="edit-organization_name"
+                  label={tu('dialogs.editUser.fields.organization', 'Organization')}
+                  value={editFormData.organization_name}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="permissions" className="mt-4">
+              <div className="grid gap-4">
+                <CheckboxField
+                  id="edit-is_admin"
+                  label={tu('dialogs.editUser.fields.admin', 'Admin')}
+                  checked={editFormData.is_admin}
+                  onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
+                  description={tu('dialogs.editUser.fields.adminDescription', 'Grant admin role')}
+                />
+                <CheckboxField
+                  id="edit-has_active_subscription"
+                  label={tu('dialogs.editUser.fields.subscription', 'Subscription')}
+                  checked={editFormData.has_active_subscription}
+                  onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
+                  description={tu('dialogs.editUser.fields.subscriptionDescription', 'Active subscription')}
+                />
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">{tu('dialogs.editUser.fields.teams', 'Teams')}</Label>
+                  <div className="col-span-3">
+                    <MultiSelect
+                      options={teams.map((team: Team) => ({
+                        value: team.id.toString(),
+                        label: team.name
+                      }))}
+                      onValueChange={setSelectedTeams}
+                      defaultValue={selectedTeams}
+                      placeholder={
+                        teamsLoading && teams.length === 0
+                          ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                          : tu('multiSelect.selectTeams', 'Select teams...')
+                      }
+                      maxCount={10}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
       </SettingsDialog>
 

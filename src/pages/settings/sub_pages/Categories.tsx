@@ -9,7 +9,8 @@ import {
   faCubes,
   faChartBar,
   faTrash,
-  faPen
+  faPen,
+  faUsers
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
@@ -26,6 +27,7 @@ import {
   useSettingsState,
   IconPicker,
   CategoryFieldsManager,
+  CategoryReportingTeamsManager,
   TextField,
   SelectField,
   CheckboxField
@@ -34,6 +36,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
+import api from "@/api/whagonsApi";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -264,12 +270,72 @@ function Categories() {
         approval_id: (editingCategory as any).approval_id?.toString?.() || '',
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
       });
+      // Load reporting teams when editing category changes
+      loadReportingTeamsForEdit();
     }
   }, [editingCategory]);
+
+  // Load reporting teams for the editing category
+  const loadReportingTeamsForEdit = async () => {
+    if (!editingCategory) return;
+    setLoadingReportingTeams(true);
+    setReportingTeamsError(null);
+    try {
+      const response = await api.get(`/categories/${editingCategory.id}/reporting-teams`);
+      const reportingTeams = response.data?.data || [];
+      setSelectedReportingTeamIds(reportingTeams.map((team: Team) => team.id));
+    } catch (e: any) {
+      console.error('Error loading reporting teams', e);
+      setReportingTeamsError(e?.response?.data?.message || 'Failed to load reporting teams');
+    } finally {
+      setLoadingReportingTeams(false);
+    }
+  };
+
+  // Handle toggle team for reporting teams
+  const handleToggleReportingTeam = (teamId: number) => {
+    setSelectedReportingTeamIds(prev => {
+      if (prev.includes(teamId)) {
+        return prev.filter(id => id !== teamId);
+      } else {
+        return [...prev, teamId];
+      }
+    });
+  };
+
+  // Save reporting teams
+  const handleSaveReportingTeams = async () => {
+    if (!editingCategory) return;
+    setSavingReportingTeams(true);
+    setReportingTeamsError(null);
+    try {
+      await api.patch(`/categories/${editingCategory.id}/reporting-teams`, {
+        team_ids: selectedReportingTeamIds
+      });
+      // Refresh categories to update reporting_teams field
+      dispatch((genericActions as any).categories.fetchFromAPI());
+      setReportingTeamsError(null);
+    } catch (e: any) {
+      console.error('Error saving reporting teams', e);
+      setReportingTeamsError(e?.response?.data?.message || 'Failed to save reporting teams');
+    } finally {
+      setSavingReportingTeams(false);
+    }
+  };
 
   // Manage Fields dialog state
   const [isFieldsDialogOpen, setIsFieldsDialogOpen] = useState(false);
   const [fieldsCategory, setFieldsCategory] = useState<Category | null>(null);
+
+  // Manage Reporting Teams dialog state
+  const [isReportingTeamsDialogOpen, setIsReportingTeamsDialogOpen] = useState(false);
+  const [reportingTeamsCategory, setReportingTeamsCategory] = useState<Category | null>(null);
+  
+  // Reporting teams state for inline tab
+  const [selectedReportingTeamIds, setSelectedReportingTeamIds] = useState<number[]>([]);
+  const [loadingReportingTeams, setLoadingReportingTeams] = useState(false);
+  const [savingReportingTeams, setSavingReportingTeams] = useState(false);
+  const [reportingTeamsError, setReportingTeamsError] = useState<string | null>(null);
 
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};
@@ -289,6 +355,16 @@ function Categories() {
   const closeManageFields = () => {
     setIsFieldsDialogOpen(false);
     setFieldsCategory(null);
+  };
+
+  const openManageReportingTeams = (category: Category) => {
+    setReportingTeamsCategory(category);
+    setIsReportingTeamsDialogOpen(true);
+  };
+
+  const closeManageReportingTeams = () => {
+    setIsReportingTeamsDialogOpen(false);
+    setReportingTeamsCategory(null);
   };
 
   // Get task count for a category
@@ -490,7 +566,7 @@ function Categories() {
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
+  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, assignmentCountByCategory, openManageFields]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -1132,6 +1208,7 @@ function Categories() {
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="rules">Rules</TabsTrigger>
+            <TabsTrigger value="reporting-teams">Reporting Teams</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <div className="grid gap-4 min-h-[320px]">
@@ -1221,6 +1298,99 @@ function Categories() {
               />
             </div>
           </TabsContent>
+          <TabsContent value="reporting-teams">
+            <div className="min-h-[320px] space-y-4">
+              {editingCategory ? (
+                <>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Reporting Teams</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Select teams that can report/create tasks for this category. The category owner team always has permission.
+                    </p>
+                  </div>
+                  
+                  {loadingReportingTeams ? (
+                    <div className="flex items-center justify-center py-8">
+                      <FontAwesomeIcon icon={faSpinner} className="animate-spin text-2xl text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                        {(() => {
+                          const availableTeams = teams.filter(team => team.id !== editingCategory?.team_id);
+                          if (availableTeams.length === 0) {
+                            return (
+                              <div className="rounded-md border border-dashed p-8 text-center">
+                                <div className="text-sm text-muted-foreground">No other teams available.</div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="space-y-3">
+                              {availableTeams.map((team) => (
+                                <div key={team.id} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
+                                  <Checkbox
+                                    id={`reporting-team-${team.id}`}
+                                    checked={selectedReportingTeamIds.includes(team.id)}
+                                    onCheckedChange={() => handleToggleReportingTeam(team.id)}
+                                  />
+                                  <Label
+                                    htmlFor={`reporting-team-${team.id}`}
+                                    className="flex-1 cursor-pointer flex items-center space-x-2"
+                                  >
+                                    <div
+                                      className="w-6 h-6 min-w-[1.5rem] text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                                      style={{ backgroundColor: team.color || '#6B7280' }}
+                                    >
+                                      {team.name ? team.name.charAt(0).toUpperCase() : 'T'}
+                                    </div>
+                                    <span>{team.name}</span>
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {reportingTeamsError && (
+                        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+                          {reportingTeamsError}
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          onClick={loadReportingTeamsForEdit}
+                          disabled={savingReportingTeams || loadingReportingTeams}
+                        >
+                          Reset
+                        </Button>
+                        <Button
+                          onClick={handleSaveReportingTeams}
+                          disabled={savingReportingTeams || loadingReportingTeams}
+                        >
+                          {savingReportingTeams ? (
+                            <>
+                              <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Changes'
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-[320px] text-muted-foreground">
+                  No category selected
+                </div>
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
       </SettingsDialog>
 
@@ -1255,6 +1425,11 @@ function Categories() {
         open={isFieldsDialogOpen}
         onOpenChange={(open) => { if (!open) closeManageFields(); }}
         category={fieldsCategory}
+      />
+      <CategoryReportingTeamsManager
+        open={isReportingTeamsDialogOpen}
+        onOpenChange={(open) => { if (!open) closeManageReportingTeams(); }}
+        category={reportingTeamsCategory}
       />
     </SettingsLayout>
   );

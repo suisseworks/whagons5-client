@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useLanguage } from "@/providers/LanguageProvider";
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import RotatingBackground from "@/components/marketing/RotatingBackground";
 import { HERO_BACKGROUND_IMAGES } from "@/assets/marketing/heroBackgrounds";
@@ -12,29 +13,59 @@ import { HERO_BACKGROUND_IMAGES } from "@/assets/marketing/heroBackgrounds";
 function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language, t } = useLanguage();
   const [showWelcome, setShowWelcome] = useState<boolean>(false);
-  const quotes = useMemo(() => [
-    'Build momentum. One small step at a time.',
-    'Clarity comes from action, not thought.',
-    'Start where you are. Use what you have. Do what you can.',
-    'Focus on progress, not perfection.',
-    'The journey of a thousand miles begins with a single step.',
-    'Done is better than perfect.',
-    'What you do today can improve all your tomorrows.',
-    'Success is the sum of small efforts, repeated day in and day out.',
-    'Your future self will thank you for starting today.',
-    'Small daily improvements lead to stunning results.',
-    'The only way to do great work is to love what you do.',
-    'Focus on being productive instead of busy.',
-    'Every expert was once a beginner.',
-    'The best time to start was yesterday. The next best time is now.',
-    'You don\'t have to be great to start, but you have to start to be great.',
-    'Action is the foundational key to all success.',
-    'Motivation gets you started. Habit keeps you going.',
-    'The difference between ordinary and extraordinary is that little extra.',
-    'Your only limit is you.',
-    'Dream big. Start small. Act now.',
-  ], []);
+  
+  const isSpanish = language === 'es-ES' || language.startsWith('es');
+  
+  const quotes = useMemo(() => {
+    if (isSpanish) {
+      return [
+        'Construye impulso. Un pequeño paso a la vez.',
+        'La claridad viene de la acción, no del pensamiento.',
+        'Empieza donde estás. Usa lo que tienes. Haz lo que puedas.',
+        'Enfócate en el progreso, no en la perfección.',
+        'El viaje de mil millas comienza con un solo paso.',
+        'Es mejor completar que perfeccionar.',
+        'Lo que haces hoy puede mejorar todos tus mañanas.',
+        'El éxito es la suma de pequeños esfuerzos, repetidos día tras día.',
+        'Tu yo futuro te agradecerá por empezar hoy.',
+        'Las pequeñas mejoras diarias conducen a resultados impresionantes.',
+        'La única forma de hacer un gran trabajo es amar lo que haces.',
+        'Enfócate en ser productivo en lugar de estar ocupado.',
+        'Todo experto fue alguna vez un principiante.',
+        'El mejor momento para empezar fue ayer. El siguiente mejor momento es ahora.',
+        'No tienes que ser genial para empezar, pero tienes que empezar para ser genial.',
+        'La acción es la clave fundamental de todo éxito.',
+        'La motivación te hace empezar. El hábito te mantiene en marcha.',
+        'La diferencia entre lo ordinario y lo extraordinario es ese pequeño extra.',
+        'Tu único límite eres tú.',
+        'Sueña en grande. Empieza pequeño. Actúa ahora.',
+      ];
+    }
+    return [
+      'Build momentum. One small step at a time.',
+      'Clarity comes from action, not thought.',
+      'Start where you are. Use what you have. Do what you can.',
+      'Focus on progress, not perfection.',
+      'The journey of a thousand miles begins with a single step.',
+      'Done is better than perfect.',
+      'What you do today can improve all your tomorrows.',
+      'Success is the sum of small efforts, repeated day in and day out.',
+      'Your future self will thank you for starting today.',
+      'Small daily improvements lead to stunning results.',
+      'The only way to do great work is to love what you do.',
+      'Focus on being productive instead of busy.',
+      'Every expert was once a beginner.',
+      'The best time to start was yesterday. The next best time is now.',
+      'You don\'t have to be great to start, but you have to start to be great.',
+      'Action is the foundational key to all success.',
+      'Motivation gets you started. Habit keeps you going.',
+      'The difference between ordinary and extraordinary is that little extra.',
+      'Your only limit is you.',
+      'Dream big. Start small. Act now.',
+    ];
+  }, [isSpanish]);
   const [quoteIndex, setQuoteIndex] = useState(0);
 
   useEffect(() => {
@@ -125,7 +156,7 @@ function Home() {
               className="cursor-pointer bg-primary text-white hover:bg-primary/90"
               onClick={() => navigate('/workspace/all', { replace: true })}
             >
-              Get Started
+              {t('home.getStarted', 'Get Started')}
             </Button>
           </div>
         </div>
@@ -138,12 +169,12 @@ function Home() {
       {/* Welcome */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome</h1>
-          <p className="text-muted-foreground">Select a workspace to get started, or explore your stats below.</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('home.welcome', 'Welcome')}</h1>
+          <p className="text-muted-foreground">{t('home.selectWorkspace', 'Select a workspace to get started, or explore your stats below.')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => navigate('/analytics')}>View Analytics</Button>
-          <Button onClick={() => navigate('/settings')}>Open Settings</Button>
+          <Button variant="outline" onClick={() => navigate('/analytics')}>{t('home.viewAnalytics', 'View Analytics')}</Button>
+          <Button onClick={() => navigate('/settings')}>{t('home.openSettings', 'Open Settings')}</Button>
         </div>
       </div>
 
@@ -153,8 +184,8 @@ function Home() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Workspaces</CardTitle>
-            <CardDescription>Total available</CardDescription>
+            <CardTitle>{t('home.workspaces', 'Workspaces')}</CardTitle>
+            <CardDescription>{t('home.totalAvailable', 'Total available')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{workspaces.length}</div>
@@ -162,8 +193,8 @@ function Home() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Teams</CardTitle>
-            <CardDescription>Across your org</CardDescription>
+            <CardTitle>{t('home.teams', 'Teams')}</CardTitle>
+            <CardDescription>{t('home.acrossOrg', 'Across your org')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{teams.length}</div>
@@ -171,8 +202,8 @@ function Home() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Categories</CardTitle>
-            <CardDescription>For organizing tasks</CardDescription>
+            <CardTitle>{t('home.categories', 'Categories')}</CardTitle>
+            <CardDescription>{t('home.forOrganizingTasks', 'For organizing tasks')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{categories.length}</div>
@@ -180,8 +211,8 @@ function Home() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Templates</CardTitle>
-            <CardDescription>Reusable workflows</CardDescription>
+            <CardTitle>{t('home.templates', 'Templates')}</CardTitle>
+            <CardDescription>{t('home.reusableWorkflows', 'Reusable workflows')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{templates.length}</div>
@@ -192,8 +223,8 @@ function Home() {
       {/* Tasks overview */}
       <Card>
         <CardHeader>
-          <CardTitle>Tasks Overview</CardTitle>
-          <CardDescription>Current total across all workspaces</CardDescription>
+          <CardTitle>{t('home.tasksOverview', 'Tasks Overview')}</CardTitle>
+          <CardDescription>{t('home.currentTotal', 'Current total across all workspaces')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{tasks.length}</div>
@@ -203,12 +234,12 @@ function Home() {
       {/* Recent Workspaces */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Workspaces</CardTitle>
-          <CardDescription>Jump back in</CardDescription>
+          <CardTitle>{t('home.recentWorkspaces', 'Recent Workspaces')}</CardTitle>
+          <CardDescription>{t('home.jumpBackIn', 'Jump back in')}</CardDescription>
         </CardHeader>
         <CardContent>
           {topWorkspaces.length === 0 ? (
-            <div className="text-muted-foreground">No workspaces yet. Create one from Settings → Workspaces.</div>
+            <div className="text-muted-foreground">{t('home.noWorkspaces', 'No workspaces yet. Create one from Settings → Workspaces.')}</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {topWorkspaces.map((ws: any) => (

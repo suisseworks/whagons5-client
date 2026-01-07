@@ -218,6 +218,22 @@ export default function TaskNotesModal() {
 
   const getUser = (id: number) => users?.find((u: any) => Number(u.id) === Number(id));
 
+  // Helper function to detect if a character is an emoji
+  const isEmoji = (char: string): boolean => {
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F191}-\u{1F251}]|[\u{2934}\u{2935}]|[\u{2190}-\u{21FF}]/u;
+    return emojiRegex.test(char);
+  };
+
+  // Render note text with emojis larger
+  const renderNoteWithEmojis = (text: string) => {
+    return text.split('').map((char, index) => {
+      if (isEmoji(char)) {
+        return <span key={index} className="text-2xl inline-block align-middle">{char}</span>;
+      }
+      return <span key={index} className="text-sm">{char}</span>;
+    });
+  };
+
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     const emoji = emojiData.emoji;
     setInput(prev => prev + emoji);
@@ -269,7 +285,9 @@ export default function TaskNotesModal() {
                     
                     {item.type === 'note' ? (
                         <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-white border shadow-sm'}`}>
-                            {item.data.note}
+                            <span className="leading-relaxed whitespace-pre-wrap break-words">
+                                {renderNoteWithEmojis(item.data.note)}
+                            </span>
                         </div>
                     ) : (
                         <div className={`rounded-lg p-2 border text-sm bg-white shadow-sm ${isMe ? 'border-primary/20' : ''}`}>

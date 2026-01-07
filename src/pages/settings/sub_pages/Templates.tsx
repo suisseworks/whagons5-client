@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faShieldAlt, faFilePdf, faTrash, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faShieldAlt, faFilePdf, faTrash, faInfoCircle, faLock } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Template, Task, Category, Approval } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -60,6 +60,7 @@ const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
 const TemplateNameCellRenderer = (props: ICellRendererParams) => {
   const templateName = props.value;
   const description = (props.data as any)?.description as string | undefined;
+  const isPrivate = (props.data as any)?.is_private === true;
 
   return (
     <div className="flex items-center h-full space-x-2">
@@ -67,8 +68,17 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
         icon={faFileAlt}
         className="w-4 h-4 text-gray-300"
       />
-      <div className="flex flex-col justify-center">
-        <span className="leading-tight">{templateName}</span>
+      <div className="flex flex-col justify-center flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="leading-tight">{templateName}</span>
+          {isPrivate && (
+            <FontAwesomeIcon
+              icon={faLock}
+              className="w-3 h-3 text-muted-foreground"
+              title="Private template"
+            />
+          )}
+        </div>
         {description ? (
           <span className="text-xs text-muted-foreground leading-snug line-clamp-2">{description}</span>
         ) : null}
@@ -156,7 +166,8 @@ function Templates() {
     default_spot_id: '',
     spots_not_applicable: false,
     expected_duration: '',
-    enabled: true
+    enabled: true,
+    is_private: false
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -167,7 +178,8 @@ function Templates() {
     default_spot_id: '',
     spots_not_applicable: false,
     expected_duration: '',
-    enabled: true
+    enabled: true,
+    is_private: false
   });
 
   useEffect(() => {
@@ -205,7 +217,8 @@ function Templates() {
         default_spot_id: (editingTemplate as any).default_spot_id?.toString() || '',
         spots_not_applicable: (editingTemplate as any).spots_not_applicable === true,
         expected_duration: (editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : '',
-        enabled: (editingTemplate as any).enabled !== false // Default to true if not set
+        enabled: (editingTemplate as any).enabled !== false, // Default to true if not set
+        is_private: (editingTemplate as any).is_private === true
       });
     }
   }, [isEditDialogOpen, editingTemplate, priorities]);
@@ -793,7 +806,8 @@ function Templates() {
       default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
       instructions,
       expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-      enabled
+      enabled,
+      is_private: createFormData.is_private
     };
 
     await createItem(templateData);
@@ -812,7 +826,8 @@ function Templates() {
       default_spot_id: '',
       spots_not_applicable: false,
       expected_duration: '',
-      enabled: true
+      enabled: true,
+      is_private: false
     });
     setCreateDefaultUserValues([]);
     // approvals state removed
@@ -852,7 +867,8 @@ function Templates() {
       default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
       instructions,
       expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-      enabled: editFormData.enabled
+      enabled: editFormData.enabled,
+      is_private: editFormData.is_private
     };
 
     await updateItem(editingTemplate.id, updates);
@@ -885,7 +901,8 @@ function Templates() {
         default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
         instructions: (editingTemplate as any).instructions ?? null,
         expected_duration: (() => { const raw: any = (document.getElementById('edit-expected_duration') as HTMLInputElement | null)?.value; const n = parseInt(raw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-        enabled: editFormData.enabled
+        enabled: editFormData.enabled,
+        is_private: editFormData.is_private
       };
       await updateItem(editingTemplate.id, updates);
 
@@ -1399,7 +1416,8 @@ function Templates() {
               default_spot_id: '',
               spots_not_applicable: false,
               expected_duration: '',
-              enabled: true
+              enabled: true,
+              is_private: false
             });
             setCreateDefaultUserValues([]);
           }
@@ -1581,6 +1599,13 @@ function Templates() {
                 <textarea id="instructions" name="instructions" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder="Enter detailed instructions..." />
               </div>
               <CheckboxField id="enabled" name="enabled" label="Status" defaultChecked={true} description="Enabled" />
+              <CheckboxField 
+                id="is_private" 
+                label="Private Template" 
+                checked={createFormData.is_private}
+                onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_private: checked }))}
+                description="Private templates can only be used by the team that owns the category"
+              />
             </div>
           </TabsContent>
           
@@ -1606,7 +1631,8 @@ function Templates() {
               default_spot_id: '',
               spots_not_applicable: false,
               expected_duration: '',
-              enabled: true
+              enabled: true,
+              is_private: false
             });
             setEditDefaultUserValues([]);
           }
@@ -1875,6 +1901,13 @@ function Templates() {
                   <textarea id="edit-instructions" name="instructions" defaultValue={(editingTemplate as any).instructions || ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder="Enter detailed instructions..." />
                 </div>
                 <CheckboxField id="edit-enabled" label="Enabled" checked={editFormData.enabled} onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))} description="Enable this template" />
+                <CheckboxField 
+                  id="edit-is_private" 
+                  label="Private Template" 
+                  checked={editFormData.is_private}
+                  onChange={(checked) => setEditFormData(prev => ({ ...prev, is_private: checked }))}
+                  description="Private templates can only be used by the team that owns the category"
+                />
               </div>
             </TabsContent>
             

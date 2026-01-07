@@ -15,7 +15,8 @@ import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ChevronUp, Plus, ShieldCheck, Clock, GripVertical } from 'lucide-react';
+import { ChevronUp, Plus, ShieldCheck, Clock, GripVertical, Info } from 'lucide-react';
+import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
 import api from '@/api/whagonsApi';
@@ -158,8 +159,18 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const { value: customFields = [] } = useSelector((s: RootState) => (s as any).customFields || { value: [] });
   const { value: categoryCustomFields = [] } = useSelector((s: RootState) => (s as any).categoryCustomFields || { value: [] });
   const { value: taskCustomFieldValues = [] } = useSelector((s: RootState) => (s as any).taskCustomFieldValues || { value: [] });
+  const { value: userTeams = [] } = useSelector((s: RootState) => (s as any).userTeams || { value: [] });
   
   const { user } = useAuth();
+
+  // Get user's team IDs
+  const userTeamIds = useMemo(() => {
+    if (!user?.id) return [];
+    return (userTeams as any[])
+      .filter((ut: any) => Number(ut.user_id) === Number(user.id))
+      .map((ut: any) => Number(ut.team_id))
+      .filter((id: number) => Number.isFinite(id));
+  }, [user, userTeams]);
 
   // Form state
   const [name, setName] = useState('');
@@ -463,6 +474,26 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     return categories.find((c: any) => c.id === categoryId);
   }, [categories, categoryId]);
 
+  // Check if user is reporting (not owner) for a category
+  const isReportingCategory = useMemo(() => {
+    if (!categoryId || !currentCategory) return false;
+    const categoryTeamId = Number(currentCategory.team_id);
+    return !userTeamIds.includes(categoryTeamId);
+  }, [categoryId, currentCategory, userTeamIds]);
+
+  // Check if user has reporting permission for a category
+  const hasReportingPermission = useMemo(() => {
+    if (!categoryId || !currentCategory) return false;
+    const categoryTeamId = Number(currentCategory.team_id);
+    
+    // If user is owner, they have permission
+    if (userTeamIds.includes(categoryTeamId)) return true;
+    
+    // Check if user's team is in reporting_teams
+    const reportingTeamIds = (currentCategory as any).reporting_teams || [];
+    return reportingTeamIds.some((tid: number) => userTeamIds.includes(Number(tid)));
+  }, [categoryId, currentCategory, userTeamIds]);
+
   const categoryFields = useMemo(() => {
     if (!categoryId) return [] as Array<{ assignment: any; field: any }>;
     const fieldById = new Map<number, any>();
@@ -561,9 +592,11 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   // For create-all mode: show all templates from all DEFAULT workspaces
   // For other modes: show templates filtered by current workspace
   const workspaceTemplates = useMemo(() => {
+    let filtered = templates;
+    
     if (mode === 'create-all') {
       // Show all enabled templates from DEFAULT workspaces
-      return templates.filter((template: any) => {
+      filtered = templates.filter((template: any) => {
         if (template?.enabled === false) return false;
         // Find the category for this template
         const cat = categories.find((c: any) => c.id === template.category_id);
@@ -573,17 +606,31 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         // Only show templates from DEFAULT workspaces
         return ws?.type === "DEFAULT";
       });
+    } else {
+      // For create and edit modes: filter by current workspace
+      if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
+        return [];
+      }
+      filtered = templates.filter((template: any) => {
+        if (template?.enabled === false) return false;
+        return template.category_id === currentWorkspace.category_id;
+      });
     }
-    
-    // For create and edit modes: filter by current workspace
-    if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
-      return [];
-    }
-    return templates.filter((template: any) => {
-      if (template?.enabled === false) return false;
-      return template.category_id === currentWorkspace.category_id;
+
+    // Filter private templates based on user permissions
+    return filtered.filter((template: any) => {
+      // If template is not private, show it
+      if (!template.is_private) return true;
+      
+      // If template is private, check if user's team owns the category
+      const cat = categories.find((c: any) => c.id === template.category_id);
+      if (!cat) return false;
+      
+      const categoryTeamId = Number(cat.team_id);
+      // User can see private template if their team owns the category
+      return userTeamIds.includes(categoryTeamId);
     });
-  }, [templates, currentWorkspace, mode, categories, workspaces]);
+  }, [templates, currentWorkspace, mode, categories, workspaces, userTeamIds]);
 
   const selectedTemplate = useMemo(() => {
     if (!templateId) return null;
@@ -1573,6 +1620,26 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                           Deadline: {selectedApproval.deadline_value} {selectedApproval.deadline_type || 'hours'}
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Workspace Destination Info - Show when reporting */}
+                {isReportingCategory && currentCategory && currentWorkspace && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50 text-sm text-blue-900">
+                    <div className="mt-0.5">
+                      <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs uppercase tracking-wide font-semibold text-blue-700">Destination Workspace</span>
+                      </div>
+                      <div className="font-semibold truncate">
+                        {currentWorkspace.name}
+                      </div>
+                      <div className="text-xs text-blue-800 truncate">
+                        Tasks created for this category will be assigned to the category's default workspace.
+                      </div>
                     </div>
                   </div>
                 )}

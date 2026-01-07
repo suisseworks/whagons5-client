@@ -375,6 +375,16 @@
       transform: translateY(-10px);
     }
   }
+
+  /* Shimmer animation for loading buttons */
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }
 
 .ag-theme-quartz {
