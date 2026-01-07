@@ -10,6 +10,7 @@ import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { BrandingProvider } from './providers/BrandingProvider';
 import { LanguageProvider } from './providers/LanguageProvider';
+import { Toaster } from 'react-hot-toast';
 import { Provider } from 'react-redux';
 import {store } from './store';
 import { registerSW } from 'virtual:pwa-register';
@@ -29,6 +30,30 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
             <BrandingProvider>
               <AuthProvider>
                 <App />
+                <Toaster 
+                  position="bottom-right"
+                  toastOptions={{
+                    duration: 5000,
+                    style: {
+                      background: '#363636',
+                      color: '#fff',
+                    },
+                    success: {
+                      duration: 8000,
+                      iconTheme: {
+                        primary: '#4ade80',
+                        secondary: '#fff',
+                      },
+                    },
+                    error: {
+                      duration: 5000,
+                      iconTheme: {
+                        primary: '#ef4444',
+                        secondary: '#fff',
+                      },
+                    },
+                  }}
+                />
               </AuthProvider>
             </BrandingProvider>
           </LanguageProvider>

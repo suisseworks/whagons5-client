@@ -4,7 +4,9 @@ import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense, forw
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
-import { updateTaskAsync, removeTaskAsync } from '@/store/reducers/tasksSlice';
+import { updateTaskAsync, removeTaskAsync, restoreTaskAsync } from '@/store/reducers/tasksSlice';
+import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
+import toast from 'react-hot-toast';
 import { iconService } from '@/database/iconService';
 import { buildWorkspaceColumns } from './workspaceTable/columns';
 import { useAuth } from '@/providers/AuthProvider';
@@ -450,8 +452,17 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     try {
       await dispatch(updateTaskAsync({ id: Number(task.id), updates: { status_id: Number(toStatusId) } })).unwrap();
       return true;
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Status change failed', e);
+      // Show toast notification for errors
+      const errorMessage = e?.message || e?.response?.data?.message || 'Failed to change task status';
+      const isPermissionError = e?.response?.status === 403 || errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('unauthorized');
+      
+      if (isPermissionError) {
+        toast.error('You do not have permission to change task status.', { duration: 5000 });
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
       return false;
     }
   }, [dispatch]);
@@ -852,17 +863,104 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return () => window.removeEventListener('wh:approvalDecision:success' as any, handler as any);
   }, [dispatch, refreshGrid]);
 
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<{ id: number; name?: string } | null>(null);
+
   // Delete handler used by action menus (placed after refreshGrid to avoid TDZ)
-  const handleDeleteTask = useCallback(async (taskId: number) => {
+  const handleDeleteTask = useCallback(async (taskId: number, taskName?: string) => {
     if (!Number.isFinite(taskId)) return;
+    
+    // Get task data from grid if available
+    let taskData: { id: number; name?: string } = { id: taskId };
+    try {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.forEachNode((node) => {
+          if (node.data?.id === taskId) {
+            taskData = { id: taskId, name: node.data?.name || taskName };
+          }
+        });
+      }
+    } catch (e) {
+      // Fallback to provided name or ID
+      taskData = { id: taskId, name: taskName };
+    }
+
+    setTaskToDelete(taskData);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  // Confirm delete action
+  const confirmDelete = useCallback(async () => {
+    if (!taskToDelete) return;
+    
+    const taskId = taskToDelete.id;
+    const taskName = taskToDelete.name;
+    
+    setDeleteDialogOpen(false);
+    
+    // Store toast ID to dismiss on error
+    let successToastId: string | undefined;
+    
     try {
       await dispatch(removeTaskAsync(taskId)).unwrap();
-    } catch (error) {
-      console.error('Failed to delete task', error);
-    } finally {
+      
+      // Show success toast with undo option
+      successToastId = toast.success(
+        (t) => (
+          <div className="flex flex-col gap-1">
+            <div className="font-semibold">Task deleted</div>
+            <div className="text-sm opacity-90">
+              {taskName ? `"${taskName}" has been deleted.` : "Task has been deleted."}
+            </div>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                const restoreToast = toast.loading("Restoring task...");
+                try {
+                  await dispatch(restoreTaskAsync(taskId)).unwrap();
+                  toast.dismiss(restoreToast);
+                  toast.success(
+                    taskName ? `"${taskName}" has been restored.` : "Task has been restored.",
+                    { duration: 5000 }
+                  );
+                  refreshGrid();
+                } catch (error: any) {
+                  toast.dismiss(restoreToast);
+                  const errorMessage = error?.message || error?.response?.data?.message || "Could not restore the task.";
+                  toast.error(errorMessage, { duration: 5000 });
+                }
+              }}
+              className="text-left text-sm font-medium underline underline-offset-4 hover:no-underline mt-1"
+            >
+              Undo
+            </button>
+          </div>
+        ),
+        { duration: 8000 }
+      );
+      
       refreshGrid();
+    } catch (error: any) {
+      // Dismiss success toast if it was shown (shouldn't happen, but just in case)
+      if (successToastId) {
+        toast.dismiss(successToastId);
+      }
+      
+      const errorMessage = error?.message || error?.response?.data?.message || error?.toString() || "Failed to delete task";
+      const status = error?.response?.status || error?.status;
+      
+      // Check if it's a permission error (403)
+      if (status === 403 || errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
+        toast.error("You do not have permission to delete this task.", { duration: 5000 });
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
+    } finally {
+      setTaskToDelete(null);
     }
-  }, [dispatch, refreshGrid]);
+  }, [taskToDelete, dispatch, refreshGrid]);
 
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
@@ -1343,6 +1441,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         suppressAnimationFrame={false}
         />
       </div>
+      
+      <DeleteTaskDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        taskName={taskToDelete?.name}
+      />
     </Suspense>
   );
 });

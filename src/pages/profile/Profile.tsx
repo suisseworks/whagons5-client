@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
 import { api } from '@/api/whagonsApi';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -9,14 +10,21 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogClose } from '@/components/ui/dialog';
-import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck } from 'lucide-react';
+import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck, Users, Shield } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
 import { ImageCropper } from '@/components/ImageCropper';
+import { RootState, AppDispatch } from '@/store/store';
+import { UserTeam, Team, Role } from '@/store/types';
+import { genericActions } from '@/store/genericSlices';
 
 function Profile() {
+    const dispatch = useDispatch<AppDispatch>();
     const { user: userData, userLoading, refetchUser } = useAuth();
+    const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
+    const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+    const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -31,6 +39,15 @@ function Profile() {
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     const [originalFile, setOriginalFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load teams and roles data when component mounts
+    useEffect(() => {
+        dispatch(genericActions.teams.getFromIndexedDB?.() as any);
+        dispatch(genericActions.teams.fetchFromAPI?.() as any);
+        dispatch(genericActions.roles.getFromIndexedDB?.() as any);
+        dispatch(genericActions.roles.fetchFromAPI?.() as any);
+        dispatch(genericActions.userTeams.getFromIndexedDB?.() as any);
+    }, [dispatch]);
 
     // Initialize form when user data is available
     useEffect(() => {
@@ -238,6 +255,34 @@ function Profile() {
         return 'U';
     };
 
+    // Get current user's teams and roles
+    const getUserTeamsAndRoles = () => {
+        if (!userData?.id) return [];
+        
+        const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userData.id);
+        
+        return userTeamRelationships.map((ut: UserTeam) => {
+            const team = teams.find((t: Team) => t.id === ut.team_id);
+            const role = ut.role_id ? roles.find((r: Role) => r.id === ut.role_id) : null;
+            
+            return {
+                team: team ? {
+                    id: team.id,
+                    name: team.name,
+                    color: team.color,
+                    description: team.description
+                } : null,
+                role: role ? {
+                    id: role.id,
+                    name: role.name,
+                    description: role.description
+                } : null
+            };
+        }).filter(item => item.team !== null);
+    };
+
+    const userTeamsAndRoles = getUserTeamsAndRoles();
+
     if (userLoading) {
         return (
             <div className="container mx-auto p-6 max-w-4xl">
@@ -410,6 +455,88 @@ function Profile() {
                         </div>
                     )}
                 </div>
+
+                {/* Teams and Roles Section */}
+                {userTeamsAndRoles.length > 0 && (
+                    <>
+                        <Separator />
+                        <div className="p-6">
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                                <Users className="w-5 h-5" />
+                                <span>Teams & Roles</span>
+                            </h2>
+                            
+                            <div className="space-y-4">
+                                {userTeamsAndRoles.map((item, index) => {
+                                    if (!item.team) return null;
+                                    
+                                    const team = item.team;
+                                    const role = item.role;
+                                    const initial = (team.name || '').charAt(0).toUpperCase();
+                                    const hex = String(team.color || '').trim();
+                                    let bg = hex || '#6b7280';
+                                    let fg = '#fff';
+                                    
+                                    try {
+                                        if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                                            const h = hex.length === 4
+                                                ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                                                : hex;
+                                            const r = parseInt(h.slice(1, 3), 16);
+                                            const g = parseInt(h.slice(3, 5), 16);
+                                            const b = parseInt(h.slice(5, 7), 16);
+                                            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                                            fg = brightness > 128 ? '#000' : '#fff';
+                                            bg = h;
+                                        }
+                                    } catch (e) {
+                                        bg = '#6b7280';
+                                    }
+                                    
+                                    return (
+                                        <div
+                                            key={`${team.id}-${index}`}
+                                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <div
+                                                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                                    style={{ backgroundColor: bg, color: fg }}
+                                                >
+                                                    {initial}
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900 dark:text-white">
+                                                        {team.name}
+                                                    </div>
+                                                    {team.description && (
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {team.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {role && (
+                                                <div className="flex items-center space-x-2">
+                                                    <Shield className="w-4 h-4 text-gray-500" />
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                        {role.name}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            {userTeamsAndRoles.length === 0 && (
+                                <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                                    No teams assigned
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Edit Profile Dialog */}

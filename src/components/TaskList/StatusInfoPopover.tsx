@@ -281,8 +281,6 @@ export function StatusInfoPopover({ taskId, statusId, children }: StatusInfoPopo
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className="inline-block relative"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         {children}
       </div>

@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addTaskAsync, updateTaskAsync } from '@/store/reducers/tasksSlice';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import toast from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
@@ -1363,8 +1364,18 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       }
       
       onOpenChange(false);
-    } catch (e) {
-      // Error is handled by slice; keep dialog open for correction
+    } catch (e: any) {
+      // Handle errors with appropriate toast messages
+      const errorMessage = e?.message || e?.toString() || 'Failed to create task';
+      const status = e?.response?.status || e?.status;
+      
+      // Check if it's a permission error (403)
+      if (status === 403 || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
+        toast.error('You do not have permission to create tasks in this category.', { duration: 5000 });
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
+      // Keep dialog open for correction
     } finally {
       setIsSubmitting(false);
     }
@@ -1510,10 +1521,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     ) : (
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
-                          options={workspaceTemplates.map((t: any) => ({
-                            value: String(t.id),
-                            label: t.name,
-                          }))}
+                          options={workspaceTemplates.map((t: any) => {
+                            const category = categories.find((c: any) => c.id === t.category_id);
+                            return {
+                              value: String(t.id),
+                              label: t.name,
+                              description: category ? category.name : undefined,
+                            };
+                          })}
                           value={templateId ? String(templateId) : undefined}
                           onValueChange={(v) => {
                             // Always set the template, don't allow deselection by clicking the same item
@@ -1561,10 +1576,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     ) : (
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
-                          options={workspaceTemplates.map((t: any) => ({
-                            value: String(t.id),
-                            label: t.name,
-                          }))}
+                          options={workspaceTemplates.map((t: any) => {
+                            const category = categories.find((c: any) => c.id === t.category_id);
+                            return {
+                              value: String(t.id),
+                              label: t.name,
+                              description: category ? category.name : undefined,
+                            };
+                          })}
                           value={templateId ? String(templateId) : undefined}
                           onValueChange={(v) => {
                             // Always set the template, don't allow deselection by clicking the same item

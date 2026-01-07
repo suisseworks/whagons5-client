@@ -160,6 +160,22 @@ const PRESET_THEMES: ThemePreset[] = [
       surfaceSize: "30px 30px",
       sidebarSize: "18px 18px"
     }
+  },
+  {
+    id: "hipster-vibes",
+    label: "Hipster Vibes",
+    description: "Muted earthy tones with vintage mustard and dusty rose accents",
+    gradient: "linear-gradient(130deg, #d4a574 0%, #c97d60 50%, #a8b5a0 100%)",
+    palette: {
+      primary: "#d4a574",
+      accent: "#c97d60",
+      background: "#faf8f3",
+      text: "#3d3528",
+      neutral: "#e8ddd0",
+      sidebar: "#f5f1eb"
+    },
+    badge: "Hipster",
+    sidebarTone: "light"
   }
 ];
 
