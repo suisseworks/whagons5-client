@@ -453,6 +453,7 @@ function Header() {
             const lastUpdate = localStorage.getItem('profile_updated');
             if (lastUpdate) {
                 handleProfileUpdate();
+                localStorage.removeItem('profile_updated');
             }
         };
         window.addEventListener('storage', checkStorage);

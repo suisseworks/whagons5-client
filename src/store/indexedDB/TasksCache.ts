@@ -143,15 +143,11 @@ export class TasksCache {
         if (normalized.id === undefined || normalized.id === null) {
             normalized.id = Number.isFinite(idNum) ? idNum : id;
         }
-        // Update in the correct store to avoid leaking shared tasks into the main workspace list
+        // Determine which store contains the task and update atomically using IndexedDB's upsert behavior
+        // DB.put() automatically replaces existing records with the same key, making this operation atomic
         const existingInTasks = await DB.get('tasks', normalized.id);
-        if (existingInTasks) {
-            await DB.delete('tasks', normalized.id);
-            await DB.put('tasks', normalized);
-        } else {
-            await DB.delete('shared_tasks', normalized.id);
-            await DB.put('shared_tasks', normalized);
-        }
+        const storeName = existingInTasks ? 'tasks' : 'shared_tasks';
+        await DB.put(storeName, normalized);
         this._memTasks = null;
         this._memTasksStamp = 0;
         this._memSharedTasks = null;

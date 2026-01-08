@@ -149,12 +149,14 @@ export default function TaskListTab({
                     taskName ? `"${taskName}" has been restored.` : "Task has been restored.",
                     { duration: 5000 }
                   );
-                  // Refresh the list
-                  const refreshedRows = await TasksCache.queryTasks({
-                    workspace_id: workspaceId || undefined,
-                    search: searchText || undefined,
-                  });
-                  setRows(refreshedRows);
+                  // Refresh the list with same pagination as initial load
+                  const baseParams: any = { search: searchText };
+                  const ws = workspaceId && workspaceId !== "all" ? workspaceId : undefined;
+                  if (ws) baseParams.workspace_id = ws;
+                  const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+                  const total = countResp?.rowCount ?? 0;
+                  const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
+                  setRows(rowsResp?.rows || []);
                 } catch (error: any) {
                   toast.dismiss(restoreToast);
                   const errorMessage = error?.message || error?.response?.data?.message || "Could not restore the task.";

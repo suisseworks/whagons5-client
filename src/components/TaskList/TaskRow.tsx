@@ -129,17 +129,26 @@ export function TaskRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="right" className="w-48">
                 <DropdownMenuLabel>Task</DropdownMenuLabel>
-                <DropdownMenuItem onClick={handleShare}>
+                <DropdownMenuItem onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  handleShare?.();
+                }}>
                   <Share2 className="h-4 w-4 mr-2" />
                   Share
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onLog}>
+                <DropdownMenuItem onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onLog?.();
+                }}>
                   <NotebookPen className="h-4 w-4 mr-2" />
                   Log
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                <DropdownMenuItem className="text-destructive" onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onDelete?.();
+                }}>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </DropdownMenuItem>

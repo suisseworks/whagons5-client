@@ -180,12 +180,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       const withColor = reduxState.users.filter((u: any) => u?.color && String(u.color).trim() !== '');
       const withoutColor = reduxState.users.filter((u: any) => !u?.color || String(u.color).trim() === '');
       try {
-        console.log('[wh:user-colors]', {
-          total: reduxState.users.length,
-          withColor: withColor.length,
-          withoutColor: withoutColor.length,
-          sampleWithout: withoutColor.slice(0, 5).map((u: any) => ({ id: u?.id, name: u?.name, color: u?.color }))
-        });
+        // Only log in development to avoid exposing sensitive user info in production
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[wh:user-colors]', {
+            total: reduxState.users.length,
+            withColor: withColor.length,
+            withoutColor: withoutColor.length,
+            sampleWithout: withoutColor.slice(0, 5).map((u: any) => ({ id: u?.id, name: u?.name, color: u?.color }))
+          });
+        }
       } catch { /* ignore logging errors */ }
 
       // If we detect users without color, force a fresh fetch to refresh IndexedDB/Redux

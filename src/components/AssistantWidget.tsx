@@ -167,7 +167,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         floating && <FloatingButton onClick={() => setOpen(true)} />
       )}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="w-[440px] max-w-full sm:max-w-md p-0 gap-0">
+        <SheetContent side="right" style={{ width: "440px" }} className="max-w-full sm:max-w-md p-0 gap-0">
           <SheetHeader className="p-6 pb-3">
             <SheetTitle>Copilot</SheetTitle>
             <SheetDescription>

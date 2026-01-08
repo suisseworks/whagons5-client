@@ -80,13 +80,16 @@ export const deleteWorkspaceResource = async (
   workspaceId: string,
   resourceId: string
 ): Promise<void> => {
-  // Get the resource first to get the file ID
-  const resources = await getWorkspaceResources(workspaceId);
-  const resource = resources.find(r => r.id.toString() === resourceId);
-  
-  if (resource) {
-    // Delete the resource record (this will also delete the file from storage)
+  try {
     await api.delete(`/workspaces/${workspaceId}/resources/${resourceId}`);
+  } catch (error: any) {
+    // Treat 404 as non-fatal (resource may have already been deleted)
+    if (error?.response?.status === 404) {
+      console.warn(`Workspace resource ${resourceId} not found (may have already been deleted)`);
+      return;
+    }
+    // Rethrow any other errors
+    throw error;
   }
 };
 
