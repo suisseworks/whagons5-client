@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -14,7 +14,14 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { updateCategoryReportingTeams } from '@/store/reducers/categoryReportingTeamsSlice';
+import { 
+  updateCategoryReportingTeams, 
+  fetchCategoryReportingTeams,
+  selectReportingTeamsByCategoryId,
+  selectReportingTeamsLoading,
+  selectReportingTeamsError,
+  selectReportingTeamsSaving
+} from '@/store/reducers/categoryReportingTeamsSlice';
 import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +44,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
-import api from "@/api/whagonsApi";
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -254,6 +260,33 @@ function Categories() {
     status_transition_group_id: ''
   });
 
+  // Get reporting teams state from Redux
+  const reportingTeamsByCategoryId = useSelector((state: RootState) => 
+    editingCategory ? selectReportingTeamsByCategoryId(state, editingCategory.id) : []
+  );
+  const loadingReportingTeams = useSelector((state: RootState) => 
+    editingCategory ? selectReportingTeamsLoading(state, editingCategory.id) : false
+  );
+  const reportingTeamsError = useSelector((state: RootState) => 
+    editingCategory ? selectReportingTeamsError(state, editingCategory.id) : null
+  );
+  const savingReportingTeams = useSelector((state: RootState) => 
+    editingCategory ? selectReportingTeamsSaving(state, editingCategory.id) : false
+  );
+
+  // Load reporting teams for the editing category - uses Redux thunk
+  const loadReportingTeamsForEdit = useCallback(async () => {
+    if (!editingCategory) return;
+    try {
+      const result = await dispatch(fetchCategoryReportingTeams(editingCategory.id)).unwrap();
+      // Update local selection state with fetched team IDs from Redux
+      setSelectedReportingTeamIds(result.teamIds);
+    } catch (e: any) {
+      console.error('Error loading reporting teams', e);
+      // Error is already stored in Redux state via selectReportingTeamsError
+    }
+  }, [editingCategory, dispatch]);
+
   // Update edit form data when editing category changes
   useEffect(() => {
     if (editingCategory) {
@@ -268,27 +301,10 @@ function Categories() {
         approval_id: (editingCategory as any).approval_id?.toString?.() || '',
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
       });
-      // Load reporting teams when editing category changes
+      // Load reporting teams when editing category changes - dispatch Redux action
       loadReportingTeamsForEdit();
     }
-  }, [editingCategory]);
-
-  // Load reporting teams for the editing category
-  const loadReportingTeamsForEdit = async () => {
-    if (!editingCategory) return;
-    setLoadingReportingTeams(true);
-    setReportingTeamsError(null);
-    try {
-      const response = await api.get(`/categories/${editingCategory.id}/reporting-teams`);
-      const reportingTeams = response.data?.data || [];
-      setSelectedReportingTeamIds(reportingTeams.map((team: Team) => team.id));
-    } catch (e: any) {
-      console.error('Error loading reporting teams', e);
-      setReportingTeamsError(e?.response?.data?.message || 'Failed to load reporting teams');
-    } finally {
-      setLoadingReportingTeams(false);
-    }
-  };
+  }, [editingCategory, loadReportingTeamsForEdit]);
 
   // Handle toggle team for reporting teams
   const handleToggleReportingTeam = (teamId: number) => {
@@ -301,11 +317,9 @@ function Categories() {
     });
   };
 
-  // Save reporting teams
+  // Save reporting teams - uses Redux thunk
   const handleSaveReportingTeams = async () => {
     if (!editingCategory) return;
-    setSavingReportingTeams(true);
-    setReportingTeamsError(null);
     try {
       // Dispatch Redux action - thunk handles API call and state updates
       await dispatch(updateCategoryReportingTeams({
@@ -314,12 +328,9 @@ function Categories() {
       })).unwrap();
       // Refresh categories to update reporting_teams field
       dispatch((genericActions as any).categories.fetchFromAPI());
-      setReportingTeamsError(null);
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
-      setReportingTeamsError(e?.response?.data?.message || 'Failed to save reporting teams');
-    } finally {
-      setSavingReportingTeams(false);
+      // Error is already stored in Redux state via selectReportingTeamsError
     }
   };
 
@@ -331,11 +342,18 @@ function Categories() {
   const [isReportingTeamsDialogOpen, setIsReportingTeamsDialogOpen] = useState(false);
   const [reportingTeamsCategory, setReportingTeamsCategory] = useState<Category | null>(null);
   
-  // Reporting teams state for inline tab
+  // Reporting teams state for inline tab (temporary UI state synced with Redux)
   const [selectedReportingTeamIds, setSelectedReportingTeamIds] = useState<number[]>([]);
-  const [loadingReportingTeams, setLoadingReportingTeams] = useState(false);
-  const [savingReportingTeams, setSavingReportingTeams] = useState(false);
-  const [reportingTeamsError, setReportingTeamsError] = useState<string | null>(null);
+
+  // Sync selectedReportingTeamIds with Redux when reportingTeamsByCategoryId changes
+  useEffect(() => {
+    if (editingCategory && reportingTeamsByCategoryId.length > 0) {
+      setSelectedReportingTeamIds(reportingTeamsByCategoryId);
+    } else if (editingCategory && reportingTeamsByCategoryId.length === 0) {
+      // If Redux has empty array, clear local state
+      setSelectedReportingTeamIds([]);
+    }
+  }, [editingCategory, reportingTeamsByCategoryId]);
 
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};

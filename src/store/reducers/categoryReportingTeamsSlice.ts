@@ -133,3 +133,20 @@ const categoryReportingTeamsSlice = createSlice({
 
 export const { clearError, clearAll } = categoryReportingTeamsSlice.actions;
 export default categoryReportingTeamsSlice.reducer;
+
+// Selectors
+export const selectReportingTeamsByCategoryId = (state: { categoryReportingTeams: CategoryReportingTeamsState }, categoryId: number): number[] => {
+  return state.categoryReportingTeams.data[categoryId] || [];
+};
+
+export const selectReportingTeamsLoading = (state: { categoryReportingTeams: CategoryReportingTeamsState }, categoryId: number): boolean => {
+  return state.categoryReportingTeams.loading[categoryId] || false;
+};
+
+export const selectReportingTeamsError = (state: { categoryReportingTeams: CategoryReportingTeamsState }, categoryId: number): string | null => {
+  return state.categoryReportingTeams.error[categoryId] || null;
+};
+
+export const selectReportingTeamsSaving = (state: { categoryReportingTeams: CategoryReportingTeamsState }, categoryId: number): boolean => {
+  return state.categoryReportingTeams.saving[categoryId] || false;
+};

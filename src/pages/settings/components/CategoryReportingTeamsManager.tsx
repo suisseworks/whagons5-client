@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RootState, AppDispatch } from "@/store/store";
 import { Category, Team } from "@/store/types";
-import { fetchCategoryReportingTeams, updateCategoryReportingTeams, clearError } from "@/store/reducers/categoryReportingTeamsSlice";
+import { fetchCategoryReportingTeams, clearError } from "@/store/reducers/categoryReportingTeamsSlice";
+import { genericActions } from "@/store/genericSlices";
 
 export interface CategoryReportingTeamsManagerProps {
   open?: boolean;
@@ -112,18 +113,15 @@ export function CategoryReportingTeamsManager({
       await controlledOnSave();
       return;
     }
-    // Dispatch update thunk - Redux handles loading/error state
+    // Dispatch generic update action - Redux handles loading/error state
     try {
-      await dispatch(updateCategoryReportingTeams({
-        categoryId: category.id,
-        teamIds: internalSelectedTeamIds
+      await dispatch(genericActions.categories.updateAsync({
+        id: category.id,
+        updates: { reporting_teams: internalSelectedTeamIds }
       })).unwrap();
       if (onOpenChange) {
         onOpenChange(false);
       }
-      // Refresh categories to update reporting_teams field
-      // TODO: Could be improved with Redux dispatch instead of reload
-      window.location.reload();
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
       // Error is already stored in Redux state
