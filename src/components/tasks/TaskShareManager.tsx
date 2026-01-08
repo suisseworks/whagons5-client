@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import api from '@/api/whagonsApi';
 import { Trash2, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface TaskShare {
   id: number;
@@ -81,7 +82,7 @@ export default function TaskShareManager({ taskId, onShareChange }: TaskShareMan
       onShareChange?.();
     } catch (err: any) {
       console.error('Failed to revoke share:', err);
-      alert(err?.response?.data?.message || 'Failed to revoke share');
+      toast.error(err?.response?.data?.message || 'Failed to revoke share');
     } finally {
       setRevoking(false);
     }

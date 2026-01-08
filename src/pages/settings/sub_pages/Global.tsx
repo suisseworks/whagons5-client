@@ -176,6 +176,28 @@ const PRESET_THEMES: ThemePreset[] = [
     },
     badge: "Hipster",
     sidebarTone: "light"
+  },
+  {
+    id: "star-wars",
+    label: "Star Wars",
+    description: "Deep space theme with Rebel Alliance blue and iconic yellow accents",
+    gradient: "linear-gradient(130deg, #0a0a0a 0%, #4A90E2 50%, #FFE81F 100%)",
+    palette: {
+      primary: "#4A90E2",
+      accent: "#FFE81F",
+      background: "#0a0a0a",
+      text: "#E8E8E8",
+      neutral: "#141414",
+      sidebar: "#000000"
+    },
+    badge: "Star Wars",
+    sidebarTone: "dark",
+    patterns: {
+      surface: "radial-gradient(circle at 2px 2px, rgba(74, 144, 226, 0.08) 1px, transparent 0)",
+      sidebar: "linear-gradient(90deg, rgba(74, 144, 226, 0.03) 0%, transparent 50%, rgba(74, 144, 226, 0.03) 100%)",
+      surfaceSize: "40px 40px",
+      sidebarSize: "20px 20px"
+    }
   }
 ];
 

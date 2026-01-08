@@ -37,9 +37,6 @@ import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
 import api from "@/api/whagonsApi";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -1299,97 +1296,19 @@ function Categories() {
             </div>
           </TabsContent>
           <TabsContent value="reporting-teams">
-            <div className="min-h-[320px] space-y-4">
-              {editingCategory ? (
-                <>
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">Reporting Teams</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Select teams that can report/create tasks for this category. The category owner team always has permission.
-                    </p>
-                  </div>
-                  
-                  {loadingReportingTeams ? (
-                    <div className="flex items-center justify-center py-8">
-                      <FontAwesomeIcon icon={faSpinner} className="animate-spin text-2xl text-muted-foreground" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                        {(() => {
-                          const availableTeams = teams.filter(team => team.id !== editingCategory?.team_id);
-                          if (availableTeams.length === 0) {
-                            return (
-                              <div className="rounded-md border border-dashed p-8 text-center">
-                                <div className="text-sm text-muted-foreground">No other teams available.</div>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="space-y-3">
-                              {availableTeams.map((team) => (
-                                <div key={team.id} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
-                                  <Checkbox
-                                    id={`reporting-team-${team.id}`}
-                                    checked={selectedReportingTeamIds.includes(team.id)}
-                                    onCheckedChange={() => handleToggleReportingTeam(team.id)}
-                                  />
-                                  <Label
-                                    htmlFor={`reporting-team-${team.id}`}
-                                    className="flex-1 cursor-pointer flex items-center space-x-2"
-                                  >
-                                    <div
-                                      className="w-6 h-6 min-w-[1.5rem] text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
-                                      style={{ backgroundColor: team.color || '#6B7280' }}
-                                    >
-                                      {team.name ? team.name.charAt(0).toUpperCase() : 'T'}
-                                    </div>
-                                    <span>{team.name}</span>
-                                  </Label>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      
-                      {reportingTeamsError && (
-                        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-                          {reportingTeamsError}
-                        </div>
-                      )}
-                      
-                      <div className="flex justify-end gap-2 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={loadReportingTeamsForEdit}
-                          disabled={savingReportingTeams || loadingReportingTeams}
-                        >
-                          Reset
-                        </Button>
-                        <Button
-                          onClick={handleSaveReportingTeams}
-                          disabled={savingReportingTeams || loadingReportingTeams}
-                        >
-                          {savingReportingTeams ? (
-                            <>
-                              <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            'Save Changes'
-                          )}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-[320px] text-muted-foreground">
-                  No category selected
-                </div>
-              )}
-            </div>
+            <CategoryReportingTeamsManager
+              variant="inline"
+              category={editingCategory}
+              selectedTeamIds={selectedReportingTeamIds}
+              onToggleTeam={handleToggleReportingTeam}
+              loading={loadingReportingTeams}
+              saving={savingReportingTeams}
+              error={reportingTeamsError}
+              onSave={handleSaveReportingTeams}
+              onLoad={loadReportingTeamsForEdit}
+              onReset={loadReportingTeamsForEdit}
+              teams={teams}
+            />
           </TabsContent>
         </Tabs>
       </SettingsDialog>

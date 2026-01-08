@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
+/* Star Wars font import */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&display=swap');
+
 /* 
   Add this to your HTML head instead of importing here:
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -171,6 +174,191 @@
   --radius-full: 9999px;
 }
 
+/* Star Wars Theme */
+.starwars {
+  /* Star Wars Color Palette - Improved for readability */
+  --background: #0a0a0a; /* Slightly lighter black for better contrast */
+  --foreground: #E8E8E8; /* Light gray for main text (more readable than pure yellow) */
+  --card: #141414; /* Card background */
+  --card-foreground: #E8E8E8;
+  --popover: #141414;
+  --popover-foreground: #E8E8E8;
+  --primary: #4A90E2; /* Star Wars blue (Rebel Alliance) */
+  --primary-foreground: #FFFFFF;
+  --secondary: #1a1a1a; /* Dark gray */
+  --secondary-foreground: #FFE81F; /* Yellow for secondary text */
+  --muted: #1a1a1a;
+  --muted-foreground: #C5A572; /* Gold/bronze for muted text */
+  --accent: #FFE81F; /* Star Wars yellow accent */
+  --accent-foreground: #000000;
+  --destructive: #DC143C; /* Red for danger (Sith-like) */
+  --destructive-foreground: #FFFFFF;
+  --border: #2a2a2a; /* More visible border */
+  --input: #1a1a1a;
+  --ring: #4A90E2; /* Blue focus ring */
+  --chart-1: #4A90E2; /* Blue */
+  --chart-2: #FFE81F; /* Yellow */
+  --chart-3: #DC143C; /* Red */
+  --chart-4: #C5A572; /* Gold */
+  --chart-5: #00D4FF; /* Cyan */
+  --radius: 0.5rem;
+
+  /* Star Wars Sidebar */
+  --sidebar: #000000;
+  --sidebar-foreground: #E8E8E8;
+  --sidebar-primary: #4A90E2;
+  --sidebar-primary-hover: #5BA0F2;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-selected-bg: rgba(74, 144, 226, 0.15); /* Blue tint for selected */
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #FFE81F;
+  --sidebar-border: rgba(74, 144, 226, 0.2);
+  --sidebar-ring: #4A90E2;
+  --sidebar-header: #000000;
+  
+  /* Sidebar text colors */
+  --sidebar-text-primary: #E8E8E8;
+  --sidebar-text-secondary: #C5A572;
+  --sidebar-text-tertiary: #666666;
+
+  /* Star Wars gradients */
+  --gradient-primary: linear-gradient(135deg, #4A90E2 0%, #2E5C8A 100%);
+  --gradient-secondary: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  --gradient-accent: linear-gradient(135deg, #FFE81F 0%, #FFD700 100%);
+  
+  /* Star Wars patterns */
+  --surface-pattern: radial-gradient(circle at 2px 2px, rgba(74, 144, 226, 0.08) 1px, transparent 0);
+  --surface-pattern-size: 40px 40px;
+  --sidebar-pattern: linear-gradient(90deg, rgba(74, 144, 226, 0.03) 0%, transparent 50%, rgba(74, 144, 226, 0.03) 100%);
+  --sidebar-pattern-size: 20px 20px;
+
+  /* Dark mode design tokens for Star Wars */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-hover: rgba(74, 144, 226, 0.1);
+  --bg-elevated: #1a1a1a;
+
+  --text-primary: #E8E8E8;
+  --text-secondary: #C5A572;
+  --text-tertiary: #888888;
+
+  --border-subtle: #2a2a2a;
+  --border-medium: #3a3a3a;
+
+  --accent-primary: #4A90E2;
+  --accent-danger: #DC143C;
+  --accent-success: #00D4FF;
+  --accent-warning: #FFE81F;
+}
+
+.starwars * {
+  font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: 0.3px;
+}
+
+.starwars h1, .starwars h2, .starwars h3, .starwars h4, .starwars h5, .starwars h6 {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  color: #FFE81F; /* Yellow for headings */
+  letter-spacing: 1.5px;
+}
+
+/* Improve text readability */
+.starwars {
+  color: var(--foreground);
+}
+
+.starwars p, .starwars span, .starwars div, .starwars li {
+  color: var(--foreground);
+}
+
+/* Yellow accents for important text */
+.starwars strong, .starwars b {
+  color: #FFE81F;
+}
+
+/* Star Wars glow effects */
+.starwars .starwars-glow {
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.5),
+              0 0 40px rgba(74, 144, 226, 0.3),
+              0 0 60px rgba(74, 144, 226, 0.1);
+}
+
+.starwars .starwars-glow-yellow {
+  box-shadow: 0 0 20px rgba(255, 232, 31, 0.5),
+              0 0 40px rgba(255, 232, 31, 0.3),
+              0 0 60px rgba(255, 232, 31, 0.1);
+}
+
+.starwars .starwars-border-glow {
+  border: 1px solid rgba(74, 144, 226, 0.5);
+  box-shadow: 0 0 10px rgba(74, 144, 226, 0.3),
+              inset 0 0 10px rgba(74, 144, 226, 0.1);
+}
+
+/* Star Wars scrolling text animation (for special effects) */
+@keyframes starwars-scroll {
+  0% {
+    transform: perspective(400px) rotateX(20deg) translateY(100%);
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(400px) rotateX(20deg) translateY(-100%);
+    opacity: 0;
+  }
+}
+
+.starwars-scroll-text {
+  animation: starwars-scroll 20s linear infinite;
+  transform-origin: 50% 100%;
+}
+
+/* Star Wars pulse animation */
+@keyframes starwars-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(74, 144, 226, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 40px rgba(74, 144, 226, 0.8);
+  }
+}
+
+.starwars-pulse {
+  animation: starwars-pulse 2s ease-in-out infinite;
+}
+
+/* Star Wars button styling */
+.starwars button.btn-primary,
+.starwars [role="button"].btn-primary {
+  background: linear-gradient(135deg, #4A90E2 0%, #2E5C8A 100%);
+  color: #000000;
+  border: 1px solid #4A90E2;
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.4);
+  transition: all 0.3s ease;
+}
+
+.starwars button.btn-primary:hover,
+.starwars [role="button"].btn-primary:hover {
+  box-shadow: 0 0 25px rgba(74, 144, 226, 0.6);
+  transform: translateY(-2px);
+}
+
+.starwars button.btn-accent,
+.starwars [role="button"].btn-accent {
+  background: linear-gradient(135deg, #FFE81F 0%, #FFD700 100%);
+  color: #000000;
+  border: 1px solid #FFE81F;
+  box-shadow: 0 0 15px rgba(255, 232, 31, 0.4);
+}
+
+.starwars button.btn-accent:hover,
+.starwars [role="button"].btn-accent:hover {
+  box-shadow: 0 0 25px rgba(255, 232, 31, 0.6);
+  transform: translateY(-2px);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -256,6 +444,22 @@
   textarea:focus-visible {
     border-color: #6366F1;
   }
+  .starwars button:focus-visible,
+  .starwars [role="button"]:focus-visible,
+  .starwars a:focus-visible,
+  .starwars input:focus-visible,
+  .starwars select:focus-visible,
+  .starwars textarea:focus-visible {
+    outline: 2px solid #4A90E2;
+    outline-offset: 2px;
+    box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+  }
+  .starwars input:focus-visible,
+  .starwars select:focus-visible,
+  .starwars textarea:focus-visible {
+    border-color: #4A90E2;
+    box-shadow: 0 0 10px rgba(74, 144, 226, 0.3);
+  }
   /* Sidebar font utility */
   .font-montserrat {
     font-family: 'Montserrat', sans-serif;
@@ -286,6 +490,12 @@
     border-bottom: 0;
     box-shadow: none;
   }
+  .starwars .wh-header {
+    background: #000000;
+    border-bottom: 1px solid rgba(74, 144, 226, 0.3);
+    box-shadow: 0 2px 10px rgba(74, 144, 226, 0.2);
+    color: #E8E8E8;
+  }
   .dark [data-sidebar="header"],
   .dark .bg-sidebar-header {
     background: var(--bg-primary) !important;
@@ -295,6 +505,37 @@
   .dark [data-sidebar="sidebar"],
   .dark .bg-sidebar {
     background: var(--bg-primary) !important;
+  }
+  .starwars [data-sidebar="sidebar"],
+  .starwars .bg-sidebar {
+    background: #000000 !important;
+    color: #E8E8E8 !important;
+  }
+  .starwars [data-sidebar="header"],
+  .starwars .bg-sidebar-header {
+    background: #000000 !important;
+    border-bottom: 1px solid rgba(74, 144, 226, 0.3) !important;
+    color: #E8E8E8 !important;
+  }
+  
+  /* Star Wars sidebar text styling */
+  .starwars [data-sidebar="item"] {
+    color: #E8E8E8 !important;
+  }
+  
+  .starwars [data-sidebar="item"]:hover {
+    background: rgba(74, 144, 226, 0.1) !important;
+    color: #FFE81F !important;
+  }
+  
+  .starwars [data-sidebar="item"][data-active="true"] {
+    background: rgba(74, 144, 226, 0.15) !important;
+    color: #FFE81F !important;
+  }
+  
+  .starwars [data-sidebar="group-label"] {
+    color: #C5A572 !important;
+    opacity: 1 !important;
   }
   
   /* Gradient button helpers */
@@ -427,6 +668,27 @@
   --ag-row-hover-color: #222222;
   --ag-column-hover-color: #222222;
   --ag-header-column-hover-color: #222222;
+}
+
+.starwars .ag-theme-quartz {
+  --ag-background-color: #0a0a0a;
+  --ag-header-background-color: #141414;
+  --ag-odd-row-background-color: #0a0a0a;
+  --ag-selected-row-background-color: rgba(74, 144, 226, 0.15);
+  --ag-border-color: rgba(74, 144, 226, 0.2);
+  --ag-secondary-border-color: rgba(74, 144, 226, 0.2);
+  --ag-icon-color: #FFE81F;
+  --ag-header-cell-hover-background-color: #1a1a1a;
+  --ag-row-hover-color: rgba(74, 144, 226, 0.1);
+  --ag-column-hover-color: rgba(74, 144, 226, 0.1);
+  --ag-header-column-hover-color: #1a1a1a;
+  --ag-foreground-color: #E8E8E8;
+  --ag-header-foreground-color: #FFE81F;
+  --ag-header-foreground-color: #FFE81F;
+  --ag-selected-row-background-color: rgba(74, 144, 226, 0.2);
+  --ag-range-selection-border-color: #4A90E2;
+  --ag-input-focus-border-color: #4A90E2;
+  --ag-accent-color: #4A90E2;
 }
 
 /* Cleaner workspace grid: remove heavy borders/lines */
@@ -595,6 +857,25 @@
     background: oklch(0.18 0.04 177.71);
   }
 
+  /* Star Wars scrollbar styling */
+  .starwars ::-webkit-scrollbar-thumb {
+    background: rgba(74, 144, 226, 0.5);
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.3);
+  }
+
+  .starwars ::-webkit-scrollbar-thumb:hover {
+    background: rgba(74, 144, 226, 0.8);
+    box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+  }
+
+  .starwars ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+
+  .starwars * {
+    scrollbar-color: rgba(74, 144, 226, 0.5) #0a0a0a;
+  }
+
   /* Hide scrollbar utility */
   .scrollbar-hide {
     -ms-overflow-style: none;  /* IE and Edge */
@@ -692,6 +973,81 @@
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+
+.starwars .wh-modern-grid .ag-center-cols-container .ag-row {
+  background-color: #141414;
+  border: none;
+  border-bottom: 1px solid rgba(74, 144, 226, 0.15);
+  color: #E8E8E8;
+  box-shadow: none !important;
+  will-change: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.starwars .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+  background-color: rgba(74, 144, 226, 0.08) !important;
+  box-shadow: 0 0 8px rgba(74, 144, 226, 0.15) !important;
+  transition: background-color 0.1s ease;
+}
+
+.starwars .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
+  background-color: rgba(74, 144, 226, 0.15) !important;
+  border-left: 3px solid #4A90E2;
+  border-color: rgba(74, 144, 226, 0.4);
+  box-shadow: 0 0 12px rgba(74, 144, 226, 0.25) !important;
+}
+
+.starwars .wh-modern-grid .ag-header {
+  background: #0a0a0a;
+  border-bottom: 2px solid rgba(74, 144, 226, 0.3);
+}
+
+.starwars .wh-modern-grid .ag-header-cell-text {
+  color: #FFE81F;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Star Wars card and surface improvements */
+.starwars [class*="card"],
+.starwars [class*="Card"] {
+  background-color: #141414;
+  border-color: rgba(74, 144, 226, 0.2);
+  color: #E8E8E8;
+}
+
+.starwars [class*="badge"],
+.starwars [class*="Badge"] {
+  border-color: rgba(74, 144, 226, 0.3);
+}
+
+/* Star Wars input and form elements */
+.starwars input,
+.starwars textarea,
+.starwars select {
+  background-color: #1a1a1a;
+  border-color: rgba(74, 144, 226, 0.2);
+  color: #E8E8E8;
+}
+
+.starwars input::placeholder,
+.starwars textarea::placeholder {
+  color: #666666;
+}
+
+/* Star Wars button improvements */
+.starwars button:not(.btn-primary):not(.btn-accent) {
+  color: #E8E8E8;
+  border-color: rgba(74, 144, 226, 0.3);
+}
+
+.starwars button:not(.btn-primary):not(.btn-accent):hover {
+  background-color: rgba(74, 144, 226, 0.1);
+  border-color: rgba(74, 144, 226, 0.5);
+  color: #FFE81F;
 }
 
 /* Hover and selection polish - only transition on hover */
