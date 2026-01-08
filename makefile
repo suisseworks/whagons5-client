@@ -46,3 +46,8 @@ docker-run:
 		whagons5-client:latest
 
 docker-build-run: docker-build docker-run
+
+
+
+varas:
+	echo hello
