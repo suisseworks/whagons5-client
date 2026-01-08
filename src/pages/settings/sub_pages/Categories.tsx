@@ -14,6 +14,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
+import { updateCategoryReportingTeams } from '@/store/reducers/categoryReportingTeamsSlice';
 import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -306,9 +307,11 @@ function Categories() {
     setSavingReportingTeams(true);
     setReportingTeamsError(null);
     try {
-      await api.patch(`/categories/${editingCategory.id}/reporting-teams`, {
-        team_ids: selectedReportingTeamIds
-      });
+      // Dispatch Redux action - thunk handles API call and state updates
+      await dispatch(updateCategoryReportingTeams({
+        categoryId: editingCategory.id,
+        teamIds: selectedReportingTeamIds
+      })).unwrap();
       // Refresh categories to update reporting_teams field
       dispatch((genericActions as any).categories.fetchFromAPI());
       setReportingTeamsError(null);

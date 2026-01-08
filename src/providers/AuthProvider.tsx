@@ -278,6 +278,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               })();
               setHydrationError(null);
 
+              // Preload category reporting teams in background
+              (async () => {
+                try {
+                  await dataManager.preloadCategoryReportingTeams();
+                } catch (e) {
+                  console.warn('AuthProvider: preload category reporting teams failed', e);
+                }
+              })();
+
               // Verify manifest
               try {
                 await dataManager.verifyManifest();

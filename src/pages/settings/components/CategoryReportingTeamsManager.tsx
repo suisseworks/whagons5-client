@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { RootState } from "@/store/store";
+import { RootState, AppDispatch } from "@/store/store";
 import { Category, Team } from "@/store/types";
-import api from "@/api/whagonsApi";
+import { fetchCategoryReportingTeams, updateCategoryReportingTeams, clearError } from "@/store/reducers/categoryReportingTeamsSlice";
 
 export interface CategoryReportingTeamsManagerProps {
   open?: boolean;
@@ -42,20 +42,26 @@ export function CategoryReportingTeamsManager({
   onReset: controlledOnReset,
   teams: controlledTeams
 }: CategoryReportingTeamsManagerProps) {
+  const dispatch = useDispatch<AppDispatch>();
   const teamsFromStore = useSelector((state: RootState) => (state.teams as { value: Team[] }).value);
   const teams = controlledTeams || teamsFromStore;
   
-  // Internal state (only used in dialog mode)
+  // Read reporting teams from Redux
+  const categoryReportingTeamsState = useSelector((state: RootState) => state.categoryReportingTeams);
+  const categoryId = category?.id;
+  const reportingTeamIdsFromRedux = categoryId ? (categoryReportingTeamsState.data[categoryId] || []) : [];
+  const loadingFromRedux = categoryId ? (categoryReportingTeamsState.loading[categoryId] || false) : false;
+  const savingFromRedux = categoryId ? (categoryReportingTeamsState.saving[categoryId] || false) : false;
+  const errorFromRedux = categoryId ? (categoryReportingTeamsState.error[categoryId] || null) : null;
+  
+  // Internal state (only UI-only state: temporary selections for dialog mode)
   const [internalSelectedTeamIds, setInternalSelectedTeamIds] = useState<number[]>([]);
-  const [internalLoading, setInternalLoading] = useState(false);
-  const [internalSaving, setInternalSaving] = useState(false);
-  const [internalError, setInternalError] = useState<string | null>(null);
 
-  // Use controlled props if provided, otherwise use internal state
+  // Use controlled props if provided, otherwise use Redux state or internal temporary state
   const selectedTeamIds = controlledSelectedTeamIds ?? internalSelectedTeamIds;
-  const loading = controlledLoading ?? internalLoading;
-  const saving = controlledSaving ?? internalSaving;
-  const error = controlledError ?? internalError;
+  const loading = controlledLoading ?? loadingFromRedux;
+  const saving = controlledSaving ?? savingFromRedux;
+  const error = controlledError ?? errorFromRedux;
 
   const loadReportingTeams = useCallback(async () => {
     if (!category) return;
@@ -63,26 +69,28 @@ export function CategoryReportingTeamsManager({
       await controlledOnLoad();
       return;
     }
-    setInternalLoading(true);
-    setInternalError(null);
+    // Dispatch fetch thunk - Redux handles loading/error state
     try {
-      const response = await api.get(`/categories/${category.id}/reporting-teams`);
-      const reportingTeams = response.data?.data || [];
-      setInternalSelectedTeamIds(reportingTeams.map((team: Team) => team.id));
+      const result = await dispatch(fetchCategoryReportingTeams(category.id)).unwrap();
+      // Update temporary selection state with fetched team IDs
+      setInternalSelectedTeamIds(result.teamIds);
     } catch (e: any) {
       console.error('Error loading reporting teams', e);
-      setInternalError(e?.response?.data?.message || 'Failed to load reporting teams');
-    } finally {
-      setInternalLoading(false);
+      // Error is already stored in Redux state
     }
-  }, [category, controlledOnLoad]);
+  }, [category, controlledOnLoad, dispatch]);
 
   // Load current reporting teams when dialog opens (only in dialog mode)
   useEffect(() => {
     if (variant === 'dialog' && open && category && controlledOnLoad === undefined) {
-      loadReportingTeams();
+      // If we already have data in Redux, use it; otherwise fetch
+      if (categoryId && categoryReportingTeamsState.data[categoryId]) {
+        setInternalSelectedTeamIds(categoryReportingTeamsState.data[categoryId]);
+      } else {
+        loadReportingTeams();
+      }
     }
-  }, [variant, open, category, controlledOnLoad, loadReportingTeams]);
+  }, [variant, open, category, categoryId, categoryReportingTeamsState.data, controlledOnLoad, loadReportingTeams]);
 
   const handleToggleTeam = (teamId: number) => {
     if (controlledOnToggleTeam) {
@@ -104,22 +112,21 @@ export function CategoryReportingTeamsManager({
       await controlledOnSave();
       return;
     }
-    setInternalSaving(true);
-    setInternalError(null);
+    // Dispatch update thunk - Redux handles loading/error state
     try {
-      await api.patch(`/categories/${category.id}/reporting-teams`, {
-        team_ids: internalSelectedTeamIds
-      });
+      await dispatch(updateCategoryReportingTeams({
+        categoryId: category.id,
+        teamIds: internalSelectedTeamIds
+      })).unwrap();
       if (onOpenChange) {
         onOpenChange(false);
       }
       // Refresh categories to update reporting_teams field
-      window.location.reload(); // Simple refresh - could be improved with Redux dispatch
+      // TODO: Could be improved with Redux dispatch instead of reload
+      window.location.reload();
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
-      setInternalError(e?.response?.data?.message || 'Failed to save reporting teams');
-    } finally {
-      setInternalSaving(false);
+      // Error is already stored in Redux state
     }
   };
 
@@ -137,7 +144,10 @@ export function CategoryReportingTeamsManager({
     if (onOpenChange) {
       onOpenChange(false);
     }
-    setInternalError(null);
+    // Clear error in Redux if category is set
+    if (categoryId) {
+      dispatch(clearError(categoryId));
+    }
   };
 
   // Filter out the category's owner team from the list
@@ -256,78 +266,6 @@ export function CategoryReportingTeamsManager({
           </DialogDescription>
         </DialogHeader>
         {renderContent()}
-        <DialogFooter>
-          <Button variant="outline" onClick={closeDialog} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
-            {saving ? (
-              <>
-                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Changes'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={closeDialog}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Manage Reporting Teams{category ? ` • ${category.name}` : ''}</DialogTitle>
-          <DialogDescription>
-            Select teams that can report/create tasks for this category. The category owner team always has permission.
-          </DialogDescription>
-        </DialogHeader>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <FontAwesomeIcon icon={faSpinner} className="animate-spin text-2xl text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="space-y-4 max-h-[400px] overflow-y-auto">
-            {availableTeams.length === 0 ? (
-              <div className="rounded-md border border-dashed p-8 text-center">
-                <div className="text-sm text-muted-foreground">No other teams available.</div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {availableTeams.map((team) => (
-                  <div key={team.id} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
-                    <Checkbox
-                      id={`team-${team.id}`}
-                      checked={selectedTeamIds.includes(team.id)}
-                      onCheckedChange={() => handleToggleTeam(team.id)}
-                    />
-                    <Label
-                      htmlFor={`team-${team.id}`}
-                      className="flex-1 cursor-pointer flex items-center space-x-2"
-                    >
-                      <div
-                        className="w-6 h-6 min-w-[1.5rem] text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
-                        style={{ backgroundColor: team.color || '#6B7280' }}
-                      >
-                        {team.name ? team.name.charAt(0).toUpperCase() : 'T'}
-                      </div>
-                      <span>{team.name}</span>
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            )}
-            {error && (
-              <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-                {error}
-              </div>
-            )}
-          </div>
-        )}
-
         <DialogFooter>
           <Button variant="outline" onClick={closeDialog} disabled={saving}>
             Cancel

@@ -6,6 +6,7 @@ import { GenericCache } from './indexedDB/GenericCache';
 import { DB } from './indexedDB/DB';
 import apiClient from '../api/whagonsApi';
 import { verifyManifest } from '../lib/manifestVerify';
+import { fetchCategoryReportingTeams } from './reducers/categoryReportingTeamsSlice';
 
 const coreKeys = [
   'workspaces',
@@ -28,6 +29,7 @@ const coreKeys = [
   'formVersions',
   'customFields',
   'categoryCustomFields',
+  'tags',
 ] as const;
 
 export class DataManager {
@@ -156,6 +158,43 @@ export class DataManager {
       }
     } catch (e) {
       console.warn('DataManager: Manifest fetch/verify failed (continuing):', e);
+    }
+  }
+
+  /**
+   * Preload reporting teams for all categories
+   * This runs in the background after categories are loaded
+   */
+  async preloadCategoryReportingTeams() {
+    try {
+      // Fetch categories from API to get all category IDs
+      const categoriesResponse = await apiClient.get('/categories');
+      const categories = categoriesResponse.data?.data || categoriesResponse.data || [];
+      
+      // Fetch reporting teams for all categories in parallel (with concurrency limit)
+      const categoryIds = categories.map((cat: any) => cat.id).filter((id: any) => id != null);
+      
+      if (categoryIds.length === 0) {
+        console.log('[DataManager] No categories found, skipping reporting teams preload');
+        return;
+      }
+      
+      // Fetch in batches of 5 to avoid overwhelming the server
+      const batchSize = 5;
+      for (let i = 0; i < categoryIds.length; i += batchSize) {
+        const batch = categoryIds.slice(i, i + batchSize);
+        await Promise.allSettled(
+          batch.map((categoryId: number) => 
+            this.dispatch(fetchCategoryReportingTeams(categoryId)).catch((err: any) => {
+              console.warn(`DataManager: Failed to preload reporting teams for category ${categoryId}`, err);
+            })
+          )
+        );
+      }
+      
+      console.log(`[DataManager] Preloaded reporting teams for ${categoryIds.length} categories`);
+    } catch (e) {
+      console.warn('DataManager: Failed to preload category reporting teams', e);
     }
   }
 }

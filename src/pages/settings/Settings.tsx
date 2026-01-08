@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from 'motion/react';
@@ -29,8 +29,7 @@ import {
   faStar as faStarSolid
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
-import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
+import { RootState } from "@/store/store";
 import {
   DndContext,
   closestCenter,
@@ -258,7 +257,6 @@ function Settings() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('basics');
   const [prevActiveTab, setPrevActiveTab] = useState<SettingsTabKey>('basics');
-  const dispatch = useDispatch<AppDispatch>();
 
   // Sync activeTab with URL on initial load
   useEffect(() => {
@@ -269,12 +267,6 @@ function Settings() {
       setPrevActiveTab(tabFromUrl as SettingsTabKey);
     }
   }, []);
-
-  // Hydrate tags so counts and downstream pickers show data without visiting Tags page
-  useEffect(() => {
-    dispatch(genericActions.tags.getFromIndexedDB());
-    dispatch(genericActions.tags.fetchFromAPI());
-  }, [dispatch]);
 
 
 

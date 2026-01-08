@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faImage, faXmark, faSpinner } from "@fortawesome/free-solid-svg-icons";
@@ -16,6 +16,7 @@ export function ImageField({
   value,
   onChange
 }: ImageFieldProps) {
+  const uniqueId = useId();
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -106,11 +107,11 @@ export function ImageField({
               accept="image/*"
               onChange={handleFileChange}
               className="hidden"
-              id="image-upload"
+              id={uniqueId}
               disabled={uploading}
             />
             <label
-              htmlFor="image-upload"
+              htmlFor={uniqueId}
               className={`cursor-pointer flex flex-col items-center gap-2 ${uploading ? 'opacity-50' : ''}`}
             >
               {uploading ? (

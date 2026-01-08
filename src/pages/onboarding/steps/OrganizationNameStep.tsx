@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { OnboardingData } from '@/types/user';
-import { checkTenantExists, createTenantName } from '@/lib/tenant';
+import { createTenantName } from '@/lib/tenant';
 import { getEnvVariables } from '@/lib/getEnvVariables';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { checkTenantAvailability, clearAvailability } from '@/store/reducers/tenantAvailabilitySlice';
+import type { RootState, AppDispatch } from '@/store/store';
 
 // Normalize an organization name into a safe tenant slug:
 // - lowercase
@@ -33,21 +36,31 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
   loading,
   hasActiveSubscription = false 
 }) => {
+  const dispatch = useDispatch<AppDispatch>();
   const { t, language } = useLanguage();
   const [organizationName, setOrganizationName] = useState(data.organization_name || '');
   const [finalTenantName, setFinalTenantName] = useState(data.tenant_domain_prefix || '');
   const [error, setError] = useState('');
-  const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus>('idle');
   const [showHelp, setShowHelp] = useState(false);
   const [copied, setCopied] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const checkCacheRef = useRef<Map<string, AvailabilityStatus>>(new Map());
+  
+  // Redux state for tenant availability
+  const tenantAvailability = useSelector((state: RootState) => state.tenantAvailability);
   
   // Check if tenant is already set (organization is already created)
   const isTenantSet = Boolean(data.tenant_domain_prefix);
+  
+  // Derive availability status from Redux state
+  const availabilityStatus: AvailabilityStatus = useMemo(() => {
+    if (tenantAvailability.loading) return 'checking';
+    if (tenantAvailability.error) return 'error';
+    if (tenantAvailability.value === null) return 'idle';
+    return tenantAvailability.value ? 'taken' : 'available';
+  }, [tenantAvailability.loading, tenantAvailability.error, tenantAvailability.value]);
 
   // Dynamic loading messages
   const loadingMessages = useMemo(() => {
@@ -90,33 +103,22 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     }
   }, [isTenantSet]);
 
-  // Debounced availability check
+  // Debounced availability check using Redux
   const checkAvailability = useCallback(async (cleanedName: string) => {
     if (!cleanedName || cleanedName.length < 2) {
-      setAvailabilityStatus('idle');
+      dispatch(clearAvailability());
       return;
     }
 
-    // Check cache first
-    const cached = checkCacheRef.current.get(cleanedName);
-    if (cached && cached !== 'checking') {
-      setAvailabilityStatus(cached);
-      return;
-    }
-
-    setAvailabilityStatus('checking');
-    
+    // Dispatch Redux thunk - handles API call, caching, and error handling
     try {
-      const exists = await checkTenantExists(cleanedName);
-      const status: AvailabilityStatus = exists ? 'taken' : 'available';
-      setAvailabilityStatus(status);
-      checkCacheRef.current.set(cleanedName, status);
+      await dispatch(checkTenantAvailability(cleanedName)).unwrap();
       setRetryCount(0); // Reset retry count on success
     } catch (error) {
       console.error('Availability check failed:', error);
-      setAvailabilityStatus('error');
+      // Error is already set in Redux state
     }
-  }, []);
+  }, [dispatch]);
 
   // Handle organization name change with debounced availability check
   const handleOrganizationNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -145,11 +147,11 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
           checkAvailability(cleanedValue);
         }, 500);
       } else {
-        setAvailabilityStatus('idle');
+        dispatch(clearAvailability());
       }
     } else {
       setFinalTenantName('');
-      setAvailabilityStatus('idle');
+      dispatch(clearAvailability());
     }
   }, [isTenantSet, hasActiveSubscription, checkAvailability]);
 
@@ -180,7 +182,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     if (!organizationName.trim()) return;
     const cleanedValue = slugifyOrganizationName(organizationName);
     if (cleanedValue.length >= 2) {
-      checkCacheRef.current.delete(cleanedValue); // Clear cache
+      dispatch(clearAvailability()); // Clear Redux state
       setRetryCount(prev => prev + 1);
       checkAvailability(cleanedValue);
     }
@@ -234,8 +236,9 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     // Final availability check before submission
     if (hasActiveSubscription) {
       try {
-        const tenantExists = await checkTenantExists(cleanedOrgName);
-        if (tenantExists) {
+        // Use Redux thunk for final check
+        const result = await dispatch(checkTenantAvailability(cleanedOrgName)).unwrap();
+        if (result) {
           setError(t('onboarding.organization.errorTaken', 'This organization name is already taken. Please choose another one.'));
           return;
         }
@@ -263,9 +266,48 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
 
   // Get API URL for tenant preview
   const getTenantUrl = () => {
-    const { VITE_API_URL } = getEnvVariables();
     if (!finalTenantName) return '';
-    return `${finalTenantName}.${VITE_API_URL}`;
+    
+    const env = getEnvVariables();
+    
+    // Prefer dedicated tenant/base domain env var if available
+    const baseDomain = env.VITE_BASE_DOMAIN || env.VITE_TENANT_DOMAIN;
+    if (baseDomain && baseDomain.trim()) {
+      return `${finalTenantName}.${baseDomain.trim()}`;
+    }
+    
+    // Fallback: extract host from VITE_API_URL
+    const apiUrl = env.VITE_API_URL;
+    if (!apiUrl || !apiUrl.trim()) {
+      return '';
+    }
+    
+    try {
+      // Parse URL and extract hostname (strip protocol and path)
+      const url = new URL(apiUrl.trim());
+      const hostname = url.hostname;
+      
+      // Validate hostname
+      if (!hostname || hostname.length === 0) {
+        return '';
+      }
+      
+      return `${finalTenantName}.${hostname}`;
+    } catch (error) {
+      // If URL parsing fails, try to extract hostname manually
+      // Remove protocol (http://, https://)
+      let hostname = apiUrl.trim().replace(/^https?:\/\//i, '');
+      // Remove path (everything after first /)
+      hostname = hostname.split('/')[0];
+      // Remove port if present (everything after :)
+      hostname = hostname.split(':')[0];
+      
+      if (!hostname || hostname.length === 0) {
+        return '';
+      }
+      
+      return `${finalTenantName}.${hostname}`;
+    }
   };
 
   // Get availability status icon

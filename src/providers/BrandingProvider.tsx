@@ -120,6 +120,143 @@ const computeSidebarAccentColor = (sidebarColor: string): string => {
 
 const BRANDING_STYLE_ELEMENT_ID = 'branding-theme-overrides';
 
+// Whitelist of allowed pattern names
+const ALLOWED_PATTERNS = [
+  'none',
+  // Predefined safe patterns from theme presets
+  'radial-gradient(circle at 12px 12px, rgba(0, 0, 0, 0.06) 2px, transparent 0), radial-gradient(circle at 4px 4px, rgba(255, 255, 255, 0.08) 2px, transparent 0)',
+  'repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 6px, transparent 6px 12px), radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.08) 1.5px, transparent 0)',
+  'radial-gradient(circle at 2px 2px, rgba(74, 144, 226, 0.08) 1px, transparent 0)',
+  'linear-gradient(90deg, rgba(74, 144, 226, 0.03) 0%, transparent 50%, rgba(74, 144, 226, 0.03) 100%)',
+] as const;
+
+// Safe CSS gradient function names
+const ALLOWED_GRADIENT_FUNCTIONS = [
+  'radial-gradient',
+  'linear-gradient',
+  'repeating-linear-gradient',
+  'repeating-radial-gradient',
+] as const;
+
+// Dangerous patterns that should never be allowed
+const DANGEROUS_PATTERNS = [
+  /url\(/i,
+  /expression\(/i,
+  /javascript:/i,
+  /@import/i,
+  /@charset/i,
+  /<script/i,
+  /<\/script>/i,
+  /on\w+\s*=/i, // Event handlers like onclick=
+  /import\s+/i,
+  /from\s+['"]/i,
+] as const;
+
+/**
+ * Validates a pattern string to prevent CSS injection.
+ * Returns a safe pattern value or 'none' if invalid.
+ */
+const validatePattern = (pattern: string | undefined | null): string => {
+  if (!pattern) return 'none';
+  
+  const trimmed = pattern.trim();
+  if (!trimmed || trimmed === '') return 'none';
+  
+  // Check against whitelist first (fast path)
+  if ((ALLOWED_PATTERNS as readonly string[]).includes(trimmed)) {
+    return trimmed;
+  }
+  
+  // Check for dangerous patterns
+  for (const dangerousPattern of DANGEROUS_PATTERNS) {
+    if (dangerousPattern.test(trimmed)) {
+      console.warn(`[BrandingProvider] Rejected dangerous pattern: ${trimmed.substring(0, 50)}...`);
+      return 'none';
+    }
+  }
+  
+  // Validate it's a safe CSS gradient function
+  // Must start with an allowed gradient function
+  const startsWithAllowedFunction = ALLOWED_GRADIENT_FUNCTIONS.some(func => 
+    trimmed.toLowerCase().startsWith(func.toLowerCase() + '(')
+  );
+  
+  if (!startsWithAllowedFunction) {
+    console.warn(`[BrandingProvider] Pattern must start with an allowed gradient function: ${trimmed.substring(0, 50)}...`);
+    return 'none';
+  }
+  
+  // Additional validation: ensure it's a well-formed CSS gradient
+  // Check for balanced parentheses
+  let parenCount = 0;
+  for (const char of trimmed) {
+    if (char === '(') parenCount++;
+    if (char === ')') parenCount--;
+    if (parenCount < 0) {
+      console.warn(`[BrandingProvider] Invalid pattern syntax (unbalanced parentheses): ${trimmed.substring(0, 50)}...`);
+      return 'none';
+    }
+  }
+  
+  if (parenCount !== 0) {
+    console.warn(`[BrandingProvider] Invalid pattern syntax (unbalanced parentheses): ${trimmed.substring(0, 50)}...`);
+    return 'none';
+  }
+  
+  // Check length limit to prevent extremely long patterns
+  if (trimmed.length > 1000) {
+    console.warn(`[BrandingProvider] Pattern too long (max 1000 chars): ${trimmed.length} chars`);
+    return 'none';
+  }
+  
+  return trimmed;
+};
+
+/**
+ * Validates a pattern size string to ensure it's a safe CSS size value.
+ * Returns a safe size value or the default if invalid.
+ */
+const validatePatternSize = (
+  size: string | undefined | null,
+  defaultValue: string
+): string => {
+  if (!size) return defaultValue;
+  
+  const trimmed = size.trim();
+  if (!trimmed || trimmed === '') return defaultValue;
+  
+  // Pattern size should match: <number><unit> or <number><unit> <number><unit>
+  // Allowed units: px, em, rem, %, vh, vw
+  // Examples: "32px", "32px 32px", "24px 24px", "1em 1em", "50% 50%"
+  const SIZE_PATTERN = /^(\d+(\.\d+)?(px|em|rem|%|vh|vw))(\s+(\d+(\.\d+)?(px|em|rem|%|vh|vw)))?$/i;
+  
+  if (!SIZE_PATTERN.test(trimmed)) {
+    console.warn(`[BrandingProvider] Invalid pattern size format: ${trimmed}. Using default: ${defaultValue}`);
+    return defaultValue;
+  }
+  
+  // Extract numeric values and validate ranges
+  const numericValues = trimmed.match(/\d+(\.\d+)?/g);
+  if (numericValues) {
+    for (const value of numericValues) {
+      const num = parseFloat(value);
+      // Reasonable limits: 0-1000px, 0-100em, 0-100rem, 0-100%
+      if (isNaN(num) || num < 0 || num > 1000) {
+        console.warn(`[BrandingProvider] Pattern size out of range: ${trimmed}. Using default: ${defaultValue}`);
+        return defaultValue;
+      }
+    }
+  }
+  
+  // Check length limit
+  if (trimmed.length > 50) {
+    console.warn(`[BrandingProvider] Pattern size too long: ${trimmed.length} chars. Using default: ${defaultValue}`);
+    return defaultValue;
+  }
+  
+  return trimmed;
+};
+
 const getBrandingStyleElement = () => {
   let styleEl = document.getElementById(BRANDING_STYLE_ELEMENT_ID) as HTMLStyleElement | null;
   if (!styleEl) {
@@ -149,10 +286,10 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
   const defaultSidebarHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.sidebarColor, DEFAULT_BRANDING_CONFIG.sidebarColor);
   const defaultTextHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.textColor, DEFAULT_BRANDING_CONFIG.textColor);
   const defaultNeutralHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.neutralColor, DEFAULT_BRANDING_CONFIG.neutralColor);
-  const surfacePattern = config.surfacePattern?.trim() || 'none';
-  const sidebarPattern = config.sidebarPattern?.trim() || 'none';
-  const surfacePatternSize = config.surfacePatternSize || DEFAULT_BRANDING_CONFIG.surfacePatternSize;
-  const sidebarPatternSize = config.sidebarPatternSize || DEFAULT_BRANDING_CONFIG.sidebarPatternSize;
+  const surfacePattern = validatePattern(config.surfacePattern);
+  const sidebarPattern = validatePattern(config.sidebarPattern);
+  const surfacePatternSize = validatePatternSize(config.surfacePatternSize, DEFAULT_BRANDING_CONFIG.surfacePatternSize);
+  const sidebarPatternSize = validatePatternSize(config.sidebarPatternSize, DEFAULT_BRANDING_CONFIG.sidebarPatternSize);
 
   const primaryHex = ensureHexColor(config.primaryColor, defaultPrimaryHex);
   const accentHex = ensureHexColor(config.accentColor, defaultAccentHex);
@@ -338,6 +475,31 @@ const loadBrandingFromStorage = (): BrandingState => {
 
     if (isLegacyColor(merged.config.neutralColor, LEGACY_NEUTRAL)) {
       merged.config.neutralColor = DEFAULT_BRANDING_CONFIG.neutralColor;
+      persistNeeded = true;
+    }
+
+    // Validate and sanitize pattern values to prevent CSS injection
+    const validatedSurfacePattern = validatePattern(merged.config.surfacePattern);
+    const validatedSidebarPattern = validatePattern(merged.config.sidebarPattern);
+    const validatedSurfacePatternSize = validatePatternSize(
+      merged.config.surfacePatternSize,
+      DEFAULT_BRANDING_CONFIG.surfacePatternSize
+    );
+    const validatedSidebarPatternSize = validatePatternSize(
+      merged.config.sidebarPatternSize,
+      DEFAULT_BRANDING_CONFIG.sidebarPatternSize
+    );
+
+    if (
+      merged.config.surfacePattern !== validatedSurfacePattern ||
+      merged.config.sidebarPattern !== validatedSidebarPattern ||
+      merged.config.surfacePatternSize !== validatedSurfacePatternSize ||
+      merged.config.sidebarPatternSize !== validatedSidebarPatternSize
+    ) {
+      merged.config.surfacePattern = validatedSurfacePattern;
+      merged.config.sidebarPattern = validatedSidebarPattern;
+      merged.config.surfacePatternSize = validatedSurfacePatternSize;
+      merged.config.sidebarPatternSize = validatedSidebarPatternSize;
       persistNeeded = true;
     }
 

@@ -842,7 +842,7 @@ function Global() {
                           >
                             <div className="flex items-center gap-3">
                               {assets.logoLight ? (
-                                <img src={assets.logoLight} alt="Brand logo" className="h-10 object-contain" />
+                                <img src={assets.logoLight} alt={t("settings.global.branding.designer.preview.brandLogoAlt", "Brand logo")} className="h-10 object-contain" />
                               ) : (
                                 <WhagonsCheck width={120} height={28} color="#ffffff" />
                               )}
@@ -983,12 +983,16 @@ function Global() {
                           />
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="font-semibold text-sm">{theme.label}</p>
-                              <p className="text-xs text-muted-foreground">{theme.description}</p>
+                              <p className="font-semibold text-sm">
+                                {t(`settings.global.branding.presets.${theme.id}.label`, theme.label)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t(`settings.global.branding.presets.${theme.id}.description`, theme.description)}
+                              </p>
                             </div>
                             {theme.badge && (
                               <Badge variant="secondary" className="text-[10px]">
-                                {theme.badge}
+                                {t(`settings.global.branding.presets.${theme.id}.badge`, theme.badge)}
                               </Badge>
                             )}
                           </div>

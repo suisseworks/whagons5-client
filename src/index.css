@@ -1,8 +1,7 @@
 @import "tailwindcss";
-@plugin "tailwindcss-animate";
-
 /* Star Wars font import */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&display=swap');
+@plugin "tailwindcss-animate";
 
 /* 
   Add this to your HTML head instead of importing here:
@@ -683,7 +682,6 @@
   --ag-column-hover-color: rgba(74, 144, 226, 0.1);
   --ag-header-column-hover-color: #1a1a1a;
   --ag-foreground-color: #E8E8E8;
-  --ag-header-foreground-color: #FFE81F;
   --ag-header-foreground-color: #FFE81F;
   --ag-selected-row-background-color: rgba(74, 144, 226, 0.2);
   --ag-range-selection-border-color: #4A90E2;
