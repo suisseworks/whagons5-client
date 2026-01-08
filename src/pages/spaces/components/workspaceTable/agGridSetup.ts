@@ -63,7 +63,7 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   ...(useClientSide ? {
     // Client-Side Row Model
     rowData: clientRows,
-    getRowId: (params: any) => String(params.data.id),
+    getRowId: (params: any) => String(params?.data?.id ?? params?.data?.ID ?? params?.node?.id ?? ''),
     groupDisplayType: 'groupRows',
     groupDefaultExpanded: collapseGroups ? 0 : 1,
     // Allow AG Grid to handle client-side filtering when rowData is fully loaded
@@ -73,10 +73,12 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     rowModelType: 'infinite' as const,
     cacheBlockSize: 50,
     cacheOverflowSize: 30,
+    // Keep phantom rows for smoother first paint / scrollbar sizing.
+    // Empty-state is rendered by WorkspaceTable (custom overlay), not AG Grid overlay.
     infiniteInitialRowCount: 500,
     maxConcurrentDatasourceRequests: 4,
     maxBlocksInCache: 70,
-    getRowId: (params: any) => String(params.data.id),
+    getRowId: (params: any) => String(params?.data?.id ?? params?.data?.ID ?? params?.node?.id ?? ''),
   }),
   // Default sort by created_at descending (newest first)
   sortModel: [{ colId: 'created_at', sort: 'desc' }],

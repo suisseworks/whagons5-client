@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -9,9 +9,10 @@ import {
   faCubes,
   faChartBar,
   faTrash,
-  faPen
+  faPen,
+  faUsers
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
+import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
 import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ import {
   useSettingsState,
   IconPicker,
   CategoryFieldsManager,
+  CategoryReportingTeamsManager,
   TextField,
   SelectField,
   CheckboxField
@@ -169,7 +171,7 @@ const CategoryActionsCellRenderer = (
 };
 
 function Categories() {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
@@ -250,6 +252,17 @@ function Categories() {
     status_transition_group_id: ''
   });
 
+  // Reporting teams state - now comes directly from category's reporting_team_ids
+  const [savingReportingTeams, setSavingReportingTeams] = useState(false);
+  const [reportingTeamsError, setReportingTeamsError] = useState<string | null>(null);
+
+  // Load reporting teams from category directly
+  const loadReportingTeamsForEdit = useCallback(() => {
+    if (!editingCategory) return;
+    setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
+    setReportingTeamsError(null);
+  }, [editingCategory]);
+
   // Update edit form data when editing category changes
   useEffect(() => {
     if (editingCategory) {
@@ -264,12 +277,58 @@ function Categories() {
         approval_id: (editingCategory as any).approval_id?.toString?.() || '',
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
       });
+      // Load reporting teams when editing category changes - dispatch Redux action
+      loadReportingTeamsForEdit();
     }
-  }, [editingCategory]);
+  }, [editingCategory, loadReportingTeamsForEdit]);
+
+  // Handle toggle team for reporting teams
+  const handleToggleReportingTeam = (teamId: number) => {
+    setSelectedReportingTeamIds(prev => {
+      if (prev.includes(teamId)) {
+        return prev.filter(id => id !== teamId);
+      } else {
+        return [...prev, teamId];
+      }
+    });
+  };
+
+  // Save reporting teams - uses category update
+  const handleSaveReportingTeams = async () => {
+    if (!editingCategory) return;
+    setSavingReportingTeams(true);
+    setReportingTeamsError(null);
+    try {
+      await dispatch(genericActions.categories.updateAsync({
+        id: editingCategory.id,
+        updates: { reporting_team_ids: selectedReportingTeamIds }
+      })).unwrap();
+    } catch (e: any) {
+      console.error('Error saving reporting teams', e);
+      setReportingTeamsError(e?.message || 'Failed to save reporting teams');
+    } finally {
+      setSavingReportingTeams(false);
+    }
+  };
 
   // Manage Fields dialog state
   const [isFieldsDialogOpen, setIsFieldsDialogOpen] = useState(false);
   const [fieldsCategory, setFieldsCategory] = useState<Category | null>(null);
+
+  // Manage Reporting Teams dialog state
+  const [isReportingTeamsDialogOpen, setIsReportingTeamsDialogOpen] = useState(false);
+  const [reportingTeamsCategory, setReportingTeamsCategory] = useState<Category | null>(null);
+  
+  // Reporting teams state for inline tab (temporary UI state synced with Redux)
+  const [selectedReportingTeamIds, setSelectedReportingTeamIds] = useState<number[]>([]);
+
+  // Sync selectedReportingTeamIds when editingCategory changes
+  useEffect(() => {
+    if (editingCategory) {
+      setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
+      setReportingTeamsError(null);
+    }
+  }, [editingCategory]);
 
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};
@@ -289,6 +348,16 @@ function Categories() {
   const closeManageFields = () => {
     setIsFieldsDialogOpen(false);
     setFieldsCategory(null);
+  };
+
+  const openManageReportingTeams = (category: Category) => {
+    setReportingTeamsCategory(category);
+    setIsReportingTeamsDialogOpen(true);
+  };
+
+  const closeManageReportingTeams = () => {
+    setIsReportingTeamsDialogOpen(false);
+    setReportingTeamsCategory(null);
   };
 
   // Get task count for a category
@@ -490,7 +559,7 @@ function Categories() {
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, handleDeleteCategory, assignmentCountByCategory, openManageFields]);
+  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, assignmentCountByCategory, openManageFields]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -1132,6 +1201,7 @@ function Categories() {
           <TabsList>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="rules">Rules</TabsTrigger>
+            <TabsTrigger value="reporting-teams">Reporting Teams</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <div className="grid gap-4 min-h-[320px]">
@@ -1221,6 +1291,19 @@ function Categories() {
               />
             </div>
           </TabsContent>
+          <TabsContent value="reporting-teams">
+            <CategoryReportingTeamsManager
+              variant="inline"
+              category={editingCategory}
+              selectedTeamIds={selectedReportingTeamIds}
+              onToggleTeam={handleToggleReportingTeam}
+              saving={savingReportingTeams}
+              error={reportingTeamsError}
+              onSave={handleSaveReportingTeams}
+              onReset={loadReportingTeamsForEdit}
+              teams={teams}
+            />
+          </TabsContent>
         </Tabs>
       </SettingsDialog>
 
@@ -1255,6 +1338,11 @@ function Categories() {
         open={isFieldsDialogOpen}
         onOpenChange={(open) => { if (!open) closeManageFields(); }}
         category={fieldsCategory}
+      />
+      <CategoryReportingTeamsManager
+        open={isReportingTeamsDialogOpen}
+        onOpenChange={(open) => { if (!open) closeManageReportingTeams(); }}
+        category={reportingTeamsCategory}
       />
     </SettingsLayout>
   );

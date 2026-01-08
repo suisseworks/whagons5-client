@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
  
 import { MultiStateBadge, AnimatedSpinner } from '@/animated/Status';
 import { Clock, Zap, Check, PauseCircle } from 'lucide-react';
+import StatusInfoPopover from '@/components/TaskList/StatusInfoPopover';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string };
 
@@ -16,9 +17,10 @@ interface StatusCellProps {
   getStatusIcon: (iconName?: string) => any;
   allowedNext: number[];
   onChange: (toStatusId: number) => Promise<boolean> | boolean;
+  taskId?: number;
 }
 
-const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon, allowedNext, onChange }) => {
+const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon, allowedNext, onChange, taskId }) => {
   const [open, setOpen] = useState(false);
   const [animationState, setAnimationState] = useState<'custom' | 'processing' | 'success' | 'error'>('custom');
 
@@ -97,6 +99,22 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
       .filter((it) => it.meta);
   }, [allowedNext, statusMap]);
 
+  const BadgeContent = (
+    <MultiStateBadge
+      state={animationState}
+      customStatus={customStatusConfig}
+      customComponent={StatusPill}
+      className="cursor-pointer"
+    />
+  );
+
+  // Wrap the entire badge with hover tooltip if taskId is provided
+  const BadgeWithTooltip = taskId ? (
+    <StatusInfoPopover taskId={taskId} statusId={value}>
+      {BadgeContent}
+    </StatusInfoPopover>
+  ) : BadgeContent;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -109,12 +127,7 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
             e.stopPropagation();
           }}
         >
-          <MultiStateBadge
-            state={animationState}
-            customStatus={customStatusConfig}
-            customComponent={StatusPill}
-            className="cursor-pointer"
-          />
+          {BadgeWithTooltip}
         </div>
       </PopoverTrigger>
       <PopoverContent 

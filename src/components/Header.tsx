@@ -9,7 +9,6 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    DropdownMenuCheckboxItem,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
@@ -19,6 +18,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
+import { getAssetDisplayUrl } from '@/lib/assetHelpers';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -42,7 +42,7 @@ function Header() {
     const location = useLocation();
     const [imageUrl, setImageUrl] = useState<string>('');
     const [imageError, setImageError] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [, setIsLoading] = useState(false);
 
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
@@ -298,17 +298,12 @@ function Header() {
     }, []);
 
     // Subtle gradient background for workspace headers
+    const headerSurfaceColor = isDarkTheme ? '#0F0F0F' : 'var(--sidebar-header)';
+
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
-        if (isDarkTheme) {
-            // Solid dark per spec. Border/shadow are handled by the header class so we
-            // don't accidentally create an extra 1px border that misaligns with the sidebar header.
-            return { backgroundColor: '#0A0A0A' } as React.CSSProperties;
-        }
-        // Light mode: very soft neutral gradient
-        const grayTop = `color-mix(in oklab, #6B7280 6%, #ffffff 94%)`;
-        return { backgroundImage: `linear-gradient(180deg, ${grayTop} 0%, var(--color-card) 70%)` } as React.CSSProperties;
-    }, [currentWorkspaceName, isDarkTheme]);
+        return { backgroundColor: headerSurfaceColor } as React.CSSProperties;
+    }, [currentWorkspaceName, headerSurfaceColor]);
 
     // Track API GET requests for syncing indicator (debounced to prevent flickering)
     useEffect(() => {
@@ -375,38 +370,47 @@ function Header() {
 
 
 
-    const cacheImage = useCallback(async (url: string) => {
+    const cacheImage = useCallback(async (url: string, forceRefresh: boolean = false) => {
+        // IMPORTANT: Never block avatar rendering on the caching path.
+        // Always display the real url_picture directly, and only cache opportunistically.
         if (!url || !firebaseUser?.uid) return;
 
+        // Always show the real URL immediately (same behavior as Profile page)
+        setImageUrl(url);
+        setImageError(false);
+
+        // Opportunistic cache refresh (best effort)
         setIsLoading(true);
         try {
-            // Try IDB cache first
-            const cached = await AvatarCache.getByAny([firebaseUser.uid, user?.google_uuid, user?.id]);
-            if (cached) {
-                setImageUrl(cached);
-                setImageError(false);
-                return;
+            if (!forceRefresh) {
+                const cachedRow = await AvatarCache.getByAnyRow([firebaseUser.uid, user?.google_uuid, user?.id]);
+                if (cachedRow?.data && (!cachedRow.url || cachedRow.url === url)) {
+                    setImageUrl(cachedRow.data);
+                    setImageError(false);
+                    return;
+                }
             }
-            // Fetch and populate cache
-            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, [user?.google_uuid, user?.id]);
+
+            const aliases = [user?.google_uuid, user?.id].filter(Boolean) as Array<string | number>;
+            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, aliases);
             if (dataUrl) {
                 setImageUrl(dataUrl);
                 setImageError(false);
-            } else {
-                setImageError(true);
             }
-        } catch (error) {
-            setImageError(true);
+        } catch {
+            // ignore cache failures (CORS etc). UI already uses direct URL.
         } finally {
             setIsLoading(false);
         }
-    }, [firebaseUser?.uid]);
+    }, [firebaseUser?.uid, user?.google_uuid, user?.id]);
 
     // Update avatar when user data changes
     useEffect(() => {
         if (user?.id) {
             if (user.url_picture) {
-                cacheImage(user.url_picture);
+                // Convert asset ID to URL if needed
+                const displayUrl = getAssetDisplayUrl(user.url_picture);
+                cacheImage(displayUrl);
             } else {
                 setImageUrl('');
                 setImageError(true);
@@ -416,6 +420,49 @@ function Header() {
             setImageError(false);
         }
     }, [user, cacheImage]);
+
+    // Listen for profile updates and clear cache to force refresh
+    useEffect(() => {
+        const handleProfileUpdate = async (event?: CustomEvent) => {
+            if (firebaseUser?.uid && user?.id) {
+                // Clear avatar cache for all user identifiers FIRST
+                await AvatarCache.deleteByAny([String(firebaseUser.uid), String(user.google_uuid), String(user.id)]);
+                
+                // ALWAYS use the URL from event detail if available (it's the new one)
+                // Only fall back to user.url_picture if event detail doesn't have it
+                const newUrl = event?.detail?.url_picture ?? user.url_picture;
+                
+                // Reload avatar with force refresh to bypass any remaining cache
+                if (newUrl) {
+                    const displayUrl = getAssetDisplayUrl(newUrl);
+                    // Force refresh by passing true as second parameter
+                    await cacheImage(displayUrl, true);
+                } else {
+                    setImageUrl('');
+                    setImageError(true);
+                }
+            }
+        };
+
+        // Listen for custom event
+        const eventHandler = (e: Event) => handleProfileUpdate(e as CustomEvent);
+        window.addEventListener('profileUpdated', eventHandler);
+        
+        // Also check localStorage for cross-tab updates
+        const checkStorage = () => {
+            const lastUpdate = localStorage.getItem('profile_updated');
+            if (lastUpdate) {
+                handleProfileUpdate();
+                localStorage.removeItem('profile_updated');
+            }
+        };
+        window.addEventListener('storage', checkStorage);
+        
+        return () => {
+            window.removeEventListener('profileUpdated', eventHandler);
+            window.removeEventListener('storage', checkStorage);
+        };
+    }, [firebaseUser?.uid, user?.id, user?.google_uuid, user?.url_picture, cacheImage]);
 
 
         
@@ -440,15 +487,12 @@ function Header() {
 
     // Loading/error header gradient style
     const loadingHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        if (isDarkTheme) {
-            return { background: 'linear-gradient(90deg, #000000 0%, #1a5d52 100%)' };
-        }
-        return { background: 'linear-gradient(90deg, #ffffff 0%, #27C1A7 100%)' };
-    }, [isDarkTheme]);
+        return { backgroundColor: headerSurfaceColor };
+    }, [headerSurfaceColor]);
 
     if (!firebaseUser || userLoading) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
+            <header className="sticky top-0 z-50 w-full backdrop-blur-xl" style={loadingHeaderGradientStyle}>
                 <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -462,7 +506,7 @@ function Header() {
 
     if (!user) {
         return (
-            <header className="sticky top-0 z-50 w-full border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] backdrop-blur-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={loadingHeaderGradientStyle}>
+            <header className="sticky top-0 z-50 w-full backdrop-blur-xl" style={loadingHeaderGradientStyle}>
                 <div className="flex items-center space-x-3 px-6 h-[var(--app-header-height)]">
                     {isMobile && <SidebarTrigger />}
                     <div className="flex items-center space-x-2">
@@ -476,17 +520,12 @@ function Header() {
 
     // Main header gradient style - soft gradient for settings pages
     const mainHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        if (isDarkTheme) {
-            // Very soft dark gradient: black to subtle dark teal
-            return { background: 'linear-gradient(90deg, #000000 0%, #0a1f1c 100%)' };
-        }
-        // Very soft light gradient: white to very light teal tint
-        return { background: 'linear-gradient(90deg, #ffffff 0%, #f0fdfa 100%)' };
-    }, [isDarkTheme]);
+        return { backgroundColor: headerSurfaceColor };
+    }, [headerSurfaceColor]);
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)]" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
+        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
@@ -616,7 +655,7 @@ function Header() {
                         <DropdownMenuTrigger asChild>
                             <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
                                 <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
-                                    {!imageError && imageUrl && !isLoading && (
+                                    {!imageError && imageUrl && (
                                         <AvatarImage 
                                             src={imageUrl} 
                                             onError={handleImageError}
@@ -624,7 +663,7 @@ function Header() {
                                         />
                                     )}
                                     <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
-                                        {isLoading ? '...' : getInitials()}
+                                        {getInitials()}
                                     </AvatarFallback>
                                 </Avatar>
                             </button>
@@ -632,7 +671,6 @@ function Header() {
 
                         <DropdownMenuContent align="end" className="w-30">
                             <DropdownMenuItem onClick={() => {
-                                console.log('Profile clicked');
                                 navigate('/profile');
                             }}>
                                 <User className="mr-2 h-3 w-3" />
@@ -640,7 +678,6 @@ function Header() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => {
-                                console.log('Logout clicked');
                                 logout();
                             }}>
                                 <LogOut className="mr-2 h-3 w-3" />

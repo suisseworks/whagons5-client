@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { Button } from '@/components/ui/button';
@@ -7,16 +7,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addTaskAsync, updateTaskAsync } from '@/store/reducers/tasksSlice';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import toast from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
-import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ChevronUp, Plus, ShieldCheck, Clock, GripVertical, Info } from 'lucide-react';
+import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
+import api from '@/api/whagonsApi';
+import TaskShareManager from '@/components/tasks/TaskShareManager';
 
 type TaskDialogMode = 'create' | 'edit' | 'create-all';
 
@@ -28,14 +33,123 @@ interface TaskDialogProps {
   task?: any | null; // Required for 'edit' mode
 }
 
+const TASK_DIALOG_WIDTH_STORAGE_KEY = 'whagons_task_dialog_width';
+const DEFAULT_WIDTH = 600; // Default width in pixels (matches original Sheet default)
+const MIN_WIDTH = 400; // Minimum width in pixels
+const MAX_WIDTH = 2000; // Maximum width in pixels
+
 export default function TaskDialog({ open, onOpenChange, mode, workspaceId: propWorkspaceId, task }: TaskDialogProps) {
   const dispatch = useDispatch<AppDispatch>();
 
+  // Resize state with localStorage persistence
+  const [width, setWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(TASK_DIALOG_WIDTH_STORAGE_KEY);
+      const savedWidth = saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+      // Ensure width doesn't exceed viewport
+      const maxAllowedWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.95);
+      return Math.max(MIN_WIDTH, Math.min(maxAllowedWidth, savedWidth));
+    }
+    return DEFAULT_WIDTH;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<HTMLDivElement>(null);
+  const sheetContentRef = useRef<HTMLDivElement>(null);
+
+  // Ensure width is applied directly to the DOM element
+  useEffect(() => {
+    if (open) {
+      // Use requestAnimationFrame to ensure element is mounted
+      requestAnimationFrame(() => {
+        if (sheetContentRef.current) {
+          const element = sheetContentRef.current;
+          element.style.width = `${width}px`;
+          element.style.maxWidth = `${width}px`;
+          element.style.minWidth = `${MIN_WIDTH}px`;
+          element.style.right = '0px';
+          element.style.top = '0px';
+          element.style.bottom = '0px';
+          element.style.zIndex = '50';
+          element.style.position = 'fixed';
+          element.style.opacity = '1';
+          element.style.visibility = 'visible';
+          element.style.display = 'flex';
+        } else {
+          console.warn('[TaskDialog] sheetContentRef.current is null');
+        }
+      });
+    }
+  }, [open, width]);
+
+  // Save width to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && width !== DEFAULT_WIDTH) {
+      localStorage.setItem(TASK_DIALOG_WIDTH_STORAGE_KEY, width.toString());
+    }
+  }, [width]);
+
+  // Ensure width is within viewport bounds when dialog opens
+  useEffect(() => {
+    if (open && typeof window !== 'undefined') {
+      const maxAllowedWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.95);
+      const minAllowedWidth = Math.max(MIN_WIDTH, window.innerWidth * 0.3);
+      if (width > maxAllowedWidth) {
+        setWidth(maxAllowedWidth);
+      } else if (width < minAllowedWidth) {
+        setWidth(minAllowedWidth);
+      }
+    }
+  }, [open, width]);
+
+  // Handle resize mouse down
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  // Handle resize mouse move
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      e.preventDefault();
+      const newWidth = window.innerWidth - e.clientX;
+      const maxAllowedWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.95);
+      const clampedWidth = Math.max(MIN_WIDTH, Math.min(maxAllowedWidth, newWidth));
+      setWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
   const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
   const { value: priorities = [] } = useSelector((s: RootState) => (s as any).priorities || { value: [] });
+  const { value: categoryPriorityAssignments = [] } = useSelector((s: RootState) => (s as any).categoryPriorities || { value: [] });
   const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
   const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
   const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
+  const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
   const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
   const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
   const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
@@ -46,8 +160,18 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const { value: customFields = [] } = useSelector((s: RootState) => (s as any).customFields || { value: [] });
   const { value: categoryCustomFields = [] } = useSelector((s: RootState) => (s as any).categoryCustomFields || { value: [] });
   const { value: taskCustomFieldValues = [] } = useSelector((s: RootState) => (s as any).taskCustomFieldValues || { value: [] });
+  const { value: userTeams = [] } = useSelector((s: RootState) => (s as any).userTeams || { value: [] });
   
   const { user } = useAuth();
+
+  // Get user's team IDs
+  const userTeamIds = useMemo(() => {
+    if (!user?.id) return [];
+    return (userTeams as any[])
+      .filter((ut: any) => Number(ut.user_id) === Number(user.id))
+      .map((ut: any) => Number(ut.team_id))
+      .filter((id: number) => Number.isFinite(id));
+  }, [user, userTeams]);
 
   // Form state
   const [name, setName] = useState('');
@@ -115,6 +239,16 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   const [showDescription, setShowDescription] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
+
+  // Sharing (phase 1)
+  const [shareTeamId, setShareTeamId] = useState<number | null>(null);
+  const [shareUserId, setShareUserId] = useState<number | null>(null);
+  const [sharePermission, setSharePermission] = useState<'COMMENT_ATTACH' | 'STATUS_TRACKING'>('STATUS_TRACKING');
+  const [shareTargetType, setShareTargetType] = useState<'user' | 'team'>('team');
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareSuccess, setShareSuccess] = useState<string | null>(null);
+  const [sharesRefreshKey, setSharesRefreshKey] = useState(0);
 
   const customFieldValuesRef = useRef<Record<number, any>>({});
   const lastCustomFieldCategoryRef = useRef<number | null>(null);
@@ -341,6 +475,26 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     return categories.find((c: any) => c.id === categoryId);
   }, [categories, categoryId]);
 
+  // Check if user is reporting (not owner) for a category
+  const isReportingCategory = useMemo(() => {
+    if (!categoryId || !currentCategory) return false;
+    const categoryTeamId = Number(currentCategory.team_id);
+    return !userTeamIds.includes(categoryTeamId);
+  }, [categoryId, currentCategory, userTeamIds]);
+
+  // Check if user has reporting permission for a category
+  const hasReportingPermission = useMemo(() => {
+    if (!categoryId || !currentCategory) return false;
+    const categoryTeamId = Number(currentCategory.team_id);
+    
+    // If user is owner, they have permission
+    if (userTeamIds.includes(categoryTeamId)) return true;
+    
+    // Check if user's team is in reporting_team_ids
+    const reportingTeamIds = currentCategory.reporting_team_ids || [];
+    return reportingTeamIds.some((tid: number) => userTeamIds.includes(Number(tid)));
+  }, [categoryId, currentCategory, userTeamIds]);
+
   const categoryFields = useMemo(() => {
     if (!categoryId) return [] as Array<{ assignment: any; field: any }>;
     const fieldById = new Map<number, any>();
@@ -356,8 +510,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         const field = fieldById.get(fieldId);
         return { assignment, field };
       })
-      .filter((row) => !!row.field);
+      .filter((row: { assignment: any; field: any }) => !!row.field);
   }, [categoryId, categoryCustomFields, customFields]);
+
+  useEffect(() => {
+    if (activeTab === 'customFields' && categoryFields.length === 0) {
+      setActiveTab('basic');
+    }
+  }, [activeTab, categoryFields.length]);
 
   const categoryInitialStatusId = useMemo(() => {
     if (mode === 'edit') return null; // Edit mode uses existing status
@@ -384,28 +544,60 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     return () => { cancelled = true; };
   }, [categories, categoryId]);
 
+  const categoryPriorityIdsForCategory = useMemo(() => {
+    const ids = new Set<number>();
+    if (!categoryId) return ids;
+    const catIdNum = Number(categoryId);
+    for (const row of categoryPriorityAssignments || []) {
+      const rowCatId = Number((row as any)?.category_id ?? (row as any)?.categoryId);
+      const rowPriorityId = Number((row as any)?.priority_id ?? (row as any)?.priorityId);
+      if (Number.isFinite(rowCatId) && Number.isFinite(rowPriorityId) && rowCatId === catIdNum) {
+        ids.add(rowPriorityId);
+      }
+    }
+    return ids;
+  }, [categoryPriorityAssignments, categoryId]);
+
   const categoryPriorities = useMemo(() => {
-    if (!categoryId) {
+    const catIdNum = categoryId != null ? Number(categoryId) : null;
+    const matchesCategory = (p: any) => {
+      const catVal = (p as any)?.category_id ?? (p as any)?.categoryId;
+      const catValNum = catVal == null ? null : Number(catVal);
+      return catIdNum != null && catValNum === catIdNum;
+    };
+    const matchesViaAssignment = (p: any) => {
+      const pid = Number((p as any)?.id ?? (p as any)?.priority_id ?? (p as any)?.priorityId);
+      return Number.isFinite(pid) && categoryPriorityIdsForCategory.has(pid);
+    };
+    const globalPriorities = () =>
+      priorities.filter((p: any) => {
+        const catVal = (p as any)?.category_id ?? (p as any)?.categoryId;
+        return catVal === null || catVal === undefined;
+      });
+
+    if (catIdNum == null) {
       if (mode === 'create' || mode === 'create-all') {
-        return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
+        return globalPriorities();
       }
       return [];
     }
-    
-    const categorySpecific = priorities.filter((p: any) => p.category_id === categoryId);
-    if (categorySpecific.length > 0) {
-      return categorySpecific;
+
+    const matched = priorities.filter((p: any) => matchesCategory(p) || matchesViaAssignment(p));
+    if (matched.length > 0) {
+      return matched;
     }
-    
-    return priorities.filter((p: any) => p.category_id === null || p.category_id === undefined);
-  }, [priorities, categoryId, mode]);
+
+    return globalPriorities();
+  }, [priorities, categoryId, mode, categoryPriorityIdsForCategory]);
 
   // For create-all mode: show all templates from all DEFAULT workspaces
   // For other modes: show templates filtered by current workspace
   const workspaceTemplates = useMemo(() => {
+    let filtered = templates;
+    
     if (mode === 'create-all') {
       // Show all enabled templates from DEFAULT workspaces
-      return templates.filter((template: any) => {
+      filtered = templates.filter((template: any) => {
         if (template?.enabled === false) return false;
         // Find the category for this template
         const cat = categories.find((c: any) => c.id === template.category_id);
@@ -415,17 +607,31 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         // Only show templates from DEFAULT workspaces
         return ws?.type === "DEFAULT";
       });
+    } else {
+      // For create and edit modes: filter by current workspace
+      if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
+        return [];
+      }
+      filtered = templates.filter((template: any) => {
+        if (template?.enabled === false) return false;
+        return template.category_id === currentWorkspace.category_id;
+      });
     }
-    
-    // For create and edit modes: filter by current workspace
-    if (!currentWorkspace || currentWorkspace.type !== "DEFAULT") {
-      return [];
-    }
-    return templates.filter((template: any) => {
-      if (template?.enabled === false) return false;
-      return template.category_id === currentWorkspace.category_id;
+
+    // Filter private templates based on user permissions
+    return filtered.filter((template: any) => {
+      // If template is not private, show it
+      if (!template.is_private) return true;
+      
+      // If template is private, check if user's team owns the category
+      const cat = categories.find((c: any) => c.id === template.category_id);
+      if (!cat) return false;
+      
+      const categoryTeamId = Number(cat.team_id);
+      // User can see private template if their team owns the category
+      return userTeamIds.includes(categoryTeamId);
     });
-  }, [templates, currentWorkspace, mode, categories, workspaces]);
+  }, [templates, currentWorkspace, mode, categories, workspaces, userTeamIds]);
 
   const selectedTemplate = useMemo(() => {
     if (!templateId) return null;
@@ -512,11 +718,13 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
   useEffect(() => {
     if (!open) return;
     dispatch(genericActions.tags.getFromIndexedDB());
+    dispatch(genericActions.tags.fetchFromAPI());
     dispatch(genericActions.customFields.getFromIndexedDB());
     dispatch(genericActions.categoryCustomFields.getFromIndexedDB());
     dispatch(genericActions.taskCustomFieldValues.getFromIndexedDB());
     if (mode === 'edit') {
       dispatch(genericActions.taskTags.getFromIndexedDB());
+      dispatch(genericActions.taskTags.fetchFromAPI());
     }
   }, [open, mode, dispatch]);
 
@@ -754,7 +962,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
 
   const customFieldRequirementMissing = useMemo(() => {
     if (!categoryFields.length) return false;
-    return categoryFields.some(({ assignment, field }) => {
+    return categoryFields.some(({ assignment, field }: { assignment: any; field: any }) => {
       if (!(assignment as any)?.is_required) return false;
       const fid = Number((field as any)?.id);
       const currentValue = customFieldValues[fid];
@@ -981,6 +1189,74 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     );
   };
 
+  const handleShareToTeam = async () => {
+    const taskId = Number(task?.id);
+    if (!Number.isFinite(taskId) || !shareTeamId) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareSuccess(null);
+    try {
+      await api.post(`/tasks/${taskId}/share`, {
+        shared_to_team_id: shareTeamId,
+        permission: sharePermission,
+      });
+      setShareSuccess('Shared successfully');
+      setShareTeamId(null);
+      setSharesRefreshKey(prev => prev + 1);
+      // Clear success message after 3 seconds
+      setTimeout(() => setShareSuccess(null), 3000);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.errors?.share?.[0] ||
+        e?.message ||
+        'Failed to share';
+      setShareError(String(msg));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const handleShareToUser = async () => {
+    const taskId = Number(task?.id);
+    if (!Number.isFinite(taskId) || !shareUserId) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareSuccess(null);
+    try {
+      await api.post(`/tasks/${taskId}/share`, {
+        shared_to_user_id: shareUserId,
+        permission: sharePermission,
+      });
+      setShareSuccess('Shared successfully');
+      setShareUserId(null);
+      setSharesRefreshKey(prev => prev + 1);
+      // Clear success message after 3 seconds
+      setTimeout(() => setShareSuccess(null), 3000);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.errors?.share?.[0] ||
+        e?.message ||
+        'Failed to share';
+      setShareError(String(msg));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (shareTargetType === 'user') {
+      await handleShareToUser();
+    } else {
+      await handleShareToTeam();
+    }
+  };
+
+  const handleShareChange = () => {
+    setSharesRefreshKey(prev => prev + 1);
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit || !categoryId || !derivedTeamId || !user?.id) return;
     if (mode === 'edit' && (!statusId || !task?.id)) return;
@@ -1088,21 +1364,35 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
       }
       
       onOpenChange(false);
-    } catch (e) {
-      // Error is handled by slice; keep dialog open for correction
+    } catch (e: any) {
+      // Handle errors with appropriate toast messages
+      const errorMessage = e?.message || e?.toString() || 'Failed to create task';
+      const status = e?.response?.status || e?.status;
+      
+      // Check if it's a permission error (403)
+      if (status === 403 || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
+        toast.error('You do not have permission to create tasks in this category.', { duration: 5000 });
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
+      // Keep dialog open for correction
     } finally {
       setIsSubmitting(false);
     }
   };
 
 
+
   // Early return for edit mode if no task
-  if (mode === 'edit' && !task) return null;
+  if (mode === 'edit' && !task) {
+    return null;
+  }
 
   // Main form (create, edit, or create-all after category selection)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
+        ref={sheetContentRef}
         side="right" 
         onInteractOutside={(e) => {
           if (isSubmitting) {
@@ -1116,8 +1406,37 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             e.preventDefault();
           }
         }}
-        className={`w-full ${mode === 'create-all' ? 'sm:w-[900px] max-w-[900px]' : 'sm:w-[1240px] max-w-[1240px]'} p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full`}
+        style={{ 
+          width: `${width}px`,
+          maxWidth: `${width}px`,
+          minWidth: `${MIN_WIDTH}px`,
+          right: 0,
+          top: 0,
+          bottom: 0,
+        }}
+        className={`p-0 m-0 top-0 gap-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 flex flex-col h-full relative bg-background`}
+        data-sheet-open={open}
+        data-testid="task-dialog-content"
+        data-custom-width={width}
       >
+        {/* Resize Handle */}
+        <div
+          ref={resizeRef}
+          onMouseDown={handleResizeStart}
+          className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-[#00BFA5]/20 transition-colors duration-150 z-50 group ${
+            isResizing ? 'bg-[#00BFA5]/40' : ''
+          }`}
+          style={{ 
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none'
+          }}
+          role="separator"
+          aria-label="Resize dialog"
+          aria-orientation="vertical"
+        >
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-20 bg-[#00BFA5] rounded-full opacity-0 group-hover:opacity-60 transition-opacity duration-150" />
+        </div>
         {/* Header Section - Fixed */}
         <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
           <div className={`flex items-center gap-3 flex-1 min-w-0 ${mode === 'edit' ? 'mb-2' : ''}`}>
@@ -1137,17 +1456,12 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               </span>
             )}
           </div>
-          {mode === 'edit' && (
-            <SheetDescription className="text-sm text-[#6B7280] mt-1">
-              Update task details and configuration.
-            </SheetDescription>
-          )}
         </SheetHeader>
 
         {/* Content Area - Scrollable */}
         <div className="flex flex-col flex-1 min-h-0 overflow-auto">
           {/* Tabs Navigation */}
-          <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+          <div className="px-4 sm:px-6 pt-2 sm:pt-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="inline-flex h-auto p-0 pr-6 bg-transparent border-b border-border/40 rounded-none gap-0 w-full overflow-x-auto">
                 <TabsTrigger 
@@ -1156,21 +1470,31 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                 >
                   Basic Details
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="customFields" 
-                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
-                >
-                  Campos personalizados
-                  {customFieldRequirementMissing && (
-                    <span className="ml-2 text-[11px] text-red-500 font-semibold align-middle">●</span>
-                  )}
-                </TabsTrigger>
+                {categoryFields.length > 0 && (
+                  <TabsTrigger 
+                    value="customFields" 
+                    className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  >
+                    Fields
+                    {customFieldRequirementMissing && (
+                      <span className="ml-2 text-[11px] text-red-500 font-semibold align-middle">●</span>
+                    )}
+                  </TabsTrigger>
+                )}
                 <TabsTrigger 
                   value="additional" 
-                  className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
                 >
                   Additional Info
                 </TabsTrigger>
+                {mode === 'edit' && (
+                  <TabsTrigger 
+                    value="share" 
+                    className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  >
+                    Share
+                  </TabsTrigger>
+                )}
               </TabsList>
               
               {/* Basic Details Tab */}
@@ -1197,10 +1521,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     ) : (
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
-                          options={workspaceTemplates.map((t: any) => ({
-                            value: String(t.id),
-                            label: t.name,
-                          }))}
+                          options={workspaceTemplates.map((t: any) => {
+                            const category = categories.find((c: any) => c.id === t.category_id);
+                            return {
+                              value: String(t.id),
+                              label: t.name,
+                              description: category ? category.name : undefined,
+                            };
+                          })}
                           value={templateId ? String(templateId) : undefined}
                           onValueChange={(v) => {
                             // Always set the template, don't allow deselection by clicking the same item
@@ -1248,10 +1576,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     ) : (
                       <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
                         <Combobox
-                          options={workspaceTemplates.map((t: any) => ({
-                            value: String(t.id),
-                            label: t.name,
-                          }))}
+                          options={workspaceTemplates.map((t: any) => {
+                            const category = categories.find((c: any) => c.id === t.category_id);
+                            return {
+                              value: String(t.id),
+                              label: t.name,
+                              description: category ? category.name : undefined,
+                            };
+                          })}
                           value={templateId ? String(templateId) : undefined}
                           onValueChange={(v) => {
                             // Always set the template, don't allow deselection by clicking the same item
@@ -1311,15 +1643,35 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </div>
                 )}
 
+                {/* Workspace Destination Info - Show when reporting */}
+                {isReportingCategory && currentCategory && currentWorkspace && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50 text-sm text-blue-900">
+                    <div className="mt-0.5">
+                      <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs uppercase tracking-wide font-semibold text-blue-700">Destination Workspace</span>
+                      </div>
+                      <div className="font-semibold truncate">
+                        {currentWorkspace.name}
+                      </div>
+                      <div className="text-xs text-blue-800 truncate">
+                        Tasks created for this category will be assigned to the category's default workspace.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Description - Collapsible */}
-                {!showDescription && !description.trim() ? (
+                {!showDescription ? (
                   <button
                     type="button"
                     onClick={() => setShowDescription(true)}
                     className="flex items-center gap-2 text-sm text-[#6B7280] hover:text-foreground transition-colors duration-150 py-2"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Add description</span>
+                    <span>{description.trim() ? 'Show description' : 'Add description'}</span>
                   </button>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -1442,30 +1794,10 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </Select>
                 </div>
 
-                {/* Tags - Only for create and edit modes */}
-                {(mode === 'create' || mode === 'edit') && (
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium font-[500] text-foreground">
-                      Tags
-                    </Label>
-                    <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
-                      <TagMultiSelect
-                        tags={tags}
-                        value={selectedTagIds}
-                        onValueChange={(values) => {
-                          setSelectedTagIds(values);
-                        }}
-                        placeholder="Select tags..."
-                        searchPlaceholder="Search tags..."
-                        emptyText="No tags found."
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                )}
               </TabsContent>
 
               {/* Custom Fields Tab */}
+              {categoryFields.length > 0 && (
               <TabsContent value="customFields" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
                 {!categoryId ? (
                   <p className="text-sm text-[#6B7280]">Selecciona una categoría para ver los campos personalizados.</p>
@@ -1473,7 +1805,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   <p className="text-sm text-[#6B7280]">Esta categoría no tiene campos personalizados asignados.</p>
                 ) : (
                   <div className="space-y-4">
-                    {categoryFields.map(({ assignment, field }) => {
+                    {categoryFields.map(({ assignment, field }: { assignment: any; field: any }) => {
                       const fieldId = Number((field as any)?.id);
                       const required = (assignment as any)?.is_required;
                       const currentValue = customFieldValues[fieldId];
@@ -1499,23 +1831,32 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </div>
                 )}
               </TabsContent>
+              )}
+
 
               {/* Additional Info Tab */}
               <TabsContent value="additional" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
-                {/* Due Date */}
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="due" className="text-sm font-medium font-[500] text-foreground">
-                    Due Date
-                  </Label>
-                  <Input 
-                    id="due" 
-                    type="date" 
-                    value={dueDate} 
-                    onChange={(e) => setDueDate(e.target.value)} 
-                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
-                  />
-                </div>
-
+                {/* Tags - Only for create and edit modes */}
+                {(mode === 'create' || mode === 'edit') && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium font-[500] text-foreground">
+                      Tags
+                    </Label>
+                    <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <TagMultiSelect
+                        tags={tags}
+                        value={selectedTagIds}
+                        onValueChange={(values) => {
+                          setSelectedTagIds(values);
+                        }}
+                        placeholder="Select tags..."
+                        searchPlaceholder="Search tags..."
+                        emptyText="No tags found."
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                )}
                 {/* SLA */}
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium font-[500] text-foreground">
@@ -1559,7 +1900,178 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Due Date */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="due" className="text-sm font-medium font-[500] text-foreground">
+                    Due Date
+                  </Label>
+                  <Input 
+                    id="due" 
+                    type="date" 
+                    value={dueDate} 
+                    onChange={(e) => setDueDate(e.target.value)} 
+                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
+                  />
+                </div>
+
               </TabsContent>
+
+              {/* Share Tab - Only visible in edit mode */}
+              {mode === 'edit' && (
+                <TabsContent value="share" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
+                  <div className="space-y-6">
+                    {/* Existing Shares */}
+                    {task?.id && (
+                      <div className="flex flex-col gap-3">
+                        <div className="text-sm font-medium font-[500] text-foreground">
+                          Existing Shares
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Manage who has access to this task. You can revoke access at any time.
+                        </p>
+                        <TaskShareManager 
+                          key={sharesRefreshKey}
+                          taskId={task.id} 
+                          onShareChange={handleShareChange}
+                        />
+                      </div>
+                    )}
+
+                    {/* Share New */}
+                    <div className="flex flex-col gap-4 pt-4 border-t border-border/40">
+                      <div className="text-sm font-medium font-[500] text-foreground">
+                        Share New
+                      </div>
+                      
+                      {/* Target Type Selector */}
+                      <div className="flex flex-col gap-2">
+                        <Label className="text-sm text-muted-foreground">Share with</Label>
+                        <ToggleGroup
+                          type="single"
+                          value={shareTargetType}
+                          onValueChange={(value) => {
+                            if (value) {
+                              setShareTargetType(value as 'user' | 'team');
+                              setShareUserId(null);
+                              setShareTeamId(null);
+                            }
+                          }}
+                          className="justify-start"
+                        >
+                          <ToggleGroupItem value="user" aria-label="Share with user">
+                            User
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="team" aria-label="Share with team">
+                            Team
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
+
+                      {/* User Picker */}
+                      {shareTargetType === 'user' && (
+                        <div className="flex flex-col gap-2">
+                          <Label className="text-sm text-muted-foreground">Select User</Label>
+                          <Combobox
+                            options={users
+                              .filter((u: any) => u?.id !== user?.id && u?.is_active !== false)
+                              .map((u: any) => ({
+                                value: String(u.id),
+                                label: `${u.name || u.email || `User ${u.id}`}${u.email ? ` (${u.email})` : ''}`,
+                              }))}
+                            value={shareUserId ? String(shareUserId) : undefined}
+                            onValueChange={(v) => setShareUserId(v ? parseInt(v, 10) : null)}
+                            placeholder="Select a user"
+                            searchPlaceholder="Search users..."
+                            emptyText="No users available"
+                          />
+                        </div>
+                      )}
+
+                      {/* Team Picker */}
+                      {shareTargetType === 'team' && (
+                        <div className="flex flex-col gap-2">
+                          <Label className="text-sm text-muted-foreground">Select Team</Label>
+                          <Select
+                            value={shareTeamId ? String(shareTeamId) : ''}
+                            onValueChange={(v) => setShareTeamId(v ? parseInt(v, 10) : null)}
+                          >
+                            <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
+                              <SelectValue placeholder="Select a team" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(teams) && teams.length > 0 ? (
+                                teams
+                                  .filter((t: any) => t?.is_active !== false)
+                                  .map((t: any) => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                      {t.name || `Team ${t.id}`}
+                                    </SelectItem>
+                                  ))
+                              ) : (
+                                <div className="px-2 py-1.5 text-sm text-[#6B7280]">No teams available</div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* Permission Selector */}
+                      <div className="flex flex-col gap-2">
+                        <Label className="text-sm text-muted-foreground">Permission Level</Label>
+                        <Select
+                          value={sharePermission}
+                          onValueChange={(v) => setSharePermission(v as 'COMMENT_ATTACH' | 'STATUS_TRACKING')}
+                        >
+                          <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="STATUS_TRACKING">
+                              Full Access (View, Comment, Update Status)
+                            </SelectItem>
+                            <SelectItem value="COMMENT_ATTACH">
+                              View & Comment Only
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {sharePermission === 'STATUS_TRACKING' 
+                            ? 'Recipients can view, comment, attach files, and update task status.'
+                            : 'Recipients can view, comment, and attach files, but cannot update status.'}
+                        </p>
+                      </div>
+
+                      {/* Share Button */}
+                      <Button
+                        type="button"
+                        onClick={handleShare}
+                        disabled={
+                          (shareTargetType === 'user' && !shareUserId) ||
+                          (shareTargetType === 'team' && !shareTeamId) ||
+                          shareBusy ||
+                          !task?.id
+                        }
+                        className="h-10 px-4 rounded-[10px] font-medium bg-[#00BFA5] hover:bg-[#00BFA5]/90 text-white transition-all duration-150 disabled:opacity-50"
+                      >
+                        {shareBusy ? 'Sharing…' : 'Share'}
+                      </Button>
+
+                      {/* Feedback Messages */}
+                      {shareError ? (
+                        <div className="text-sm text-destructive p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                          {shareError}
+                        </div>
+                      ) : null}
+                      {shareSuccess ? (
+                        <div className="text-sm text-foreground text-[#00BFA5] p-2 rounded-md bg-[#00BFA5]/10 border border-[#00BFA5]/20">
+                          {shareSuccess}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>

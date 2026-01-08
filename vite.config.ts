@@ -134,8 +134,6 @@ export default defineConfig(({ mode }) => {
 
             if (id.includes('/node_modules/axios')) return 'http';
 
-            if (id.includes('/node_modules/sockjs-client')) return 'sockjs';
-
             // Icons and crypto helpers
             if (id.includes('/node_modules/@fortawesome')) return 'icons';
             if (id.includes('/node_modules/crypto-js')) return 'crypto';

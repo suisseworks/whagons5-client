@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/popover"
 
 interface ComboboxProps {
-  options: Array<{ value: string; label: string }>
+  options: Array<{ value: string; label: string; description?: string }>
   value?: string
   onValueChange?: (value: string | undefined) => void
   placeholder?: string
@@ -78,7 +78,12 @@ export function Combobox({
                         isSelected ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {option.label}
+                    <div className="flex flex-col">
+                      <span>{option.label}</span>
+                      {option.description && (
+                        <span className="text-xs text-[#6B7280]">{option.description}</span>
+                      )}
+                    </div>
                   </CommandItem>
                 )
               })}

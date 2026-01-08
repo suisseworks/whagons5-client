@@ -44,6 +44,7 @@ import { Workspace } from '@/store/types';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import { genericCaches } from '@/store/genericSlices';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
@@ -89,6 +90,7 @@ const IconBadge = ({
 
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   const [isPinned, setIsPinned] = useState(isPinnedGlobal);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const unsubscribe = subscribeToPinnedState(setIsPinned);
@@ -108,7 +110,7 @@ const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
       size="icon"
       className={`size-7 ${className || ''}`}
       onClick={handleClick}
-      title={isPinned ? 'Unpin Sidebar' : 'Pin Sidebar'}
+      title={isPinned ? t('sidebar.unpinSidebar', 'Unpin Sidebar') : t('sidebar.pinSidebar', 'Pin Sidebar')}
     >
       <div className="relative w-4 h-4 flex items-center justify-center">
         {/* Circle */}
@@ -119,7 +121,7 @@ const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
         )}
       </div>
       <span className="sr-only">
-        {isPinned ? 'Unpin Sidebar' : 'Pin Sidebar'}
+        {isPinned ? t('sidebar.unpinSidebar', 'Unpin Sidebar') : t('sidebar.pinSidebar', 'Pin Sidebar')}
       </span>
     </Button>
   );
@@ -130,6 +132,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const location = useLocation();
   const pathname = location.pathname;
   const isCollapsed = state === 'collapsed';
+  const { t } = useLanguage();
 
   // Extract toggleSidebar to suppress unused warning
   // const { toggleSidebar } = useSidebar();
@@ -324,7 +327,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       onMouseLeave={handleMouseLeave}
     >
       <SidebarHeader
-        className={`!p-0 bg-sidebar-header backdrop-blur-xl transition-colors duration-200 border-b-2 border-[#D1D5DB] dark:border-[#2A2A2A] shadow-[0_4px_12px_0_rgba(0,0,0,0.12),0_2px_4px_0_rgba(0,0,0,0.08)] ${isCollapsed ? 'px-1' : ''
+        className={`!p-0 bg-sidebar-header backdrop-blur-xl transition-colors duration-200 ${isCollapsed ? 'px-1' : ''
         }`}
         style={{
           height: 'var(--app-header-height)',
@@ -377,7 +380,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           <CollapsibleTrigger asChild>
             <SidebarMenuButton
               asChild
-              tooltip={isCollapsed && !isMobile ? 'More' : undefined}
+              tooltip={isCollapsed && !isMobile ? t('sidebar.more', 'More') : undefined}
               className="rounded-[8px] transition-opacity opacity-70 hover:opacity-100 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
               style={{
                 height: '30px',
@@ -394,7 +397,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 <IconBadge color="var(--sidebar-border)" size={18}>
                   <MoreHorizontal size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                 </IconBadge>
-                {!isCollapsed && !isMobile && <span className="ml-1.5">More</span>}
+                {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.more', 'More')}</span>}
               </button>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -406,7 +409,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={isCollapsed && !isMobile ? 'TeamConnect' : undefined}
+                      tooltip={isCollapsed && !isMobile ? t('sidebar.teamConnect', 'TeamConnect') : undefined}
                       className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
                       style={{
                         height: '30px',
@@ -424,7 +427,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         <IconBadge color="var(--sidebar-border)" size={18}>
                           <Users2 size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">TeamConnect</span>}
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.teamConnect', 'TeamConnect')}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -432,7 +435,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={isCollapsed && !isMobile ? 'Compliance' : undefined}
+                      tooltip={isCollapsed && !isMobile ? t('sidebar.compliance', 'Compliance') : undefined}
                       className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
                       style={{
                         height: '30px',
@@ -450,7 +453,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         <IconBadge color="var(--sidebar-border)" size={18}>
                           <FileText size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">Compliance</span>}
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.compliance', 'Compliance')}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -458,7 +461,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={isCollapsed && !isMobile ? 'Analytics' : undefined}
+                      tooltip={isCollapsed && !isMobile ? t('sidebar.analytics', 'Analytics') : undefined}
                       className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
                       style={{
                         height: '30px',
@@ -476,7 +479,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         <IconBadge color="var(--sidebar-border)" size={18}>
                           <BarChart3 size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">Analytics</span>}
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.analytics', 'Analytics')}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -484,7 +487,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={isCollapsed && !isMobile ? 'Plugins' : undefined}
+                      tooltip={isCollapsed && !isMobile ? t('sidebar.plugins', 'Plugins') : undefined}
                       className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
                       style={{
                         height: '30px',
@@ -502,15 +505,17 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         <IconBadge color="var(--sidebar-border)" size={18}>
                           <Plug size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">Plugins</span>}
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.plugins', 'Plugins')}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
+                  <SidebarSeparator className="my-1 border-[var(--sidebar-border)]" />
+
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={isCollapsed && !isMobile ? 'Settings' : undefined}
+                      tooltip={isCollapsed && !isMobile ? t('sidebar.settings', 'Settings') : undefined}
                       className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
                       style={{
                         height: '30px',
@@ -528,7 +533,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         <IconBadge color="var(--sidebar-border)" size={18}>
                           <Settings size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">Settings</span>}
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.settings', 'Settings')}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -536,7 +541,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      tooltip={isCollapsed && !isMobile ? 'Global Settings' : undefined}
+                      tooltip={isCollapsed && !isMobile ? t('sidebar.globalSettings', 'Global Settings') : undefined}
                       className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
                       style={{
                         height: '30px',
@@ -554,7 +559,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         <IconBadge color="var(--sidebar-border)" size={18}>
                           <Globe size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">Global Settings</span>}
+                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.globalSettings', 'Global Settings')}</span>}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -571,7 +576,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               <button
                 type="button"
                 onClick={open}
-                title="Copilot"
+                title={t('sidebar.copilot', 'Copilot')}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[var(--sidebar-border)]/80 text-[var(--sidebar-text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] transition-colors"
               >
                 <Sparkles className="h-4 w-4" />

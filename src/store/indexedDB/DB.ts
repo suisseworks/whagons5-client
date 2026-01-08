@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.11';
+const CURRENT_DB_VERSION = '1.9.15';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -125,6 +125,10 @@ export class DB {
           if (!db.objectStoreNames.contains('tasks')) {
             db.createObjectStore('tasks', { keyPath: 'id' });
           }
+          // Virtual workspace: tasks shared with the current user/teams
+          if (!db.objectStoreNames.contains('shared_tasks')) {
+            db.createObjectStore('shared_tasks', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('teams')) {
             db.createObjectStore('teams', { keyPath: 'id' });
           }
@@ -176,6 +180,9 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('status_transition_groups')) {
             db.createObjectStore('status_transition_groups', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('status_transition_logs')) {
+            db.createObjectStore('status_transition_logs', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('task_tags')) {
             db.createObjectStore('task_tags', { keyPath: 'id' });
@@ -269,8 +276,14 @@ export class DB {
           if (!db.objectStoreNames.contains('task_attachments')) {
             db.createObjectStore('task_attachments', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('task_notes')) {
+            db.createObjectStore('task_notes', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('task_recurrences')) {
             db.createObjectStore('task_recurrences', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('workspace_chat')) {
+            db.createObjectStore('workspace_chat', { keyPath: 'id' });
           }
 
           // Error Tracking
@@ -280,6 +293,10 @@ export class DB {
           // Avatar image cache (base64 or blob references)
           if (!db.objectStoreNames.contains('avatars')) {
             db.createObjectStore('avatars', { keyPath: 'id' });
+          }
+          // Tenant availability cache (keyed by tenant name)
+          if (!db.objectStoreNames.contains('tenant_availability')) {
+            db.createObjectStore('tenant_availability', { keyPath: 'tenantName' });
           }
           // Keys store for per-store Content Encryption Keys (CEKs)
           if (!db.objectStoreNames.contains('cache_keys')) {
@@ -490,7 +507,9 @@ export class DB {
       | 'session_logs'
       | 'config_logs'
       | 'task_attachments'
+      | 'task_notes'
       | 'task_recurrences'
+      | 'workspace_chat'
       | 'exceptions'
       | 'avatars',
     mode: IDBTransactionMode = 'readonly'
@@ -547,7 +566,9 @@ export class DB {
       | 'session_logs'
       | 'config_logs'
       | 'task_attachments'
+      | 'task_notes'
       | 'task_recurrences'
+      | 'workspace_chat'
       | 'exceptions'
       | 'avatars',
     mode: IDBTransactionMode = 'readwrite'

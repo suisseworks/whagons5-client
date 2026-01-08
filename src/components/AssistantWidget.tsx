@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Sparkles } from 'lucide-react';
 
@@ -115,6 +115,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  React.useEffect(() => {
+    if (!open) return;
+    const id = window.setTimeout(() => textareaRef.current?.focus(), 50);
+    return () => window.clearTimeout(id);
+  }, [open]);
+
   // Context-aware suggestions (basic): use path to offer quick prompts
   React.useEffect(() => {
     try {
@@ -160,16 +166,14 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       ) : (
         floating && <FloatingButton onClick={() => setOpen(true)} />
       )}
-      <Dialog modal open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-xl p-0">
-          <div className="p-6 pb-3">
-            <DialogHeader>
-              <DialogTitle>Copilot</DialogTitle>
-              <DialogDescription>
-                Ask about features, find settings, or get help with tasks.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="right" style={{ width: "440px" }} className="max-w-full sm:max-w-md p-0 gap-0">
+          <SheetHeader className="p-6 pb-3">
+            <SheetTitle>Copilot</SheetTitle>
+            <SheetDescription>
+              Ask about features, find settings, or get help with tasks.
+            </SheetDescription>
+          </SheetHeader>
 
           {suggestions.length > 0 && (
             <div className="px-6 pb-2 flex flex-wrap gap-2">
@@ -186,34 +190,36 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
             </div>
           )}
 
-          <div className="px-6 max-h-[50vh] overflow-auto space-y-3">
-            {messages.length === 0 ? (
-              <div className="text-sm text-muted-foreground">Type a question to get started.</div>
-            ) : (
-              messages.map((m, idx) => (
-                <div key={idx} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-                  <div className={`inline-block rounded-md px-3 py-2 text-sm ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'}`}>
-                    {m.content}
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="px-6 flex-1 min-h-0 overflow-auto space-y-3 py-3">
+              {messages.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Type a question to get started.</div>
+              ) : (
+                messages.map((m, idx) => (
+                  <div key={idx} className={m.role === 'user' ? 'text-right' : 'text-left'}>
+                    <div className={`inline-block rounded-md px-3 py-2 text-sm ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'}`}>
+                      {m.content}
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
 
-          <form onSubmit={handleSubmit} className="p-6 pt-3 flex gap-2 items-end">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me anything..."
-              ref={textareaRef}
-              className="flex-1 min-h-[44px] max-h-[120px] resize-y rounded-md border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <Button type="submit" disabled={submitting || input.trim().length === 0}>
-              Send
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+            <form onSubmit={handleSubmit} className="p-6 pt-4 border-t flex gap-2 items-end">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask me anything..."
+                ref={textareaRef}
+                className="flex-1 min-h-[44px] max-h-[120px] resize-y rounded-md border bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <Button type="submit" disabled={submitting || input.trim().length === 0}>
+                Send
+              </Button>
+            </form>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 };

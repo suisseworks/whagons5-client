@@ -1,7 +1,7 @@
 // Datasource and refresh helpers for WorkspaceTable
 
 export function buildGetRows(TasksCache: any, refs: any) {
-  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery } = refs;
+  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible } = refs;
   return async (params: any) => {
    // Default sortModel to created_at desc if not provided
     const sortModel = params.sortModel && params.sortModel.length > 0 
@@ -11,6 +11,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
     const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(sortModel)}-${searchRef.current}`;
     if (rowCache.current.has(cacheKey)) {
       const cachedData = rowCache.current.get(cacheKey)!;
+      try { setEmptyOverlayVisible?.(cachedData.rowCount === 0); } catch {}
       params.successCallback(cachedData.rows, cachedData.rowCount);
       return;
     }
@@ -61,7 +62,9 @@ export function buildGetRows(TasksCache: any, refs: any) {
         search: searchRef.current,
         sortModel: sortModel, // Always include sortModel, defaulting to created_at desc
       };
-      if (workspaceRef.current !== 'all') {
+      if (workspaceRef.current === 'shared') {
+        queryParams.shared_with_me = true;
+      } else if (workspaceRef.current !== 'all') {
         queryParams.workspace_id = workspaceRef.current;
       }
       queryParams.__statusMap = statusMapRef.current;
@@ -76,9 +79,11 @@ export function buildGetRows(TasksCache: any, refs: any) {
       const total = result?.rowCount || 0;
       try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
+      try { setEmptyOverlayVisible?.(total === 0); } catch {}
       params.successCallback(rows, total);
     } catch (error) {
       console.error('Error querying local tasks cache:', error);
+      try { setEmptyOverlayVisible?.(false); } catch {}
       params.failCallback();
     }
   };
@@ -87,7 +92,8 @@ export function buildGetRows(TasksCache: any, refs: any) {
 export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
   const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef } = params;
   const baseParams: any = { search };
-  if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
+  if (workspaceRef.current === 'shared') baseParams.shared_with_me = true;
+  else if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
   baseParams.__statusMap = statusMapRef.current;
   baseParams.__priorityMap = priorityMapRef.current;
   baseParams.__spotMap = spotMapRef.current;

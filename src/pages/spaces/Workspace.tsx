@@ -148,6 +148,7 @@ export const Workspace = () => {
     return () => window.removeEventListener('wh:displayOptionsChanged', handler as any);
   }, [id]);
 
+
   useEffect(() => {
     try {
       localStorage.setItem('wh_workspace_right_panel_w', String(rightPanelWidth));
@@ -203,6 +204,8 @@ export const Workspace = () => {
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
+  const users = useSelector((s: RootState) => (s as any).users.value as any[]);
+  const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
   // Grouping
   const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>(() => {
     try {
@@ -618,16 +621,10 @@ export const Workspace = () => {
       value: 'statistics',
       label: (
         <div className="flex items-center gap-2" aria-label="Statistics">
-          <div
-            className="flex items-center justify-center rounded-[4px] flex-shrink-0"
-            style={{
-              backgroundColor: '#3B82F6',
-              width: '20px',
-              height: '20px',
-            }}
-          >
-            <BarChart3 size={16} className="w-4 h-4" style={{ color: '#ffffff', strokeWidth: 2 }} />
+          <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/40 text-muted-foreground">
+            <BarChart3 className="w-4 h-4" strokeWidth={2.2} />
           </div>
+          <span className="tab-label-text">Stats</span>
         </div>
       ),
       content: (
@@ -640,7 +637,10 @@ export const Workspace = () => {
       value: 'settings',
       label: (
         <div className="flex items-center gap-2" aria-label="Settings">
-          <Settings />
+          <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/30 text-muted-foreground">
+            <Settings className="w-4 h-4" strokeWidth={2.2} />
+          </div>
+          <span className="tab-label-text">Config</span>
         </div>
       ),
       content: (
@@ -899,6 +899,20 @@ export const Workspace = () => {
         statuses={(statuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
         priorities={(priorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
         spots={(spots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
+        owners={(users || [])
+          .map((u: any) => {
+            const idNum = Number(u.id);
+            if (!Number.isFinite(idNum)) return null;
+            return { id: idNum, name: u.name || u.email || `User #${idNum}` };
+          })
+          .filter((o): o is { id: number; name: string } => Boolean(o))}
+        tags={(tags || [])
+          .map((t: any) => {
+            const idNum = Number(t.id);
+            if (!Number.isFinite(idNum)) return null;
+            return { id: idNum, name: t.name, color: t.color };
+          })
+          .filter((t): t is { id: number; name: string; color?: string | null } => Boolean(t))}
         currentModel={tableRef.current?.getFilterModel?.()}
         currentSearchText={searchText}
         onApply={(model) => {

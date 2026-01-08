@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { Task } from "../types";
 import { TasksCache } from "../indexedDB/TasksCache";
+import { TaskEvents } from "../eventEmiters/taskEvents";
 import api from "@/api/whagonsApi";
 
 // Helper function to ensure task has all required properties
@@ -37,7 +38,12 @@ export const addTaskAsync = createAsyncThunk(
             return newTask;
         } catch (error: any) {
             console.error('Failed to add task:', error);
-            return rejectWithValue(error.response?.data?.message || 'Failed to add task');
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to add task';
+            // Preserve status code for permission checking
+            const errorWithStatus = new Error(errorMessage) as any;
+            errorWithStatus.response = error.response;
+            errorWithStatus.status = error.response?.status;
+            return rejectWithValue(errorWithStatus);
         }
     }
 );
@@ -50,10 +56,15 @@ export const updateTaskAsync = createAsyncThunk(
             // Call API to update task using PATCH (only send updated fields)
             const response = await api.patch(`/tasks/${id}`, updates);
             const payload = (response.data?.data ?? response.data?.row ?? response.data?.rows?.[0] ?? response.data) as any;
+            // Merge with cached task and submitted updates to avoid dropping fields the API might omit (e.g., user_ids)
+            const cachedTask = await TasksCache.getTask(id.toString());
             const updatedTask = ensureTaskDefaults({
+                ...cachedTask,
                 ...payload,
+                // Ensure the fields we sent (like user_ids) are preserved even if API omits them
+                ...updates,
                 id: payload?.id ?? id,
-                created_at: payload?.created_at ?? response.data?.created_at ?? undefined,
+                created_at: payload?.created_at ?? response.data?.created_at ?? cachedTask?.created_at ?? undefined,
                 updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
             });
             
@@ -82,7 +93,40 @@ export const removeTaskAsync = createAsyncThunk(
             return taskId;
         } catch (error: any) {
             console.error('Failed to remove task:', error);
-            return rejectWithValue(error.response?.data?.message || 'Failed to remove task');
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to remove task';
+            // Preserve status code for permission checking
+            const errorWithStatus = new Error(errorMessage) as any;
+            errorWithStatus.response = error.response;
+            errorWithStatus.status = error.response?.status;
+            return rejectWithValue(errorWithStatus);
+        }
+    }
+);
+
+// Async thunk for restoring a deleted task
+export const restoreTaskAsync = createAsyncThunk(
+    'tasks/restoreTaskAsync',
+    async (taskId: number, { rejectWithValue }) => {
+        try {
+            // Call API to restore task
+            const response = await api.post(`/tasks/${taskId}/restore`);
+            const payload = (response.data?.data ?? response.data) as any;
+            const restoredTask = ensureTaskDefaults({
+                ...payload,
+                id: payload?.id ?? taskId,
+            });
+            
+            // Add back to IndexedDB on success - this will emit TASK_CREATED event
+            await TasksCache.addTask(restoredTask);
+            
+            // Also emit TASK_UPDATED event to ensure grid refreshes
+            TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, restoredTask);
+            
+            return restoredTask;
+        } catch (error: any) {
+            console.error('Failed to restore task:', error);
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to restore task';
+            return rejectWithValue(errorMessage);
         }
     }
 );
@@ -214,6 +258,25 @@ export const tasksSlice = createSlice({
                 state.value = state.previousState;
                 state.previousState = null;
             }
+            state.error = action.payload as string;
+        });
+
+        // Restore task
+        builder.addCase(restoreTaskAsync.pending, (state) => {
+            state.loading = true;
+        });
+        builder.addCase(restoreTaskAsync.fulfilled, (state, action) => {
+            // Add restored task back to the list
+            const index = state.value.findIndex(task => task.id === action.payload.id);
+            if (index === -1) {
+                state.value.push(ensureTaskDefaults(action.payload));
+            } else {
+                state.value[index] = ensureTaskDefaults(action.payload);
+            }
+            state.loading = false;
+        });
+        builder.addCase(restoreTaskAsync.rejected, (state, action) => {
+            state.loading = false;
             state.error = action.payload as string;
         });
     }

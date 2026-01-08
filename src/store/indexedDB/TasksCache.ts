@@ -46,6 +46,10 @@ export class TasksCache {
     private static _memTasksStamp = 0;
     private static readonly MEM_TTL_MS = 10000; // 10s TTL for in-memory decrypted cache
 
+    private static _memSharedTasks: Task[] | null = null;
+    private static _memSharedTasksStamp = 0;
+    private static _fetchingSharedTasks = false;
+
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
         if (this.initPromise) {
@@ -97,9 +101,17 @@ export class TasksCache {
 
     public static async deleteTask(taskId: string) {
         if (!DB.inited) await DB.init();
-        await DB.delete('tasks', taskId);
+        // Delete from whichever store contains the task
+        const inTasks = await DB.get('tasks', taskId);
+        if (inTasks) {
+            await DB.delete('tasks', taskId);
+        } else {
+            await DB.delete('shared_tasks', taskId);
+        }
         this._memTasks = null;
         this._memTasksStamp = 0;
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_DELETED, { id: taskId });
@@ -110,8 +122,17 @@ export class TasksCache {
         await DB.clear('tasks');
         this._memTasks = null;
         this._memTasksStamp = 0;
+        // Note: shared_tasks are managed separately
         
         // Emit cache invalidate event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
+    }
+
+    public static async deleteSharedTasks() {
+        if (!DB.inited) await DB.init();
+        await DB.clear('shared_tasks');
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
         TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
     }
 
@@ -122,10 +143,15 @@ export class TasksCache {
         if (normalized.id === undefined || normalized.id === null) {
             normalized.id = Number.isFinite(idNum) ? idNum : id;
         }
-        await DB.delete('tasks', normalized.id);
-        await DB.put('tasks', normalized);
+        // Determine which store contains the task and update atomically using IndexedDB's upsert behavior
+        // DB.put() automatically replaces existing records with the same key, making this operation atomic
+        const existingInTasks = await DB.get('tasks', normalized.id);
+        const storeName = existingInTasks ? 'tasks' : 'shared_tasks';
+        await DB.put(storeName, normalized);
         this._memTasks = null;
         this._memTasksStamp = 0;
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
         
         // Emit event to refresh table
         TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, task);
@@ -158,12 +184,17 @@ export class TasksCache {
 
     public static async getTask(taskId: string) {
         if (!DB.inited) await DB.init();
-        return await DB.get('tasks', taskId);
+        return (await DB.get('tasks', taskId)) ?? (await DB.get('shared_tasks', taskId));
     }
 
     public static async getTasks() {
         if (!DB.inited) await DB.init();
         return (await DB.getAll('tasks')).filter(t => t != null);
+    }
+
+    public static async getSharedTasks() {
+        if (!DB.inited) await DB.init();
+        return (await DB.getAll('shared_tasks')).filter(t => t != null);
     }
 
     public static async getLastUpdated(): Promise<Date> {
@@ -193,8 +224,9 @@ export class TasksCache {
             
             // console.log("🚀 Starting to fetch all tasks with pagination...");
             
-            // Clear existing tasks first
-            await this.deleteTasks();
+            // Do NOT clear existing tasks at the start.
+            // Clearing triggers UI refresh events and causes the grid to “blink”.
+            // We'll replace the store atomically at the end of the fetch.
             
             // Loop through all pages
             while (hasNextPage) {
@@ -290,13 +322,17 @@ export class TasksCache {
                 }
             }
             
-            // Add all tasks to IndexedDB (this will emit TASKS_BULK_UPDATE event)
+            // Replace the tasks store once (single refresh)
+            await DB.clear('tasks');
+            this._memTasks = null;
+            this._memTasksStamp = 0;
+
             if (allTasks.length > 0) {
-                // console.log(`💾 Saving ${allTasks.length} tasks to IndexedDB...`);
-                await this.addTasks(allTasks);
-                // console.log(`✅ Successfully saved ${allTasks.length} tasks to IndexedDB`);
+                await DB.bulkPut('tasks', allTasks as any[]);
+                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
             } else {
-                console.warn(`⚠️  No tasks to save to IndexedDB`);
+                // Ensure stale tasks disappear if server returns none
+                TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
             }
             
             return true;
@@ -312,7 +348,81 @@ export class TasksCache {
         }
     }
 
+    public static async fetchSharedTasks() {
+        let allTasks: Task[] = [];
+        let currentPage = 1;
+        let totalApiCalls = 0;
+
+        try {
+            let hasNextPage = true;
+
+            // Do NOT clear at start to avoid UI blinking; replace at end.
+
+            while (hasNextPage) {
+                totalApiCalls++;
+                const apiParams = {
+                    page: currentPage,
+                    per_page: 500,
+                    sort_by: 'id',
+                    sort_direction: 'asc',
+                    shared_with_me: 1,
+                };
+
+                const response = await api.get('/tasks', { params: apiParams });
+                const pageData = response.data.data as Task[];
+                const pagination = response.data.pagination;
+
+                if (pageData && pageData.length > 0) {
+                    const existingIds = new Set(allTasks.map(task => task.id));
+                    const newTasks = pageData.filter(task => !existingIds.has(task.id));
+                    allTasks = [...allTasks, ...newTasks];
+                }
+
+                hasNextPage = pagination?.has_next_page || false;
+                currentPage = pagination?.next_page || currentPage + 1;
+                if (!hasNextPage) break;
+            }
+
+            if (allTasks.length > 0) {
+                await DB.clear('shared_tasks');
+                await DB.bulkPut('shared_tasks', allTasks as any[]);
+                // Populate memory cache immediately to prevent repeated queries
+                this._memSharedTasks = allTasks;
+                this._memSharedTasksStamp = Date.now();
+                // Emit event to refresh grid - event handler will check workspaceId
+                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
+            } else {
+                await DB.clear('shared_tasks');
+                // Set empty array in memory cache to prevent repeated fetches
+                this._memSharedTasks = [];
+                this._memSharedTasksStamp = Date.now();
+                // Emit event with empty array - event handler will check workspaceId
+                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, []);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ fetchSharedTasks error:', error, { currentPage, totalApiCalls });
+            return false;
+        }
+    }
+
     public static async validateTasks(serverGlobalHash?: string | null, serverBlockCount?: number | null) {
+        // Tasks are now visibility-scoped (workspace access / shares), so comparing against global table hashes
+        // will cause false mismatches. Skip integrity validation for tasks by default.
+        const integrityEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('wh-enable-task-integrity') === 'true';
+        if (!integrityEnabled) {
+            // Still ensure we bootstrap the tasks cache when empty, otherwise users see no tasks after DB resets.
+            try {
+                const existingTasks = await this.getTasks();
+                if (existingTasks.length === 0) {
+                    return await this.fetchTasks();
+                }
+            } catch (e) {
+                console.warn('[TasksCache] validateTasks bootstrap (integrity disabled) failed:', e);
+            }
+            return true;
+        }
         try {
             if (this.validating) {
                 this.dlog('validateTasks: already running, skipping re-entry');
@@ -578,16 +688,62 @@ export class TasksCache {
         try {
             if (!DB.inited) await DB.init();
             
-            // Get all tasks from IndexedDB (reuse in-memory decrypted cache when fresh)
+            const sharedWithMe = !!params.shared_with_me;
+
+            // Get tasks from the appropriate store (tasks vs shared_tasks)
             let tasks: Task[];
             const now = Date.now();
-            if (this._memTasks && (now - this._memTasksStamp) < this.MEM_TTL_MS) {
-                tasks = this._memTasks;
+            if (sharedWithMe) {
+                if (this._memSharedTasks && (now - this._memSharedTasksStamp) < this.MEM_TTL_MS) {
+                    tasks = this._memSharedTasks;
+                } else {
+                    tasks = await this.getSharedTasks();
+                    // Bootstrap fetch if empty - fire and forget to avoid blocking the UI
+                    // Only fetch if cache is truly empty AND we're not already fetching
+                    if (tasks.length === 0 && !this._fetchingSharedTasks) {
+                        // Prevent multiple simultaneous fetches
+                        this._fetchingSharedTasks = true;
+                        // Trigger fetch in background without blocking
+                        this.fetchSharedTasks()
+                            .catch(err => {
+                                console.error('Background fetchSharedTasks failed:', err);
+                            })
+                            .finally(() => {
+                                this._fetchingSharedTasks = false;
+                            });
+                        // Return empty results immediately - grid will refresh when fetch completes
+                    }
+                    // Always update memory cache with current results (even if empty)
+                    // This prevents repeated fetches when refreshGrid is called multiple times
+                    this._memSharedTasks = tasks;
+                    this._memSharedTasksStamp = now;
+                }
             } else {
-                tasks = await this.getTasks();
-                this._memTasks = tasks;
-                this._memTasksStamp = now;
+                if (this._memTasks && (now - this._memTasksStamp) < this.MEM_TTL_MS) {
+                    tasks = this._memTasks;
+                } else {
+                    tasks = await this.getTasks();
+                    this._memTasks = tasks;
+                    this._memTasksStamp = now;
+                }
             }
+
+            // Optional lookup for tag filters/search
+            const taskTagsParam: Array<{ task_id: number; tag_id: number }> = params.__taskTags || [];
+            let taskTagMapCache: Record<number, number[]> | null = null;
+            const getTaskTagMap = () => {
+                if (taskTagMapCache) return taskTagMapCache;
+                const m: Record<number, number[]> = {};
+                for (const tt of taskTagsParam) {
+                    const taskId = Number((tt as any).task_id);
+                    const tagId = Number((tt as any).tag_id);
+                    if (!Number.isFinite(taskId) || !Number.isFinite(tagId)) continue;
+                    if (!m[taskId]) m[taskId] = [];
+                    m[taskId].push(tagId);
+                }
+                taskTagMapCache = m;
+                return m;
+            };
 
             // Check if filterModel is present - if so, skip simple filters for columns that are in filterModel
             const hasFilterModel = params.filterModel && typeof params.filterModel === 'object' && Object.keys(params.filterModel).length > 0;
@@ -595,7 +751,13 @@ export class TasksCache {
             
             // Apply simple parameter filters (skip if column is in filterModel, as filterModel will handle it)
             if (params.workspace_id) {
-                tasks = tasks.filter(task => task.workspace_id === parseInt(params.workspace_id));
+                const wsId = typeof params.workspace_id === 'string' ? parseInt(params.workspace_id, 10) : Number(params.workspace_id);
+                if (Number.isFinite(wsId)) {
+                    tasks = tasks.filter(task => {
+                        const taskWsId = typeof task.workspace_id === 'string' ? parseInt(task.workspace_id, 10) : Number(task.workspace_id);
+                        return Number.isFinite(taskWsId) && taskWsId === wsId;
+                    });
+                }
             }
             if (params.status_id && !filterModelKeys.has('status_id')) {
                 tasks = tasks.filter(task => task.status_id === parseInt(params.status_id));
@@ -626,18 +788,7 @@ export class TasksCache {
                 const spotMap: Record<number, { name?: string }> = params.__spotMap || {};
                 const userMap: Record<number, { name?: string; email?: string }> = params.__userMap || {};
                 const tagMap: Record<number, { name?: string }> = params.__tagMap || {};
-                const taskTags: Array<{ task_id: number; tag_id: number }> = params.__taskTags || [];
-
-                // Build a map of task_id -> tag_ids for efficient lookup
-                const taskTagMap: Record<number, number[]> = {};
-                for (const tt of taskTags) {
-                    const taskId = Number(tt.task_id);
-                    const tagId = Number(tt.tag_id);
-                    if (!taskTagMap[taskId]) {
-                        taskTagMap[taskId] = [];
-                    }
-                    taskTagMap[taskId].push(tagId);
-                }
+                const taskTagMap: Record<number, number[]> = getTaskTagMap();
 
                 const matches = (t: Task): boolean => {
                     // ID
@@ -701,6 +852,13 @@ export class TasksCache {
 
             // Apply complex filterModel
             if (params.filterModel && typeof params.filterModel === 'object') {
+                if ((params.filterModel as any).tag_ids && taskTagsParam && taskTagsParam.length > 0) {
+                    const map = getTaskTagMap();
+                    tasks = tasks.map((t: Task) => {
+                        const tagIds = map[t.id] || [];
+                        return { ...t, tag_ids: tagIds };
+                    });
+                }
                 tasks = this.applyFilterModel(tasks, params.filterModel);
             }
 
@@ -850,6 +1008,21 @@ export class TasksCache {
                 if (v === undefined) return 'undefined';
                 return String(v);
             });
+
+            // If the task value is an array (e.g., multiple owners), match if any entry is selected
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    const vNum = Number(v);
+                    if (Number.isFinite(vNum) && normalizedSelectedNums.length > 0 && normalizedSelectedNums.includes(vNum)) {
+                        return true;
+                    }
+                    const vStr = v === null ? 'null' : v === undefined ? 'undefined' : String(v);
+                    if (normalizedSelectedStrs.includes(vStr)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
             // Try numeric comparison first (most reliable for IDs)
             const asNum = Number(value);

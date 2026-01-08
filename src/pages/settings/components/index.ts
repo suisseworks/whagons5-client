@@ -48,5 +48,8 @@ export type { IconPickerProps } from './IconPicker';
 export { CategoryFieldsManager } from './CategoryFieldsManager';
 export type { CategoryFieldsManagerProps } from './CategoryFieldsManager';
 
+export { CategoryReportingTeamsManager } from './CategoryReportingTeamsManager';
+export type { CategoryReportingTeamsManagerProps } from './CategoryReportingTeamsManager';
+
 export { ApprovalApproversManager } from './ApprovalApproversManager';
 export type { ApprovalApproversManagerProps } from './ApprovalApproversManager';

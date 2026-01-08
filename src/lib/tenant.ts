@@ -1,9 +1,6 @@
-// Placeholder function to check if tenant name exists
-// TODO: Replace with actual API call when backend endpoint is ready
-export const checkTenantExists = async (tenantName: string): Promise<boolean> => {
-  // Always return false for now as per requirement
-  return false;
-};
+// NOTE: checkTenantExists has been migrated to Redux-based state management
+// See: src/store/reducers/tenantAvailabilitySlice.ts
+// Use checkTenantAvailability thunk from Redux instead
 
 // Generate random suffix for non-paying users
 export const generateTenantSuffix = (): string => {

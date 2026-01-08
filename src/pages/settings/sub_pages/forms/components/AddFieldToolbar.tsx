@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Type, AlignLeft, List, CheckSquare, Calendar, ChevronDown, Hash, Clock, CalendarClock, PenTool } from "lucide-react";
+import { Type, AlignLeft, List, CheckSquare, Calendar, ChevronDown, Hash, Clock, CalendarClock, PenTool, Image, ImageIcon } from "lucide-react";
 import { BuilderSchemaField } from "./FormBuilder";
 import {
   DropdownMenu,
@@ -32,6 +32,8 @@ export function AddFieldToolbar({ onAddField }: AddFieldToolbarProps) {
     { type: 'time' as const, label: 'Time', icon: Clock },
     { type: 'datetime' as const, label: 'Date & Time', icon: CalendarClock },
     { type: 'signature' as const, label: 'Signature', icon: PenTool },
+    { type: 'image' as const, label: 'Image Upload', icon: Image },
+    { type: 'fixed-image' as const, label: 'Fixed Image', icon: ImageIcon },
   ];
 
   return (

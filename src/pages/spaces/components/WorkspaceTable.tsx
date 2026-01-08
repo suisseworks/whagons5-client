@@ -4,7 +4,9 @@ import { useCallback, useMemo, useState, useRef, useEffect, lazy, Suspense, forw
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
-import { updateTaskAsync, removeTaskAsync } from '@/store/reducers/tasksSlice';
+import { updateTaskAsync, removeTaskAsync, restoreTaskAsync } from '@/store/reducers/tasksSlice';
+import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
+import toast from 'react-hot-toast';
 import { iconService } from '@/database/iconService';
 import { buildWorkspaceColumns } from './workspaceTable/columns';
 import { useAuth } from '@/providers/AuthProvider';
@@ -34,7 +36,7 @@ import {
   createFilteredPriorities,
   createTagMap
 } from './workspaceTable/mappers';
-const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'name', 'description', 'due_date']);
+const ALLOWED_FILTER_KEYS = new Set(['status_id', 'priority_id', 'spot_id', 'user_ids', 'tag_ids', 'name', 'description', 'due_date']);
 
 const sanitizeFilterModel = (model: any): any => {
   if (!model || typeof model !== 'object') return {};
@@ -49,7 +51,7 @@ const sanitizeFilterModel = (model: any): any => {
 const normalizeFilterModelForGrid = (raw: any): any => {
   if (!raw || typeof raw !== 'object') return {};
   const fm = sanitizeFilterModel(raw);
-  for (const key of ['status_id', 'priority_id', 'spot_id']) {
+  for (const key of ['status_id', 'priority_id', 'spot_id', 'user_ids', 'tag_ids']) {
     if (fm[key]) {
       const st = { ...fm[key] } as any;
       if ((st as any).filterType === 'set') {
@@ -72,7 +74,7 @@ const normalizeFilterModelForQuery = (raw: any): any => {
     fm.status_id = st;
   }
   // Text/date filters pass through unchanged
-  for (const key of ['priority_id', 'spot_id']) {
+  for (const key of ['priority_id', 'spot_id', 'user_ids', 'tag_ids']) {
     if (fm[key]) {
       const st = { ...fm[key] } as any;
       const rawValues: any[] = Array.isArray(st.values) ? st.values : [];
@@ -127,6 +129,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const externalFilterModelRef = useRef<any>({});
   const debugFilters = useRef<boolean>(false);
   const lastDoubleClickRef = useRef<{ rowId: any; timestamp: number } | null>(null);
+  const [emptyOverlayVisible, setEmptyOverlayVisible] = useState(false);
+
+  // Overlay is controlled by the datasource (see workspaceTable/dataSource.ts)
   useEffect(() => {
     try { debugFilters.current = localStorage.getItem('wh-debug-filters') === 'true'; } catch { debugFilters.current = false; }
   }, []);
@@ -167,6 +172,35 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const reduxState = useGridReduxState();
   const derivedState = useDerivedGridState(reduxState, { workspaceId, searchText });
 
+  const userColorSyncOnce = useRef(false);
+
+  // Debug: surface user color coverage to help trace IndexedDB/API hydration
+  useEffect(() => {
+    if (Array.isArray(reduxState.users) && reduxState.users.length > 0) {
+      const withColor = reduxState.users.filter((u: any) => u?.color && String(u.color).trim() !== '');
+      const withoutColor = reduxState.users.filter((u: any) => !u?.color || String(u.color).trim() === '');
+      try {
+        // Only log in development to avoid exposing sensitive user info in production
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[wh:user-colors]', {
+            total: reduxState.users.length,
+            withColor: withColor.length,
+            withoutColor: withoutColor.length,
+            sampleWithout: withoutColor.slice(0, 5).map((u: any) => ({ id: u?.id, name: u?.name, color: u?.color }))
+          });
+        }
+      } catch { /* ignore logging errors */ }
+
+      // If we detect users without color, force a fresh fetch to refresh IndexedDB/Redux
+      if (!userColorSyncOnce.current && withoutColor.length > 0) {
+        userColorSyncOnce.current = true;
+        try {
+          dispatch((genericActions as any).users.fetchFromAPI?.());
+        } catch { /* ignore */ }
+      }
+    }
+  }, [reduxState.users, dispatch]);
+
   // State for status icons
   const [statusIcons, setStatusIcons] = useState<{ [key: string]: any }>({});
   const [defaultStatusIcon, setDefaultStatusIcon] = useState<any>(null);
@@ -193,6 +227,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   } = reduxState as any;
   const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
+  // Ensure user metadata is hydrated so owner avatars reflect configured colors
+  useEffect(() => {
+    dispatch((genericActions as any).users.getFromIndexedDB());
+    dispatch((genericActions as any).users.fetchFromAPI?.());
+  }, [dispatch]);
   const slaMap = useMemo(() => {
     const map: Record<number, any> = {};
     (slas || []).forEach((s: any) => {
@@ -392,28 +431,41 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   const handleChangeStatus = useCallback(async (task: any, toStatusId: number): Promise<boolean> => {
     if (!task || Number(task.status_id) === Number(toStatusId)) return true;
-    // Block starting/progress changes when approval is required but not yet approved
+    // Block status changes only when an approval exists and is pending or rejected
     const needsApproval = !!task?.approval_id;
-    const isApproved = String(task?.approval_status || '').toLowerCase() === 'approved';
-    if (needsApproval && !isApproved) {
+    const normalizedApprovalStatus = String(task?.approval_status || '').toLowerCase().trim();
+    const isPendingApproval = needsApproval && normalizedApprovalStatus === 'pending';
+    const isRejectedApproval = needsApproval && normalizedApprovalStatus === 'rejected';
+    if (isPendingApproval || isRejectedApproval) {
       try {
         window.dispatchEvent(new CustomEvent('wh:notify', {
           detail: {
             type: 'warning',
             title: 'Approval required',
-            message: 'This task cannot start until the approval is completed.',
+            message: isRejectedApproval
+              ? 'Status cannot be changed because the approval was rejected.'
+              : 'This task cannot start until the approval is completed.',
           }
         }));
       } catch {
-        console.warn('Task status change blocked: approval pending');
+        console.warn('Task status change blocked: approval pending or rejected');
       }
       return false;
     }
     try {
       await dispatch(updateTaskAsync({ id: Number(task.id), updates: { status_id: Number(toStatusId) } })).unwrap();
       return true;
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Status change failed', e);
+      // Show toast notification for errors
+      const errorMessage = e?.message || e?.response?.data?.message || 'Failed to change task status';
+      const isPermissionError = e?.response?.status === 403 || errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('unauthorized');
+      
+      if (isPermissionError) {
+        toast.error('You do not have permission to change task status.', { duration: 5000 });
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
       return false;
     }
   }, [dispatch]);
@@ -513,7 +565,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     if (gridRef.current?.api) {
       gridRef.current.api.refreshCells({ columns: ['user_ids'], force: true, suppressFlash: true });
     }
-  }, [metadataLoadedFlags.usersLoaded]);
+  }, [metadataLoadedFlags.usersLoaded, users, userMap]);
 
   useEffect(() => {
     if (gridRef.current?.api) {
@@ -735,9 +787,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         taskTagsRef,
         externalFilterModelRef,
         normalizeFilterModelForQuery,
+        setEmptyOverlayVisible,
       }),
-    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef]
+    [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, setEmptyOverlayVisible]
   );
+
+  // Reset empty overlay when workspace/search changes; datasource will set it once it knows rowCount.
+  useEffect(() => {
+    setEmptyOverlayVisible(false);
+  }, [workspaceId, searchText]);
 
   // Function to refresh the grid
   const refreshGrid = useCallback(async () => {
@@ -808,17 +866,104 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return () => window.removeEventListener('wh:approvalDecision:success' as any, handler as any);
   }, [dispatch, refreshGrid]);
 
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<{ id: number; name?: string } | null>(null);
+
   // Delete handler used by action menus (placed after refreshGrid to avoid TDZ)
-  const handleDeleteTask = useCallback(async (taskId: number) => {
+  const handleDeleteTask = useCallback(async (taskId: number, taskName?: string) => {
     if (!Number.isFinite(taskId)) return;
+    
+    // Get task data from grid if available
+    let taskData: { id: number; name?: string } = { id: taskId };
+    try {
+      const api = gridRef.current?.api;
+      if (api) {
+        api.forEachNode((node) => {
+          if (node.data?.id === taskId) {
+            taskData = { id: taskId, name: node.data?.name || taskName };
+          }
+        });
+      }
+    } catch (e) {
+      // Fallback to provided name or ID
+      taskData = { id: taskId, name: taskName };
+    }
+
+    setTaskToDelete(taskData);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  // Confirm delete action
+  const confirmDelete = useCallback(async () => {
+    if (!taskToDelete) return;
+    
+    const taskId = taskToDelete.id;
+    const taskName = taskToDelete.name;
+    
+    setDeleteDialogOpen(false);
+    
+    // Store toast ID to dismiss on error
+    let successToastId: string | undefined;
+    
     try {
       await dispatch(removeTaskAsync(taskId)).unwrap();
-    } catch (error) {
-      console.error('Failed to delete task', error);
-    } finally {
+      
+      // Show success toast with undo option
+      successToastId = toast.success(
+        (t) => (
+          <div className="flex flex-col gap-1">
+            <div className="font-semibold">Task deleted</div>
+            <div className="text-sm opacity-90">
+              {taskName ? `"${taskName}" has been deleted.` : "Task has been deleted."}
+            </div>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                const restoreToast = toast.loading("Restoring task...");
+                try {
+                  await dispatch(restoreTaskAsync(taskId)).unwrap();
+                  toast.dismiss(restoreToast);
+                  toast.success(
+                    taskName ? `"${taskName}" has been restored.` : "Task has been restored.",
+                    { duration: 5000 }
+                  );
+                  refreshGrid();
+                } catch (error: any) {
+                  toast.dismiss(restoreToast);
+                  const errorMessage = error?.message || error?.response?.data?.message || "Could not restore the task.";
+                  toast.error(errorMessage, { duration: 5000 });
+                }
+              }}
+              className="text-left text-sm font-medium underline underline-offset-4 hover:no-underline mt-1"
+            >
+              Undo
+            </button>
+          </div>
+        ),
+        { duration: 8000 }
+      );
+      
       refreshGrid();
+    } catch (error: any) {
+      // Dismiss success toast if it was shown (shouldn't happen, but just in case)
+      if (successToastId) {
+        toast.dismiss(successToastId);
+      }
+      
+      const errorMessage = error?.message || error?.response?.data?.message || error?.toString() || "Failed to delete task";
+      const status = error?.response?.status || error?.status;
+      
+      // Check if it's a permission error (403)
+      if (status === 403 || errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
+        toast.error("You do not have permission to delete this task.", { duration: 5000 });
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
+    } finally {
+      setTaskToDelete(null);
     }
-  }, [dispatch, refreshGrid]);
+  }, [taskToDelete, dispatch, refreshGrid]);
 
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
@@ -972,10 +1117,53 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Clear cache and refresh grid when workspaceId changes
   useEffect(() => {
-    if (gridRef.current?.api && modulesLoaded) {
-      console.log(`Workspace changed to ${workspaceId}, clearing cache and refreshing grid`);
-      refreshGrid();
-    }
+    const checkAndRefresh = async () => {
+      if (!modulesLoaded) return;
+      
+      try {
+        // Ensure cache is initialized
+        await TasksCache.init();
+        
+        // Check if we have tasks for this workspace in cache
+        const baseParams: any = {};
+        if (workspaceId !== 'all' && workspaceId !== 'shared') {
+          baseParams.workspace_id = workspaceId;
+        }
+        if (workspaceId === 'shared') {
+          baseParams.shared_with_me = true;
+        }
+        
+        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const taskCount = countResp?.rowCount ?? 0;
+        
+        console.log(`[WorkspaceTable] Workspace changed to ${workspaceId}, found ${taskCount} tasks in cache`);
+        
+        // If no tasks found and we're viewing a specific workspace (not 'all'), 
+        // try fetching from API to ensure cache is up to date
+        if (taskCount === 0 && workspaceId !== 'all' && workspaceId !== 'shared') {
+          console.log(`[WorkspaceTable] No tasks found for workspace ${workspaceId}, fetching from API...`);
+          try {
+            await TasksCache.fetchTasks();
+            console.log(`[WorkspaceTable] Fetch completed, refreshing grid...`);
+          } catch (fetchError) {
+            console.warn(`[WorkspaceTable] Failed to fetch tasks from API:`, fetchError);
+          }
+        }
+        
+        // Refresh grid after checking/fetching
+        if (gridRef.current?.api) {
+          refreshGrid();
+        }
+      } catch (error) {
+        console.error(`[WorkspaceTable] Error checking workspace tasks:`, error);
+        // Still try to refresh grid even if check failed
+        if (gridRef.current?.api) {
+          refreshGrid();
+        }
+      }
+    };
+    
+    checkAndRefresh();
   }, [workspaceId, refreshGrid, modulesLoaded]);
 
   // Refresh when global search text changes
@@ -985,14 +1173,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     }
   }, [searchText, modulesLoaded, refreshGrid]);
 
-  // When reference data (statuses, priorities, spots, users, tags, categories, customFields) changes, refresh the grid
-  // This ensures that when someone updates a status/priority/etc in settings, the grid shows the updated data
-  useEffect(() => {
-    if (gridRef.current?.api && modulesLoaded) {
-      // Refresh the grid to pick up changes in reference data
-      refreshGrid();
-    }
-  }, [statuses, priorities, spots, users, tags, categories, customFields, categoryCustomFields, modulesLoaded, refreshGrid]);
+  // IMPORTANT: Do NOT call refreshGrid() on reference-data changes.
+  // That clears the row cache + refreshes infinite cache and can cause the grid to blink repeatedly during startup
+  // as reference tables hydrate. We already refresh specific columns via refreshCells() effects above.
 
   // Set up task event handlers using abstracted utility
   useEffect(() => {
@@ -1116,65 +1299,84 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return createLoadingSpinner();
   }
 
+  // We keep phantom rows in infinite model, so AG Grid's built-in "no rows" overlay cannot be relied on.
+  // Render our own overlay layer controlled by datasource rowCount instead.
+
   const gridOptions = createGridOptions(useClientSide, clientRows, collapseGroups);
 
   
 
   return createGridContainer(
     <Suspense fallback={createLoadingSpinner()}>
-      <AgGridReact
-        key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
-        ref={gridRef}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        rowHeight={rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}
-        headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
-        rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
-        {...gridOptions}
-        suppressContextMenu={false}
-        getContextMenuItems={getContextMenuItems}
-        autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
-        rowSelection={'multiple'}
-        suppressRowClickSelection={true}
-        getRowStyle={getRowStyle}
-        onGridReady={onGridReady}
-        onFirstDataRendered={() => {
-          if (!gridRef.current?.api) return;
-          onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
-          const count = gridRef.current.api.getDisplayedRowCount?.() ?? 0;
-          if (count === 0) gridRef.current.api.showNoRowsOverlay?.(); else gridRef.current.api.hideOverlay?.();
-        }}
-        onFilterChanged={(e: any) => {
-          if (suppressPersistRef.current) return;
-          onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
-          const count = e.api.getDisplayedRowCount?.() ?? 0;
-          if (count === 0) e.api.showNoRowsOverlay?.(); else e.api.hideOverlay?.();
-          try {
-            const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
-            const gm = e.api.getFilterModel?.() || {};
-            // Keep externalFilterModelRef in sync with AG Grid so datasource
-            // and modal both see the same canonical model.
-            externalFilterModelRef.current = gm;
-            if (debugFilters.current) {
-              console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+      <div className="relative h-full w-full">
+        {emptyOverlayVisible ? (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{ textAlign: 'center', maxWidth: 520 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <svg width="190" height="190" viewBox="0 0 24 24" style={{ opacity: 0.18 }}>
+                  <path fill="currentColor" d="M19 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4l3 3l3-3h4a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 12H16.17L12 19.17L7.83 15H5V5h14v10z"/>
+                  <path fill="currentColor" d="M7 7h10v2H7V7zm0 4h7v2H7v-2z"/>
+                </svg>
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 650, letterSpacing: '-0.01em', opacity: 0.9, marginBottom: 6 }}>
+                No tasks to show
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.4, opacity: 0.65 }}>
+                This workspace is empty, or you don’t have access to its tasks.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <AgGridReact
+          key={`rm-${useClientSide ? 'client' : 'infinite'}-${workspaceId}-${groupBy}-${collapseGroups ? 1 : 0}-${rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}`}
+          ref={gridRef}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowHeight={rowHeight ?? GRID_CONSTANTS.ROW_HEIGHT}
+          headerHeight={GRID_CONSTANTS.HEADER_HEIGHT}
+          rowBuffer={GRID_CONSTANTS.ROW_BUFFER}
+          {...gridOptions}
+          suppressContextMenu={false}
+          getContextMenuItems={getContextMenuItems}
+          autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
+          rowSelection={'multiple'}
+          suppressRowClickSelection={true}
+          getRowStyle={getRowStyle}
+          onGridReady={onGridReady}
+          onFirstDataRendered={() => {
+            if (!gridRef.current?.api) return;
+            onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+          }}
+          onFilterChanged={(e: any) => {
+            if (suppressPersistRef.current) return;
+            onFiltersChanged?.(!!e.api.isAnyFilterPresent?.());
+            try {
+              const key = `wh_workspace_filters_${workspaceRef.current || 'all'}`;
+              const gm = e.api.getFilterModel?.() || {};
+              externalFilterModelRef.current = gm;
+              if (debugFilters.current) {
+                console.log('[WT Filters] onFilterChanged - grid filterModel:', JSON.stringify(gm, null, 2));
+              }
+              if (gm && Object.keys(gm).length > 0) {
+                localStorage.setItem(key, JSON.stringify(gm));
+              }
+            } catch {}
+            if (!useClientSide) {
+              refreshGrid();
             }
-            // Persist only when there is an active model; do not remove the saved
-            // filter on incidental empty events (those can happen during grid resets).
-            if (gm && Object.keys(gm).length > 0) {
-              localStorage.setItem(key, JSON.stringify(gm));
-            }
-          } catch {}
-          // Only refresh if not in client-side mode (client-side mode handles filtering internally)
-          // or if suppressPersistRef is false (meaning this is a user-initiated filter change)
-          if (!useClientSide) {
-            refreshGrid();
-          }
-        }}
-        onModelUpdated={(e: any) => {
-          const api = e.api;
-          const count = api.getDisplayedRowCount?.() ?? 0;
-          if (count === 0) api.showNoRowsOverlay?.(); else api.hideOverlay?.();
-        }}
+          }}
         onSelectionChanged={(e: any) => {
           if (!onSelectionChanged) return;
           try {
@@ -1240,6 +1442,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         loading={false}
         suppressScrollOnNewData={true}
         suppressAnimationFrame={false}
+        />
+      </div>
+      
+      <DeleteTaskDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        taskName={taskToDelete?.name}
       />
     </Suspense>
   );

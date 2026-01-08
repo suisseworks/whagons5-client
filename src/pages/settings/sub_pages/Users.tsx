@@ -16,6 +16,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
@@ -395,7 +396,7 @@ function Users() {
           }
 
           return (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 py-1 px-1 items-center">
               {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
                 const initial = (team.name || '').charAt(0).toUpperCase();
                 const hex = String(team.color || '').trim();
@@ -416,21 +417,21 @@ function Users() {
                   }
                 } catch { /* ignore */ }
                 return (
-                  <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
-                    <div
-                      className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
-                      style={bg ? { backgroundColor: bg, color: fg } : undefined}
-                      title={team.name}
-                    >
-                      {initial || 'T'}
-                    </div>
-                    {team.name}
-                  </Badge>
+                  <div
+                    key={team.id}
+                    className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default leading-none ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
                 );
               })}
             </div>
           );
-        }
+        },
+        cellStyle: { overflow: 'visible', padding: '0' },
+        autoHeight: true
       },
       {
         field: 'job_position_id',
@@ -573,7 +574,7 @@ function Users() {
           }
 
         return (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 py-1 px-1 items-center">
             {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
               const initial = (team.name || '').charAt(0).toUpperCase();
               const hex = String(team.color || '').trim();
@@ -594,22 +595,22 @@ function Users() {
                 }
               } catch { /* ignore */ }
               return (
-                <Badge key={team.id} variant="secondary" className="h-6 px-2 inline-flex items-center gap-1">
-                  <div
-                    className={`w-4 h-4 min-w-[1rem] rounded-full flex items-center justify-center text-[10px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
-                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
-                    title={team.name}
-                  >
-                    {initial || 'T'}
-                  </div>
-                  {team.name}
-                </Badge>
+                <div
+                  key={team.id}
+                  className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                  style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                  title={team.name}
+                >
+                  {initial || 'T'}
+                </div>
               );
             })}
           </div>
         );
-      }
-    },
+      },
+      cellStyle: { overflow: 'visible', padding: '0' },
+      autoHeight: true
+      },
     {
       field: 'invitation_link',
       headerName: 'Invitation Link',
@@ -752,16 +753,14 @@ function Users() {
                   }
                 } catch { /* ignore */ }
                 return (
-                  <Badge key={team.id} variant="secondary" className="text-xs inline-flex items-center gap-1">
-                    <div
-                      className={`w-3 h-3 min-w-[0.75rem] rounded-full flex items-center justify-center text-[9px] font-semibold ${bg ? '' : 'bg-muted text-foreground/80'}`}
-                      style={bg ? { backgroundColor: bg, color: fg } : undefined}
-                      title={team.name}
-                    >
-                      {initial || 'T'}
-                    </div>
-                    {team.name}
-                  </Badge>
+                  <div
+                    key={team.id}
+                    className={`w-5 h-5 min-w-[1.25rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
                 );
               })}
             </div>
@@ -800,11 +799,36 @@ function Users() {
           <div className="font-medium">{user.name}</div>
           <div className="text-sm text-muted-foreground">{user.email}</div>
           <div className="flex items-center space-x-2 mt-1 flex-wrap gap-1">
-            {userTeamObjects.length > 0 && userTeamObjects.map((team: { id: number; name: string; color: string | null }) => (
-              <Badge key={team.id} variant="secondary" className="text-xs">
-                {team.name}
-              </Badge>
-            ))}
+            {userTeamObjects.length > 0 && userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <div
+                  key={team.id}
+                  className={`w-5 h-5 min-w-[1.25rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                  style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                  title={team.name}
+                >
+                  {initial || 'T'}
+                </div>
+              );
+            })}
             <Badge variant={user.is_admin ? "default" : "outline"} className="text-xs">
               {user.is_admin ? adminLabel : userLabel}
             </Badge>
@@ -913,18 +937,31 @@ function Users() {
       const createdUser = createdUserResult as UserData;
       
       if (createdUser && createSelectedTeams.length > 0) {
+        // Get default role (first available role, or first role with name "Usuario"/"User" if exists)
+        const defaultRole = roles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || roles[0];
+        if (!defaultRole) {
+          setFormError(tu('errors.noRoleAvailable', 'No roles available. Please create a role first.'));
+          setIsCreating(false);
+          return;
+        }
+
         // Add user-team relationships
         for (const teamIdStr of createSelectedTeams) {
           const teamId = Number(teamIdStr);
           try {
             await dispatch((genericActions as any).userTeams.addAsync({
               user_id: createdUser.id,
-              team_id: teamId
+              team_id: teamId,
+              role_id: defaultRole.id
             })).unwrap();
           } catch (error) {
             console.error(`Failed to add user-team relationship:`, error);
+            setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${error instanceof Error ? error.message : 'Unknown error'}`));
           }
         }
+        
+        // Refresh userTeams cache to reflect changes
+        dispatch((genericActions as any).userTeams.getFromIndexedDB());
       }
       
       // Close dialog
@@ -958,42 +995,80 @@ function Users() {
       has_active_subscription: editFormData.has_active_subscription
     };
     
-    // Update user first
-    await updateItem(editingUser.id, updates);
+    try {
+      // Update user first
+      await updateItem(editingUser.id, updates);
 
-    // Handle user-team relationships
-    const selectedTeamIds = selectedTeams.map(id => Number(id));
-    const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
-    const existingTeamIds = existingUserTeams.map((ut: UserTeam) => ut.team_id);
+      // Handle user-team relationships
+      const selectedTeamIds = selectedTeams.map(id => Number(id));
+      const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
+      const existingTeamIds = existingUserTeams.map((ut: UserTeam) => ut.team_id);
 
-    // Find teams to add (in selectedTeams but not in existing)
-    const teamsToAdd = selectedTeamIds.filter(teamId => !existingTeamIds.includes(teamId));
-    
-    // Find teams to remove (in existing but not in selectedTeams)
-    const teamsToRemove = existingTeamIds.filter(teamId => !selectedTeamIds.includes(teamId));
+      // Find teams to add (in selectedTeams but not in existing)
+      const teamsToAdd = selectedTeamIds.filter(teamId => !existingTeamIds.includes(teamId));
+      
+      // Find teams to remove (in existing but not in selectedTeams)
+      const teamsToRemove = existingTeamIds.filter(teamId => !selectedTeamIds.includes(teamId));
 
-    // Add new user-team relationships
-    for (const teamId of teamsToAdd) {
-      try {
-        await dispatch((genericActions as any).userTeams.addAsync({
-          user_id: editingUser.id,
-          team_id: teamId
-        })).unwrap();
-      } catch (error) {
-        console.error(`Failed to add user-team relationship:`, error);
-      }
-    }
-
-    // Remove deleted user-team relationships
-    for (const teamId of teamsToRemove) {
-      const userTeamToRemove = existingUserTeams.find((ut: UserTeam) => ut.team_id === teamId);
-      if (userTeamToRemove) {
-        try {
-          await dispatch((genericActions as any).userTeams.removeAsync(userTeamToRemove.id)).unwrap();
-        } catch (error) {
-          console.error(`Failed to remove user-team relationship:`, error);
+      // Get default role (use existing role from userTeams if available, otherwise find default)
+      let defaultRole: Role | undefined;
+      if (existingUserTeams.length > 0) {
+        // Use the role from the first existing user-team relationship
+        const firstRoleId = getUserTeamRoleId(existingUserTeams[0]);
+        if (firstRoleId != null) {
+          defaultRole = roles.find((r: Role) => r.id === firstRoleId);
         }
       }
+      // If no existing role, find a default role
+      if (!defaultRole) {
+        defaultRole = roles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || roles[0];
+      }
+      
+      if (teamsToAdd.length > 0 && !defaultRole) {
+        setFormError(tu('errors.noRoleAvailable', 'No roles available. Please create a role first.'));
+        return;
+      }
+
+      // Add new user-team relationships
+      for (const teamId of teamsToAdd) {
+        try {
+          await dispatch((genericActions as any).userTeams.addAsync({
+            user_id: editingUser.id,
+            team_id: teamId,
+            role_id: defaultRole!.id
+          })).unwrap();
+        } catch (error: any) {
+          console.error(`Failed to add user-team relationship:`, error);
+          const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+          setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${errorMsg}`));
+          return;
+        }
+      }
+
+      // Remove deleted user-team relationships
+      for (const teamId of teamsToRemove) {
+        const userTeamToRemove = existingUserTeams.find((ut: UserTeam) => ut.team_id === teamId);
+        if (userTeamToRemove) {
+          try {
+            await dispatch((genericActions as any).userTeams.removeAsync(userTeamToRemove.id)).unwrap();
+          } catch (error: any) {
+            console.error(`Failed to remove user-team relationship:`, error);
+            const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+            setFormError(tu('errors.removeTeamFailed', `Failed to remove team relationship: ${errorMsg}`));
+            return;
+          }
+        }
+      }
+
+      // Refresh userTeams cache to reflect changes
+      dispatch((genericActions as any).userTeams.getFromIndexedDB());
+    } catch (error: any) {
+      const backendErrors = error?.response?.data?.errors;
+      const backendMessage = error?.response?.data?.message;
+      const errorMessage = backendErrors
+        ? Object.entries(backendErrors).map(([k, v]: any) => `${k}: ${(v?.[0] || v)}`).join(', ')
+        : (backendMessage || error?.message || tu('errors.updateUser', 'Failed to update user'));
+      setFormError(errorMessage);
     }
   };
 
@@ -1440,85 +1515,108 @@ function Users() {
         submitDisabled={isSubmitting || !editingUser}
       >
         {editingUser && (
-          <div className="grid gap-4">
-            <TextField
-              id="edit-name"
-              label={tu('dialogs.editUser.fields.name', 'Name')}
-              value={editFormData.name}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
-              required
-            />
-            <TextField
-              id="edit-email"
-              label={tu('dialogs.editUser.fields.email', 'Email')}
-              type="email"
-              value={editFormData.email}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
-              required
-            />
-            <TextField
-              id="edit-color"
-              label={tu('dialogs.editUser.fields.color', 'Color')}
-              type="color"
-              value={editFormData.color}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
-            />
-            <SelectField
-              id="edit-job_position_id"
-              label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
-              value={editFormData.job_position_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
-              placeholder={
-                jobPositionsLoading && jobPositions.length === 0
-                  ? tu('fields.loading', 'Loading…')
-                  : tu('fields.noJobPosition', 'No Job Position')
-              }
-              options={jobPositions.map((jp: any) => ({
-                value: jp.id?.toString?.() ?? String(jp.id),
-                label: jp.title
-              }))}
-            />
-            <TextField
-              id="edit-organization_name"
-              label={tu('dialogs.editUser.fields.organization', 'Organization')}
-              value={editFormData.organization_name}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
-            />
-            <CheckboxField
-              id="edit-is_admin"
-              label={tu('dialogs.editUser.fields.admin', 'Admin')}
-              checked={editFormData.is_admin}
-              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
-              description={tu('dialogs.editUser.fields.adminDescription', 'Grant admin role')}
-            />
-            <CheckboxField
-              id="edit-has_active_subscription"
-              label={tu('dialogs.editUser.fields.subscription', 'Subscription')}
-              checked={editFormData.has_active_subscription}
-              onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-              description={tu('dialogs.editUser.fields.subscriptionDescription', 'Active subscription')}
-            />
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">{tu('dialogs.editUser.fields.teams', 'Teams')}</Label>
-              <div className="col-span-3">
-                <MultiSelect
-                  options={teams.map((team: Team) => ({
-                    value: team.id.toString(),
-                    label: team.name
-                  }))}
-                  onValueChange={setSelectedTeams}
-                  defaultValue={selectedTeams}
-                  placeholder={
-                    teamsLoading && teams.length === 0
-                      ? tu('multiSelect.loadingTeams', 'Loading teams...')
-                      : tu('multiSelect.selectTeams', 'Select teams...')
-                  }
-                  maxCount={10}
-                  className="w-full"
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">
+                {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
+              </TabsTrigger>
+              <TabsTrigger value="professional">
+                {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
+              </TabsTrigger>
+              <TabsTrigger value="permissions">
+                {tu('dialogs.editUser.tabs.permissions', 'Permissions & Teams')}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic" className="mt-4">
+              <div className="grid gap-4">
+                <TextField
+                  id="edit-name"
+                  label={tu('dialogs.editUser.fields.name', 'Name')}
+                  value={editFormData.name}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+                  required
+                />
+                <TextField
+                  id="edit-email"
+                  label={tu('dialogs.editUser.fields.email', 'Email')}
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
+                  required
+                />
+                <TextField
+                  id="edit-color"
+                  label={tu('dialogs.editUser.fields.color', 'Color')}
+                  type="color"
+                  value={editFormData.color}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
                 />
               </div>
-            </div>
-          </div>
+            </TabsContent>
+            <TabsContent value="professional" className="mt-4">
+              <div className="grid gap-4">
+                <SelectField
+                  id="edit-job_position_id"
+                  label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
+                  value={editFormData.job_position_id}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, job_position_id: value }))}
+                  placeholder={
+                    jobPositionsLoading && jobPositions.length === 0
+                      ? tu('fields.loading', 'Loading…')
+                      : tu('fields.noJobPosition', 'No Job Position')
+                  }
+                  options={jobPositions.map((jp: any) => ({
+                    value: jp.id?.toString?.() ?? String(jp.id),
+                    label: jp.title
+                  }))}
+                />
+                <TextField
+                  id="edit-organization_name"
+                  label={tu('dialogs.editUser.fields.organization', 'Organization')}
+                  value={editFormData.organization_name}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="permissions" className="mt-4">
+              <div className="grid gap-4">
+                <CheckboxField
+                  id="edit-is_admin"
+                  label={tu('dialogs.editUser.fields.admin', 'Admin')}
+                  checked={editFormData.is_admin}
+                  onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
+                  description={tu('dialogs.editUser.fields.adminDescription', 'Grant admin role')}
+                />
+                <CheckboxField
+                  id="edit-has_active_subscription"
+                  label={tu('dialogs.editUser.fields.subscription', 'Subscription')}
+                  checked={editFormData.has_active_subscription}
+                  onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
+                  description={tu('dialogs.editUser.fields.subscriptionDescription', 'Active subscription')}
+                />
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">{tu('dialogs.editUser.fields.teams', 'Teams')}</Label>
+                  <div className="col-span-3">
+                    <MultiSelect
+                      options={teams.map((team: Team) => ({
+                        value: team.id.toString(),
+                        label: team.name
+                      }))}
+                      onValueChange={setSelectedTeams}
+                      defaultValue={selectedTeams}
+                      placeholder={
+                        teamsLoading && teams.length === 0
+                          ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                          : tu('multiSelect.selectTeams', 'Select teams...')
+                      }
+                      maxCount={10}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
       </SettingsDialog>
 

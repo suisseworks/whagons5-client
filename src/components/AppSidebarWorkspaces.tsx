@@ -9,6 +9,7 @@ import {
   Search,
   MoreHorizontal,
   Layers,
+  Inbox,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 const WS_ORDER_STORAGE = 'wh-workspace-order';
 
@@ -237,6 +239,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const { isMobile, state } = useSidebar();
   const isCollapsedState = state === 'collapsed';
   const collapsed = isCollapsedState && !isMobile;
+  const { t } = useLanguage();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
@@ -329,7 +332,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
 
   const handleAddWorkspace = async () => {
     if (!workspaceName.trim()) {
-      alert('Please enter a workspace name.');
+      alert(t('sidebar.pleaseEnterWorkspaceName', 'Please enter a workspace name.'));
       return;
     }
 
@@ -349,7 +352,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error creating workspace:', error);
-      alert('Failed to create workspace. Please try again.');
+      alert(t('sidebar.failedToCreateWorkspace', 'Failed to create workspace. Please try again.'));
     }
   };
 
@@ -379,7 +382,34 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
               </WorkspaceIconBadge>
             </span>
-            <span>Everything</span>
+            <span>{t('sidebar.everything', 'Everything')}</span>
+          </Link>
+        </div>
+      )}
+
+      {/* Shared with me - virtual workspace */}
+      {showEverythingButton && !collapsed && (
+        <div style={{ marginBottom: '10px' }}>
+          <Link
+            to={`/shared-with-me`}
+            className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/shared-with-me`
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+              }`}
+            style={{
+              padding: '8px 12px',
+              gap: '10px',
+              boxShadow: pathname === `/shared-with-me` ? '0 1px 3px rgba(0, 191, 165, 0.1)' : 'none',
+              fontWeight: pathname === `/shared-with-me` ? 600 : 500,
+              fontSize: '15px'
+            }}
+          >
+            <span className="flex items-center gap-3">
+              <WorkspaceIconBadge color="var(--sidebar-primary)">
+                <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+              </WorkspaceIconBadge>
+            </span>
+            <span>{t('sidebar.sharedWithMe', 'Shared with me')}</span>
           </Link>
         </div>
       )}
@@ -397,12 +427,35 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
               height: '32px',
               opacity: pathname === `/workspace/all` ? 1 : 0.7
             }}
-            title={'Everything'}
+            title={t('sidebar.everything', 'Everything')}
           >
             <WorkspaceIconBadge color="var(--sidebar-primary)">
               <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
             </WorkspaceIconBadge>
-            <span className="sr-only">Everything</span>
+            <span className="sr-only">{t('sidebar.everything', 'Everything')}</span>
+          </Link>
+        </div>
+      )}
+
+      {showEverythingButton && collapsed && !isMobile && (
+        <div className="px-2 flex justify-center" style={{ marginBottom: '10px' }}>
+          <Link
+            to={`/shared-with-me`}
+            className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/shared-with-me`
+                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
+                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
+              }`}
+            style={{
+              width: '32px',
+              height: '32px',
+              opacity: pathname === `/shared-with-me` ? 1 : 0.7
+            }}
+            title={t('sidebar.sharedWithMe', 'Shared with me')}
+          >
+            <WorkspaceIconBadge color="var(--sidebar-primary)">
+              <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+            </WorkspaceIconBadge>
+            <span className="sr-only">{t('sidebar.sharedWithMe', 'Shared with me')}</span>
           </Link>
         </div>
       )}
@@ -442,7 +495,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                   >
                     <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
                     <span className="pl-2" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--sidebar-text-primary)' }}>
-                      Spaces
+                      {t('sidebar.spaces', 'Spaces')}
                     </span>
                   </CollapsibleTrigger>
                   
@@ -451,35 +504,35 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 hover:bg-transparent"
-                      title="More options"
+                      title={t('sidebar.moreOptions', 'More options')}
                       type="button"
                       style={{ width: '20px', height: '20px', padding: 0 }}
                     >
                       <MoreHorizontal size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
-                      <span className="sr-only">More options</span>
+                      <span className="sr-only">{t('sidebar.moreOptions', 'More options')}</span>
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 hover:bg-transparent"
-                      title="Search"
+                      title={t('sidebar.search', 'Search')}
                       type="button"
                       style={{ width: '20px', height: '20px', padding: 0 }}
                     >
                       <Search size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
-                      <span className="sr-only">Search</span>
+                      <span className="sr-only">{t('sidebar.search', 'Search')}</span>
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 hover:bg-transparent"
-                      title="Add Workspace"
+                      title={t('sidebar.addWorkspace', 'Add Workspace')}
                       type="button"
                       onClick={() => setIsModalOpen(true)}
                       style={{ width: '20px', height: '20px', padding: 0 }}
                     >
                       <Plus size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
-                      <span className="sr-only">Add Workspace</span>
+                      <span className="sr-only">{t('sidebar.addWorkspace', 'Add Workspace')}</span>
                     </Button>
                   </div>
                 </>
@@ -497,39 +550,39 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 }}>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                      <DialogTitle>Add New Workspace</DialogTitle>
+                      <DialogTitle>{t('sidebar.addNewWorkspace', 'Add New Workspace')}</DialogTitle>
                       <DialogDescription>
-                        Enter the details for your new workspace. Click save when you're done.
+                        {t('sidebar.addNewWorkspaceDescription', 'Enter the details for your new workspace. Click save when you\'re done.')}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="workspace-name" className="text-right">
-                          Name
+                          {t('sidebar.workspaceName', 'Name')}
                         </Label>
                         <Input
                           id="workspace-name"
                           value={workspaceName}
                           onChange={(e) => setWorkspaceName(e.target.value)}
                           className="col-span-3"
-                          placeholder="e.g., Project Phoenix"
+                          placeholder={t('sidebar.workspaceNamePlaceholder', 'e.g., Project Phoenix')}
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="workspace-description" className="text-right">
-                          Description
+                          {t('sidebar.workspaceDescription', 'Description')}
                         </Label>
                         <Input
                           id="workspace-description"
                           value={workspaceDescription}
                           onChange={(e) => setWorkspaceDescription(e.target.value)}
                           className="col-span-3"
-                          placeholder="e.g., For managing project tasks"
+                          placeholder={t('sidebar.workspaceDescriptionPlaceholder', 'e.g., For managing project tasks')}
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="workspace-color" className="text-right">
-                          Color
+                          {t('sidebar.workspaceColor', 'Color')}
                         </Label>
                         <div className="col-span-3">
                           <Popover>
@@ -539,7 +592,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                                 type="button"
                                 className="h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                 style={{ backgroundColor: workspaceColor }}
-                                aria-label="Open color picker"
+                                aria-label={t('sidebar.openColorPicker', 'Open color picker')}
                               />
                             </PopoverTrigger>
                             <PopoverContent
@@ -579,17 +632,17 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="workspace-type" className="text-right">
-                          Type
+                          {t('sidebar.workspaceType', 'Type')}
                         </Label>
                         <div className="col-span-3">
                           <Select value={workspaceType} onValueChange={setWorkspaceType}>
                             <SelectTrigger id="workspace-type">
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue placeholder={t('sidebar.selectType', 'Select type')} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="standard">Standard</SelectItem>
-                              <SelectItem value="project">Project</SelectItem>
-                              <SelectItem value="department">Department</SelectItem>
+                              <SelectItem value="standard">{t('sidebar.workspaceTypeStandard', 'Standard')}</SelectItem>
+                              <SelectItem value="project">{t('sidebar.workspaceTypeProject', 'Project')}</SelectItem>
+                              <SelectItem value="department">{t('sidebar.workspaceTypeDepartment', 'Department')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -597,10 +650,10 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                        Cancel
+                        {t('sidebar.cancel', 'Cancel')}
                       </Button>
                       <Button type="button" onClick={handleAddWorkspace}>
-                        Save Workspace
+                        {t('sidebar.saveWorkspace', 'Save Workspace')}
                       </Button>
                     </DialogFooter>
                   </DialogContent>

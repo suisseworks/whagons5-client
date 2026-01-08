@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
 import { api } from '@/api/whagonsApi';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -7,12 +8,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogClose } from '@/components/ui/dialog';
-import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck } from 'lucide-react';
+import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck, Users, Shield } from 'lucide-react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
+import { ImageCropper } from '@/components/ImageCropper';
+import { RootState, AppDispatch } from '@/store/store';
+import { UserTeam, Team, Role } from '@/store/types';
+import { genericActions } from '@/store/genericSlices';
 
 function Profile() {
+    const dispatch = useDispatch<AppDispatch>();
     const { user: userData, userLoading, refetchUser } = useAuth();
+    const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
+    const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+    const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -20,8 +32,22 @@ function Profile() {
         name: '',
         url_picture: ''
     });
-    const [previewImage, setPreviewImage] = useState<string>('');
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [showCropper, setShowCropper] = useState(false);
+    const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+    const [originalFile, setOriginalFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load teams and roles data when component mounts
+    useEffect(() => {
+        dispatch(genericActions.teams.getFromIndexedDB?.() as any);
+        dispatch(genericActions.teams.fetchFromAPI?.() as any);
+        dispatch(genericActions.roles.getFromIndexedDB?.() as any);
+        dispatch(genericActions.roles.fetchFromAPI?.() as any);
+        dispatch(genericActions.userTeams.getFromIndexedDB?.() as any);
+    }, [dispatch]);
 
     // Initialize form when user data is available
     useEffect(() => {
@@ -30,7 +56,12 @@ function Profile() {
                 name: userData.name || '',
                 url_picture: userData.url_picture || ''
             });
-            setPreviewImage(userData.url_picture || '');
+            // Set preview using getAssetDisplayUrl to handle both URLs and asset IDs
+            if (userData.url_picture) {
+                setPreviewImage(getAssetDisplayUrl(userData.url_picture));
+            } else {
+                setPreviewImage(null);
+            }
         }
     }, [userData]);
 
@@ -42,13 +73,89 @@ function Profile() {
         }));
     };
 
-    // Handle image URL change
-    const handleImageUrlChange = (url: string) => {
+    // Handle image file selection - show cropper instead of uploading immediately
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate image type
+        if (!file.type.startsWith('image/')) {
+            setUploadError('Please select an image file');
+            return;
+        }
+
+        setUploadError(null);
+        
+        // Create preview and show cropper
+        try {
+            const previewUrl = await createImagePreview(file);
+            setImageToCrop(previewUrl);
+            setOriginalFile(file);
+            setShowCropper(true);
+        } catch (error: any) {
+            setUploadError('Failed to load image');
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    // Handle cropped image - convert to file and upload
+    const handleCropComplete = async (croppedImageUrl: string) => {
+        if (!originalFile) return;
+
+        setUploading(true);
+        setUploadError(null);
+        setShowCropper(false);
+
+        try {
+            // Convert data URL to File
+            const response = await fetch(croppedImageUrl);
+            const blob = await response.blob();
+            const croppedFile = new File([blob], originalFile.name, {
+                type: originalFile.type || 'image/png',
+                lastModified: Date.now(),
+            });
+
+            // Set preview
+            setPreviewImage(croppedImageUrl);
+
+            // Upload to asset service
+            const uploadedFile = await uploadImageAsset(croppedFile, {
+                maxSize: 10 * 1024 * 1024, // 10MB
+            });
+
+            // Store the uploaded file URL (this is what the backend expects to persist for `url_picture`)
+            setEditForm(prev => ({
+                ...prev,
+                url_picture: uploadedFile.url || ''
+            }));
+
+            // Clean up
+            URL.revokeObjectURL(croppedImageUrl);
+        } catch (error: any) {
+            setUploadError(error.message || 'Failed to upload image');
+            setPreviewImage(userData?.url_picture ? getAssetDisplayUrl(userData.url_picture) : null);
+        } finally {
+            setUploading(false);
+            setOriginalFile(null);
+            setImageToCrop(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    // Handle image removal
+    const handleRemoveImage = () => {
+        setPreviewImage(null);
         setEditForm(prev => ({
             ...prev,
-            url_picture: url
+            url_picture: ''
         }));
-        setPreviewImage(url);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     };
 
     // Handle profile update
@@ -58,24 +165,32 @@ function Profile() {
             const response = await api.patch('/users/me', editForm);
             
             if (response.status === 200) {
-                // Refresh user data through AuthContext
-                await refetchUser();
-                setIsEditing(false);
+                console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
                 
-                // Clear image cache if URL changed to force header to reload image
-                if (userData && editForm.url_picture !== userData.url_picture) {
-                    const firebaseUser = (window as any).firebase?.auth?.currentUser;
-                    if (firebaseUser?.uid) {
-                        localStorage.removeItem(`user_avatar_cache_${firebaseUser.uid}`);
-                        localStorage.removeItem(`user_avatar_timestamp_${firebaseUser.uid}`);
-                    }
+                // Clear avatar cache BEFORE refreshing to ensure fresh image loads
+                const { AvatarCache } = await import('@/store/indexedDB/AvatarCache');
+                const firebaseUser = (window as any).firebase?.auth?.currentUser;
+                if (firebaseUser?.uid && userData?.id) {
+                    console.log('Profile: Clearing cache for', [firebaseUser.uid, userData.google_uuid, userData.id]);
+                    await AvatarCache.deleteByAny([firebaseUser.uid, userData.google_uuid, userData.id]);
+                    console.log('Profile: Cache cleared');
                 }
                 
-                // Notify other components (like header) that profile was updated
-                // Use custom event for same-tab communication
+                // Notify other components (like header) that profile was updated WITH THE NEW URL
+                // Dispatch BEFORE refetchUser so Header can use the new URL immediately
                 window.dispatchEvent(new CustomEvent('profileUpdated', {
-                    detail: { timestamp: Date.now() }
+                    detail: { 
+                        timestamp: Date.now(),
+                        url_picture: editForm.url_picture 
+                    }
                 }));
+                console.log('Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
+                
+                // Refresh user data through AuthContext (this will update the user object)
+                await refetchUser();
+                console.log('Profile: User data refetched');
+                
+                setIsEditing(false);
                 
                 // Also set localStorage for cross-tab communication
                 localStorage.setItem('profile_updated', Date.now().toString());
@@ -95,8 +210,13 @@ function Profile() {
                 name: userData.name || '',
                 url_picture: userData.url_picture || ''
             });
-            setPreviewImage(userData.url_picture || '');
+            if (userData.url_picture) {
+                setPreviewImage(getAssetDisplayUrl(userData.url_picture));
+            } else {
+                setPreviewImage(null);
+            }
         }
+        setUploadError(null);
         setIsEditing(false);
     };
 
@@ -134,6 +254,34 @@ function Profile() {
         }
         return 'U';
     };
+
+    // Get current user's teams and roles
+    const getUserTeamsAndRoles = () => {
+        if (!userData?.id) return [];
+        
+        const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userData.id);
+        
+        return userTeamRelationships.map((ut: UserTeam) => {
+            const team = teams.find((t: Team) => t.id === ut.team_id);
+            const role = ut.role_id ? roles.find((r: Role) => r.id === ut.role_id) : null;
+            
+            return {
+                team: team ? {
+                    id: team.id,
+                    name: team.name,
+                    color: team.color,
+                    description: team.description
+                } : null,
+                role: role ? {
+                    id: role.id,
+                    name: role.name,
+                    description: role.description
+                } : null
+            };
+        }).filter(item => item.team !== null);
+    };
+
+    const userTeamsAndRoles = getUserTeamsAndRoles();
 
     if (userLoading) {
         return (
@@ -201,7 +349,11 @@ function Profile() {
                         <div className="flex items-center space-x-4">
                             <Avatar className="w-20 h-20">
                                 <AvatarImage 
-                                    src={isEditing ? previewImage : userData.url_picture} 
+                                    src={isEditing && previewImage 
+                                        ? previewImage 
+                                        : userData.url_picture 
+                                            ? getAssetDisplayUrl(userData.url_picture) 
+                                            : undefined} 
                                     alt={userData.name || 'Profile'} 
                                 />
                                 <AvatarFallback className="text-lg font-semibold">
@@ -303,6 +455,88 @@ function Profile() {
                         </div>
                     )}
                 </div>
+
+                {/* Teams and Roles Section */}
+                {userTeamsAndRoles.length > 0 && (
+                    <>
+                        <Separator />
+                        <div className="p-6">
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
+                                <Users className="w-5 h-5" />
+                                <span>Teams & Roles</span>
+                            </h2>
+                            
+                            <div className="space-y-4">
+                                {userTeamsAndRoles.map((item, index) => {
+                                    if (!item.team) return null;
+                                    
+                                    const team = item.team;
+                                    const role = item.role;
+                                    const initial = (team.name || '').charAt(0).toUpperCase();
+                                    const hex = String(team.color || '').trim();
+                                    let bg = hex || '#6b7280';
+                                    let fg = '#fff';
+                                    
+                                    try {
+                                        if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                                            const h = hex.length === 4
+                                                ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                                                : hex;
+                                            const r = parseInt(h.slice(1, 3), 16);
+                                            const g = parseInt(h.slice(3, 5), 16);
+                                            const b = parseInt(h.slice(5, 7), 16);
+                                            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                                            fg = brightness > 128 ? '#000' : '#fff';
+                                            bg = h;
+                                        }
+                                    } catch (e) {
+                                        bg = '#6b7280';
+                                    }
+                                    
+                                    return (
+                                        <div
+                                            key={`${team.id}-${index}`}
+                                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <div
+                                                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                                    style={{ backgroundColor: bg, color: fg }}
+                                                >
+                                                    {initial}
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900 dark:text-white">
+                                                        {team.name}
+                                                    </div>
+                                                    {team.description && (
+                                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                            {team.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {role && (
+                                                <div className="flex items-center space-x-2">
+                                                    <Shield className="w-4 h-4 text-gray-500" />
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                        {role.name}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            {userTeamsAndRoles.length === 0 && (
+                                <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                                    No teams assigned
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Edit Profile Dialog */}
@@ -329,24 +563,78 @@ function Profile() {
                         {/* Profile Picture Section */}
                         <div className="space-y-4">
                             <Label className="text-sm font-medium">Profile Picture</Label>
-                            <div className="flex items-center space-x-4">
-                                <Avatar className="w-16 h-16">
-                                    <AvatarImage src={previewImage} alt="Preview" />
-                                    <AvatarFallback>
-                                        {getUserInitials(editForm.name, userData.email)}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                    <Input
-                                        placeholder="Enter image URL..."
-                                        value={editForm.url_picture}
-                                        onChange={(e) => handleImageUrlChange(e.target.value)}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Enter a valid image URL (HTTPS recommended)
-                                    </p>
+                            {previewImage ? (
+                                <div className="space-y-3">
+                                    <div className="relative inline-block">
+                                        <img
+                                            src={previewImage}
+                                            alt="Profile preview"
+                                            className="w-32 h-32 rounded-full object-cover border-2 border-border"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-0 right-0 h-6 w-6 rounded-full"
+                                            onClick={handleRemoveImage}
+                                            disabled={uploading}
+                                        >
+                                            <FontAwesomeIcon icon={faXmark} className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            if (originalFile) {
+                                                createImagePreview(originalFile).then(url => {
+                                                    setImageToCrop(url);
+                                                    setShowCropper(true);
+                                                });
+                                            } else {
+                                                fileInputRef.current?.click();
+                                            }
+                                        }}
+                                        disabled={uploading}
+                                        className="w-full"
+                                    >
+                                        <Camera className="w-4 h-4 mr-2" />
+                                        Adjust & Center
+                                    </Button>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                        id="profile-image-upload"
+                                        disabled={uploading}
+                                    />
+                                    <label
+                                        htmlFor="profile-image-upload"
+                                        className={`cursor-pointer flex flex-col items-center gap-2 ${uploading ? 'opacity-50' : ''}`}
+                                    >
+                                        {uploading ? (
+                                            <>
+                                                <FontAwesomeIcon icon={faSpinner} className="h-6 w-6 text-muted-foreground animate-spin" />
+                                                <span className="text-sm text-muted-foreground">Uploading...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FontAwesomeIcon icon={faUpload} className="h-6 w-6 text-muted-foreground" />
+                                                <span className="text-sm text-muted-foreground">Click to upload an image</span>
+                                            </>
+                                        )}
+                                    </label>
+                                    {uploadError && (
+                                        <div className="mt-2 text-sm text-destructive">{uploadError}</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <Separator />
@@ -401,6 +689,25 @@ function Profile() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Image Cropper Dialog */}
+            {imageToCrop && (
+                <ImageCropper
+                    image={imageToCrop}
+                    open={showCropper}
+                    onClose={() => {
+                        setShowCropper(false);
+                        setImageToCrop(null);
+                        setOriginalFile(null);
+                        if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                        }
+                    }}
+                    onCropComplete={handleCropComplete}
+                    aspect={1}
+                    circularCrop={true}
+                />
+            )}
         </div>
     );
 }

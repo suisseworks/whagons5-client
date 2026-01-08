@@ -28,6 +28,7 @@ const coreKeys = [
   'formVersions',
   'customFields',
   'categoryCustomFields',
+  'tags',
 ] as const;
 
 export class DataManager {
@@ -158,4 +159,5 @@ export class DataManager {
       console.warn('DataManager: Manifest fetch/verify failed (continuing):', e);
     }
   }
+
 }

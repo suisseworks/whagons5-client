@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '@/api/whagonsApi';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface EmailVerificationStepProps {
   email: string;
@@ -7,6 +8,7 @@ interface EmailVerificationStepProps {
 }
 
 const EmailVerificationStep: React.FC<EmailVerificationStepProps> = ({ email, onVerified }) => {
+  const { t } = useLanguage();
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
 
@@ -51,14 +53,14 @@ const EmailVerificationStep: React.FC<EmailVerificationStepProps> = ({ email, on
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Verify your email
+          {t('onboarding.emailVerification.title', 'Verify your email')}
         </h2>
         <p className="text-gray-600 dark:text-gray-400 mb-4">
-          We've sent a verification link to{' '}
+          {t('onboarding.emailVerification.sentLink', 'We\'ve sent a verification link to')}{' '}
           <span className="font-medium text-gray-900 dark:text-white">{email}</span>
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Please check your email and click the verification link to continue.
+          {t('onboarding.emailVerification.checkEmail', 'Please check your email and click the verification link to continue.')}
         </p>
       </div>
 
@@ -67,23 +69,23 @@ const EmailVerificationStep: React.FC<EmailVerificationStepProps> = ({ email, on
           onClick={handleContinue}
           className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary/90 transition-colors font-medium"
         >
-          I've verified my email
+          {t('onboarding.emailVerification.verified', 'I\'ve verified my email')}
         </button>
 
         <div className="text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-            Didn't receive the email?
+            {t('onboarding.emailVerification.didntReceive', 'Didn\'t receive the email?')}
           </p>
           <button
             onClick={handleResendVerification}
             disabled={isResending}
             className="text-primary hover:text-primary/80 transition-colors font-medium disabled:opacity-50"
           >
-            {isResending ? 'Sending...' : 'Resend verification email'}
+            {isResending ? t('onboarding.emailVerification.sending', 'Sending...') : t('onboarding.emailVerification.resend', 'Resend verification email')}
           </button>
           {resendSuccess && (
             <p className="text-green-600 dark:text-green-400 text-sm mt-2">
-              Verification email sent successfully!
+              {t('onboarding.emailVerification.resendSuccess', 'Verification email sent successfully!')}
             </p>
           )}
         </div>

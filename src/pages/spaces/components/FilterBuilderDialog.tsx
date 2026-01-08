@@ -3,11 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { listPresets, savePreset, deletePreset, getPresetById, SavedFilterPreset } from './workspaceTable/filterPresets';
+import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 
 type Option = { id: number; name: string };
+type TagOption = { id: number; name: string; color?: string | null };
 
 export type FilterBuilderDialogProps = {
   open: boolean;
@@ -16,6 +18,8 @@ export type FilterBuilderDialogProps = {
   statuses: Option[];
   priorities: Option[];
   spots: Option[];
+  owners: Option[];
+  tags: TagOption[];
   currentModel?: any;
   currentSearchText?: string;
   onApply: (model: any, searchText?: string) => void;
@@ -27,16 +31,22 @@ const buildModel = (params: {
   statusIds: number[];
   priorityIds: number[];
   spotIds: number[];
-  nameContains: string;
-  descriptionContains: string;
+  ownerIds: number[];
+  tagIds: number[];
+  textContains: string;
   dueQuick: DueQuick;
 }): any => {
   const model: any = {};
   if (params.statusIds.length) model.status_id = { filterType: 'set', values: params.statusIds };
   if (params.priorityIds.length) model.priority_id = { filterType: 'set', values: params.priorityIds };
   if (params.spotIds.length) model.spot_id = { filterType: 'set', values: params.spotIds };
-  if (params.nameContains?.trim()) model.name = { filterType: 'text', type: 'contains', filter: params.nameContains.trim() };
-  if (params.descriptionContains?.trim()) model.description = { filterType: 'text', type: 'contains', filter: params.descriptionContains.trim() };
+  if (params.ownerIds.length) model.user_ids = { filterType: 'set', values: params.ownerIds };
+  if (params.tagIds.length) model.tag_ids = { filterType: 'set', values: params.tagIds };
+  if (params.textContains?.trim()) {
+    const v = params.textContains.trim();
+    model.name = { filterType: 'text', type: 'contains', filter: v };
+    model.description = { filterType: 'text', type: 'contains', filter: v };
+  }
 
   // Map dueQuick to a date filter model if needed
   if (params.dueQuick !== 'any') {
@@ -64,8 +74,9 @@ const getInitial = (model?: any) => {
     statusIds: coerceSet(model?.status_id),
     priorityIds: coerceSet(model?.priority_id),
     spotIds: coerceSet(model?.spot_id),
-    nameContains: model?.name?.filter || '',
-    descriptionContains: model?.description?.filter || '',
+    ownerIds: coerceSet(model?.user_ids),
+    tagIds: coerceSet(model?.tag_ids),
+    textContains: model?.name?.filter || model?.description?.filter || '',
     dueQuick: 'any' as DueQuick,
   };
 };
@@ -73,17 +84,37 @@ const getInitial = (model?: any) => {
 const useOptions = (items: Option[]) => useMemo(() => (items || []).map(i => ({ id: Number(i.id), name: i.name })), [items]);
 
 export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
-  const { open, onOpenChange, workspaceId, statuses, priorities, spots, currentModel, currentSearchText, onApply } = props;
+  const { open, onOpenChange, workspaceId, statuses, priorities, spots, owners, tags, currentModel, currentSearchText, onApply } = props;
 
   const statusOptions = useOptions(statuses);
   const priorityOptions = useOptions(priorities);
   const spotOptions = useOptions(spots);
+  const ownerOptions = useOptions(owners);
+  const tagOptions = useMemo(() => (tags || []).map(t => ({ id: Number(t.id), name: t.name, color: t.color })), [tags]);
 
-  const [nameContains, setNameContains] = useState('');
-  const [descriptionContains, setDescriptionContains] = useState('');
+  const statusSelectOptions = useMemo(
+    () => statusOptions.map((i) => ({ value: String(i.id), label: i.name || `#${i.id}` })),
+    [statusOptions]
+  );
+  const prioritySelectOptions = useMemo(
+    () => priorityOptions.map((i) => ({ value: String(i.id), label: i.name || `#${i.id}` })),
+    [priorityOptions]
+  );
+  const spotSelectOptions = useMemo(
+    () => spotOptions.map((i) => ({ value: String(i.id), label: i.name || `#${i.id}` })),
+    [spotOptions]
+  );
+  const ownerSelectOptions = useMemo(
+    () => ownerOptions.map((i) => ({ value: String(i.id), label: i.name || `#${i.id}` })),
+    [ownerOptions]
+  );
+
+  const [textContains, setTextContains] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<number[]>([]);
   const [selectedPriorities, setSelectedPriorities] = useState<number[]>([]);
   const [selectedSpots, setSelectedSpots] = useState<number[]>([]);
+  const [selectedOwners, setSelectedOwners] = useState<number[]>([]);
+  const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [dueQuick, setDueQuick] = useState<DueQuick>('any');
 
   const [presets, setPresets] = useState<SavedFilterPreset[]>([]);
@@ -101,22 +132,22 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
     setSelectedStatuses(init.statusIds);
     setSelectedPriorities(init.priorityIds);
     setSelectedSpots(init.spotIds);
-    setNameContains(init.nameContains || '');
-    setDescriptionContains(init.descriptionContains || '');
+    setSelectedOwners(init.ownerIds);
+    setSelectedTags(init.tagIds);
+    setTextContains(init.textContains || '');
     setDueQuick('any');
     setSelectedPresetId('');
     setPresetName('');
   }, [open, currentModel, currentSearchText]);
-
-  const toggleId = (list: number[], id: number): number[] => list.includes(id) ? list.filter(x => x !== id) : [...list, id];
 
   const apply = () => {
     const model = buildModel({
       statusIds: selectedStatuses,
       priorityIds: selectedPriorities,
       spotIds: selectedSpots,
-      nameContains,
-      descriptionContains,
+      ownerIds: selectedOwners,
+      tagIds: selectedTags,
+      textContains,
       dueQuick,
     });
     onApply(model);
@@ -131,8 +162,9 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
     setSelectedStatuses(init.statusIds);
     setSelectedPriorities(init.priorityIds);
     setSelectedSpots(init.spotIds);
-    setNameContains(init.nameContains || '');
-    setDescriptionContains(init.descriptionContains || '');
+    setSelectedOwners(init.ownerIds);
+    setSelectedTags(init.tagIds);
+    setTextContains(init.textContains || '');
     setDueQuick('any');
   };
 
@@ -142,11 +174,12 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
       statusIds: selectedStatuses,
       priorityIds: selectedPriorities,
       spotIds: selectedSpots,
-      nameContains,
-      descriptionContains,
+      ownerIds: selectedOwners,
+      tagIds: selectedTags,
+      textContains,
       dueQuick,
     });
-    const saved = savePreset({ name, workspaceScope: workspaceId, model, searchText: nameContains });
+    const saved = savePreset({ name, workspaceScope: workspaceId, model, searchText: textContains });
     setPresets(listPresets(workspaceId));
     setSelectedPresetId(saved.id);
   };
@@ -169,38 +202,57 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Status</Label>
-            <div className="border rounded p-2 max-h-40 overflow-auto">
-              {statusOptions.map(o => (
-                <label key={o.id} className="flex items-center gap-2 py-1">
-                  <Checkbox checked={selectedStatuses.includes(o.id)} onCheckedChange={() => setSelectedStatuses(prev => toggleId(prev, o.id))} />
-                  <span className="text-sm">{o.name}</span>
-                </label>
-              ))}
-            </div>
+            <MultiSelectCombobox
+              options={statusSelectOptions}
+              value={selectedStatuses.map(String)}
+              onValueChange={(vals) => setSelectedStatuses(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
+              placeholder="Any status"
+              searchPlaceholder="Search statuses..."
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Priority</Label>
-            <div className="border rounded p-2 max-h-40 overflow-auto">
-              {priorityOptions.map(o => (
-                <label key={o.id} className="flex items-center gap-2 py-1">
-                  <Checkbox checked={selectedPriorities.includes(o.id)} onCheckedChange={() => setSelectedPriorities(prev => toggleId(prev, o.id))} />
-                  <span className="text-sm">{o.name}</span>
-                </label>
-              ))}
-            </div>
+            <MultiSelectCombobox
+              options={prioritySelectOptions}
+              value={selectedPriorities.map(String)}
+              onValueChange={(vals) => setSelectedPriorities(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
+              placeholder="Any priority"
+              searchPlaceholder="Search priorities..."
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Location</Label>
-            <div className="border rounded p-2 max-h-40 overflow-auto">
-              {spotOptions.map(o => (
-                <label key={o.id} className="flex items-center gap-2 py-1">
-                  <Checkbox checked={selectedSpots.includes(o.id)} onCheckedChange={() => setSelectedSpots(prev => toggleId(prev, o.id))} />
-                  <span className="text-sm">{o.name}</span>
-                </label>
-              ))}
-            </div>
+            <MultiSelectCombobox
+              options={spotSelectOptions}
+              value={selectedSpots.map(String)}
+              onValueChange={(vals) => setSelectedSpots(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
+              placeholder="Any location"
+              searchPlaceholder="Search locations..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Owner</Label>
+            <MultiSelectCombobox
+              options={ownerSelectOptions}
+              value={selectedOwners.map(String)}
+              onValueChange={(vals) => setSelectedOwners(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
+              placeholder="Any owner"
+              searchPlaceholder="Search owners..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <TagMultiSelect
+              tags={tagOptions}
+              value={selectedTags}
+              onValueChange={(vals) => setSelectedTags(vals.filter((n) => Number.isFinite(n)))}
+              placeholder="Any tag"
+              searchPlaceholder="Search tags..."
+            />
           </div>
 
           <div className="space-y-2">
@@ -219,11 +271,8 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label>Text contains</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Input placeholder="Name contains..." value={nameContains} onChange={(e) => setNameContains(e.target.value)} />
-              <Input placeholder="Description contains..." value={descriptionContains} onChange={(e) => setDescriptionContains(e.target.value)} />
-            </div>
+            <Label>Text contains (name or description)</Label>
+            <Input placeholder="e.g. leak, HVAC, meeting" value={textContains} onChange={(e) => setTextContains(e.target.value)} />
           </div>
 
           <div className="space-y-2 md:col-span-2">

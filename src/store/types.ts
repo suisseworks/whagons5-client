@@ -39,6 +39,7 @@ export interface Category {
     team_id: number;
     workspace_id: number;
     status_transition_group_id: number;
+    reporting_team_ids: number[];
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -63,6 +64,7 @@ export interface Template {
     default_duration?: number;
     instructions?: string | null;
     enabled?: boolean;
+    is_private?: boolean;
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;

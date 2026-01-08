@@ -9,6 +9,10 @@ export type BrandingConfig = {
   textColor: string;
   neutralColor: string;
   gradientAccent: string;
+  surfacePattern: string;
+  sidebarPattern: string;
+  surfacePatternSize: string;
+  sidebarPatternSize: string;
   notes: string;
 };
 
@@ -37,6 +41,10 @@ export const DEFAULT_BRANDING_CONFIG: BrandingConfig = {
   textColor: '#0f172a',
   neutralColor: '#e2e8f0',
   gradientAccent: 'linear-gradient(130deg, #009579 0%, #2563eb 100%)',
+  surfacePattern: 'none',
+  sidebarPattern: 'none',
+  surfacePatternSize: '32px 32px',
+  sidebarPatternSize: '24px 24px',
   notes: '',
 };
 

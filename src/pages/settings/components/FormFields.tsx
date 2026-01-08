@@ -87,8 +87,8 @@ export function TextField({
             <button
               id={id}
               type="button"
-              className="h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              style={{ backgroundColor: isControlled ? value : defaultValue }}
+              className={`h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${!(isControlled ? value : defaultValue) ? 'bg-primary' : ''}`}
+              style={{ backgroundColor: (isControlled ? value : defaultValue) || undefined }}
               aria-label="Open color picker"
             />
           </PopoverTrigger>
@@ -102,12 +102,13 @@ export function TextField({
           >
             {(() => {
               const colorValue = isControlled ? value : defaultValue;
+              const fallbackColor = '#3b82f6'; // match primary fallback used in avatars
               // Handle empty or invalid color values
               if (!colorValue || colorValue.trim() === '') {
                 return (
                   <ColorPicker
                     className="max-w-xs rounded-md p-2"
-                    defaultValue="#000000"
+                    defaultValue={fallbackColor}
                     onChange={(color : ColorLike) => {
                       const colorInstance = new Color(color);
                       const hex = colorInstance.hex();
@@ -510,14 +511,16 @@ export function AvatarCellRenderer({ name, color, size = "md" }: { name: string;
     }
   };
 
-  const backgroundColor = color || undefined;
-  const textColor = color ? getTextColor(color) : undefined;
+  // Check if color is valid (non-empty string)
+  const hasValidColor = color && typeof color === 'string' && color.trim() !== '' && color.trim() !== 'null' && color.trim() !== 'undefined';
+  const backgroundColor = hasValidColor ? color : undefined;
+  const textColor = hasValidColor ? getTextColor(color) : undefined;
   
   return (
     <div className="flex items-center space-x-2">
       <div 
-        className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-medium flex-shrink-0 ${!backgroundColor ? 'bg-primary text-primary-foreground' : ''}`}
-        style={backgroundColor ? { backgroundColor, color: textColor } : undefined}
+        className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-medium flex-shrink-0 ${!hasValidColor ? 'bg-primary text-primary-foreground' : ''}`}
+        style={hasValidColor ? { backgroundColor, color: textColor } : undefined}
       >
         {name?.charAt(0)?.toUpperCase() || '?'}
       </div>

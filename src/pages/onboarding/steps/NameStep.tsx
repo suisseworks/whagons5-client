@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { OnboardingData } from '@/types/user';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface NameStepProps {
   data: OnboardingData;
@@ -9,6 +10,7 @@ interface NameStepProps {
 }
 
 const NameStep: React.FC<NameStepProps> = ({ data, onNext, loading }) => {
+  const { t } = useLanguage();
   const [name, setName] = useState(data.name || '');
   const [error, setError] = useState('');
 
@@ -16,12 +18,12 @@ const NameStep: React.FC<NameStepProps> = ({ data, onNext, loading }) => {
     e.preventDefault();
     
     if (!name.trim()) {
-      setError('Please enter your name');
+      setError(t('onboarding.nameStep.pleaseEnterName', 'Please enter your name'));
       return;
     }
     
     if (name.trim().length < 2) {
-      setError('Name must be at least 2 characters long');
+      setError(t('onboarding.nameStep.nameTooShort', 'Name must be at least 2 characters long'));
       return;
     }
 
@@ -54,24 +56,24 @@ const NameStep: React.FC<NameStepProps> = ({ data, onNext, loading }) => {
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          What's your name?
+          {t('onboarding.nameStep.title', 'What\'s your name?')}
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
-          This will be displayed on your profile and used to personalize your experience.
+          {t('onboarding.nameStep.description', 'This will be displayed on your profile and used to personalize your experience.')}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Full Name
+            {t('onboarding.nameStep.fullName', 'Full Name')}
           </label>
           <input
             type="text"
             id="name"
             value={name}
             onChange={handleNameChange}
-            placeholder="Enter your full name"
+            placeholder={t('onboarding.nameStep.enterFullName', 'Enter your full name')}
             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
               error ? 'border-red-500' : 'border-gray-300'
             }`}
@@ -90,10 +92,10 @@ const NameStep: React.FC<NameStepProps> = ({ data, onNext, loading }) => {
           {loading ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Saving...
+              {t('onboarding.nameStep.saving', 'Saving...')}
             </div>
           ) : (
-            'Continue'
+            t('onboarding.nameStep.continue', 'Continue')
           )}
         </button>
       </form>

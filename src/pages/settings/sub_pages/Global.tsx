@@ -51,7 +51,18 @@ type ThemePreset = {
   };
   badge?: string;
   sidebarTone?: 'light' | 'dark';
+  patterns?: {
+    surface?: string;
+    sidebar?: string;
+    surfaceSize?: string;
+    sidebarSize?: string;
+  };
 };
+
+const RETRO_SURFACE_PATTERN =
+  "radial-gradient(circle at 12px 12px, rgba(0, 0, 0, 0.06) 2px, transparent 0), radial-gradient(circle at 4px 4px, rgba(255, 255, 255, 0.08) 2px, transparent 0)";
+const RETRO_SIDEBAR_PATTERN =
+  "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 6px, transparent 6px 12px), radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.08) 1.5px, transparent 0)";
 
 const PRESET_THEMES: ThemePreset[] = [
   {
@@ -128,6 +139,65 @@ const PRESET_THEMES: ThemePreset[] = [
     },
     badge: "Dark sidebar",
     sidebarTone: "dark"
+  },
+  {
+    id: "retro-grid",
+    label: "Retro Grid",
+    description: "80s neon palette with subtle pixel patterns on menus.",
+    gradient: "linear-gradient(130deg, #ff8fb1 0%, #7c3aed 45%, #22d3ee 100%)",
+    palette: {
+      primary: "#ff7f5f",
+      accent: "#22d3ee",
+      background: "#fff6e8",
+      text: "#20121f",
+      neutral: "#f2e4d2",
+      sidebar: "#2b1b34"
+    },
+    badge: "Retro",
+    patterns: {
+      surface: RETRO_SURFACE_PATTERN,
+      sidebar: RETRO_SIDEBAR_PATTERN,
+      surfaceSize: "30px 30px",
+      sidebarSize: "18px 18px"
+    }
+  },
+  {
+    id: "hipster-vibes",
+    label: "Hipster Vibes",
+    description: "Muted earthy tones with vintage mustard and dusty rose accents",
+    gradient: "linear-gradient(130deg, #d4a574 0%, #c97d60 50%, #a8b5a0 100%)",
+    palette: {
+      primary: "#d4a574",
+      accent: "#c97d60",
+      background: "#faf8f3",
+      text: "#3d3528",
+      neutral: "#e8ddd0",
+      sidebar: "#f5f1eb"
+    },
+    badge: "Hipster",
+    sidebarTone: "light"
+  },
+  {
+    id: "star-wars",
+    label: "Star Wars",
+    description: "Deep space theme with Rebel Alliance blue and iconic yellow accents",
+    gradient: "linear-gradient(130deg, #0a0a0a 0%, #4A90E2 50%, #FFE81F 100%)",
+    palette: {
+      primary: "#4A90E2",
+      accent: "#FFE81F",
+      background: "#0a0a0a",
+      text: "#E8E8E8",
+      neutral: "#141414",
+      sidebar: "#000000"
+    },
+    badge: "Star Wars",
+    sidebarTone: "dark",
+    patterns: {
+      surface: "radial-gradient(circle at 2px 2px, rgba(74, 144, 226, 0.08) 1px, transparent 0)",
+      sidebar: "linear-gradient(90deg, rgba(74, 144, 226, 0.03) 0%, transparent 50%, rgba(74, 144, 226, 0.03) 100%)",
+      surfaceSize: "40px 40px",
+      sidebarSize: "20px 20px"
+    }
   }
 ];
 
@@ -147,7 +217,15 @@ const getPresetIdForConfig = (config: BrandingConfig) => {
       theme.palette.background === config.backgroundColor &&
       getSidebarColorForTheme(theme) === config.sidebarColor &&
       theme.palette.text === config.textColor &&
-      theme.palette.neutral === config.neutralColor
+      theme.palette.neutral === config.neutralColor &&
+      (theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern) ===
+        (config.surfacePattern ?? DEFAULT_BRANDING_CONFIG.surfacePattern) &&
+      (theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern) ===
+        (config.sidebarPattern ?? DEFAULT_BRANDING_CONFIG.sidebarPattern) &&
+      (theme.patterns?.surfaceSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize) ===
+        (config.surfacePatternSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize) &&
+      (theme.patterns?.sidebarSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize) ===
+        (config.sidebarPatternSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize)
   );
   return preset?.id ?? CUSTOM_THEME_ID;
 };
@@ -272,6 +350,12 @@ function Global() {
     () => brand.gradientAccent || `linear-gradient(130deg, ${brand.primaryColor}, ${brand.accentColor})`,
     [brand.gradientAccent, brand.primaryColor, brand.accentColor]
   );
+  const surfacePattern = brand.surfacePattern ?? DEFAULT_BRANDING_CONFIG.surfacePattern;
+  const sidebarPattern = brand.sidebarPattern ?? DEFAULT_BRANDING_CONFIG.sidebarPattern;
+  const surfacePatternSize = brand.surfacePatternSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize;
+  const sidebarPatternSize = brand.sidebarPatternSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize;
+  const hasSurfacePattern = surfacePattern !== "none" && surfacePattern.trim() !== "";
+  const hasSidebarPattern = sidebarPattern !== "none" && sidebarPattern.trim() !== "";
 
   const handleBrandFieldChange =
     (field: keyof BrandingConfig) =>
@@ -299,7 +383,11 @@ function Global() {
       sidebarColor: getSidebarColorForTheme(theme),
       textColor: theme.palette.text,
       neutralColor: theme.palette.neutral,
-      gradientAccent: theme.gradient
+      gradientAccent: theme.gradient,
+      surfacePattern: theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern,
+      sidebarPattern: theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern,
+      surfacePatternSize: theme.patterns?.surfaceSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize,
+      sidebarPatternSize: theme.patterns?.sidebarSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize
     }));
   };
 
@@ -746,11 +834,15 @@ function Global() {
                         <div className="rounded-xl border overflow-hidden shadow-sm">
                           <div
                             className="p-5 text-white"
-                            style={{ background: previewGradient }}
+                            style={{
+                              backgroundImage: `${hasSurfacePattern ? `${surfacePattern}, ` : ""}${previewGradient}`,
+                              backgroundSize: hasSurfacePattern ? `${surfacePatternSize}, cover` : "cover",
+                              backgroundBlendMode: hasSurfacePattern ? "soft-light, normal" : undefined
+                            }}
                           >
                             <div className="flex items-center gap-3">
                               {assets.logoLight ? (
-                                <img src={assets.logoLight} alt="Brand logo" className="h-10 object-contain" />
+                                <img src={assets.logoLight} alt={t("settings.global.branding.designer.preview.brandLogoAlt", "Brand logo")} className="h-10 object-contain" />
                               ) : (
                                 <WhagonsCheck width={120} height={28} color="#ffffff" />
                               )}
@@ -766,7 +858,14 @@ function Global() {
 
                           <div
                             className="p-5 space-y-4"
-                            style={{ backgroundColor: brand.backgroundColor, color: brand.textColor }}
+                            style={{
+                              backgroundColor: brand.backgroundColor,
+                              color: brand.textColor,
+                              backgroundImage: hasSurfacePattern ? surfacePattern : undefined,
+                              backgroundSize: hasSurfacePattern ? surfacePatternSize : undefined,
+                              backgroundRepeat: hasSurfacePattern ? "repeat" : undefined,
+                              backgroundBlendMode: hasSurfacePattern ? "soft-light" : undefined
+                            }}
                           >
                             <div className="flex items-center justify-between">
                               <div>
@@ -796,7 +895,13 @@ function Global() {
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div
                                 className="rounded-lg p-3 text-sm text-white"
-                                style={{ backgroundColor: brand.sidebarColor }}
+                                style={{
+                                  backgroundColor: brand.sidebarColor,
+                                  backgroundImage: hasSidebarPattern ? sidebarPattern : undefined,
+                                  backgroundSize: hasSidebarPattern ? sidebarPatternSize : undefined,
+                                  backgroundRepeat: hasSidebarPattern ? "repeat" : undefined,
+                                  backgroundBlendMode: hasSidebarPattern ? "soft-light" : undefined
+                                }}
                               >
                                 {t("settings.global.branding.designer.preview.sidebarSample", "Sidebar sample")}
                               </div>
@@ -878,12 +983,16 @@ function Global() {
                           />
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="font-semibold text-sm">{theme.label}</p>
-                              <p className="text-xs text-muted-foreground">{theme.description}</p>
+                              <p className="font-semibold text-sm">
+                                {t(`settings.global.branding.presets.${theme.id}.label`, theme.label)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {t(`settings.global.branding.presets.${theme.id}.description`, theme.description)}
+                              </p>
                             </div>
                             {theme.badge && (
                               <Badge variant="secondary" className="text-[10px]">
-                                {theme.badge}
+                                {t(`settings.global.branding.presets.${theme.id}.badge`, theme.badge)}
                               </Badge>
                             )}
                           </div>

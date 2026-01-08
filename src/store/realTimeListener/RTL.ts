@@ -4,7 +4,6 @@ import { getEnvVariables } from "@/lib/getEnvVariables";
 // Removed direct TasksCache usage; routed through CacheRegistry
 import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
 import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
-import SockJS from 'sockjs-client';
 
 interface RTLMessage {
   type: 'ping' | 'system' | 'error' | 'echo' | 'database';
@@ -28,16 +27,16 @@ interface ConnectionOptions {
 }
 
 export class RealTimeListener {
-  private sock: any | null = null;
+  private ws: WebSocket | null = null;
   private isConnected: boolean = false;
   private isConnecting: boolean = false;
   private reconnectAttempts: number = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private pingInterval: NodeJS.Timeout | null = null;
   private options: ConnectionOptions;
   
   // Event listeners
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
-  // removed unused keepAliveListenerAdded
 
   constructor(options: ConnectionOptions = {}) {
     this.options = {
@@ -59,9 +58,9 @@ export class RealTimeListener {
   }
 
   /**
-   * Get the SockJS URL for connection
+   * Get the WebSocket URL for connection
    */
-  private getSockJSUrl(): string {
+  private getWebSocketUrl(): string {
     const { VITE_API_URL, VITE_DEVELOPMENT } = getEnvVariables();
     const subdomain = this.getSubdomain();
     const token = this.getStoredToken();
@@ -80,8 +79,8 @@ export class RealTimeListener {
     const apiUrlWithoutPort = VITE_API_URL.replace(/:\d+$/, ''); // Remove port from API URL
     const domain = cleanSubdomain ? `${cleanSubdomain}${apiUrlWithoutPort}` : apiUrlWithoutPort;
     
-    // SockJS uses regular HTTP/HTTPS protocol, not WebSocket protocol
-    const protocol = VITE_DEVELOPMENT === 'true' ? 'http' : 'https';
+    // WebSocket uses ws:// or wss:// protocol
+    const protocol = VITE_DEVELOPMENT === 'true' ? 'ws' : 'wss';
     const host = VITE_DEVELOPMENT === 'true' ? 'localhost:8082' : domain;
     
     const wsUrl = `${protocol}://${host}/ws?domain=${encodeURIComponent(domain)}&token=${encodeURIComponent(token)}`;
@@ -122,7 +121,7 @@ export class RealTimeListener {
   }
 
   /**
-   * Check if SockJS server is available
+   * Check if WebSocket server is available
    */
   async checkServerAvailability(): Promise<boolean> {
     const { VITE_DEVELOPMENT } = getEnvVariables();
@@ -130,7 +129,7 @@ export class RealTimeListener {
     if (VITE_DEVELOPMENT === 'true') {
       // In development, check if localhost:8082 is accessible
       try {
-        const response = await fetch('http://localhost:8082/health', { 
+        const response = await fetch('http://localhost:8082/api/health', { 
           method: 'GET',
           mode: 'no-cors' // Allow connection even if CORS isn't configured
         });
@@ -138,8 +137,8 @@ export class RealTimeListener {
         return true;
       } catch (error) {
         this.debugLog('Server health check failed:', error);
-        console.warn('⚠️  SockJS server appears to be offline at localhost:8082');
-        console.warn('💡 Make sure your SockJS server is running before connecting');
+        console.warn('⚠️  WebSocket server appears to be offline at localhost:8082');
+        console.warn('💡 Make sure your WebSocket server is running before connecting');
         return false;
       }
     }
@@ -155,7 +154,7 @@ export class RealTimeListener {
    //check if server is available
    const serverAvailable = await this.checkServerAvailability();
    if(!serverAvailable) {
-    throw new Error('SockJS server is not available. Please start the server and try again.');
+    throw new Error('WebSocket server is not available. Please start the server and try again.');
    }
    
    this.connect();
@@ -172,7 +171,7 @@ export class RealTimeListener {
   };
 
   /**
-   * Connect to SockJS
+   * Connect to WebSocket
    */
   async connect(): Promise<void> {
     if (this.isConnected || this.isConnecting) {
@@ -182,17 +181,17 @@ export class RealTimeListener {
 
     try {
       this.isConnecting = true;
-      const wsUrl = this.getSockJSUrl();
+      const wsUrl = this.getWebSocketUrl();
       
-      this.debugLog('Connecting to SockJS...', { subdomain: this.getSubdomain(), wsUrl });
-      this.emit('connection:status', { status: 'connecting', message: 'Connecting to SockJS...' });
+      this.debugLog('Connecting to WebSocket...', { subdomain: this.getSubdomain(), wsUrl });
+      this.emit('connection:status', { status: 'connecting', message: 'Connecting to WebSocket...' });
 
-      this.sock = new SockJS(wsUrl);
+      this.ws = new WebSocket(wsUrl);
       
-      this.sock.onopen = this.handleOpen.bind(this);
-      this.sock.onmessage = this.handleMessage.bind(this);
-      this.sock.onclose = this.handleClose.bind(this);
-      this.sock.onerror = this.handleError.bind(this);
+      this.ws.onopen = this.handleOpen.bind(this);
+      this.ws.onmessage = this.handleMessage.bind(this);
+      this.ws.onclose = this.handleClose.bind(this);
+      this.ws.onerror = this.handleError.bind(this);
 
     } catch (error) {
       console.error('RTL: Failed to create WebSocket connection:', error);
@@ -214,7 +213,7 @@ export class RealTimeListener {
     // Check server availability in development
     const serverAvailable = await this.checkServerAvailability();
     if (!serverAvailable) {
-      throw new Error('SockJS server is not available. Please start the server and try again.');
+      throw new Error('WebSocket server is not available. Please start the server and try again.');
     }
     
     return this.connect();
@@ -229,14 +228,14 @@ export class RealTimeListener {
     // Check server availability in development
     const serverAvailable = await this.checkServerAvailability();
     if (!serverAvailable) {
-      throw new Error('SockJS server is not available. Please start the server and try again.');
+      throw new Error('WebSocket server is not available. Please start the server and try again.');
     }
     
     return this.connectAndHold();
   }
 
   /**
-   * Disconnect from SockJS
+   * Disconnect from WebSocket
    */
   disconnect(): void {
     this.debugLog('Disconnecting...');
@@ -247,9 +246,14 @@ export class RealTimeListener {
       this.reconnectTimer = null;
     }
 
-    if (this.sock) {
-      this.sock.close();
-      this.sock = null;
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
     }
 
     this.isConnected = false;
@@ -260,33 +264,40 @@ export class RealTimeListener {
   }
 
   /**
-   * Send a message through SockJS
+   * Send a message through WebSocket
    */
   send(message: string | object): void {
-    if (!this.isConnected || !this.sock) {
+    if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
       console.warn('RTL: Cannot send message - not connected');
       return;
     }
 
     const payload = typeof message === 'string' ? message : JSON.stringify(message);
-    this.sock.send(payload);
+    this.ws.send(payload);
     this.debugLog('Message sent:', payload);
   }
 
   /**
-   * Handle SockJS open event
+   * Handle WebSocket open event
    */
   private handleOpen(): void {
-    this.debugLog('SockJS connected');
+    this.debugLog('WebSocket connected');
     this.isConnected = true;
     this.isConnecting = false;
     this.reconnectAttempts = 0;
+    
+    // Start ping interval to keep connection alive
+    this.pingInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000); // Send ping every 30 seconds
     
     this.emit('connection:status', { status: 'connected', message: 'Connected - Authenticating...' });
   }
 
   /**
-   * Handle SockJS message event
+   * Handle WebSocket message event
    */
   private handleMessage(event: MessageEvent): void {
     try {
@@ -301,12 +312,17 @@ export class RealTimeListener {
   }
 
   /**
-   * Handle SockJS close event
+   * Handle WebSocket close event
    */
   private handleClose(event: CloseEvent): void {
-    this.debugLog('SockJS disconnected', { code: event.code, reason: event.reason });
+    this.debugLog('WebSocket disconnected', { code: event.code, reason: event.reason });
     this.isConnected = false;
     this.isConnecting = false;
+    
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
     
     this.emit('connection:status', { status: 'disconnected', message: 'Connection closed' });
 
@@ -317,17 +333,17 @@ export class RealTimeListener {
   }
 
   /**
-   * Handle SockJS error event
+   * Handle WebSocket error event
    */
   private handleError(error: Event): void {
-    console.error('RTL: SockJS error:', error);
+    console.error('RTL: WebSocket error:', error);
     this.isConnecting = false;
     
     // More specific error message based on the current state
-    const wsUrl = this.sock?.url || 'unknown';
+    const wsUrl = this.ws?.url || 'unknown';
     const errorMessage = this.getConnectionErrorMessage(wsUrl);
     
-    console.error('❌ SockJS Connection Failed');
+    console.error('❌ WebSocket Connection Failed');
     console.error('📍 URL:', wsUrl);
     console.error('💡 Suggestion:', errorMessage);
     
@@ -343,11 +359,11 @@ export class RealTimeListener {
    */
   private getConnectionErrorMessage(wsUrl: string): string {
     if (wsUrl.includes('localhost:8082')) {
-      return 'SockJS server not running on localhost:8082. Please start your SockJS server.';
+      return 'WebSocket server not running on localhost:8082. Please start your WebSocket server.';
     } else if (wsUrl.includes('localhost')) {
-      return 'Local SockJS server connection failed. Check if the server is running.';
+      return 'Local WebSocket server connection failed. Check if the server is running.';
     } else {
-      return 'SockJS connection failed. Check your network connection and server status.';
+      return 'WebSocket connection failed. Check your network connection and server status.';
     }
   }
 

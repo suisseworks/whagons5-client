@@ -24,28 +24,41 @@ ENV VITE_DOMAIN=$VITE_DOMAIN
 ENV VITE_CACHE_ENCRYPTION=$VITE_CACHE_ENCRYPTION
 ENV VITE_ALLOW_UNVERIFIED_LOGIN=$VITE_ALLOW_UNVERIFIED_LOGIN
 ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
+# Note: BRYNTUM_USERNAME and BRYNTUM_PASSWORD are used in RUN commands, not set as ENV
 
 # Copy package files
 COPY package.json bun.lockb* package-lock.json* pnpm-lock.yaml* ./
 
-# Create .npmrc with FontAwesome token and Bryntum registry (Docker doesn't substitute vars in COPY)
-# Use $FONTAWESOME_PACKAGE_TOKEN from ARG (available in RUN commands)
-RUN if [ -z "$FONTAWESOME_PACKAGE_TOKEN" ]; then \
+# Install npm (needed for reliable registry authentication)
+# Configure .npmrc and install dependencies with npm using BuildKit secrets
+# Bun doesn't reliably authenticate with private registries, so we use npm for installation
+# Bun can use the node_modules that npm installs
+RUN apt-get update && \
+    apt-get install -y npm && \
+    npm --version && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create .npmrc from build args (without printing credentials) and install dependencies
+# Use BuildKit secret mount pattern: if .npmrc is provided via --secret id=npmrc,src=.npmrc,
+# it will be mounted at /app/.npmrc. Otherwise, create from build args silently.
+# To use secret: docker build --secret id=npmrc,src=.npmrc
+RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
+    if [ -z "$FONTAWESOME_PACKAGE_TOKEN" ]; then \
       echo "ERROR: FONTAWESOME_PACKAGE_TOKEN is not set!" && exit 1; \
     fi && \
     if [ -z "$BRYNTUM_USERNAME" ] || [ -z "$BRYNTUM_PASSWORD" ]; then \
       echo "ERROR: BRYNTUM_USERNAME and BRYNTUM_PASSWORD must be set!" && exit 1; \
     fi && \
-    echo "@fortawesome:registry=https://npm.fontawesome.com/" > .npmrc && \
-    echo "@awesome.me:registry=https://npm.fontawesome.com/" >> .npmrc && \
+    BRYNTUM_AUTH=$(echo -n "$BRYNTUM_USERNAME:$BRYNTUM_PASSWORD" | base64) && \
+    echo "@fortawesome:registry=https://npm.fontawesome.com" > .npmrc && \
+    echo "@awesome.me:registry=https://npm.fontawesome.com" >> .npmrc && \
     echo "//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" >> .npmrc && \
     echo "@bryntum:registry=https://npm.bryntum.com" >> .npmrc && \
-    echo "//npm.bryntum.com/:_authToken=$(echo -n \"$BRYNTUM_USERNAME:$BRYNTUM_PASSWORD\" | base64)" >> .npmrc && \
-    echo "Created .npmrc with FontAwesome token and Bryntum registry"
-
-# Install dependencies (Bun reads package-lock.json or creates bun.lockb)
-# Bun respects .npmrc for registry authentication
-RUN bun install --frozen-lockfile
+    echo "//npm.bryntum.com/:_authToken=$BRYNTUM_AUTH" >> .npmrc && \
+    echo "Installing dependencies with npm (reliable authentication)..." && \
+    npm ci --legacy-peer-deps && \
+    echo "Dependencies installed successfully!"
 
 # Copy source code
 COPY . .

@@ -29,18 +29,25 @@ export class AvatarCache {
     return Date.now() - ts > this.TTL_MS;
   }
 
-  public static async get(userId: number | string): Promise<string | null> {
+  public static async getRow(userId: number | string): Promise<AvatarRow | null> {
     await this.init();
     const mem = this.memory.get(userId);
-    if (mem && !this.isExpired(mem.timestamp)) return mem.data;
+    if (mem && !this.isExpired(mem.timestamp)) return mem;
+
     const row = (await DB.get(this.STORE as any, userId)) as AvatarRow | null;
     if (!row) return null;
     if (!row.timestamp || this.isExpired(row.timestamp)) {
       try { await DB.delete(this.STORE as any, userId); } catch {}
+      this.memory.delete(userId);
       return null;
     }
     this.memory.set(userId, row);
-    return row.data || null;
+    return row;
+  }
+
+  public static async get(userId: number | string): Promise<string | null> {
+    const row = await this.getRow(userId);
+    return row?.data || null;
   }
 
   public static async put(userId: number | string, dataUrl: string, url?: string | null): Promise<void> {
@@ -56,6 +63,16 @@ export class AvatarCache {
       if (id == null) continue;
       const v = await this.get(id);
       if (v) return v;
+    }
+    return null;
+  }
+
+  public static async getByAnyRow(ids: Array<number | string | undefined | null>): Promise<AvatarRow | null> {
+    await this.init();
+    for (const id of ids) {
+      if (id == null) continue;
+      const row = await this.getRow(id);
+      if (row) return row;
     }
     return null;
   }
@@ -77,6 +94,7 @@ export class AvatarCache {
     await this.init();
     if (!url) return null;
     if (this.pending.has(userId)) return this.pending.get(userId)!;
+
     const job = (async () => {
       try {
       const resp = await fetch(url);
@@ -85,6 +103,7 @@ export class AvatarCache {
         return null;
       }
       const blob = await resp.blob();
+
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -107,6 +126,29 @@ export class AvatarCache {
     const cached = await this.getByAny([userId, ...(aliases || [])]);
     if (cached) return cached;
     return await this.fetchAndCache(userId, url, aliases);
+  }
+
+  public static async delete(userId: number | string): Promise<void> {
+    await this.init();
+    try {
+      await DB.delete(this.STORE as any, userId);
+      this.memory.delete(userId);
+      // Also clear from pending requests
+      this.pending.delete(userId);
+      console.log('AvatarCache: Deleted cache for', userId);
+    } catch (error) {
+      console.error('AvatarCache: Error deleting cache for', userId, error);
+    }
+  }
+
+  public static async deleteByAny(ids: Array<number | string | undefined | null>): Promise<void> {
+    await this.init();
+    console.log('AvatarCache: deleteByAny called with ids:', ids);
+    for (const id of ids) {
+      if (id == null) continue;
+      await this.delete(id);
+    }
+    console.log('AvatarCache: deleteByAny completed');
   }
 }
 
