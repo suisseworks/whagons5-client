@@ -12,16 +12,8 @@ import {
   faPen,
   faUsers
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
+import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { 
-  updateCategoryReportingTeams, 
-  fetchCategoryReportingTeams,
-  selectReportingTeamsByCategoryId,
-  selectReportingTeamsLoading,
-  selectReportingTeamsError,
-  selectReportingTeamsSaving
-} from '@/store/reducers/categoryReportingTeamsSlice';
 import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -179,7 +171,7 @@ const CategoryActionsCellRenderer = (
 };
 
 function Categories() {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
@@ -260,32 +252,16 @@ function Categories() {
     status_transition_group_id: ''
   });
 
-  // Get reporting teams state from Redux
-  const reportingTeamsByCategoryId = useSelector((state: RootState) => 
-    editingCategory ? selectReportingTeamsByCategoryId(state, editingCategory.id) : []
-  );
-  const loadingReportingTeams = useSelector((state: RootState) => 
-    editingCategory ? selectReportingTeamsLoading(state, editingCategory.id) : false
-  );
-  const reportingTeamsError = useSelector((state: RootState) => 
-    editingCategory ? selectReportingTeamsError(state, editingCategory.id) : null
-  );
-  const savingReportingTeams = useSelector((state: RootState) => 
-    editingCategory ? selectReportingTeamsSaving(state, editingCategory.id) : false
-  );
+  // Reporting teams state - now comes directly from category's reporting_team_ids
+  const [savingReportingTeams, setSavingReportingTeams] = useState(false);
+  const [reportingTeamsError, setReportingTeamsError] = useState<string | null>(null);
 
-  // Load reporting teams for the editing category - uses Redux thunk
-  const loadReportingTeamsForEdit = useCallback(async () => {
+  // Load reporting teams from category directly
+  const loadReportingTeamsForEdit = useCallback(() => {
     if (!editingCategory) return;
-    try {
-      const result = await dispatch(fetchCategoryReportingTeams(editingCategory.id)).unwrap();
-      // Update local selection state with fetched team IDs from Redux
-      setSelectedReportingTeamIds(result.teamIds);
-    } catch (e: any) {
-      console.error('Error loading reporting teams', e);
-      // Error is already stored in Redux state via selectReportingTeamsError
-    }
-  }, [editingCategory, dispatch]);
+    setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
+    setReportingTeamsError(null);
+  }, [editingCategory]);
 
   // Update edit form data when editing category changes
   useEffect(() => {
@@ -317,20 +293,21 @@ function Categories() {
     });
   };
 
-  // Save reporting teams - uses Redux thunk
+  // Save reporting teams - uses category update
   const handleSaveReportingTeams = async () => {
     if (!editingCategory) return;
+    setSavingReportingTeams(true);
+    setReportingTeamsError(null);
     try {
-      // Dispatch Redux action - thunk handles API call and state updates
-      await dispatch(updateCategoryReportingTeams({
-        categoryId: editingCategory.id,
-        teamIds: selectedReportingTeamIds
+      await dispatch(genericActions.categories.updateAsync({
+        id: editingCategory.id,
+        updates: { reporting_team_ids: selectedReportingTeamIds }
       })).unwrap();
-      // Refresh categories to update reporting_teams field
-      dispatch((genericActions as any).categories.fetchFromAPI());
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
-      // Error is already stored in Redux state via selectReportingTeamsError
+      setReportingTeamsError(e?.message || 'Failed to save reporting teams');
+    } finally {
+      setSavingReportingTeams(false);
     }
   };
 
@@ -345,15 +322,13 @@ function Categories() {
   // Reporting teams state for inline tab (temporary UI state synced with Redux)
   const [selectedReportingTeamIds, setSelectedReportingTeamIds] = useState<number[]>([]);
 
-  // Sync selectedReportingTeamIds with Redux when reportingTeamsByCategoryId changes
+  // Sync selectedReportingTeamIds when editingCategory changes
   useEffect(() => {
-    if (editingCategory && reportingTeamsByCategoryId.length > 0) {
-      setSelectedReportingTeamIds(reportingTeamsByCategoryId);
-    } else if (editingCategory && reportingTeamsByCategoryId.length === 0) {
-      // If Redux has empty array, clear local state
-      setSelectedReportingTeamIds([]);
+    if (editingCategory) {
+      setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
+      setReportingTeamsError(null);
     }
-  }, [editingCategory, reportingTeamsByCategoryId]);
+  }, [editingCategory]);
 
   const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
     const map: Record<number, number> = {};
@@ -1322,11 +1297,9 @@ function Categories() {
               category={editingCategory}
               selectedTeamIds={selectedReportingTeamIds}
               onToggleTeam={handleToggleReportingTeam}
-              loading={loadingReportingTeams}
               saving={savingReportingTeams}
               error={reportingTeamsError}
               onSave={handleSaveReportingTeams}
-              onLoad={loadReportingTeamsForEdit}
               onReset={loadReportingTeamsForEdit}
               teams={teams}
             />

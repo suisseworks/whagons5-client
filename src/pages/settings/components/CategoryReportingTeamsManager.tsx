@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RootState, AppDispatch } from "@/store/store";
 import { Category, Team } from "@/store/types";
-import { fetchCategoryReportingTeams, clearError } from "@/store/reducers/categoryReportingTeamsSlice";
 import { genericActions } from "@/store/genericSlices";
 
 export interface CategoryReportingTeamsManagerProps {
@@ -23,7 +22,6 @@ export interface CategoryReportingTeamsManagerProps {
   saving?: boolean;
   error?: string | null;
   onSave?: () => Promise<void>;
-  onLoad?: () => Promise<void>;
   onReset?: () => void;
   teams?: Team[];
 }
@@ -39,7 +37,6 @@ export function CategoryReportingTeamsManager({
   saving: controlledSaving,
   error: controlledError,
   onSave: controlledOnSave,
-  onLoad: controlledOnLoad,
   onReset: controlledOnReset,
   teams: controlledTeams
 }: CategoryReportingTeamsManagerProps) {
@@ -47,51 +44,26 @@ export function CategoryReportingTeamsManager({
   const teamsFromStore = useSelector((state: RootState) => (state.teams as { value: Team[] }).value);
   const teams = controlledTeams || teamsFromStore;
   
-  // Read reporting teams from Redux
-  const categoryReportingTeamsState = useSelector((state: RootState) => state.categoryReportingTeams);
-  const categoryId = category?.id;
-  const reportingTeamIdsFromRedux = categoryId ? (categoryReportingTeamsState.data[categoryId] || []) : [];
-  const loadingFromRedux = categoryId ? (categoryReportingTeamsState.loading[categoryId] || false) : false;
-  const savingFromRedux = categoryId ? (categoryReportingTeamsState.saving[categoryId] || false) : false;
-  const errorFromRedux = categoryId ? (categoryReportingTeamsState.error[categoryId] || null) : null;
-  
-  // Internal state (only UI-only state: temporary selections for dialog mode)
+  // Internal state for temporary selections (dialog mode)
   const [internalSelectedTeamIds, setInternalSelectedTeamIds] = useState<number[]>([]);
+  const [internalSaving, setInternalSaving] = useState(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
 
-  // Use controlled props if provided, otherwise use Redux state or internal temporary state
+  // Use controlled props if provided, otherwise use internal state
   const selectedTeamIds = controlledSelectedTeamIds ?? internalSelectedTeamIds;
-  const loading = controlledLoading ?? loadingFromRedux;
-  const saving = controlledSaving ?? savingFromRedux;
-  const error = controlledError ?? errorFromRedux;
+  const loading = controlledLoading ?? false;
+  const saving = controlledSaving ?? internalSaving;
+  const error = controlledError ?? internalError;
 
-  const loadReportingTeams = useCallback(async () => {
-    if (!category) return;
-    if (controlledOnLoad) {
-      await controlledOnLoad();
-      return;
-    }
-    // Dispatch fetch thunk - Redux handles loading/error state
-    try {
-      const result = await dispatch(fetchCategoryReportingTeams(category.id)).unwrap();
-      // Update temporary selection state with fetched team IDs
-      setInternalSelectedTeamIds(result.teamIds);
-    } catch (e: any) {
-      console.error('Error loading reporting teams', e);
-      // Error is already stored in Redux state
-    }
-  }, [category, controlledOnLoad, dispatch]);
-
-  // Load current reporting teams when dialog opens (only in dialog mode)
+  // Initialize selections from category's reporting_team_ids when dialog opens
   useEffect(() => {
-    if (variant === 'dialog' && open && category && controlledOnLoad === undefined) {
-      // If we already have data in Redux, use it; otherwise fetch
-      if (categoryId && categoryReportingTeamsState.data[categoryId]) {
-        setInternalSelectedTeamIds(categoryReportingTeamsState.data[categoryId]);
-      } else {
-        loadReportingTeams();
+    if ((variant === 'dialog' && open) || variant === 'inline') {
+      if (category && controlledSelectedTeamIds === undefined) {
+        setInternalSelectedTeamIds(category.reporting_team_ids || []);
+        setInternalError(null);
       }
     }
-  }, [variant, open, category, categoryId, categoryReportingTeamsState.data, controlledOnLoad, loadReportingTeams]);
+  }, [variant, open, category, controlledSelectedTeamIds]);
 
   const handleToggleTeam = (teamId: number) => {
     if (controlledOnToggleTeam) {
@@ -113,18 +85,23 @@ export function CategoryReportingTeamsManager({
       await controlledOnSave();
       return;
     }
-    // Dispatch generic update action - Redux handles loading/error state
+    
+    setInternalSaving(true);
+    setInternalError(null);
+    
     try {
       await dispatch(genericActions.categories.updateAsync({
         id: category.id,
-        updates: { reporting_teams: internalSelectedTeamIds }
+        updates: { reporting_team_ids: internalSelectedTeamIds }
       })).unwrap();
       if (onOpenChange) {
         onOpenChange(false);
       }
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
-      // Error is already stored in Redux state
+      setInternalError(e?.message || 'Failed to save reporting teams');
+    } finally {
+      setInternalSaving(false);
     }
   };
 
@@ -133,8 +110,9 @@ export function CategoryReportingTeamsManager({
       controlledOnReset();
       return;
     }
-    if (variant === 'dialog' && category) {
-      loadReportingTeams();
+    if (category) {
+      setInternalSelectedTeamIds(category.reporting_team_ids || []);
+      setInternalError(null);
     }
   };
 
@@ -142,10 +120,7 @@ export function CategoryReportingTeamsManager({
     if (onOpenChange) {
       onOpenChange(false);
     }
-    // Clear error in Redux if category is set
-    if (categoryId) {
-      dispatch(clearError(categoryId));
-    }
+    setInternalError(null);
   };
 
   // Filter out the category's owner team from the list
@@ -202,7 +177,7 @@ export function CategoryReportingTeamsManager({
   // Render footer buttons (shared between dialog and inline modes)
   const renderFooter = () => (
     <div className="flex justify-end gap-2 pt-4 border-t">
-      {variant === 'inline' && controlledOnReset && (
+      {variant === 'inline' && (
         <Button
           variant="outline"
           onClick={handleReset}
@@ -285,5 +260,3 @@ export function CategoryReportingTeamsManager({
 }
 
 export default CategoryReportingTeamsManager;
-
-

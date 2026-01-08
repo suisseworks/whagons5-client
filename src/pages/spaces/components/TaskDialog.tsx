@@ -490,8 +490,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     // If user is owner, they have permission
     if (userTeamIds.includes(categoryTeamId)) return true;
     
-    // Check if user's team is in reporting_teams
-    const reportingTeamIds = (currentCategory as any).reporting_teams || [];
+    // Check if user's team is in reporting_team_ids
+    const reportingTeamIds = currentCategory.reporting_team_ids || [];
     return reportingTeamIds.some((tid: number) => userTeamIds.includes(Number(tid)));
   }, [categoryId, currentCategory, userTeamIds]);
 
