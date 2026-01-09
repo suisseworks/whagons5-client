@@ -71,5 +71,6 @@ EXPOSE 3000
 
 # Use serve (via bunx) to serve static files from dist directory
 # Listen on port 3000 (serve defaults to 0.0.0.0)
-CMD ["bunx", "serve", "dist", "-l", "3000"]
+CMD ["bunx", "serve", "-s", "dist", "-l", "3000"]
+
 
