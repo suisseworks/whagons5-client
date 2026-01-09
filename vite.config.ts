@@ -55,37 +55,42 @@ export default defineConfig(({ mode }) => {
         sourceMap: false,
         compact: true
       }),
-      // Include PWA plugin to provide virtual module resolution in all modes
-      VitePWA({
-        registerType: 'autoUpdate',
-        injectRegister: null,
-        includeAssets: ['whagons.svg'],
-        manifest: {
-          name: 'WHagons',
-          short_name: 'WHagons',
-          start_url: '/',
-          display: 'standalone',
-          background_color: '#ffffff',
-          theme_color: '#ffffff'
-        },
-        workbox: {
-          // Default precaching of build assets; include large vendor chunks as well
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-          runtimeCaching: [
-            {
-              urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'api-cache',
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-                cacheableResponse: { statuses: [0, 200] }
-              }
-            }
-          ]
-        },
-        devOptions: { enabled: false }
-      })
+      // PWA plugin temporarily disabled for debugging
+      // VitePWA({
+      //   registerType: 'autoUpdate',
+      //   injectRegister: null,
+      //   includeAssets: ['whagons.svg'],
+      //   manifest: {
+      //     name: 'WHagons',
+      //     short_name: 'WHagons',
+      //     start_url: '/',
+      //     display: 'standalone',
+      //     background_color: '#ffffff',
+      //     theme_color: '#ffffff'
+      //   },
+      //   workbox: {
+      //     // Default precaching of build assets; include large vendor chunks as well
+      //     globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+      //     maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+      //     // Enable skipWaiting and clientsClaim for immediate updates
+      //     skipWaiting: true,
+      //     clientsClaim: true,
+      //     // Check for updates more frequently
+      //     cleanupOutdatedCaches: true,
+      //     runtimeCaching: [
+      //       {
+      //         urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+      //         handler: 'NetworkFirst',
+      //         options: {
+      //           cacheName: 'api-cache',
+      //           expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+      //           cacheableResponse: { statuses: [0, 200] }
+      //         }
+      //       }
+      //     ]
+      //   },
+      //   devOptions: { enabled: false }
+      // })
     ].filter(Boolean),
     define: {
       global: 'globalThis',
@@ -97,6 +102,10 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+    },
+    optimizeDeps: {
+      // Exclude FontAwesome from pre-bundling to avoid circular dependency issues
+      exclude: ['@fortawesome/pro-regular-svg-icons', '@fortawesome/fontawesome-common-types'],
     },
     build: {
       // Enable build caching for faster rebuilds
@@ -134,8 +143,9 @@ export default defineConfig(({ mode }) => {
 
             if (id.includes('/node_modules/axios')) return 'http';
 
-            // Icons and crypto helpers
-            if (id.includes('/node_modules/@fortawesome')) return 'icons';
+            // Don't chunk FontAwesome separately - causes circular dependency issues
+            // Keep it in main bundle to avoid initialization order problems
+            // if (id.includes('/node_modules/@fortawesome')) return 'icons';
             if (id.includes('/node_modules/crypto-js')) return 'crypto';
 
             const utilPkgs = ['tailwind-merge','tailwindcss-animate','clsx'];
