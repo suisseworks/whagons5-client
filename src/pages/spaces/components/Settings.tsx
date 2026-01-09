@@ -92,6 +92,23 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     return allDefault;
   });
 
+  const [visibleTabs, setVisibleTabs] = useState<string[]>(() => {
+    const defaultTabs = ['grid', 'calendar', 'scheduler', 'map', 'board'];
+    try {
+      const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (!raw) return defaultTabs;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        // Always ensure grid is included
+        return Array.from(new Set(['grid', ...parsed]));
+      }
+    } catch {
+      // ignore
+    }
+    return defaultTabs;
+  });
+
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   // Using async actions for workspace operations
@@ -511,6 +528,113 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                 <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-3 text-xs">Comfortable</ToggleGroupItem>
                 <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-3 text-xs">Spacious</ToggleGroupItem>
               </ToggleGroup>
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-start gap-3">
+              <div className="flex-1 space-y-1">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-muted-foreground" />
+                  <span>Visible tabs</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Select which tabs are visible in the workspace. Tasks tab is always visible.
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                { id: 'grid', label: 'Tasks', locked: true },
+                { id: 'calendar', label: 'Calendar', locked: false },
+                { id: 'scheduler', label: 'Scheduler', locked: false },
+                { id: 'map', label: 'Map', locked: false },
+                { id: 'board', label: 'Board', locked: false },
+              ].map(tab => (
+                <div
+                  key={tab.id}
+                  role="button"
+                  tabIndex={tab.locked ? -1 : 0}
+                  aria-disabled={tab.locked}
+                  aria-pressed={visibleTabs.includes(tab.id)}
+                  onClick={() => {
+                    if (tab.locked) return;
+                    const newTabs = visibleTabs.includes(tab.id)
+                      ? visibleTabs.filter(t => t !== tab.id)
+                      : [...visibleTabs, tab.id];
+                    setVisibleTabs(newTabs);
+                    try {
+                      const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
+                      window.localStorage.setItem(key, JSON.stringify(newTabs));
+                      window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
+                        detail: {
+                          workspaceId: workspaceId || 'all',
+                          visibleTabs: newTabs,
+                        }
+                      }));
+                    } catch {
+                      // ignore storage / event errors
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (tab.locked) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      const newTabs = visibleTabs.includes(tab.id)
+                        ? visibleTabs.filter(t => t !== tab.id)
+                        : [...visibleTabs, tab.id];
+                      setVisibleTabs(newTabs);
+                      try {
+                        const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
+                        window.localStorage.setItem(key, JSON.stringify(newTabs));
+                        window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
+                          detail: {
+                            workspaceId: workspaceId || 'all',
+                            visibleTabs: newTabs,
+                          }
+                        }));
+                      } catch {
+                        // ignore storage / event errors
+                      }
+                    }
+                  }}
+                  className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left ${
+                    tab.locked
+                      ? 'opacity-70 cursor-not-allowed'
+                      : 'hover:bg-accent cursor-pointer'
+                  }`}
+                >
+                  <Checkbox
+                    checked={tab.locked || visibleTabs.includes(tab.id)}
+                    disabled={tab.locked}
+                    onCheckedChange={() => {
+                      if (tab.locked) return;
+                      const newTabs = visibleTabs.includes(tab.id)
+                        ? visibleTabs.filter(t => t !== tab.id)
+                        : [...visibleTabs, tab.id];
+                      setVisibleTabs(newTabs);
+                      try {
+                        const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
+                        window.localStorage.setItem(key, JSON.stringify(newTabs));
+                        window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
+                          detail: {
+                            workspaceId: workspaceId || 'all',
+                            visibleTabs: newTabs,
+                          }
+                        }));
+                      } catch {
+                        // ignore storage / event errors
+                      }
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="text-xs">
+                    {tab.label}
+                    {tab.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">(Required)</span>}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
           <div className="mb-4 p-3 border rounded-md bg-background">

@@ -1075,7 +1075,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Ingresa un valor..."
-          className="min-h-[100px] px-4 py-3 rounded-[10px] text-sm focus:border-[#00BFA5] focus:ring-[3px] focus:ring-[#00BFA5]/10 transition-all duration-150"
+          className="min-h-[100px] px-4 py-3 rounded-[10px] text-sm focus:border-primary focus:ring-[3px] focus:ring-ring transition-all duration-150"
         />
       );
     }
@@ -1087,7 +1087,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           value={value === undefined || value === null ? '' : String(value)}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Ingresa un número"
-          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+          className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
         />
       );
     }
@@ -1113,7 +1113,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           onValueChange={(v) => onChange(v)}
         >
           <SelectTrigger 
-            className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+            className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
           >
             <SelectValue placeholder="Selecciona una opción" />
           </SelectTrigger>
@@ -1121,7 +1121,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
             {options.length ? options.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             )) : (
-              <div className="px-2 py-1.5 text-sm text-[#6B7280]">Sin opciones</div>
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">Sin opciones</div>
             )}
           </SelectContent>
         </Select>
@@ -1131,7 +1131,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
     if (type === 'multi_select' || type === 'multi-select' || type === 'multi select') {
       const values = Array.isArray(value) ? value.map(String) : parseMultiValue(value);
       return (
-        <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+        <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
           <MultiSelectCombobox
             options={options}
             value={values}
@@ -1151,7 +1151,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           type="date"
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+          className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
         />
       );
     }
@@ -1162,7 +1162,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           type="datetime-local"
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+          className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
         />
       );
     }
@@ -1173,7 +1173,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           type="time"
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+          className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
         />
       );
     }
@@ -1184,7 +1184,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Ingresa un valor..."
-        className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+        className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
       />
     );
   };
@@ -1423,8 +1423,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
         <div
           ref={resizeRef}
           onMouseDown={handleResizeStart}
-          className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-[#00BFA5]/20 transition-colors duration-150 z-50 group ${
-            isResizing ? 'bg-[#00BFA5]/40' : ''
+          className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-primary/20 transition-colors duration-150 z-50 group ${
+            isResizing ? 'bg-primary/40' : ''
           }`}
           style={{ 
             touchAction: 'none',
@@ -1435,10 +1435,10 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
           aria-label="Resize dialog"
           aria-orientation="vertical"
         >
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-20 bg-[#00BFA5] rounded-full opacity-0 group-hover:opacity-60 transition-opacity duration-150" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-20 bg-primary rounded-full opacity-0 group-hover:opacity-60 transition-opacity duration-150" />
         </div>
         {/* Header Section - Fixed */}
-        <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-[#00BFA5]/5 via-transparent to-transparent flex-shrink-0">
+        <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-transparent flex-shrink-0">
           <div className={`flex items-center gap-3 flex-1 min-w-0 ${mode === 'edit' ? 'mb-2' : ''}`}>
             <SheetTitle className="text-xl sm:text-2xl font-semibold font-[600] text-foreground flex-shrink-0">
               {mode === 'edit' ? 'Edit Task' : 'Create New Task'}
@@ -1451,7 +1451,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               />
             )}
             {categoryId && currentCategory && (
-              <span className="text-sm text-[#6B7280] font-medium whitespace-nowrap truncate">
+              <span className="text-sm text-muted-foreground font-medium whitespace-nowrap truncate">
                 {currentCategory.name}
               </span>
             )}
@@ -1466,14 +1466,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               <TabsList className="inline-flex h-auto p-0 pr-6 bg-transparent border-b border-border/40 rounded-none gap-0 w-full overflow-x-auto">
                 <TabsTrigger 
                   value="basic" 
-                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
                 >
                   Basic Details
                 </TabsTrigger>
                 {categoryFields.length > 0 && (
                   <TabsTrigger 
                     value="customFields" 
-                    className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                    className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
                   >
                     Fields
                     {customFieldRequirementMissing && (
@@ -1483,14 +1483,14 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                 )}
                 <TabsTrigger 
                   value="additional" 
-                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
                 >
                   Additional Info
                 </TabsTrigger>
                 {mode === 'edit' && (
                   <TabsTrigger 
                     value="share" 
-                    className="px-0 py-3 text-sm font-medium text-[#6B7280] data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-[#00BFA5] rounded-none transition-all duration-150 ease-in-out"
+                    className="px-0 py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
                   >
                     Share
                   </TabsTrigger>
@@ -1507,7 +1507,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   {mode === 'create-all' ? (
                     // For create-all mode: show all templates from all DEFAULT workspaces
                     workspaceTemplates.length === 0 ? (
-                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={[]}
                           value={undefined}
@@ -1519,7 +1519,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                         />
                       </div>
                     ) : (
-                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={workspaceTemplates.map((t: any) => {
                             const category = categories.find((c: any) => c.id === t.category_id);
@@ -1550,7 +1550,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   ) : (
                     // For create and edit modes: show templates filtered by workspace
                     !currentWorkspace || currentWorkspace.type !== "DEFAULT" ? (
-                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={[]}
                           value={undefined}
@@ -1562,7 +1562,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                         />
                       </div>
                     ) : workspaceTemplates.length === 0 ? (
-                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={[]}
                           value={undefined}
@@ -1574,7 +1574,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                         />
                       </div>
                     ) : (
-                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={workspaceTemplates.map((t: any) => {
                             const category = categories.find((c: any) => c.id === t.category_id);
@@ -1600,7 +1600,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     )
                   )}
                   {!workspaceTemplates.length && (
-                    <p className="text-xs text-[#6B7280] mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {mode === 'create-all'
                         ? 'No templates available. Enable or create templates in default workspaces first.'
                         : !currentWorkspace || currentWorkspace.type !== "DEFAULT"
@@ -1624,7 +1624,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs uppercase tracking-wide font-semibold text-blue-700">Approval required</span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white text-blue-700 border border-blue-100 font-semibold">Pending</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-card text-card-foreground border border-border font-semibold">Pending</span>
                       </div>
                       <div className="font-semibold truncate">
                         {selectedApproval?.name || `Approval #${selectedApprovalId}`}
@@ -1668,7 +1668,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   <button
                     type="button"
                     onClick={() => setShowDescription(true)}
-                    className="flex items-center gap-2 text-sm text-[#6B7280] hover:text-foreground transition-colors duration-150 py-2"
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 py-2"
                   >
                     <Plus className="w-4 h-4" />
                     <span>{description.trim() ? 'Show description' : 'Add description'}</span>
@@ -1687,7 +1687,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                             setDescription('');
                           }
                         }}
-                        className="text-[#6B7280] hover:text-foreground transition-colors duration-150 p-1"
+                        className="text-muted-foreground hover:text-foreground transition-colors duration-150 p-1"
                         aria-label="Hide description"
                       >
                         <ChevronUp className="w-4 h-4" />
@@ -1703,7 +1703,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                         }
                       }}
                       placeholder="Add a description for this task..." 
-                      className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y focus:border-[#00BFA5] focus:ring-[3px] focus:ring-[#00BFA5]/10 transition-all duration-150" 
+                      className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y focus:border-primary focus:ring-[3px] focus:ring-ring transition-all duration-150" 
                     />
                   </div>
                 )}
@@ -1726,7 +1726,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                       <Label className="text-sm font-medium font-[500] text-foreground">
                         Location
                       </Label>
-                      <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                      <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                         <Combobox
                           options={workspaceSpots.map((s: any) => ({
                             value: String(s.id),
@@ -1749,7 +1749,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   <Label className="text-sm font-medium font-[500] text-foreground">
                     Responsible
                   </Label>
-                  <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                  <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                     <MultiSelectCombobox
                       options={workspaceUsers.map((u: any) => ({
                         value: String(u.id),
@@ -1774,7 +1774,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </Label>
                   <Select value={priorityId ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
                     >
                       <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
                     </SelectTrigger>
@@ -1800,9 +1800,9 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               {categoryFields.length > 0 && (
               <TabsContent value="customFields" className="mt-0 pt-4 sm:pt-6 px-4 sm:px-6 pb-6 space-y-4 data-[state=inactive]:hidden">
                 {!categoryId ? (
-                  <p className="text-sm text-[#6B7280]">Selecciona una categoría para ver los campos personalizados.</p>
+                  <p className="text-sm text-muted-foreground">Selecciona una categoría para ver los campos personalizados.</p>
                 ) : categoryFields.length === 0 ? (
-                  <p className="text-sm text-[#6B7280]">Esta categoría no tiene campos personalizados asignados.</p>
+                  <p className="text-sm text-muted-foreground">Esta categoría no tiene campos personalizados asignados.</p>
                 ) : (
                   <div className="space-y-4">
                     {categoryFields.map(({ assignment, field }: { assignment: any; field: any }) => {
@@ -1842,7 +1842,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     <Label className="text-sm font-medium font-[500] text-foreground">
                       Tags
                     </Label>
-                    <div className="[&_button]:border [&_button]:border-black/8 [&_button]:bg-[#F8F9FA] [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-black/12 [&_button]:focus-visible:border-[#00BFA5] [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-[#00BFA5]/10 [&_button]:focus-visible:bg-background">
+                    <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
                       <TagMultiSelect
                         tags={tags}
                         value={selectedTagIds}
@@ -1864,7 +1864,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   </Label>
                   <Select value={slaId ? String(slaId) : ""} onValueChange={(v) => setSlaId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
                     >
                       <SelectValue placeholder="Select SLA (optional)" />
                     </SelectTrigger>
@@ -1874,7 +1874,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                           <SelectItem key={s.id} value={String(s.id)}>{s.name || `SLA ${s.id}`}</SelectItem>
                         ))
                       ) : (
-                        <div className="px-2 py-1.5 text-sm text-[#6B7280]">No SLAs available</div>
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">No SLAs available</div>
                       )}
                     </SelectContent>
                   </Select>
@@ -1885,7 +1885,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                   <Label className="text-sm font-medium font-[500] text-foreground">Approval</Label>
                   <Select value={approvalId ? String(approvalId) : ""} onValueChange={(v) => setApprovalId(v ? parseInt(v, 10) : null)}>
                     <SelectTrigger 
-                      className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background"
+                      className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
                     >
                       <SelectValue placeholder="Select approval (optional)" />
                     </SelectTrigger>
@@ -1895,7 +1895,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                           <SelectItem key={a.id} value={String(a.id)}>{a.name || `Approval ${a.id}`}</SelectItem>
                         ))
                       ) : (
-                        <div className="px-2 py-1.5 text-sm text-[#6B7280]">No approvals available</div>
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">No approvals available</div>
                       )}
                     </SelectContent>
                   </Select>
@@ -1911,7 +1911,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                     type="date" 
                     value={dueDate} 
                     onChange={(e) => setDueDate(e.target.value)} 
-                    className="h-10 px-4 border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background" 
+                    className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background" 
                   />
                 </div>
 
@@ -1996,7 +1996,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                             value={shareTeamId ? String(shareTeamId) : ''}
                             onValueChange={(v) => setShareTeamId(v ? parseInt(v, 10) : null)}
                           >
-                            <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
+                            <SelectTrigger className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background">
                               <SelectValue placeholder="Select a team" />
                             </SelectTrigger>
                             <SelectContent>
@@ -2009,7 +2009,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                                     </SelectItem>
                                   ))
                               ) : (
-                                <div className="px-2 py-1.5 text-sm text-[#6B7280]">No teams available</div>
+                                <div className="px-2 py-1.5 text-sm text-muted-foreground">No teams available</div>
                               )}
                             </SelectContent>
                           </Select>
@@ -2023,7 +2023,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                           value={sharePermission}
                           onValueChange={(v) => setSharePermission(v as 'COMMENT_ATTACH' | 'STATUS_TRACKING')}
                         >
-                          <SelectTrigger className="h-10 px-4 border border-black/8 bg-[#F8F9FA] rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-black/12 focus-visible:border-[#00BFA5] focus-visible:ring-[3px] focus-visible:ring-[#00BFA5]/10 focus-visible:bg-background">
+                          <SelectTrigger className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -2052,7 +2052,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                           shareBusy ||
                           !task?.id
                         }
-                        className="h-10 px-4 rounded-[10px] font-medium bg-[#00BFA5] hover:bg-[#00BFA5]/90 text-white transition-all duration-150 disabled:opacity-50"
+                        className="h-10 px-4 rounded-[10px] font-medium bg-primary hover:opacity-90 text-primary-foreground transition-all duration-150 disabled:opacity-50"
                       >
                         {shareBusy ? 'Sharing…' : 'Share'}
                       </Button>
@@ -2064,7 +2064,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
                         </div>
                       ) : null}
                       {shareSuccess ? (
-                        <div className="text-sm text-foreground text-[#00BFA5] p-2 rounded-md bg-[#00BFA5]/10 border border-[#00BFA5]/20">
+                        <div className="text-sm text-foreground text-primary p-2 rounded-md bg-primary/10 border border-primary/20">
                           {shareSuccess}
                         </div>
                       ) : null}
@@ -2084,7 +2084,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               onClick={() => onOpenChange(false)} 
               disabled={isSubmitting} 
               className={mode === 'create-all' 
-                ? "h-12 px-6 text-[#6B7280] border border-black/20 bg-transparent hover:bg-[#F3F4F6] rounded-[10px] transition-all duration-200 font-medium order-3 sm:order-2"
+                ? "h-12 px-6 text-muted-foreground border border-border bg-transparent hover:bg-muted rounded-[10px] transition-all duration-200 font-medium order-3 sm:order-2"
                 : "h-11 px-6 rounded-[10px] font-medium transition-all duration-150"
               }
             >
@@ -2094,8 +2094,8 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               onClick={handleSubmit} 
               disabled={!canSubmit || isSubmitting} 
               className={mode === 'create-all'
-                ? "h-12 px-8 bg-[#00BFA5] hover:bg-[#00AA92] text-white rounded-[10px] transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-3"
-                : "h-11 px-6 rounded-[10px] font-medium bg-[#00BFA5] hover:bg-[#00BFA5]/90 text-white transition-all duration-150"
+                ? "h-12 px-8 bg-primary hover:opacity-90 text-primary-foreground rounded-[10px] transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-3"
+                : "h-11 px-6 rounded-[10px] font-medium bg-primary hover:opacity-90 text-primary-foreground transition-all duration-150"
               }
             >
               {isSubmitting 

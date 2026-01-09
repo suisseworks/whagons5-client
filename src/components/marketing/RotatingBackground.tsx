@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type RotatingBackgroundProps = {
@@ -25,6 +25,16 @@ export default function RotatingBackground({
 }: RotatingBackgroundProps) {
   const canAnimate = useMemo(() => !prefersReducedMotion(), []);
 
+  // Track images that fail to load so we can skip them (e.g. missing local assets).
+  const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
+  const preloadedRef = useRef<Set<string>>(new Set());
+
+  const usableImages = useMemo(() => {
+    const list = (images ?? []).filter(Boolean);
+    if (!failedImages.size) return list;
+    return list.filter((src) => !failedImages.has(src));
+  }, [images, failedImages]);
+
   const [currentIndex, setCurrentIndex] = useState<number>(() => {
     if (!images?.length) return 0;
     return randomStart ? Math.floor(Math.random() * images.length) : 0;
@@ -33,19 +43,43 @@ export default function RotatingBackground({
   const [showNext, setShowNext] = useState(false);
 
   useEffect(() => {
-    if (!images?.length) return;
+    if (!usableImages?.length) return;
     // If images array changes, ensure indices stay valid.
-    setCurrentIndex((i) => Math.min(i, images.length - 1));
-  }, [images]);
+    setCurrentIndex((i) => Math.min(i, usableImages.length - 1));
+  }, [usableImages.length]);
 
   useEffect(() => {
     if (!images?.length) return;
+    // Fire-and-forget preload to detect broken URLs; background-image doesn't surface load errors.
+    images.forEach((src) => {
+      if (!src) return;
+      if (preloadedRef.current.has(src)) return;
+      preloadedRef.current.add(src);
+
+      const img = new Image();
+      img.onload = () => {
+        // keep
+      };
+      img.onerror = () => {
+        setFailedImages((prev) => {
+          if (prev.has(src)) return prev;
+          const next = new Set(prev);
+          next.add(src);
+          return next;
+        });
+      };
+      img.src = src;
+    });
+  }, [images]);
+
+  useEffect(() => {
+    if (!usableImages?.length) return;
     if (!canAnimate) return;
-    if (images.length < 2) return;
+    if (usableImages.length < 2) return;
 
     let timeoutId: number | null = null;
     const id = window.setInterval(() => {
-      const next = (currentIndex + 1) % images.length;
+      const next = (currentIndex + 1) % usableImages.length;
       setNextIndex(next);
       setShowNext(true);
 
@@ -62,10 +96,10 @@ export default function RotatingBackground({
       if (timeoutId) window.clearTimeout(timeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canAnimate, images.length, intervalMs, currentIndex]);
+  }, [canAnimate, usableImages.length, intervalMs, currentIndex]);
 
-  const current = images?.[currentIndex];
-  const next = images?.[nextIndex];
+  const current = usableImages?.[currentIndex];
+  const next = usableImages?.[nextIndex];
 
   return (
     <div className={cn("relative overflow-hidden", className)}>

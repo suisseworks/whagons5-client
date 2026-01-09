@@ -165,7 +165,7 @@ export const esTranslations: Record<string, string> = {
   "settings.cards.approvals.description": "Configura las aprobaciones de tareas",
   "settings.cards.workflows.title": "Workflows",
   "settings.cards.workflows.description": "Diseña y automatiza workflows",
-  "settings.cards.schedules.title": "Programaciones",
+  "settings.cards.schedules.title": "Horarios",
   "settings.cards.schedules.description": "Gestiona horarios y workflows basados en tiempo",
   "settings.cards.motivation.title": "Motivación",
   "settings.cards.motivation.description": "Configura motivadores y herramientas de engagement",
@@ -597,7 +597,7 @@ export const esTranslations: Record<string, string> = {
 
   // Sidebar translations
   "sidebar.everything": "Todo",
-  "sidebar.sharedWithMe": "Compartido conmigo",
+  "sidebar.sharedWithMe": "Compartido",
   "sidebar.spaces": "Espacios",
   "sidebar.more": "Más",
   "sidebar.teamConnect": "TeamConnect",

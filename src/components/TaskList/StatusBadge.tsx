@@ -23,7 +23,22 @@ export function StatusBadge({
       <span className={"inline-flex items-center text-xs text-muted-foreground" + (className ? ` ${className}` : "")}>No status</span>
     );
   }
-  const color = meta.color || "#6B7280";
+  
+  // Soften red colors for "pending" statuses - use amber/orange instead
+  const nameLower = (meta.name || '').toLowerCase();
+  const isPendingStatus = nameLower.includes('pending') || nameLower.includes('waiting') || nameLower.includes('todo');
+  let color = meta.color || "#6B7280";
+  
+  // If status is "pending" and color is red-like, replace with amber/orange
+  if (isPendingStatus) {
+    const colorLower = color.toLowerCase();
+    // Check if color is red-like (hex codes or color names)
+    if (colorLower.includes('#ef') || colorLower.includes('#dc') || colorLower.includes('#f8') || 
+        colorLower.includes('red') || colorLower.includes('#ff') && colorLower.includes('0000')) {
+      color = '#F59E0B'; // Amber/orange color
+    }
+  }
+  
   const icon = meta.icon && typeof getStatusIcon === "function" ? getStatusIcon(meta.icon) : null;
 
   const inner = (

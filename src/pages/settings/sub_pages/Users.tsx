@@ -1513,21 +1513,22 @@ function Users() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingUser}
+        contentClassName="max-w-[80vw] sm:max-w-4xl"
       >
         {editingUser && (
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">
+            <TabsList className="flex w-full gap-2 flex-wrap md:flex-nowrap">
+              <TabsTrigger value="basic" className="flex-1 px-6 py-2.5">
                 {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
               </TabsTrigger>
-              <TabsTrigger value="professional">
+              <TabsTrigger value="professional" className="flex-1 px-6 py-2.5">
                 {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
               </TabsTrigger>
-              <TabsTrigger value="permissions">
+              <TabsTrigger value="permissions" className="flex-1 px-6 py-2.5">
                 {tu('dialogs.editUser.tabs.permissions', 'Permissions & Teams')}
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="basic" className="mt-4">
+            <TabsContent value="basic" className="mt-4 min-h-[200px]">
               <div className="grid gap-4">
                 <TextField
                   id="edit-name"
@@ -1553,7 +1554,7 @@ function Users() {
                 />
               </div>
             </TabsContent>
-            <TabsContent value="professional" className="mt-4">
+            <TabsContent value="professional" className="mt-4 min-h-[200px]">
               <div className="grid gap-4">
                 <SelectField
                   id="edit-job_position_id"
@@ -1578,7 +1579,7 @@ function Users() {
                 />
               </div>
             </TabsContent>
-            <TabsContent value="permissions" className="mt-4">
+            <TabsContent value="permissions" className="mt-4 min-h-[200px]">
               <div className="grid gap-4">
                 <CheckboxField
                   id="edit-is_admin"

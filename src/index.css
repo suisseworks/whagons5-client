@@ -1,6 +1,4 @@
 @import "tailwindcss";
-/* Star Wars font import */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&display=swap');
 @plugin "tailwindcss-animate";
 
 /* 
@@ -204,7 +202,7 @@
 
   /* Star Wars Sidebar */
   --sidebar: #000000;
-  --sidebar-foreground: #E8E8E8;
+  --sidebar-foreground: #ffffff;
   --sidebar-primary: #4A90E2;
   --sidebar-primary-hover: #5BA0F2;
   --sidebar-primary-foreground: #FFFFFF;
@@ -216,9 +214,9 @@
   --sidebar-header: #000000;
   
   /* Sidebar text colors */
-  --sidebar-text-primary: #E8E8E8;
-  --sidebar-text-secondary: #C5A572;
-  --sidebar-text-tertiary: #666666;
+  --sidebar-text-primary: #ffffff; /* brightest for readability on black */
+  --sidebar-text-secondary: #e8edf7; /* readable secondary */
+  --sidebar-text-tertiary: #d5deeb; /* readable tertiary */
 
   /* Star Wars gradients */
   --gradient-primary: linear-gradient(135deg, #4A90E2 0%, #2E5C8A 100%);
@@ -250,16 +248,34 @@
   --accent-warning: #FFE81F;
 }
 
-.starwars * {
-  font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  letter-spacing: 0.3px;
-}
-
 .starwars h1, .starwars h2, .starwars h3, .starwars h4, .starwars h5, .starwars h6 {
   font-family: 'Orbitron', sans-serif;
   font-weight: 700;
   color: #FFE81F; /* Yellow for headings */
   letter-spacing: 1.5px;
+}
+
+/* Mixed-surfaces: make the workspace grid a readable light panel inside Star Wars chrome */
+.starwars .wh-starwars-light-panel {
+  /* Remap semantic tokens just for the grid subtree */
+  --background: #ffffff;
+  --foreground: #111827; /* slate-900 */
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --secondary: #f3f4f6; /* slate-100 */
+  --secondary-foreground: #111827;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280; /* slate-500 */
+  --border: rgba(17, 24, 39, 0.10);
+  --input: #ffffff;
+  /* Keep Star Wars accents for interactions */
+  --primary: #4A90E2;
+  --primary-foreground: #ffffff;
+  --ring: rgba(74, 144, 226, 0.45);
+  --accent: #FFE81F;
+  --accent-foreground: #111827;
 }
 
 /* Improve text readability */
@@ -518,22 +534,115 @@
   }
   
   /* Star Wars sidebar text styling */
-  .starwars [data-sidebar="item"] {
-    color: #E8E8E8 !important;
+  /* NOTE: sidebar library uses menu-button/menu-sub-button/etc (not "item") */
+  .starwars [data-sidebar="menu-button"],
+  .starwars [data-sidebar="menu-sub-button"],
+  .starwars [data-sidebar="menu-badge"],
+  .starwars [data-sidebar="menu-action"] {
+    color: var(--sidebar-text-primary) !important;
+    opacity: 1 !important;
   }
-  
-  .starwars [data-sidebar="item"]:hover {
-    background: rgba(74, 144, 226, 0.1) !important;
-    color: #FFE81F !important;
+
+  /* Star Wars font for sidebar labels */
+  .starwars [data-sidebar="sidebar"] *:not(svg) {
+    font-family: 'Orbitron', 'Inter', system-ui, -apple-system, sans-serif !important;
   }
-  
-  .starwars [data-sidebar="item"][data-active="true"] {
-    background: rgba(74, 144, 226, 0.15) !important;
+
+  /* Ensure inner text nodes inherit the bright Star Wars palette */
+  .starwars [data-sidebar="menu-button"] span,
+  .starwars [data-sidebar="menu-sub-button"] span,
+  .starwars [data-sidebar="group-label"] span,
+  .starwars [data-sidebar="sidebar"] a,
+  .starwars [data-sidebar="sidebar"] div,
+  .starwars [data-sidebar="sidebar"] span,
+  .starwars .text-sidebar-foreground {
+    color: var(--sidebar-text-primary) !important;
+    opacity: 1 !important;
+    --tw-text-opacity: 1 !important;
+  }
+
+  /* Nuclear option: every sidebar descendant uses white text */
+  .starwars [data-sidebar="sidebar"] *:not(svg) {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    --tw-text-opacity: 1 !important;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Ensure icons match the light palette */
+  .starwars [data-sidebar="sidebar"] svg {
+    color: #e8edf7 !important;
+    stroke: #e8edf7 !important;
+    fill: #e8edf7 !important;
+    opacity: 1 !important;
+  }
+
+  /* Fix tailwind opacity utility variants on sidebar text */
+  .starwars .text-sidebar-foreground\/70,
+  .starwars .text-sidebar-foreground\/60,
+  .starwars .text-sidebar-foreground\/80 {
+    color: var(--sidebar-text-primary) !important;
+    opacity: 1 !important;
+    --tw-text-opacity: 1 !important;
+  }
+
+  .starwars [data-sidebar="menu-button"] svg,
+  .starwars [data-sidebar="menu-sub-button"] svg,
+  .starwars [data-sidebar="menu-action"] svg {
+    color: var(--sidebar-text-secondary) !important;
+    opacity: 1 !important;
+  }
+
+  /* Force all sidebar text and icons to bright white */
+  .starwars [data-sidebar="sidebar"],
+  .starwars [data-sidebar="sidebar"] * {
+    color: var(--sidebar-text-primary) !important;
+    opacity: 1 !important;
+    --tw-text-opacity: 1 !important;
+  }
+
+  /* Star Wars: brighten KPI cards on workspace page */
+  .starwars .workspace-kpi-card,
+  .starwars .workspace-kpi-card *:not(svg) {
+    color: #f8fbff !important;
+    opacity: 1 !important;
+    --tw-text-opacity: 1 !important;
+  }
+  .starwars .workspace-kpi-card .text-muted-foreground,
+  .starwars .workspace-kpi-card .text-muted-foreground\/90 {
+    color: #e7ecf5 !important;
+    opacity: 1 !important;
+  }
+  .starwars .workspace-kpi-card .text-[11px] {
+    color: #e7ecf5 !important;
+  }
+  .starwars .workspace-kpi-icon {
+    color: #0f172a !important;
+  }
+  .starwars .workspace-kpi-icon svg {
+    color: #0f172a !important;
+    stroke: #0f172a !important;
+    fill: none !important;
+    opacity: 1 !important;
+  }
+
+  .starwars [data-sidebar="menu-button"]:hover,
+  .starwars [data-sidebar="menu-sub-button"]:hover,
+  .starwars [data-sidebar="menu-action"]:hover {
+    background: rgba(74, 144, 226, 0.12) !important;
     color: #FFE81F !important;
+    opacity: 1 !important;
+  }
+
+  .starwars [data-sidebar="menu-button"][data-active="true"],
+  .starwars [data-sidebar="menu-sub-button"][data-active="true"] {
+    background: rgba(74, 144, 226, 0.18) !important;
+    color: #FFE81F !important;
+    opacity: 1 !important;
   }
   
   .starwars [data-sidebar="group-label"] {
-    color: #C5A572 !important;
+    color: var(--sidebar-text-secondary) !important;
     opacity: 1 !important;
   }
   
@@ -1009,6 +1118,31 @@
   letter-spacing: 0.5px;
 }
 
+/* When Star Wars uses a light panel for the grid, render the grid with readable light styles */
+.starwars .wh-starwars-light-panel.wh-modern-grid .ag-center-cols-container .ag-row {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.starwars .wh-starwars-light-panel.wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
+  background-color: color-mix(in oklab, var(--primary) 10%, var(--background) 90%) !important;
+  box-shadow: none !important;
+}
+.starwars .wh-starwars-light-panel.wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
+  background-color: color-mix(in oklab, var(--primary) 16%, var(--background) 84%) !important;
+  border-left: 3px solid var(--primary) !important;
+  box-shadow: none !important;
+}
+.starwars .wh-starwars-light-panel.wh-modern-grid .ag-header {
+  background: var(--background) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+.starwars .wh-starwars-light-panel.wh-modern-grid .ag-header-cell-text {
+  color: #111827 !important;
+  text-transform: none !important;
+  letter-spacing: 0.2px !important;
+}
+
 /* Star Wars card and surface improvements */
 .starwars [class*="card"],
 .starwars [class*="Card"] {
@@ -1046,6 +1180,110 @@
   background-color: rgba(74, 144, 226, 0.1);
   border-color: rgba(74, 144, 226, 0.5);
   color: #FFE81F;
+}
+
+/* Star Wars tooltip styling - ensure portal elements get theme colors */
+.starwars [data-radix-popper-content-wrapper] [role="tooltip"],
+.starwars [role="tooltip"],
+html.starwars [data-radix-popper-content-wrapper] [role="tooltip"] {
+  background-color: #4A90E2 !important;
+  color: #ffffff !important;
+  border-color: rgba(74, 144, 226, 0.5) !important;
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Star Wars popover styling */
+.starwars [data-radix-popper-content-wrapper] [data-radix-popover-content],
+html.starwars [data-radix-popper-content-wrapper] [data-radix-popover-content] {
+  background-color: #141414 !important;
+  color: #E8E8E8 !important;
+  border-color: rgba(74, 144, 226, 0.3) !important;
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.3), 0 10px 15px -3px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Star Wars dropdown menu styling */
+.starwars [data-radix-popper-content-wrapper] [role="menu"],
+html.starwars [data-radix-popper-content-wrapper] [role="menu"] {
+  background-color: #141414 !important;
+  color: #E8E8E8 !important;
+  border-color: rgba(74, 144, 226, 0.3) !important;
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.3), 0 10px 15px -3px rgba(0, 0, 0, 0.4) !important;
+}
+
+.starwars [data-radix-popper-content-wrapper] [role="menuitem"],
+html.starwars [data-radix-popper-content-wrapper] [role="menuitem"] {
+  color: #E8E8E8 !important;
+}
+
+.starwars [data-radix-popper-content-wrapper] [role="menuitem"]:hover,
+.starwars [data-radix-popper-content-wrapper] [role="menuitem"]:focus,
+html.starwars [data-radix-popper-content-wrapper] [role="menuitem"]:hover,
+html.starwars [data-radix-popper-content-wrapper] [role="menuitem"]:focus {
+  background-color: rgba(74, 144, 226, 0.15) !important;
+  color: #FFE81F !important;
+}
+
+/* Portal-only safety overrides.
+   Previously these were global and broke mixed surfaces (white panel with light text).
+   Keep them scoped to Radix portal wrappers so only tooltips/popovers/menus are forced. */
+html.starwars [data-radix-popper-content-wrapper] .bg-primary,
+.starwars [data-radix-popper-content-wrapper] .bg-primary {
+  background-color: #4A90E2 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .text-primary,
+.starwars [data-radix-popper-content-wrapper] .text-primary {
+  color: #4A90E2 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .text-primary-foreground,
+.starwars [data-radix-popper-content-wrapper] .text-primary-foreground {
+  color: #ffffff !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .bg-popover,
+.starwars [data-radix-popper-content-wrapper] .bg-popover {
+  background-color: #141414 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .text-popover-foreground,
+.starwars [data-radix-popper-content-wrapper] .text-popover-foreground {
+  color: #E8E8E8 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .bg-card,
+.starwars [data-radix-popper-content-wrapper] .bg-card {
+  background-color: #141414 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .text-card-foreground,
+.starwars [data-radix-popper-content-wrapper] .text-card-foreground {
+  color: #E8E8E8 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .bg-muted,
+.starwars [data-radix-popper-content-wrapper] .bg-muted {
+  background-color: #1a1a1a !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .text-muted-foreground,
+.starwars [data-radix-popper-content-wrapper] .text-muted-foreground {
+  color: #C5A572 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .bg-accent,
+.starwars [data-radix-popper-content-wrapper] .bg-accent {
+  background-color: #FFE81F !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .text-accent-foreground,
+.starwars [data-radix-popper-content-wrapper] .text-accent-foreground {
+  color: #000000 !important;
+}
+
+html.starwars [data-radix-popper-content-wrapper] .border-border,
+.starwars [data-radix-popper-content-wrapper] .border-border {
+  border-color: rgba(74, 144, 226, 0.3) !important;
 }
 
 /* Hover and selection polish - only transition on hover */
@@ -1151,6 +1389,14 @@
 }
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
   background-color: #1a1a1a;
+}
+
+/* Star Wars: avoid zebra rules fighting with Star Wars grid styling */
+.starwars .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
+  background-color: inherit;
+}
+.starwars .wh-starwars-light-panel.wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
+  background-color: var(--background) !important;
 }
 
 /* Ensure striping is visible even if cells paint their own backgrounds */

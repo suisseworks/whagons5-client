@@ -26,13 +26,27 @@ export function PriorityBadge({
         ? { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981' }
         : { bg: `color-mix(in oklab, ${(meta.color || '#6B7280')} 12%, #ffffff 88%)`, text: (meta.color || '#6B7280') };
 
+  // Add colored dot indicator alongside the flag icon
+  const getPriorityDotColor = () => {
+    if (name.includes('high')) return '#EF4444';
+    if (name.includes('medium')) return '#F59E0B';
+    if (name.includes('low')) return '#10B981';
+    return palette.text;
+  };
+
   const inner = (
     <span
       className={"inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none whitespace-nowrap " + (className || "")}
       style={{ background: palette.bg, color: palette.text }}
       aria-label={`Priority: ${meta.name}`}
     >
-      <Flag className="h-3.5 w-3.5 flex-shrink-0" style={{ color: palette.text, opacity: 0.9 }} />
+      <div className="flex items-center gap-1.5">
+        <span 
+          className="inline-block h-2 w-2 rounded-full flex-shrink-0" 
+          style={{ backgroundColor: getPriorityDotColor() }}
+        />
+        <Flag className="h-3.5 w-3.5 flex-shrink-0" style={{ color: palette.text, opacity: 0.9 }} />
+      </div>
       <span>{meta.name}</span>
     </span>
   );

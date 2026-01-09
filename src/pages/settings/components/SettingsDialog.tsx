@@ -118,42 +118,71 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
-        <DialogHeader>
-          <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
-            {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
-            <span>{getDefaultTitle()}</span>
-          </DialogTitle>
-          <DialogDescription>
-            {getDefaultDescription()}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className={`overflow-hidden ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
+        <div className="flex flex-col max-h-[90vh]">
+          <DialogHeader className="flex-shrink-0 mb-4 space-y-1">
+            <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
+              {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
+              <span>{getDefaultTitle()}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {getDefaultDescription()}
+            </DialogDescription>
+          </DialogHeader>
 
-        {type === 'delete' && entityData && renderEntityPreview && (
-          <div className="py-4">
-            <div className="bg-muted rounded-lg p-4">
-              {renderEntityPreview(entityData)}
-            </div>
-          </div>
-        )}
-
-        {(type === 'create' || type === 'edit' || type === 'custom') ? (
-          <>
-            <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate onKeyDown={(e)=>{ if(e.key==='Enter' && (e.target as HTMLElement)?.tagName?.toLowerCase() !== 'textarea'){ e.preventDefault(); } }}>
-              {children}
-              <button type="submit" style={{ display: 'none' }} data-hidden-submit="true" />
-            </form>
-            <DialogFooter>
-              <div className="text-sm text-destructive mb-2 text-left mr-auto">
-                {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
+          {type === 'delete' && entityData && renderEntityPreview && (
+            <div className="py-4 flex-shrink-0">
+              <div className="bg-muted rounded-lg p-4">
+                {renderEntityPreview(entityData)}
               </div>
+            </div>
+          )}
+
+          {(type === 'create' || type === 'edit' || type === 'custom') ? (
+            <>
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6">
+                <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate onKeyDown={(e)=>{ if(e.key==='Enter' && (e.target as HTMLElement)?.tagName?.toLowerCase() !== 'textarea'){ e.preventDefault(); } }}>
+                  {children}
+                  <button type="submit" style={{ display: 'none' }} data-hidden-submit="true" />
+                </form>
+              </div>
+              <DialogFooter className="flex-shrink-0">
+                <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                  {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
+                </div>
+                <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+                  {cancelText}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitNow}
+                  variant={getSubmitVariant()}
+                  disabled={isSubmitting || submitDisabled}
+                >
+                  {isSubmitting ? (
+                    <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                  ) : (
+                    <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
+                  )}
+                  {getDefaultSubmitText()}
+                </Button>
+                {footerActions ? footerActions : null}
+              </DialogFooter>
+            </>
+          ) : (
+            <DialogFooter className="flex-shrink-0">
+              {error && (
+                <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                  {error}
+                </div>
+              )}
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
                 {cancelText}
               </Button>
               <Button
                 type="button"
-                onClick={submitNow}
                 variant={getSubmitVariant()}
+                onClick={onConfirm}
                 disabled={isSubmitting || submitDisabled}
               >
                 {isSubmitting ? (
@@ -165,33 +194,8 @@ export function SettingsDialog({
               </Button>
               {footerActions ? footerActions : null}
             </DialogFooter>
-          </>
-        ) : (
-          <DialogFooter>
-            {error && (
-              <div className="text-sm text-destructive mb-2 text-left mr-auto">
-                {error}
-              </div>
-            )}
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              {cancelText}
-            </Button>
-            <Button
-              type="button"
-              variant={getSubmitVariant()}
-              onClick={onConfirm}
-              disabled={isSubmitting || submitDisabled}
-            >
-              {isSubmitting ? (
-                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-              ) : (
-                <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
-              )}
-              {getDefaultSubmitText()}
-            </Button>
-            {footerActions ? footerActions : null}
-          </DialogFooter>
-        )}
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -229,7 +229,7 @@ export default function TaskListTab({
           {actionError}
         </div>
       ) : null}
-      {rows.map((task) => (
+      {rows.map((task, index) => (
         <TaskRow
           key={task.id}
           task={task}
@@ -241,6 +241,7 @@ export default function TaskListTab({
           density={density}
           onDelete={() => handleDeleteTask(Number(task?.id))}
           onLog={() => console.info("Log action selected (placeholder) for task", task?.id)}
+          rowIndex={index}
         />
       ))}
       

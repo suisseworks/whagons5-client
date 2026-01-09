@@ -284,13 +284,13 @@ export default function TaskNotesModal() {
                     </div>
                     
                     {item.type === 'note' ? (
-                        <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-white border shadow-sm'}`}>
+                        <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground border border-border shadow-sm'}`}>
                             <span className="leading-relaxed whitespace-pre-wrap break-words">
                                 {renderNoteWithEmojis(item.data.note)}
                             </span>
                         </div>
                     ) : (
-                        <div className={`rounded-lg p-2 border text-sm bg-white shadow-sm ${isMe ? 'border-primary/20' : ''}`}>
+                        <div className={`rounded-lg p-2 border text-sm bg-card text-card-foreground border-border shadow-sm ${isMe ? 'border-primary/20' : ''}`}>
                             {item.data.type === 'IMAGE' ? (
                                 <div className="space-y-1">
                                     <img 

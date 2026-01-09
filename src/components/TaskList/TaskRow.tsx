@@ -41,6 +41,7 @@ export function TaskRow({
   onDelete,
   onLog,
   density = 'comfortable',
+  rowIndex = 0,
 }: {
   task: any;
   statusMap: Record<number, StatusMeta>;
@@ -52,6 +53,7 @@ export function TaskRow({
   onDelete?: () => void;
   onLog?: () => void;
   density?: 'compact' | 'comfortable' | 'spacious';
+  rowIndex?: number;
 }) {
   // Priority color indicator removed per design feedback
   const CategoryIcon = ({ iconClass, color }: { iconClass?: string; color?: string }) => {
@@ -101,12 +103,17 @@ export function TaskRow({
     // Could open task dialog to Share tab here
   };
 
+  // Determine if this is an even or odd row for alternating background
+  const isEvenRow = rowIndex % 2 === 0;
+  
   return (
     <motion.div
       variants={taskVariants}
       initial="hidden"
       animate="visible"
-      className="group relative overflow-hidden border border-[#E5E7EB] bg-card rounded-xl px-6 py-5 hover:shadow-lg transition-all duration-200 cursor-pointer select-none"
+      className={`group relative overflow-hidden border border-[#E5E7EB] rounded-xl px-6 py-5 transition-all duration-200 cursor-pointer select-none ${
+        isEvenRow ? 'bg-card' : 'bg-card/50'
+      } hover:bg-accent/50 hover:shadow-md hover:border-accent-foreground/20`}
       onClick={onClick}
       style={{
         transformOrigin: "center",
