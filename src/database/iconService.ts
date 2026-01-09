@@ -1,6 +1,5 @@
 import { iconCacheManager } from './iconCacheDB';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import * as Icons from '@fortawesome/pro-regular-svg-icons';
 import { IconDefinition } from '@fortawesome/fontawesome-common-types';
 
 // Simple inline default icon definition (building icon)
@@ -134,32 +133,15 @@ class IconService {
       const faIconName = 'fa' + toPascalCase(iconName);
 
       // Dynamically import only the specific icon we need
+      // Avoid importing the full module to prevent circular dependency issues
       try {
         const iconModule = await import(/* @vite-ignore */ `@fortawesome/pro-regular-svg-icons/${faIconName}.js`);
         return iconModule[faIconName];
       } catch (specificError) {
-        // If specific import fails, fall back to the full module (but only load what we need)
-        const iconModule = await import('@fortawesome/pro-regular-svg-icons');
-        const icon = (iconModule as any)[faIconName];
-
-        if (icon) {
-          return icon;
-        }
-
-        // If not found, try some common variations for hyphenated names
-        const variations = [
-          faIconName, // faClockSeven
-          'fa' + iconName.charAt(0).toUpperCase() + iconName.slice(1), // faClockSeven (simple)
-          'fa' + iconName.replace(/[-_]/g, '').charAt(0).toUpperCase() + iconName.replace(/[-_]/g, '').slice(1), // faclockseven -> faClockSeven
-          'fa' + iconName.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(''), // fa + ClockSeven
-        ];
-
-        for (const variation of variations) {
-          const variantIcon = (iconModule as any)[variation];
-          if (variantIcon) {
-            return variantIcon;
-          }
-        }
+        // Don't fall back to full module import - it causes circular dependency crashes
+        // Just return null and let the default icon be used
+        console.warn(`Could not load icon ${iconName} (${faIconName}):`, specificError);
+        return null;
       }
 
       return null;
@@ -231,6 +213,7 @@ class IconService {
 
   /**
    * Get all available icons with lazy loading (only loads when needed)
+   * Returns a subset of commonly used icons to avoid circular dependency issues
    */
   async getAllIcons(): Promise<IconItem[]> {
     if (this.allIconsPromise) {
@@ -246,8 +229,49 @@ class IconService {
       return this.allIconsCache;
     }
 
-    await this.loadAllIcons();
-    return this.allIconsCache || [];
+    // For now, return a curated list of common icons instead of loading all FontAwesome icons
+    // This avoids the circular dependency issues during build
+    this.allIconsCache = await this.getCuratedIconList();
+    return this.allIconsCache;
+  }
+
+  /**
+   * Get a curated list of common icons without loading the entire FontAwesome module
+   */
+  private async getCuratedIconList(): Promise<IconItem[]> {
+    const commonIconNames = [
+      'building', 'briefcase', 'user', 'users', 'settings', 'home', 'folder',
+      'file', 'star', 'heart', 'check', 'times', 'plus', 'minus', 'edit',
+      'trash', 'search', 'filter', 'sort', 'calendar', 'clock', 'bell',
+      'envelope', 'phone', 'map', 'tag', 'bookmark', 'share', 'link',
+      'broom', 'wrench', 'seedling', 'tools', 'car', 'utensils', 'laptop', 'book',
+      'circle', 'square', 'triangle', 'diamond', 'hexagon', 'octagon', 'shield',
+      'key', 'lock', 'unlock', 'eye', 'eye-slash', 'cog', 'gears', 'bolt',
+      'cloud', 'sun', 'moon', 'rain', 'snow', 'wind', 'umbrella', 'fire',
+      'leaf', 'tree', 'flower', 'bug', 'paw', 'fish', 'bird', 'cat', 'dog'
+    ];
+
+    const iconList: IconItem[] = [];
+
+    // Load each icon individually to avoid bulk import issues
+    for (const iconName of commonIconNames) {
+      try {
+        const icon = await this.loadIcon(iconName);
+        if (icon) {
+          const keywords = this.getIconKeywords(iconName);
+          iconList.push({
+            name: iconName,
+            icon: icon,
+            keywords: keywords,
+          });
+        }
+      } catch (error) {
+        // Skip icons that can't be loaded
+        console.warn(`Could not load curated icon ${iconName}:`, error);
+      }
+    }
+
+    return iconList.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**
@@ -360,61 +384,6 @@ class IconService {
     });
   }
 
-  /**
-   * Load all icons from FontAwesome and store them in the database
-   */
-  private async loadAllIcons(): Promise<void> {
-    // Load FontAwesome metadata first
-    await this.loadFontAwesomeMetadata();
-    
-    try {
-      // Clear existing cache
-      this.allIconsCache = null;
-      this.allIconsPromise = null;
-      
-      const iconList: IconItem[] = [];
-      const seenNames = new Set<string>();
-      
-      // Process all regular icons
-      for (const [iconKey, iconDefinition] of Object.entries(Icons)) {
-        if (iconDefinition && typeof iconDefinition === 'object' && 'iconName' in iconDefinition) {
-          const iconName = iconDefinition.iconName;
-          
-          // Ensure iconName is a string
-          if (typeof iconName !== 'string') {
-            continue;
-          }
-          
-          // Skip if we've already seen this icon name (prevents duplicates)
-          if (seenNames.has(iconName)) {
-            continue;
-          }
-          seenNames.add(iconName);
-          
-          try {
-            // Get keywords using the new method
-            const keywords = this.getIconKeywords(iconName);
-            
-            iconList.push({
-              name: iconName,
-              icon: iconDefinition,
-              keywords: keywords,
-            });
-          } catch (error) {
-            console.error(`Error processing icon ${iconName}:`, error);
-          }
-        }
-      }
-      
-      // Sort and cache the icons
-      this.allIconsCache = iconList.sort((a, b) => a.name.localeCompare(b.name));
-      console.log(`Loaded ${iconList.length} icons with FontAwesome metadata`);
-      
-    } catch (error) {
-      console.error('Error loading all icons:', error);
-      throw error;
-    }
-  }
 
   /**
    * Search icons by keyword
