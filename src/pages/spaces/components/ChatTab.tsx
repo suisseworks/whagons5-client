@@ -160,7 +160,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
                         {dayjs(msg.created_at).format('MMM D, h:mm A')}
                       </span>
                     </div>
-                    <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-white border shadow-sm'}`}>
+                    <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground border border-border shadow-sm'}`}>
                       <span className="leading-relaxed whitespace-pre-wrap break-words">
                         {renderMessageWithEmojis(msg.message)}
                       </span>

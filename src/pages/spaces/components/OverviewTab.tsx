@@ -465,7 +465,7 @@ function OverviewTab({
                   </div>
                   
                   {showIconDropdown && (
-                    <div className="absolute top-full left-0 mt-2 w-96 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-2 w-96 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
                       <div className="p-3">
                         <Input
                           placeholder="Search icons... (e.g., heart, user, star)"
@@ -516,7 +516,7 @@ function OverviewTab({
                         >
                           {loadingIcons ? (
                             <div className="col-span-10 text-center py-4">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto"></div>
                             </div>
                           ) : (
                             <>
@@ -532,7 +532,7 @@ function OverviewTab({
                               ))}
                               {loadingMoreIcons && (
                                 <div className="col-span-10 text-center py-2">
-                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-foreground mx-auto"></div>
                                 </div>
                               )}
                             </>
@@ -553,7 +553,7 @@ function OverviewTab({
                   )}
 
                   {showColorPicker && (
-                    <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-50">
+                    <div className="absolute top-full left-0 mt-2 w-80 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50">
                       <div className="p-4">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-sm font-medium">Choose Icon Color</span>

@@ -194,17 +194,17 @@ export function buildWorkspaceColumns(opts: any) {
       const overlay = document.createElement('div');
       overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/40';
       overlay.innerHTML = `
-        <div class="bg-white rounded-lg shadow-xl w-[360px] max-w-[90%] border border-gray-200">
-          <div class="px-4 py-3 border-b border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-900">${title}</h3>
-            <p class="text-xs text-gray-500 mt-1">${message}</p>
+        <div class="bg-card text-card-foreground rounded-lg shadow-xl w-[360px] max-w-[90%] border border-border">
+          <div class="px-4 py-3 border-b border-border">
+            <h3 class="text-sm font-semibold">${title}</h3>
+            <p class="text-xs text-muted-foreground mt-1">${message}</p>
           </div>
           <div class="p-4 space-y-3">
-            <textarea class="w-full border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Enter your comment"></textarea>
+            <textarea class="w-full border border-input bg-background text-foreground rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring" rows="3" placeholder="Enter your comment"></textarea>
           </div>
           <div class="px-4 pb-4 flex justify-end gap-2">
-            <button class="wh-modal-cancel px-3 py-1.5 text-sm border rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-            <button class="wh-modal-ok px-3 py-1.5 text-sm border rounded-md text-white bg-blue-600 hover:bg-blue-700">Submit</button>
+            <button class="wh-modal-cancel px-3 py-1.5 text-sm border border-border rounded-md text-foreground bg-background hover:bg-muted">Cancel</button>
+            <button class="wh-modal-ok px-3 py-1.5 text-sm border border-border rounded-md text-primary-foreground bg-primary hover:opacity-90">Submit</button>
           </div>
         </div>
       `;
@@ -259,7 +259,7 @@ export function buildWorkspaceColumns(opts: any) {
     if (!visibilitySet) return true;
     if (!id) return true;
     // Always show key columns
-    if (id === '__actions' || id === 'name' || id === 'notes' || id === 'id') return true;
+    if (id === 'name' || id === 'notes' || id === 'id') return true;
     return visibilitySet.has(id);
   };
 
@@ -828,7 +828,7 @@ export function buildWorkspaceColumns(opts: any) {
               ) : isRejected ? (
                 <XCircle className="w-3.5 h-3.5 text-red-600" />
               ) : (
-                <Clock className="w-3.5 h-3.5 text-gray-400" />
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
               )}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">{isPending ? 'Approval pending' : approvalStatusLabel}</span>
@@ -975,57 +975,42 @@ export function buildWorkspaceColumns(opts: any) {
       filter: 'agNumberColumnFilter',
       cellClass: 'wh-id-cell',
       valueFormatter: (p: any) => (p?.value ?? ''),
+      cellStyle: { overflow: 'visible' },
       cellRenderer: (p: any) => {
         const id = p?.value;
+        const taskId = Number(p?.data?.id);
+        const hasValidId = Number.isFinite(taskId);
+        
+        if (!hasValidId) {
+          return (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
+              {id ?? ''}
+            </span>
+          );
+        }
+        
         return (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
-            {id ?? ''}
-          </span>
-        );
-      },
-    },
-    {
-      headerName: '',
-      field: '__actions',
-      width: 54,
-      minWidth: 54,
-      maxWidth: 54,
-      pinned: 'left',
-      sortable: false,
-      filter: false,
-      suppressMenu: true,
-      suppressMovable: true,
-      lockPinned: true,
-      cellClass: 'wh-action-cell',
-      colId: '__actions',
-      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
-      cellRenderer: (p: any) => {
-        const id = Number(p?.data?.id);
-        if (!Number.isFinite(id)) return null;
-        return (
-          <div className="flex items-center justify-center w-full h-full">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-white hover:bg-accent text-muted-foreground"
-                  aria-label="Task actions"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(id); }}>
-                  Log
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(id); }}>
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                aria-label="Task actions"
+              >
+                {id ?? ''}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
+                Log
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },
@@ -1081,7 +1066,7 @@ export function buildWorkspaceColumns(opts: any) {
             {/* Name row with category icon */}
             <div className="flex items-center gap-2.5 min-w-0">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
-              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-[#1a1a1a] dark:text-white min-w-0 flex-1 truncate">{name}</div>
+              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-foreground min-w-0 flex-1 truncate">{name}</div>
             </div>
             {/* Tags row - separate line below name for better visual separation */}
             {(taskTagsData && taskTagsData.length > 0) && (
@@ -1114,7 +1099,7 @@ export function buildWorkspaceColumns(opts: any) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-[#6b7280] dark:text-muted-foreground"
+                      className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-muted-foreground"
                       style={{
                         whiteSpace: 'normal',
                         display: '-webkit-box',
@@ -1455,7 +1440,7 @@ export function buildWorkspaceColumns(opts: any) {
         if (users.length === 0) return (
           <div className="flex items-center h-full py-1">
             <button
-              className="text-sm text-gray-400 hover:text-gray-600 underline-offset-2"
+              className="text-sm text-muted-foreground hover:text-foreground underline-offset-2"
               onClick={(e) => {
                 e.stopPropagation();
                 try {
@@ -1930,7 +1915,7 @@ export function buildWorkspaceColumns(opts: any) {
   // Apply compact styling to secondary columns + visibility handling
   for (const col of cols as any[]) {
     const id = (col.colId as string) || (col.field as string) || '';
-    if (id && !['name', 'priority_id', 'user_ids', '__actions'].includes(id)) {
+    if (id && !['name', 'priority_id', 'user_ids'].includes(id)) {
       col.cellClass = appendCellClass(col.cellClass, 'wh-compact-col');
     }
     if (id === 'name') continue;

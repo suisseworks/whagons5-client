@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 import { useLanguage } from "@/providers/LanguageProvider";
+import { ActiveFilterChips } from "@/components/ActiveFilterChips";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -124,6 +125,7 @@ function Header() {
     const [collapseGroups, setCollapseGroups] = useState<boolean>(true);
     const [quickPresets, setQuickPresets] = useState<any[]>([]);
     const [allPresets, setAllPresets] = useState<any[]>([]);
+    const [currentFilterModel, setCurrentFilterModel] = useState<any>(null);
 
     const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
     useEffect(() => {
@@ -231,6 +233,17 @@ function Header() {
         window.addEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
         return () => {
             window.removeEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
+        };
+    }, []);
+
+    // Listen for filter model changes from Workspace component
+    useEffect(() => {
+        const handleFilterModelChange = (event: CustomEvent<{ filterModel: any }>) => {
+            setCurrentFilterModel(event.detail.filterModel || null);
+        };
+        window.addEventListener('workspace-filter-model-changed', handleFilterModelChange as EventListener);
+        return () => {
+            window.removeEventListener('workspace-filter-model-changed', handleFilterModelChange as EventListener);
         };
     }, []);
 
@@ -693,9 +706,32 @@ function Header() {
         {/* Secondary Toolbar: Filters and Grouping (only shown in workspace) */}
         {currentWorkspaceName && (
             <div className="sticky top-16 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur-sm px-6 py-2">
-                <div className="flex items-center gap-4">
-                    {/* Quick filter chips */}
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
+                    {/* Active filter chips - shown inline */}
+                    <ActiveFilterChips
+                        filterModel={currentFilterModel}
+                        onRemoveFilter={(filterKey) => {
+                            // Remove specific filter from model
+                            const newModel = { ...currentFilterModel };
+                            if (filterKey === 'text') {
+                                delete newModel.name;
+                                delete newModel.description;
+                            } else {
+                                delete newModel[filterKey];
+                            }
+                            window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                detail: { filterModel: Object.keys(newModel).length > 0 ? newModel : null, clearSearch: false } 
+                            }));
+                        }}
+                        onClearAll={() => {
+                            window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                detail: { filterModel: null, clearSearch: true } 
+                            }));
+                        }}
+                    />
+                    <div className="flex items-center gap-4">
+                        {/* Quick filter chips */}
+                        <div className="flex items-center gap-2">
                         <Button 
                             variant="outline" 
                             size="sm" 
@@ -767,28 +803,29 @@ function Header() {
                                 )}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                    </div>
+                        </div>
 
-                    {/* Group by control */}
-                    <div className="flex items-center gap-2 ml-auto">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
-                        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-                            <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
-                                <SelectValue placeholder="Group" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">None</SelectItem>
-                                <SelectItem value="spot_id">Location</SelectItem>
-                                <SelectItem value="status_id">Status</SelectItem>
-                                <SelectItem value="priority_id">Priority</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {groupBy !== 'none' && (
-                            <div className="flex items-center gap-2">
-                                <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
-                                <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
-                            </div>
-                        )}
+                        {/* Group by control */}
+                        <div className="flex items-center gap-2 ml-auto">
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
+                            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                                <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
+                                    <SelectValue placeholder="Group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    <SelectItem value="spot_id">Location</SelectItem>
+                                    <SelectItem value="status_id">Status</SelectItem>
+                                    <SelectItem value="priority_id">Priority</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {groupBy !== 'none' && (
+                                <div className="flex items-center gap-2">
+                                    <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
+                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -11,6 +11,7 @@ import {
   Layers,
   Inbox,
 } from 'lucide-react';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -98,6 +99,7 @@ interface SortableWorkspaceItemProps {
   pathname: string;
   collapsed: boolean;
   getWorkspaceIcon: (iconName?: string) => any;
+  taskCount?: number;
 }
 
 const WorkspaceIconBadge = ({
@@ -134,7 +136,7 @@ const KeepCollapsibleOpenOnCollapse = ({ forceOpen }: { forceOpen: boolean }) =>
   return null;
 };
 
-function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon }: SortableWorkspaceItemProps) {
+function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon, taskCount }: SortableWorkspaceItemProps) {
   const {
     attributes,
     listeners,
@@ -195,7 +197,7 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
           }}
           className={`${collapsed
             ? 'grid place-items-center w-8 h-8 p-0'
-            : 'flex items-center'
+            : 'flex items-center justify-between'
           } group relative`}
           style={{
             pointerEvents: isDragging ? 'none' : 'auto',
@@ -207,27 +209,36 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
               style={{ width: '2px', height: collapsed ? '80%' : '85%' }}
             />
           )}
-          <WorkspaceIconBadge color={workspace.color || '#3b82f6'}>
-            <FontAwesomeIcon
-              icon={getWorkspaceIcon(workspace.icon)}
-              style={{
-                color: '#ffffff',
-                fontSize: '14px',
-                width: '14px',
-                height: '14px',
-                display: 'block',
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)'
-              }}
-            />
-          </WorkspaceIconBadge>
-          {collapsed ? (
-            <span className="sr-only">{workspace.name}</span>
-          ) : (
-            <span className="truncate ml-1.5">{workspace.name}</span>
-          )}
+          <div className="flex items-center min-w-0 flex-1">
+            <WorkspaceIconBadge color={workspace.color || '#3b82f6'}>
+              <FontAwesomeIcon
+                icon={getWorkspaceIcon(workspace.icon)}
+                style={{
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  width: '14px',
+                  height: '14px',
+                  display: 'block',
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%,-50%)'
+                }}
+              />
+            </WorkspaceIconBadge>
+            {collapsed ? (
+              <span className="sr-only">{workspace.name}</span>
+            ) : (
+              <>
+                <span className="truncate ml-1.5">{workspace.name}</span>
+                {taskCount !== undefined && taskCount > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--sidebar-accent)] text-[var(--sidebar-text-secondary)] min-w-[18px] text-center flex-shrink-0">
+                    {taskCount > 99 ? '99+' : taskCount}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         </Link>
       </SidebarMenuButton>
     </div>
@@ -240,6 +251,44 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const isCollapsedState = state === 'collapsed';
   const collapsed = isCollapsedState && !isMobile;
   const { t } = useLanguage();
+  
+  // Track task counts for each workspace
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+  
+  // Load task counts for all workspaces
+  useEffect(() => {
+    let cancelled = false;
+    const loadTaskCounts = async () => {
+      if (!TasksCache.initialized) {
+        try {
+          await TasksCache.init();
+        } catch {
+          return;
+        }
+      }
+      
+      const counts: Record<string, number> = {};
+      for (const workspace of workspaces) {
+        try {
+          const result = await TasksCache.queryTasks({ 
+            workspace_id: Number(workspace.id), 
+            startRow: 0, 
+            endRow: 0 
+          });
+          counts[String(workspace.id)] = result?.rowCount || 0;
+        } catch {
+          counts[String(workspace.id)] = 0;
+        }
+      }
+      
+      if (!cancelled) {
+        setTaskCounts(counts);
+      }
+    };
+    
+    loadTaskCounts();
+    return () => { cancelled = true; };
+  }, [workspaces]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
@@ -409,7 +458,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
               </WorkspaceIconBadge>
             </span>
-            <span>{t('sidebar.sharedWithMe', 'Shared with me')}</span>
+            <span>{t('sidebar.sharedWithMe', 'Shared')}</span>
           </Link>
         </div>
       )}
@@ -425,7 +474,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             style={{
               width: '32px',
               height: '32px',
-              opacity: pathname === `/workspace/all` ? 1 : 0.7
+              opacity: 1
             }}
             title={t('sidebar.everything', 'Everything')}
           >
@@ -448,14 +497,14 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
             style={{
               width: '32px',
               height: '32px',
-              opacity: pathname === `/shared-with-me` ? 1 : 0.7
+              opacity: 1
             }}
-            title={t('sidebar.sharedWithMe', 'Shared with me')}
+            title={t('sidebar.sharedWithMe', 'Shared')}
           >
             <WorkspaceIconBadge color="var(--sidebar-primary)">
               <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
             </WorkspaceIconBadge>
-            <span className="sr-only">{t('sidebar.sharedWithMe', 'Shared with me')}</span>
+            <span className="sr-only">{t('sidebar.sharedWithMe', 'Shared')}</span>
           </Link>
         </div>
       )}
@@ -485,7 +534,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 <>
                   <CollapsibleTrigger
                     disabled={collapsed}
-                    className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm justify-start flex-1"
+                    className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm justify-start flex-1 transition-all duration-200"
                     style={{
                       padding: '4px 8px 4px 0',
                       fontSize: '14px',
@@ -493,7 +542,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       color: 'var(--sidebar-text-primary)'
                     }}
                   >
-                    <ChevronDown className="ease-out group-data-[state=open]/collapsible:rotate-180 w-4 h-4" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
+                    <ChevronDown className="ease-out transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180 w-4 h-4" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
                     <span className="pl-2" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--sidebar-text-primary)' }}>
                       {t('sidebar.spaces', 'Spaces')}
                     </span>
@@ -663,7 +712,11 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           </div>
         </SidebarGroupLabel>
 
-        <CollapsibleContent keepRendered forceVisible={collapsed}>
+        <CollapsibleContent 
+          keepRendered 
+          forceVisible={collapsed}
+          className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up overflow-hidden transition-all duration-200"
+        >
           <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
               sensors={sensors}
@@ -684,6 +737,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       pathname={pathname}
                       collapsed={collapsed}
                       getWorkspaceIcon={getWorkspaceIcon}
+                      taskCount={taskCounts[String(workspace.id)]}
                     />
                   ))}
                 </div>
