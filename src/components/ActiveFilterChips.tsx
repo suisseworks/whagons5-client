@@ -145,6 +145,7 @@ export function ActiveFilterChips({ filterModel, onRemoveFilter, onClearAll }: A
           <span className="text-muted-foreground">{chip.label}:</span>
           <span className="truncate max-w-[200px]">{chip.value || chip.label}</span>
           <button
+            type="button"
             onClick={() => onRemoveFilter(chip.key)}
             className="ml-0.5 hover:bg-accent rounded-sm p-0.5 transition-colors"
             aria-label={`Remove ${chip.label} filter`}

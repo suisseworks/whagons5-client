@@ -995,7 +995,7 @@ export function buildWorkspaceColumns(opts: any) {
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary focus-visible:ring-offset-background focus-visible:border-primary"
                 aria-label="Task actions"
               >
                 {id ?? ''}

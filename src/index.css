@@ -524,49 +524,35 @@
   .starwars [data-sidebar="sidebar"],
   .starwars .bg-sidebar {
     background: #000000 !important;
-    color: #E8E8E8 !important;
   }
   .starwars [data-sidebar="header"],
   .starwars .bg-sidebar-header {
     background: #000000 !important;
     border-bottom: 1px solid rgba(74, 144, 226, 0.3) !important;
-    color: #E8E8E8 !important;
   }
   
   /* Star Wars sidebar text styling */
   /* NOTE: sidebar library uses menu-button/menu-sub-button/etc (not "item") */
+  /* Apply base text color only to specific text elements, not globally */
   .starwars [data-sidebar="menu-button"],
   .starwars [data-sidebar="menu-sub-button"],
   .starwars [data-sidebar="menu-badge"],
   .starwars [data-sidebar="menu-action"] {
-    color: var(--sidebar-text-primary) !important;
-    opacity: 1 !important;
+    color: var(--sidebar-text-primary);
+    opacity: 1;
   }
 
-  /* Star Wars font for sidebar labels */
-  .starwars [data-sidebar="sidebar"] *:not(svg) {
-    font-family: 'Orbitron', 'Inter', system-ui, -apple-system, sans-serif !important;
-  }
-
-  /* Ensure inner text nodes inherit the bright Star Wars palette */
+  /* Apply base text color to specific text elements within sidebar */
   .starwars [data-sidebar="menu-button"] span,
   .starwars [data-sidebar="menu-sub-button"] span,
   .starwars [data-sidebar="group-label"] span,
+  .starwars [data-sidebar="menu-action"] span,
   .starwars [data-sidebar="sidebar"] a,
   .starwars [data-sidebar="sidebar"] div,
   .starwars [data-sidebar="sidebar"] span,
   .starwars .text-sidebar-foreground {
-    color: var(--sidebar-text-primary) !important;
-    opacity: 1 !important;
-    --tw-text-opacity: 1 !important;
-  }
-
-  /* Nuclear option: every sidebar descendant uses white text */
-  .starwars [data-sidebar="sidebar"] *:not(svg) {
-    color: #ffffff !important;
-    opacity: 1 !important;
-    --tw-text-opacity: 1 !important;
-    text-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+    font-family: 'Orbitron', 'Inter', system-ui, -apple-system, sans-serif !important;
+    color: var(--sidebar-text-primary);
   }
 
   /* Ensure icons match the light palette */
@@ -591,14 +577,6 @@
   .starwars [data-sidebar="menu-action"] svg {
     color: var(--sidebar-text-secondary) !important;
     opacity: 1 !important;
-  }
-
-  /* Force all sidebar text and icons to bright white */
-  .starwars [data-sidebar="sidebar"],
-  .starwars [data-sidebar="sidebar"] * {
-    color: var(--sidebar-text-primary) !important;
-    opacity: 1 !important;
-    --tw-text-opacity: 1 !important;
   }
 
   /* Star Wars: brighten KPI cards on workspace page */
@@ -630,15 +608,26 @@
   .starwars [data-sidebar="menu-sub-button"]:hover,
   .starwars [data-sidebar="menu-action"]:hover {
     background: rgba(74, 144, 226, 0.12) !important;
-    color: #FFE81F !important;
     opacity: 1 !important;
+  }
+
+  /* Override inner text color on hover */
+  .starwars [data-sidebar="menu-button"]:hover span,
+  .starwars [data-sidebar="menu-sub-button"]:hover span,
+  .starwars [data-sidebar="menu-action"]:hover span {
+    color: #FFE81F !important;
   }
 
   .starwars [data-sidebar="menu-button"][data-active="true"],
   .starwars [data-sidebar="menu-sub-button"][data-active="true"] {
     background: rgba(74, 144, 226, 0.18) !important;
-    color: #FFE81F !important;
     opacity: 1 !important;
+  }
+
+  /* Override inner text color on active state */
+  .starwars [data-sidebar="menu-button"][data-active="true"] span,
+  .starwars [data-sidebar="menu-sub-button"][data-active="true"] span {
+    color: #FFE81F !important;
   }
   
   .starwars [data-sidebar="group-label"] {

@@ -272,35 +272,17 @@ function Settings() {
   const [prevActiveTab, setPrevActiveTab] = useState<SettingsTabKey>(activeTab);
 
   // Sync activeTab with URL on initial load (URL takes precedence)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabFromUrl = urlParams.get('tab');
-    if (tabFromUrl === 'advanced' || tabFromUrl === 'basics' || tabFromUrl === 'favorites') {
-      setActiveTab(tabFromUrl as SettingsTabKey);
-      setPrevActiveTab(tabFromUrl as SettingsTabKey);
-      // Save URL tab to localStorage
-      try {
-        localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, tabFromUrl);
-      } catch {}
-    } else {
-      // No URL param, use localStorage value (already set in useState initializer)
-      // This ensures we restore the last selected tab when navigating back to settings
-      try {
-        const saved = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-        if (saved === 'advanced' || saved === 'basics' || saved === 'favorites') {
-          setActiveTab(saved as SettingsTabKey);
-          setPrevActiveTab(saved as SettingsTabKey);
-        }
-      } catch {}
-    }
-  }, []);
-
-  // Save tab to localStorage when it changes
+  // Only syncs from URL, not localStorage (localStorage handled by onValueChange)
   useEffect(() => {
     try {
-      localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, activeTab);
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabFromUrl = urlParams.get('tab');
+      if (tabFromUrl === 'advanced' || tabFromUrl === 'basics' || tabFromUrl === 'favorites') {
+        setActiveTab(tabFromUrl as SettingsTabKey);
+        setPrevActiveTab(tabFromUrl as SettingsTabKey);
+      }
     } catch {}
-  }, [activeTab]);
+  }, []);
 
 
 
@@ -973,13 +955,12 @@ function Settings() {
 
       <UrlTabs
         tabs={mainSettingsTabs}
-        defaultValue={activeTab}
+        value={activeTab}
         basePath="/settings"
         onValueChange={(value) => {
-          setPrevActiveTab(activeTab);
-          setActiveTab(value as SettingsTabKey);
-          // Save to localStorage
           try {
+            setPrevActiveTab(activeTab);
+            setActiveTab(value as SettingsTabKey);
             localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, value);
           } catch {}
         }}

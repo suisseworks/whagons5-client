@@ -250,6 +250,7 @@ export const Workspace = () => {
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const users = useSelector((s: RootState) => (s as any).users.value as any[]);
   const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
+  const currentUser = useSelector((s: RootState) => (s as any).auth?.user);
   // Grouping
   const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>(() => {
     try {
@@ -477,13 +478,17 @@ export const Workspace = () => {
   // Initialize common presets if they don't exist
   useEffect(() => {
     const ws = isAllWorkspaces ? 'all' : (id || 'all');
+    const currentUserId = Number((currentUser as any)?.id);
+    if (!Number.isFinite(currentUserId)) return;
     const all = listPresets(ws);
     
     // Check if common presets exist, if not create them
+    // Normalize dates to YYYY-MM-DD format for consistent TasksCache date parsing
+    const today = new Date().toISOString().split('T')[0];
     const commonPresets = [
-      { name: 'My tasks', model: { user_ids: { filterType: 'set', values: [] } } }, // Will be populated with current user
-      { name: 'Overdue', model: { due_date: { filterType: 'date', type: 'dateBefore', filter: new Date().toISOString() } } },
-      { name: 'Due today', model: { due_date: { filterType: 'date', type: 'equals', filter: new Date().toISOString().split('T')[0] } } },
+      { name: 'My tasks', model: { user_ids: { filterType: 'set', values: [currentUserId] } } },
+      { name: 'Overdue', model: { due_date: { filterType: 'date', type: 'dateBefore', filter: today } } },
+      { name: 'Due today', model: { due_date: { filterType: 'date', type: 'equals', filter: today } } },
     ];
     
     const existingNames = new Set(all.map(p => p.name.toLowerCase()));
@@ -506,7 +511,7 @@ export const Workspace = () => {
         detail: { quickPresets: quick, allPresets: updatedAll } 
       }));
     }
-  }, [id, isAllWorkspaces]);
+  }, [id, isAllWorkspaces, currentUser]);
 
   // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
   useEffect(() => {

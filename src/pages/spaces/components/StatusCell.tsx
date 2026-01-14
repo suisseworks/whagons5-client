@@ -82,8 +82,8 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
       style={{ background: baseColor, color: '#ffffff' }}
     >
       {isWorkingStatus ? (
-        <span className="relative inline-flex items-center justify-center h-3.5 w-3.5" aria-busy="true" style={{ color: '#ffffff' }}>
-          <AnimatedSpinner />
+        <span className="relative inline-flex items-center justify-center h-4 w-4" aria-busy="true" style={{ color: '#ffffff' }}>
+          <AnimatedSpinner className="h-4 w-4" />
         </span>
       ) : (
         <span className="w-3.5 h-3.5">{variantIcon}</span>

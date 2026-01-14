@@ -109,6 +109,27 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     return defaultTabs;
   });
 
+  const toggleTabVisibility = (tabId: string) => {
+    try {
+      const newTabs = visibleTabs.includes(tabId)
+        ? visibleTabs.filter((t) => t !== tabId)
+        : [...visibleTabs, tabId];
+
+      setVisibleTabs(newTabs);
+
+      const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
+      window.localStorage.setItem(key, JSON.stringify(newTabs));
+      window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
+        detail: {
+          workspaceId: workspaceId || 'all',
+          visibleTabs: newTabs,
+        }
+      }));
+    } catch {
+      // ignore storage / event errors
+    }
+  };
+
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   // Using async actions for workspace operations
@@ -558,43 +579,13 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   aria-pressed={visibleTabs.includes(tab.id)}
                   onClick={() => {
                     if (tab.locked) return;
-                    const newTabs = visibleTabs.includes(tab.id)
-                      ? visibleTabs.filter(t => t !== tab.id)
-                      : [...visibleTabs, tab.id];
-                    setVisibleTabs(newTabs);
-                    try {
-                      const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
-                      window.localStorage.setItem(key, JSON.stringify(newTabs));
-                      window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
-                        detail: {
-                          workspaceId: workspaceId || 'all',
-                          visibleTabs: newTabs,
-                        }
-                      }));
-                    } catch {
-                      // ignore storage / event errors
-                    }
+                    toggleTabVisibility(tab.id);
                   }}
                   onKeyDown={(event) => {
                     if (tab.locked) return;
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      const newTabs = visibleTabs.includes(tab.id)
-                        ? visibleTabs.filter(t => t !== tab.id)
-                        : [...visibleTabs, tab.id];
-                      setVisibleTabs(newTabs);
-                      try {
-                        const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
-                        window.localStorage.setItem(key, JSON.stringify(newTabs));
-                        window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
-                          detail: {
-                            workspaceId: workspaceId || 'all',
-                            visibleTabs: newTabs,
-                          }
-                        }));
-                      } catch {
-                        // ignore storage / event errors
-                      }
+                      toggleTabVisibility(tab.id);
                     }
                   }}
                   className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left ${
@@ -608,22 +599,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                     disabled={tab.locked}
                     onCheckedChange={() => {
                       if (tab.locked) return;
-                      const newTabs = visibleTabs.includes(tab.id)
-                        ? visibleTabs.filter(t => t !== tab.id)
-                        : [...visibleTabs, tab.id];
-                      setVisibleTabs(newTabs);
-                      try {
-                        const key = `wh_workspace_visible_tabs_${workspaceId || 'all'}`;
-                        window.localStorage.setItem(key, JSON.stringify(newTabs));
-                        window.dispatchEvent(new CustomEvent('wh:workspaceTabsChanged', {
-                          detail: {
-                            workspaceId: workspaceId || 'all',
-                            visibleTabs: newTabs,
-                          }
-                        }));
-                      } catch {
-                        // ignore storage / event errors
-                      }
+                      toggleTabVisibility(tab.id);
                     }}
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
