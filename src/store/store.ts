@@ -6,6 +6,9 @@ import { tasksSlice } from "./reducers/tasksSlice";
 // Tenant availability slice
 import tenantAvailabilityReducer from "./reducers/tenantAvailabilitySlice";
 
+// UI state slice
+import uiStateReducer from "./reducers/uiStateSlice";
+
 // All other slices (30+ tables) handled by generic factory
 import { genericSlices } from "./genericSlices";
 
@@ -15,6 +18,9 @@ const appReducer = combineReducers({
 
     // Tenant availability checking
     tenantAvailability: tenantAvailabilityReducer,
+
+    // UI state (filter model, search text, grouping, presets)
+    uiState: uiStateReducer,
 
     // All other slices (30+ tables) handled by generic factory
     ...genericSlices.reducers,

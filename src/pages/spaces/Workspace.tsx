@@ -11,15 +11,25 @@ import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/store';
+import {
+  setFilterModel,
+  setSearchText,
+  setGroupBy,
+  setCollapseGroups,
+  setPresets,
+  selectSearchText,
+  selectGroupBy,
+  selectCollapseGroups,
+} from '@/store/reducers/uiStateSlice';
 import { Button } from '@/components/ui/button';
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { motion } from 'motion/react';
 import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
-import { listPresets, listPinnedPresets, isPinned, togglePin, setPinnedOrder, SavedFilterPreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
+import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
@@ -38,6 +48,7 @@ type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
 const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'statistics', 'settings'];
 
 export const Workspace = () => {
+  const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -76,8 +87,12 @@ export const Workspace = () => {
   const [prevActiveTab, setPrevActiveTab] = useState<WorkspaceTabKey>(initialTab);
 
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
-  const [searchText, setSearchText] = useState('');
   const tableRef = useRef<WorkspaceTableHandle | null>(null);
+
+  // Redux UI state selectors
+  const searchText = useSelector(selectSearchText);
+  const groupBy = useSelector(selectGroupBy);
+  const collapseGroups = useSelector(selectCollapseGroups);
 
   const allowedTabOrder = DEFAULT_TAB_SEQUENCE;
   const resolvedOrder = useMemo(() => buildTabSequence(allowedTabOrder), [allowedTabOrder]);
@@ -119,6 +134,22 @@ export const Workspace = () => {
       return (saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text';
     } catch { return 'icon-text'; }
   });
+  const [visibleTabs, setVisibleTabs] = useState<string[]>(() => {
+    const defaultTabs = ['grid', 'calendar', 'scheduler', 'map', 'board'];
+    try {
+      const key = `wh_workspace_visible_tabs_${id || 'all'}`;
+      const raw = localStorage.getItem(key);
+      if (!raw) return defaultTabs;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        // Always ensure grid is included
+        return Array.from(new Set(['grid', ...parsed]));
+      }
+    } catch {
+      // ignore
+    }
+    return defaultTabs;
+  });
   useEffect(() => {
     // Update when workspace changes
     try {
@@ -130,6 +161,18 @@ export const Workspace = () => {
       const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
       const saved = localStorage.getItem(key);
       setTagDisplayMode((saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text');
+    } catch {}
+    try {
+      const key = `wh_workspace_visible_tabs_${id || 'all'}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+          setVisibleTabs(Array.from(new Set(['grid', ...parsed])));
+        }
+      } else {
+        setVisibleTabs(['grid', 'calendar', 'scheduler', 'map', 'board']);
+      }
     } catch {}
   }, [id]);
   useEffect(() => {
@@ -146,6 +189,21 @@ export const Workspace = () => {
     };
     window.addEventListener('wh:displayOptionsChanged', handler as any);
     return () => window.removeEventListener('wh:displayOptionsChanged', handler as any);
+  }, [id]);
+  useEffect(() => {
+    const handler = (e: any) => {
+      const eventWorkspaceId = e?.detail?.workspaceId || 'all';
+      const currentWorkspaceId = id || 'all';
+      // Only update if the event is for the current workspace
+      if (eventWorkspaceId === currentWorkspaceId) {
+        const tabs = e?.detail?.visibleTabs;
+        if (Array.isArray(tabs) && tabs.every((x) => typeof x === 'string')) {
+          setVisibleTabs(Array.from(new Set(['grid', ...tabs])));
+        }
+      }
+    };
+    window.addEventListener('wh:workspaceTabsChanged', handler as any);
+    return () => window.removeEventListener('wh:workspaceTabsChanged', handler as any);
   }, [id]);
 
 
@@ -206,68 +264,42 @@ export const Workspace = () => {
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const users = useSelector((s: RootState) => (s as any).users.value as any[]);
   const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
-  // Grouping
-  const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>(() => {
+  const currentUser = useSelector((s: RootState) => (s as any).auth?.user);
+  // Load groupBy and collapseGroups from localStorage when workspace changes
+  useEffect(() => {
+    if (!id && !isAllWorkspaces) return;
+    const workspaceId = id || 'all';
     try {
-      const key = `wh_workspace_group_by_${id || 'all'}`;
-      const saved = localStorage.getItem(key) as any;
-      return saved || 'none';
-    } catch { return 'none'; }
-  });
-  const [collapseGroups, setCollapseGroups] = useState<boolean>(() => {
-    try {
-      const key = `wh_workspace_group_collapse_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      return saved == null ? true : saved === 'true';
-    } catch { return true; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(`wh_workspace_group_by_${id || 'all'}`, groupBy); } catch {}
-    // Dispatch to Header component
-    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-      detail: { groupBy, collapseGroups } 
-    }));
-  }, [groupBy, id, collapseGroups]);
-  useEffect(() => {
-    try { localStorage.setItem(`wh_workspace_group_collapse_${id || 'all'}`, String(collapseGroups)); } catch {}
-    // Dispatch to Header component
-    window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-      detail: { groupBy, collapseGroups } 
-    }));
-  }, [collapseGroups, id, groupBy]);
-
-  // Listen for group changes from Header component
-  useEffect(() => {
-    const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
-      const newGroupBy = event.detail.groupBy as any;
-      if (newGroupBy !== groupBy) {
-        setGroupBy(newGroupBy);
+      const groupKey = `wh_workspace_group_by_${workspaceId}`;
+      const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
+      const savedGroup = localStorage.getItem(groupKey) as any;
+      const savedCollapse = localStorage.getItem(collapseKey);
+      if (savedGroup && savedGroup !== groupBy) {
+        dispatch(setGroupBy(savedGroup));
       }
-      if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
-        setCollapseGroups(event.detail.collapseGroups);
+      if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+        dispatch(setCollapseGroups(savedCollapse === 'true'));
       }
-    };
-    window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
-    return () => {
-      window.removeEventListener('workspace-group-changed', handleGroupChange as EventListener);
-    };
-  }, [groupBy, collapseGroups]);
+    } catch {}
+  }, [id, isAllWorkspaces, dispatch, groupBy, collapseGroups]);
 
   // Listen for filter apply events from Header component
   useEffect(() => {
     const handleFilterApply = (event: CustomEvent<{ filterModel: any; clearSearch?: boolean }>) => {
       if (tableRef.current) {
-        tableRef.current.setFilterModel(event.detail.filterModel);
+        const filterModel = event.detail.filterModel || null;
+        tableRef.current.setFilterModel(filterModel);
+        dispatch(setFilterModel(filterModel));
         const key = `wh_workspace_filters_${id || 'all'}`;
         try {
-          if (event.detail.filterModel) {
-            localStorage.setItem(key, JSON.stringify(event.detail.filterModel));
+          if (filterModel) {
+            localStorage.setItem(key, JSON.stringify(filterModel));
           } else {
             localStorage.removeItem(key);
           }
         } catch {}
         if (event.detail.clearSearch) {
-          setSearchText('');
+          dispatch(setSearchText(''));
         }
       }
     };
@@ -275,7 +307,7 @@ export const Workspace = () => {
     return () => {
       window.removeEventListener('workspace-filter-apply', handleFilterApply as EventListener);
     };
-  }, [id]);
+  }, [id, dispatch]);
 
   // Listen for filter dialog open events from Header component
   useEffect(() => {
@@ -378,9 +410,6 @@ export const Workspace = () => {
 
   // Filter builder dialog
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [quickPresets, setQuickPresets] = useState<SavedFilterPreset[]>([]);
-  const [allPresets, setAllPresets] = useState<SavedFilterPreset[]>([]);
-  const dragIdRef = useRef<string | null>(null);
 
 
 
@@ -425,52 +454,64 @@ export const Workspace = () => {
 
   
 
+  // Initialize common presets if they don't exist
+  useEffect(() => {
+    const ws = isAllWorkspaces ? 'all' : (id || 'all');
+    const currentUserId = Number((currentUser as any)?.id);
+    if (!Number.isFinite(currentUserId)) return;
+    const all = listPresets(ws);
+    
+    // Check if common presets exist, if not create them
+    // Normalize dates to YYYY-MM-DD format for consistent TasksCache date parsing
+    const today = new Date().toISOString().split('T')[0];
+    const commonPresets = [
+      { name: 'My tasks', model: { user_ids: { filterType: 'set', values: [currentUserId] } } },
+      { name: 'Overdue', model: { due_date: { filterType: 'date', type: 'dateBefore', filter: today } } },
+      { name: 'Due today', model: { due_date: { filterType: 'date', type: 'equals', filter: today } } },
+    ];
+    
+    const existingNames = new Set(all.map(p => p.name.toLowerCase()));
+    let needsUpdate = false;
+    
+    for (const preset of commonPresets) {
+      if (!existingNames.has(preset.name.toLowerCase())) {
+        savePreset({ name: preset.name, workspaceScope: ws, model: preset.model });
+        needsUpdate = true;
+      }
+    }
+    
+    if (needsUpdate) {
+      // Reload presets after creating common ones
+      const quick = listPinnedPresets(ws).slice(0, 4);
+      const updatedAll = listPresets(ws);
+      dispatch(setPresets({ quickPresets: quick, allPresets: updatedAll }));
+    }
+  }, [id, isAllWorkspaces, currentUser, dispatch]);
+
   // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
   useEffect(() => {
     const ws = isAllWorkspaces ? 'all' : (id || 'all');
     try {
       const quick = listPinnedPresets(ws).slice(0, 4);
       const all = listPresets(ws);
-      setQuickPresets(quick);
-      setAllPresets(all);
-      // Dispatch to Header component
-      window.dispatchEvent(new CustomEvent('workspace-presets-changed', { 
-        detail: { quickPresets: quick, allPresets: all } 
-      }));
+      dispatch(setPresets({ quickPresets: quick, allPresets: all }));
     } catch {
-      setQuickPresets([]);
-      setAllPresets([]);
-      window.dispatchEvent(new CustomEvent('workspace-presets-changed', { 
-        detail: { quickPresets: [], allPresets: [] } 
-      }));
+      dispatch(setPresets({ quickPresets: [], allPresets: [] }));
     }
-  }, [id, isAllWorkspaces, filtersOpen]);
+  }, [id, isAllWorkspaces, filtersOpen, dispatch]);
 
   // Persist and restore search text globally
   useEffect(() => {
     const key = `wh_workspace_search_global`;
     try {
       const saved = localStorage.getItem(key);
-      if (saved != null) setSearchText(saved);
-    } catch {}
-  }, []);
-
-  // Listen for search changes from Header component
-  useEffect(() => {
-    const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
-      const newSearchText = event.detail.searchText;
-      // Only update if different to prevent unnecessary re-renders
-      if (newSearchText !== searchText) {
-        setSearchText(newSearchText);
+      if (saved != null && saved !== searchText) {
+        dispatch(setSearchText(saved));
       }
-    };
-    window.addEventListener('workspace-search-changed', handleSearchChange as EventListener);
-    return () => {
-      window.removeEventListener('workspace-search-changed', handleSearchChange as EventListener);
-    };
-  }, [searchText]);
+    } catch {}
+  }, [dispatch, searchText]);
 
-  // Dispatch event when searchText changes (for Header sync)
+  // Save search text to localStorage when it changes
   useEffect(() => {
     const key = `wh_workspace_search_global`;
     try {
@@ -479,8 +520,6 @@ export const Workspace = () => {
       } else {
         localStorage.removeItem(key);
       }
-      // Dispatch custom event to notify Header component
-      window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
     } catch {}
   }, [searchText]);
 
@@ -546,7 +585,12 @@ export const Workspace = () => {
             rowCache={rowCache} 
             workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
             searchText={searchText}
-            onFiltersChanged={(active) => setShowClearFilters(!!active)}
+            onFiltersChanged={(active) => {
+              setShowClearFilters(!!active);
+              // Track current filter model for active filter chips
+              const model = tableRef.current?.getFilterModel?.();
+              dispatch(setFilterModel(model || null));
+            }}
             onSelectionChanged={setSelectedIds}
             onRowDoubleClicked={(task) => {
               setSelectedTask(task);
@@ -669,10 +713,20 @@ export const Workspace = () => {
     acc[tab.value] = tab;
     return acc;
   }, {});
-  const orderedVisibleTabs = resolvedOrder
+  
+  // Filter tabs based on visibility preferences (always show grid, statistics, settings)
+  const visibleTabSet = new Set(visibleTabs);
+  const alwaysVisibleTabs = ['grid', 'statistics', 'settings'];
+  const filteredOrder = resolvedOrder.filter(key => 
+    alwaysVisibleTabs.includes(key) || visibleTabSet.has(key)
+  );
+  
+  const orderedVisibleTabs = filteredOrder
     .map((key) => workspaceTabMap[key])
     .filter((tab): tab is typeof workspaceTabs[number] => Boolean(tab));
-  const tabsForRender = orderedVisibleTabs.length > 0 ? orderedVisibleTabs : workspaceTabs;
+  const tabsForRender = orderedVisibleTabs.length > 0 ? orderedVisibleTabs : workspaceTabs.filter(tab => 
+    alwaysVisibleTabs.includes(tab.value) || visibleTabSet.has(tab.value)
+  );
 
   const statsArePending = stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0;
   const formatStatValue = (value: number) => (statsArePending ? '—' : value.toLocaleString());
@@ -736,7 +790,8 @@ export const Workspace = () => {
       value: formatStatValue(stats.completedToday),
       icon: <Sparkles className="h-4 w-4" />,
       badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-200',
-      barClass: 'from-emerald-50 to-emerald-100'
+      barClass: 'from-emerald-50 to-emerald-100',
+      helperText: stats.completedToday === 0 && !statsArePending ? 'Start completing tasks to see progress!' : undefined
     },
     {
       key: 'trend',
@@ -746,7 +801,11 @@ export const Workspace = () => {
       badgeClass: 'bg-purple-100 text-purple-900 border-purple-200',
       barClass: 'from-purple-50 to-purple-100',
       sparkline: <TrendSparkline data={stats.trend} />,
-      helperText: statsArePending ? '' : `${trendDelta >= 0 ? '+' : ''}${trendDelta} vs yesterday`
+      helperText: statsArePending 
+        ? '' 
+        : completedLast7Days === 0 
+          ? 'Complete your first task to begin tracking progress!'
+          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} vs yesterday`
     }
   ];
 
@@ -759,11 +818,11 @@ export const Workspace = () => {
               {kpiCards.map((card) => (
                 <div
                   key={card.key}
-                  className="relative overflow-hidden rounded-xl border bg-card/90 backdrop-blur-sm shadow-sm border-border/60"
+                  className="relative overflow-hidden rounded-xl border bg-card/90 backdrop-blur-sm shadow-sm border-border/60 workspace-kpi-card"
                 >
                   <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass}`} />
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <div className={`flex items-center justify-center rounded-lg p-2 border ${card.badgeClass}`}>
+                    <div className={`flex items-center justify-center rounded-lg p-2 border ${card.badgeClass} workspace-kpi-icon`}>
                       {card.icon}
                     </div>
                     <div className="min-w-0">
@@ -907,18 +966,23 @@ export const Workspace = () => {
           })
           .filter((o): o is { id: number; name: string } => Boolean(o))}
         tags={(tags || [])
-          .map((t: any) => {
+          .filter((t: any) => {
             const idNum = Number(t.id);
-            if (!Number.isFinite(idNum)) return null;
-            return { id: idNum, name: t.name, color: t.color };
+            return Number.isFinite(idNum);
           })
-          .filter((t): t is { id: number; name: string; color?: string | null } => Boolean(t))}
+          .map((t: any) => ({
+            id: Number(t.id),
+            name: t.name,
+            color: t.color
+          }))}
         currentModel={tableRef.current?.getFilterModel?.()}
         currentSearchText={searchText}
         onApply={(model) => {
-          tableRef.current?.setFilterModel(model);
-          try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(model)); } catch {}
-          setSearchText('');
+          const filterModel = model || null;
+          tableRef.current?.setFilterModel(filterModel);
+          dispatch(setFilterModel(filterModel));
+          try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(filterModel)); } catch {}
+          dispatch(setSearchText(''));
         }}
       />
 

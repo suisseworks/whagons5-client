@@ -35,6 +35,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  useCollapsible,
 } from '@/components/animate-ui/primitives/radix/collapsible';
 import AssistantWidget from './AssistantWidget';
 import WhagonsCheck from '@/assets/WhagonsCheck';
@@ -87,6 +88,30 @@ const IconBadge = ({
     {children}
   </div>
 );
+
+const MoreMenuTriggerContent = ({ isCollapsed, isMobile }: { isCollapsed: boolean; isMobile: boolean }) => {
+  const { isOpen } = useCollapsible();
+  const { t } = useLanguage();
+  
+  return (
+    <CollapsibleTrigger
+      className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center w-full'} rounded-[8px] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] text-[var(--sidebar-text-primary)] cursor-pointer`}
+      style={{
+        height: '30px',
+        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+        gap: '8px',
+        fontWeight: 500,
+        fontSize: '12px',
+      }}
+      title={isCollapsed && !isMobile ? (isOpen ? t('sidebar.less', 'Less') : t('sidebar.more', 'More')) : undefined}
+    >
+      <IconBadge color="var(--sidebar-accent)" size={18}>
+        <MoreHorizontal size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-primary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+      </IconBadge>
+      {!isCollapsed && !isMobile && <span className="ml-1.5">{isOpen ? t('sidebar.less', 'Less') : t('sidebar.more', 'More')}</span>}
+    </CollapsibleTrigger>
+  );
+};
 
 const PinnedSidebarTrigger = ({ className }: { className?: string }) => {
   const [isPinned, setIsPinned] = useState(isPinnedGlobal);
@@ -377,32 +402,9 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
 
       <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid var(--sidebar-border)', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
         <Collapsible defaultOpen={false} className="w-full">
-          <CollapsibleTrigger asChild>
-            <SidebarMenuButton
-              asChild
-              tooltip={isCollapsed && !isMobile ? t('sidebar.more', 'More') : undefined}
-              className="rounded-[8px] transition-opacity opacity-70 hover:opacity-100 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-              style={{
-                height: '30px',
-                padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
-                gap: '8px',
-                fontWeight: 500,
-                fontSize: '12px',
-              }}
-            >
-              <button
-                type="button"
-                className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center w-full'} text-[var(--sidebar-text-primary)]`}
-              >
-                <IconBadge color="var(--sidebar-border)" size={18}>
-                  <MoreHorizontal size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                </IconBadge>
-                {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.more', 'More')}</span>}
-              </button>
-            </SidebarMenuButton>
-          </CollapsibleTrigger>
+          <MoreMenuTriggerContent isCollapsed={isCollapsed} isMobile={isMobile} />
 
-          <CollapsibleContent className="mt-2 space-y-1 opacity-70 hover:opacity-100 transition-opacity">
+          <CollapsibleContent keepRendered={true} className="mt-2 space-y-1">
             <SidebarGroup style={{ flexShrink: 0 }}>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1">
@@ -424,8 +426,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         to="/teamconnect"
                         className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
                       >
-                        <IconBadge color="var(--sidebar-border)" size={18}>
-                          <Users2 size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        <IconBadge color="#3b82f6" size={18}>
+                          <Users2 size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
                         {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.teamConnect', 'TeamConnect')}</span>}
                       </Link>
@@ -450,8 +452,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         to="/compliance/standards"
                         className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
                       >
-                        <IconBadge color="var(--sidebar-border)" size={18}>
-                          <FileText size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        <IconBadge color="#10b981" size={18}>
+                          <FileText size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
                         {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.compliance', 'Compliance')}</span>}
                       </Link>
@@ -476,8 +478,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         to="/analytics"
                         className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
                       >
-                        <IconBadge color="var(--sidebar-border)" size={18}>
-                          <BarChart3 size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        <IconBadge color="#8b5cf6" size={18}>
+                          <BarChart3 size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
                         {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.analytics', 'Analytics')}</span>}
                       </Link>
@@ -502,8 +504,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         to="/plugins"
                         className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
                       >
-                        <IconBadge color="var(--sidebar-border)" size={18}>
-                          <Plug size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                        <IconBadge color="#f59e0b" size={18}>
+                          <Plug size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                         </IconBadge>
                         {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.plugins', 'Plugins')}</span>}
                       </Link>
@@ -530,9 +532,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         to="/settings"
                         className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
                       >
-                        <IconBadge color="var(--sidebar-border)" size={18}>
-                          <Settings size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                        </IconBadge>
+                        <Settings size={16} className="w-4 h-4 block flex-shrink-0" style={{ color: 'var(--sidebar-text-primary)', strokeWidth: 2.5 }} />
                         {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.settings', 'Settings')}</span>}
                       </Link>
                     </SidebarMenuButton>
@@ -556,9 +556,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                         to="/settings/global"
                         className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
                       >
-                        <IconBadge color="var(--sidebar-border)" size={18}>
-                          <Globe size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-secondary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                        </IconBadge>
+                        <Globe size={16} className="w-4 h-4 block flex-shrink-0" style={{ color: 'var(--sidebar-text-primary)', strokeWidth: 2.5 }} />
                         {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.globalSettings', 'Global Settings')}</span>}
                       </Link>
                     </SidebarMenuButton>

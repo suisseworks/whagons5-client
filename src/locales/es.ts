@@ -107,7 +107,6 @@ export const esTranslations: Record<string, string> = {
   // Preset themes
   "settings.global.branding.presets.jadeOps.label": "Jade Ops",
   "settings.global.branding.presets.jadeOps.description": "Primario verde azulado vibrante con acentos índigo eléctrico",
-  "settings.global.branding.presets.jadeOps.badge": "Predeterminado",
   "settings.global.branding.presets.ember.label": "Ember Sunrise",
   "settings.global.branding.presets.ember.description": "Gradientes ámbar cálidos con tipografía carbón",
   "settings.global.branding.presets.ember.badge": "Popular",
@@ -165,7 +164,7 @@ export const esTranslations: Record<string, string> = {
   "settings.cards.approvals.description": "Configura las aprobaciones de tareas",
   "settings.cards.workflows.title": "Workflows",
   "settings.cards.workflows.description": "Diseña y automatiza workflows",
-  "settings.cards.schedules.title": "Programaciones",
+  "settings.cards.schedules.title": "Horarios",
   "settings.cards.schedules.description": "Gestiona horarios y workflows basados en tiempo",
   "settings.cards.motivation.title": "Motivación",
   "settings.cards.motivation.description": "Configura motivadores y herramientas de engagement",
@@ -597,9 +596,10 @@ export const esTranslations: Record<string, string> = {
 
   // Sidebar translations
   "sidebar.everything": "Todo",
-  "sidebar.sharedWithMe": "Compartido conmigo",
+  "sidebar.sharedWithMe": "Compartido",
   "sidebar.spaces": "Espacios",
   "sidebar.more": "Más",
+  "sidebar.less": "Menos",
   "sidebar.teamConnect": "TeamConnect",
   "sidebar.compliance": "Cumplimiento",
   "sidebar.analytics": "Analítica",

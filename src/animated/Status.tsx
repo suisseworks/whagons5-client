@@ -49,13 +49,12 @@ const SPRING = { type: "spring" as const, stiffness: 520, damping: 24, mass: 0.9
 // --- Component --------------------------------------------------------------
 
 // Inline animated SVG spinner (smooth rotating dash)
-export function AnimatedSpinner() {
+export function AnimatedSpinner({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <MotionConfig>
       <motion.svg
         viewBox="0 0 24 24"
-        width="16"
-        height="16"
+        className={className}
         fill="none"
         stroke="currentColor"
         strokeWidth="3"

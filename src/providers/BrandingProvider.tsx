@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { convert, lighten, darken, mix } from 'colorizr';
 import {
   BRANDING_STORAGE_KEY,
   BrandingAssets,
@@ -71,18 +72,36 @@ const rgbToHex = (r: number, g: number, b: number) => {
 };
 
 const mixColors = (source: string, target: string, amount: number): string => {
-  const src = hexToRgb(source);
-  const tgt = hexToRgb(target);
-  if (!src || !tgt) return source;
-  const mixChannel = (channel: number) => src[channel] + (tgt[channel] - src[channel]) * amount;
-  return rgbToHex(mixChannel(0), mixChannel(1), mixChannel(2));
+  try {
+    // Use colorizr's mix function which handles any color format (hex, oklch, rgb, hsl, etc.)
+    // Amount is 0-1, colorizr expects percentage 0-100
+    return mix(source, target, amount * 100);
+  } catch {
+    // Fallback to hex-based mixing
+    const src = hexToRgb(source);
+    const tgt = hexToRgb(target);
+    if (!src || !tgt) return source;
+    const mixChannel = (channel: number) => src[channel] + (tgt[channel] - src[channel]) * amount;
+    return rgbToHex(mixChannel(0), mixChannel(1), mixChannel(2));
+  }
 };
 
 const ensureHexColor = (color: string, fallback: string): string => {
+  // If color is already in OKLCH or other CSS format, pass it through
+  if (color && (color.startsWith('oklch(') || color.startsWith('rgb(') || color.startsWith('hsl('))) {
+    return color;
+  }
+  
   const normalized = normalizeHex(color);
   if (normalized) {
     return `#${normalized}`;
   }
+  
+  // Check if fallback is OKLCH or other CSS format
+  if (fallback && (fallback.startsWith('oklch(') || fallback.startsWith('rgb(') || fallback.startsWith('hsl('))) {
+    return fallback;
+  }
+  
   const fallbackNormalized = normalizeHex(fallback);
   return fallbackNormalized ? `#${fallbackNormalized}` : fallback;
 };
@@ -96,26 +115,56 @@ const getLuminance = (r: number, g: number, b: number) => {
 };
 
 const getAccessibleTextColor = (background: string, fallback: string): string => {
+  // For OKLCH, use lightness value to determine text color
+  if (background.startsWith('oklch(')) {
+    const match = background.match(/oklch\(([\d.]+)/);
+    if (match) {
+      const lightness = parseFloat(match[1]);
+      return lightness > 0.5 ? '#0f172a' : '#f8fafc';
+    }
+  }
+  
   const rgb = hexToRgb(background.trim());
   if (!rgb) return fallback;
   const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
   return luminance > 0.5 ? '#0f172a' : '#f8fafc';
 };
 
-const rgba = (hexColor: string, alpha: number): string => {
-  const rgb = hexToRgb(hexColor);
-  if (!rgb) return hexColor;
-  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+const rgba = (color: string, alpha: number): string => {
+  try {
+    // Convert any color format to RGB using colorizr, then add alpha
+    const rgbString = convert(color, 'rgb');
+    // rgbString is like "rgb(255 0 68)", convert to rgba
+    return rgbString.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+  } catch {
+    // Fallback for edge cases
+    return color;
+  }
 };
 
 const computeSidebarAccentColor = (sidebarColor: string): string => {
-  const rgb = hexToRgb(sidebarColor);
-  if (!rgb) return '#F1F3F5';
-  const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
-  if (luminance < 0.45) {
-    return mixColors(sidebarColor, '#ffffff', 0.15);
+  try {
+    // Convert to hex to check luminance, then use colorizr to lighten/darken
+    const hexColor = convert(sidebarColor, 'hex');
+    const rgb = hexToRgb(hexColor);
+    if (!rgb) return '#F1F3F5';
+    
+    const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
+    // For dark sidebars, lighten; for light sidebars, darken
+    if (luminance < 0.45) {
+      return lighten(sidebarColor, 8); // lighten by 8%
+    }
+    return darken(sidebarColor, 5); // darken by 5%
+  } catch {
+    // Fallback to original hex-based logic
+    const rgb = hexToRgb(sidebarColor);
+    if (!rgb) return '#F1F3F5';
+    const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
+    if (luminance < 0.45) {
+      return mixColors(sidebarColor, '#ffffff', 0.15);
+    }
+    return mixColors(sidebarColor, '#000000', 0.08);
   }
-  return mixColors(sidebarColor, '#000000', 0.08);
 };
 
 const BRANDING_STYLE_ELEMENT_ID = 'branding-theme-overrides';
@@ -316,6 +365,25 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
   const sidebarAccent = computeSidebarAccentColor(config.sidebarColor);
   const sidebarAccentForeground = getAccessibleTextColor(sidebarAccent, sidebarTextColor);
 
+  // Determine if sidebar is dark (for Night Ops theme which uses dark sidebar in light mode)
+  let isDarkSidebar = false;
+  if (sidebarHex.startsWith('oklch(')) {
+    const match = sidebarHex.match(/oklch\(([\d.]+)/);
+    if (match) {
+      const lightness = parseFloat(match[1]);
+      isDarkSidebar = lightness < 0.3; // Lightness below 0.3 is considered dark
+    }
+  } else {
+    const rgb = hexToRgb(sidebarHex);
+    if (rgb) {
+      const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
+      isDarkSidebar = luminance < 0.3;
+    }
+  }
+  
+  const sidebarHeaderColor = isDarkSidebar ? sidebarHex : '#ffffff';
+  const sidebarBorderColor = isDarkSidebar ? 'rgba(255, 255, 255, 0.12)' : neutralHex;
+  
   const lightThemeVariables: Record<string, string> = {
     '--primary': primaryHex,
     '--color-primary': primaryHex,
@@ -331,6 +399,7 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--card-foreground': textHex,
     '--popover-foreground': textHex,
     '--sidebar': sidebarHex,
+    '--sidebar-header': sidebarHeaderColor,
     '--sidebar-foreground': sidebarTextColor,
     '--sidebar-text-primary': sidebarTextColor,
     '--sidebar-text-secondary': sidebarTextSecondary,
@@ -338,7 +407,7 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--muted': neutralHex,
     '--muted-foreground': textHex,
     '--border': neutralHex,
-    '--sidebar-border': neutralHex,
+    '--sidebar-border': sidebarBorderColor,
     '--sidebar-accent': sidebarAccent,
     '--sidebar-accent-foreground': sidebarAccentForeground,
     '--gradient-primary': gradient,
@@ -350,65 +419,69 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--sidebar-pattern-size': sidebarPatternSize,
   };
 
-  const darkBgPrimary = mixColors('#0F0F0F', backgroundHex, 0.18);
-  const darkBgSecondary = mixColors('#1A1A1A', backgroundHex, 0.22);
-  const darkBgHover = mixColors('#222222', backgroundHex, 0.25);
-  const darkBgElevated = mixColors('#181818', backgroundHex, 0.2);
-  const darkSidebar = mixColors('#0a0a0a', sidebarHex, 0.2);
-  const darkSidebarText = getAccessibleTextColor(darkSidebar, '#f3f4f6');
+  // Use explicit dark mode colors if provided, otherwise generate
+  const darkPrimaryHex = config.darkPrimaryColor ? ensureHexColor(config.darkPrimaryColor, primaryHex) : mixColors(primaryHex, '#ffffff', 0.08);
+  const darkAccentHex = config.darkAccentColor ? ensureHexColor(config.darkAccentColor, accentHex) : mixColors(accentHex, '#ffffff', 0.06);
+  const darkBackgroundHex = config.darkBackgroundColor ? ensureHexColor(config.darkBackgroundColor, '#0F0F0F') : mixColors('#0F0F0F', backgroundHex, 0.18);
+  const darkSidebarHex = config.darkSidebarColor ? ensureHexColor(config.darkSidebarColor, sidebarHex) : mixColors('#0a0a0a', sidebarHex, 0.2);
+  const darkTextHex = config.darkTextColor ? ensureHexColor(config.darkTextColor, '#f8fafc') : '#f8fafc';
+  const darkNeutralHex = config.darkNeutralColor ? ensureHexColor(config.darkNeutralColor, neutralHex) : mixColors('#1F1F1F', neutralHex, 0.25);
+  const darkGradient = config.darkGradientAccent || gradient;
+  
+  const darkBgSecondary = mixColors('#1A1A1A', darkBackgroundHex, 0.22);
+  const darkBgHover = mixColors('#222222', darkBackgroundHex, 0.25);
+  const darkBgElevated = mixColors('#181818', darkBackgroundHex, 0.2);
+  const darkSidebarText = getAccessibleTextColor(darkSidebarHex, darkTextHex);
   const darkSidebarTextSecondary = rgba(darkSidebarText, 0.75);
   const darkSidebarTextTertiary = rgba(darkSidebarText, 0.55);
-  const darkSidebarAccent = mixColors(darkSidebar, '#ffffff', 0.08);
+  const darkSidebarAccent = mixColors(darkSidebarHex, '#ffffff', 0.08);
   const darkSidebarAccentForeground = getAccessibleTextColor(darkSidebarAccent, darkSidebarText);
-  const darkPrimary = mixColors(primaryHex, '#ffffff', 0.08);
-  const darkPrimaryHover = mixColors(darkPrimary, '#ffffff', 0.06);
-  const darkAccent = mixColors(accentHex, '#ffffff', 0.06);
-  const darkNeutral = mixColors('#1F1F1F', neutralHex, 0.25);
-  const textPrimary = '#f8fafc';
-  const textSecondary = rgba(textPrimary, 0.7);
-  const textTertiary = rgba(textPrimary, 0.5);
-  const darkBorder = mixColors('#2A2A2A', neutralHex, 0.3);
-  const darkBorderMedium = mixColors('#374151', neutralHex, 0.35);
+  const darkPrimaryHover = mixColors(darkPrimaryHex, '#ffffff', 0.06);
+  const textSecondary = rgba(darkTextHex, 0.7);
+  const textTertiary = rgba(darkTextHex, 0.5);
+  const darkBorder = mixColors('#2A2A2A', darkNeutralHex, 0.3);
+  const darkBorderMedium = mixColors('#374151', darkNeutralHex, 0.35);
 
   const darkThemeVariables: Record<string, string> = {
-    '--primary': darkPrimary,
-    '--color-primary': darkPrimary,
-    '--sidebar-primary': darkPrimary,
+    '--primary': darkPrimaryHex,
+    '--color-primary': darkPrimaryHex,
+    '--sidebar-primary': darkPrimaryHex,
     '--sidebar-primary-hover': darkPrimaryHover,
     '--sidebar-primary-foreground': '#ffffff',
-    '--accent': darkAccent,
-    '--color-accent': darkAccent,
-    '--background': darkBgPrimary,
+    '--accent': darkAccentHex,
+    '--color-accent': darkAccentHex,
+    '--background': darkBackgroundHex,
     '--card': darkBgSecondary,
     '--popover': darkBgSecondary,
-    '--foreground': textPrimary,
-    '--card-foreground': textPrimary,
-    '--popover-foreground': textPrimary,
-    '--muted': darkNeutral,
+    '--foreground': darkTextHex,
+    '--card-foreground': darkTextHex,
+    '--popover-foreground': darkTextHex,
+    '--muted': darkNeutralHex,
     '--muted-foreground': textSecondary,
     '--border': darkBorder,
     '--sidebar-border': darkBorderMedium,
-    '--sidebar': darkSidebar,
+    '--sidebar': darkSidebarHex,
+    '--sidebar-header': darkSidebarHex,
     '--sidebar-foreground': darkSidebarText,
     '--sidebar-text-primary': darkSidebarText,
     '--sidebar-text-secondary': darkSidebarTextSecondary,
     '--sidebar-text-tertiary': darkSidebarTextTertiary,
     '--sidebar-accent': darkSidebarAccent,
     '--sidebar-accent-foreground': darkSidebarAccentForeground,
-    '--sidebar-selected-bg': mixColors(darkSidebar, '#ffffff', 0.04),
-    '--gradient-primary': gradient,
-    '--gradient-secondary': gradient,
-    '--gradient-accent': gradient,
-    '--ring': mixColors(darkPrimary, '#ffffff', 0.25),
+    '--sidebar-selected-bg': mixColors(darkSidebarHex, '#ffffff', 0.04),
+    '--gradient-primary': darkGradient,
+    '--gradient-secondary': darkGradient,
+    '--gradient-accent': darkGradient,
+    '--ring': mixColors(darkPrimaryHex, '#ffffff', 0.25),
     '--surface-pattern': surfacePattern,
     '--surface-pattern-size': surfacePatternSize,
     '--sidebar-pattern': sidebarPattern,
     '--sidebar-pattern-size': sidebarPatternSize,
-    '--bg-primary': darkBgPrimary,
+    '--bg-primary': darkBackgroundHex,
     '--bg-secondary': darkBgSecondary,
     '--bg-hover': darkBgHover,
     '--bg-elevated': darkBgElevated,
-    '--text-primary': textPrimary,
+    '--text-primary': darkTextHex,
     '--text-secondary': textSecondary,
     '--text-tertiary': textTertiary,
     '--border-subtle': darkBorder,
@@ -429,15 +502,10 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     `:root:not(.dark) {`,
     formatVariableBlock(lightThemeVariables),
     `}`,
+    `.dark {`,
+    formatVariableBlock(darkThemeVariables),
+    `}`
   ];
-
-  if (!isDefaultTheme) {
-    sections.push(
-      `.dark {`,
-      formatVariableBlock(darkThemeVariables),
-      `}`
-    );
-  }
 
   styleElement.textContent = sections.filter(Boolean).join('\n');
 };

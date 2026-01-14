@@ -14,8 +14,21 @@ import {
 import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
+import {
+  setFilterModel,
+  setSearchText,
+  setGroupBy,
+  setCollapseGroups,
+  setPresets,
+  selectFilterModel,
+  selectSearchText,
+  selectGroupBy,
+  selectCollapseGroups,
+  selectQuickPresets,
+  selectAllPresets,
+} from "@/store/reducers/uiStateSlice";
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { getAssetDisplayUrl } from '@/lib/assetHelpers';
@@ -30,11 +43,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 import { useLanguage } from "@/providers/LanguageProvider";
+import { ActiveFilterChips } from "@/components/ActiveFilterChips";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
+    const dispatch = useDispatch();
     const { firebaseUser, user, userLoading, hydrating, hydrationError } = useAuth();
     const [apiLoading, setApiLoading] = useState<boolean>(false);
     const { isMobile } = useSidebar();
@@ -46,6 +61,14 @@ function Header() {
 
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
+
+    // Redux UI state selectors
+    const currentFilterModel = useSelector(selectFilterModel);
+    const searchText = useSelector(selectSearchText);
+    const groupBy = useSelector(selectGroupBy);
+    const collapseGroups = useSelector(selectCollapseGroups);
+    const quickPresets = useSelector(selectQuickPresets);
+    const allPresets = useSelector(selectAllPresets);
 
     const isSettings = useMemo(() => location.pathname.startsWith('/settings'), [location.pathname]);
     const isAnalytics = useMemo(() => location.pathname.startsWith('/analytics'), [location.pathname]);
@@ -119,11 +142,6 @@ function Header() {
         return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
     }, [location.pathname, workspaces]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
-    const [searchText, setSearchText] = useState('');
-    const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>('none');
-    const [collapseGroups, setCollapseGroups] = useState<boolean>(true);
-    const [quickPresets, setQuickPresets] = useState<any[]>([]);
-    const [allPresets, setAllPresets] = useState<any[]>([]);
 
     const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
     useEffect(() => {
@@ -148,30 +166,15 @@ function Header() {
         const key = `wh_workspace_search_global`;
         try {
             const saved = localStorage.getItem(key);
-            if (saved != null) {
-                setSearchText(saved);
-            } else {
-                setSearchText('');
+            if (saved != null && saved !== searchText) {
+                dispatch(setSearchText(saved));
+            } else if (saved === null && searchText !== '') {
+                dispatch(setSearchText(''));
             }
         } catch {}
-    }, [currentWorkspaceName]);
+    }, [currentWorkspaceName, dispatch, searchText]);
 
-    // Listen for search changes from Workspace component
-    useEffect(() => {
-        const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
-            const newSearchText = event.detail.searchText;
-            // Only update if different to prevent unnecessary re-renders
-            if (newSearchText !== searchText) {
-                setSearchText(newSearchText);
-            }
-        };
-        window.addEventListener('workspace-search-changed', handleSearchChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-search-changed', handleSearchChange as EventListener);
-        };
-    }, [searchText]);
-
-    // Save search text to localStorage and dispatch custom event
+    // Save search text to localStorage when it changes
     useEffect(() => {
         const key = `wh_workspace_search_global`;
         try {
@@ -180,8 +183,6 @@ function Header() {
             } else {
                 localStorage.removeItem(key);
             }
-            // Dispatch custom event to notify Workspace component
-            window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
         } catch {}
     }, [searchText]);
 
@@ -194,69 +195,32 @@ function Header() {
             const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
             const savedGroup = localStorage.getItem(groupKey) as any;
             const savedCollapse = localStorage.getItem(collapseKey);
-            if (savedGroup) setGroupBy(savedGroup);
-            if (savedCollapse !== null) setCollapseGroups(savedCollapse === 'true');
+            if (savedGroup && savedGroup !== groupBy) {
+                dispatch(setGroupBy(savedGroup));
+            }
+            if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+                dispatch(setCollapseGroups(savedCollapse === 'true'));
+            }
         } catch {}
-    }, [currentWorkspaceName, currentWorkspaceId]);
+    }, [currentWorkspaceName, currentWorkspaceId, dispatch, groupBy, collapseGroups]);
 
-    const isInternalGroupChange = useRef(false);
-
-    // Listen for groupBy changes from Workspace component
+    // Save groupBy to localStorage when changed
     useEffect(() => {
-        const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
-            // Only update if different to prevent loops
-            if (event.detail.groupBy !== groupBy) {
-                isInternalGroupChange.current = true;
-                setGroupBy(event.detail.groupBy as any);
-                setTimeout(() => { isInternalGroupChange.current = false; }, 0);
-            }
-            if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
-                isInternalGroupChange.current = true;
-                setCollapseGroups(event.detail.collapseGroups);
-                setTimeout(() => { isInternalGroupChange.current = false; }, 0);
-            }
-        };
-        window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-group-changed', handleGroupChange as EventListener);
-        };
-    }, [groupBy, collapseGroups]);
-
-    // Listen for filter presets from Workspace component
-    useEffect(() => {
-        const handlePresetsChange = (event: CustomEvent<{ quickPresets: any[]; allPresets: any[] }>) => {
-            setQuickPresets(event.detail.quickPresets || []);
-            setAllPresets(event.detail.allPresets || []);
-        };
-        window.addEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
-        };
-    }, []);
-
-    // Save groupBy and dispatch event when changed (only if changed internally)
-    useEffect(() => {
-        if (!currentWorkspaceName || isInternalGroupChange.current) return;
+        if (!currentWorkspaceName) return;
         const workspaceId = currentWorkspaceId || 'all';
         try {
             localStorage.setItem(`wh_workspace_group_by_${workspaceId}`, groupBy);
-            window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-                detail: { groupBy, collapseGroups } 
-            }));
         } catch {}
-    }, [groupBy, currentWorkspaceName, currentWorkspaceId, collapseGroups]);
+    }, [groupBy, currentWorkspaceName, currentWorkspaceId]);
 
-    // Save collapseGroups and dispatch event when changed (only if changed internally)
+    // Save collapseGroups to localStorage when changed
     useEffect(() => {
-        if (!currentWorkspaceName || isInternalGroupChange.current) return;
+        if (!currentWorkspaceName) return;
         const workspaceId = currentWorkspaceId || 'all';
         try {
             localStorage.setItem(`wh_workspace_group_collapse_${workspaceId}`, String(collapseGroups));
-            window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-                detail: { groupBy, collapseGroups } 
-            }));
         } catch {}
-    }, [collapseGroups, currentWorkspaceName, currentWorkspaceId, groupBy]);
+    }, [collapseGroups, currentWorkspaceName, currentWorkspaceId]);
 
     // Track theme changes (dark/light) so the gradient updates without hard refresh
     const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => {
@@ -299,6 +263,101 @@ function Header() {
 
     // Subtle gradient background for workspace headers
     const headerSurfaceColor = isDarkTheme ? '#0F0F0F' : 'var(--sidebar-header)';
+    
+    // Detect if header has dark background for text contrast
+    const [isDarkHeader, setIsDarkHeader] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        const sidebarHeader = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+        // Quick check for known dark values
+        return sidebarHeader.includes('#08111f') || sidebarHeader.includes('oklch(0.0') || sidebarHeader.includes('oklch(0.1');
+    });
+    
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const checkHeaderBrightness = () => {
+            // Get the actual computed color of --sidebar-header
+            const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+            
+            // Parse and check brightness
+            let isDark = isDarkTheme;
+            
+            if (computedColor && computedColor !== '') {
+                // Quick string checks for known dark colors
+                if (computedColor.includes('#08111f') || computedColor.includes('#000000') || 
+                    computedColor.includes('oklch(0.0') || computedColor.includes('oklch(0.1')) {
+                    isDark = true;
+                } else {
+                    // Try to parse the color using canvas
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1;
+                        canvas.height = 1;
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (ctx) {
+                            ctx.fillStyle = computedColor;
+                            const computed = ctx.fillStyle;
+                            
+                            // Parse RGB
+                            const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                            if (match) {
+                                const r = parseInt(match[1]);
+                                const g = parseInt(match[2]);
+                                const b = parseInt(match[3]);
+                                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                                isDark = luminance < 0.45;
+                            }
+                        }
+                    } catch (e) {
+                        // Silent fail
+                    }
+                }
+            }
+            
+            setIsDarkHeader(isDark);
+        };
+        
+        // Check immediately
+        checkHeaderBrightness();
+        
+        // Check after styles load
+        const timeout1 = setTimeout(checkHeaderBrightness, 50);
+        const timeout2 = setTimeout(checkHeaderBrightness, 200);
+        const timeout3 = setTimeout(checkHeaderBrightness, 500);
+        
+        // Re-check when theme or branding changes
+        const observer = new MutationObserver(() => {
+            checkHeaderBrightness();
+        });
+        
+        const styleObserver = new MutationObserver(() => {
+            checkHeaderBrightness();
+        });
+        
+        observer.observe(document.documentElement, { 
+            attributes: true, 
+            attributeFilter: ['style', 'class'],
+            subtree: false
+        });
+        
+        // Watch for style tag changes (branding updates)
+        const head = document.querySelector('head');
+        if (head) {
+            styleObserver.observe(head, {
+                childList: true,
+                subtree: true
+            });
+        }
+        
+        return () => {
+            clearTimeout(timeout1);
+            clearTimeout(timeout2);
+            clearTimeout(timeout3);
+            observer.disconnect();
+            styleObserver.disconnect();
+        };
+    }, [isDarkTheme]);
 
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
@@ -525,7 +584,10 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
+        <header 
+            className={`sticky top-0 z-50 w-full backdrop-blur-xl wh-header ${(isDarkTheme || isDarkHeader) ? 'wh-header-dark' : ''}`}
+            style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}
+        >
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
@@ -536,14 +598,21 @@ function Header() {
                     {currentWorkspaceName ? (
                         <div className="flex items-center space-x-2">
                             {workspaceIcon ? (
-                                <FontAwesomeIcon
-                                    icon={workspaceIcon}
-                                    className="flex-shrink-0 text-base sm:text-xl lg:text-2xl leading-none"
-                                    style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
-                                />
+                                <div 
+                                    className="flex-shrink-0 workspace-icon-wrapper"
+                                    style={{ 
+                                        color: currentWorkspaceColor || '#3b82f6',
+                                        ['--workspace-color' as any]: currentWorkspaceColor || '#3b82f6'
+                                    }}
+                                >
+                                    <FontAwesomeIcon
+                                        icon={workspaceIcon}
+                                        className="text-base sm:text-xl lg:text-2xl leading-none"
+                                    />
+                                </div>
                             ) : (
                                 currentWorkspaceName === 'Everything' ? (
-                                    <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" style={{ color: '#27C1A7' }} />
+                                    <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
                                 ) : null
                             )}
                             <h1 className="font-title tracking-tight text-base sm:text-xl lg:text-2xl font-extrabold truncate max-w-[32rem]">
@@ -618,7 +687,7 @@ function Header() {
                                 placeholder="Search…"
                                 className="h-9 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
                                 value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
+                                onChange={(e) => dispatch(setSearchText(e.target.value))}
                             />
                         </div>
                     </div>
@@ -693,15 +762,56 @@ function Header() {
         {/* Secondary Toolbar: Filters and Grouping (only shown in workspace) */}
         {currentWorkspaceName && (
             <div className="sticky top-16 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur-sm px-6 py-2">
-                <div className="flex items-center gap-4">
-                    {/* Quick filter chips */}
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
+                    {/* Active filter chips - shown inline */}
+                    <ActiveFilterChips
+                        filterModel={currentFilterModel}
+                        onRemoveFilter={(filterKey) => {
+                            // Remove specific filter from model
+                            const newModel = { ...currentFilterModel };
+                            if (filterKey === 'text') {
+                                delete newModel.name;
+                                delete newModel.description;
+                                // Clear search input and signal Workspace to not re-apply the filter
+                                dispatch(setSearchText(''));
+                                const finalModel = Object.keys(newModel).length > 0 ? newModel : null;
+                                dispatch(setFilterModel(finalModel));
+                                // Dispatch to Workspace component for table update with clearSearch: true
+                                window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                    detail: { filterModel: finalModel, clearSearch: true } 
+                                }));
+                                return;
+                            } else {
+                                delete newModel[filterKey];
+                            }
+                            const finalModel = Object.keys(newModel).length > 0 ? newModel : null;
+                            dispatch(setFilterModel(finalModel));
+                            // Dispatch to Workspace component for table update
+                            window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                detail: { filterModel: finalModel, clearSearch: false } 
+                            }));
+                        }}
+                        onClearAll={() => {
+                            dispatch(setFilterModel(null));
+                            dispatch(setSearchText(''));
+                            // Dispatch to Workspace component for table update
+                            window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                detail: { filterModel: null, clearSearch: true } 
+                            }));
+                        }}
+                    />
+                    <div className="flex items-center gap-4">
+                        {/* Quick filter chips */}
+                        <div className="flex items-center gap-2">
                         <Button 
                             variant="outline" 
                             size="sm" 
                             className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
                             title="All tasks"
                             onClick={() => {
+                                dispatch(setFilterModel(null));
+                                dispatch(setSearchText(''));
+                                // Dispatch to Workspace component for table update
                                 window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                     detail: { filterModel: null, clearSearch: true } 
                                 }));
@@ -717,6 +827,9 @@ function Header() {
                                 className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
                                 title={p.name}
                                 onClick={() => {
+                                    dispatch(setFilterModel(p.model));
+                                    dispatch(setSearchText(''));
+                                    // Dispatch to Workspace component for table update
                                     window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                         detail: { filterModel: p.model, clearSearch: true } 
                                     }));
@@ -767,28 +880,29 @@ function Header() {
                                 )}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                    </div>
+                        </div>
 
-                    {/* Group by control */}
-                    <div className="flex items-center gap-2 ml-auto">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
-                        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-                            <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
-                                <SelectValue placeholder="Group" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">None</SelectItem>
-                                <SelectItem value="spot_id">Location</SelectItem>
-                                <SelectItem value="status_id">Status</SelectItem>
-                                <SelectItem value="priority_id">Priority</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {groupBy !== 'none' && (
-                            <div className="flex items-center gap-2">
-                                <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
-                                <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
-                            </div>
-                        )}
+                        {/* Group by control */}
+                        <div className="flex items-center gap-2 ml-auto">
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
+                            <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
+                                <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
+                                    <SelectValue placeholder="Group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    <SelectItem value="spot_id">Location</SelectItem>
+                                    <SelectItem value="status_id">Status</SelectItem>
+                                    <SelectItem value="priority_id">Priority</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {groupBy !== 'none' && (
+                                <div className="flex items-center gap-2">
+                                    <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
+                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
