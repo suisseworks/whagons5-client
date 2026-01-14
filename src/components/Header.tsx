@@ -644,11 +644,18 @@ function Header() {
                     {currentWorkspaceName ? (
                         <div className="flex items-center space-x-2">
                             {workspaceIcon ? (
-                                <FontAwesomeIcon
-                                    icon={workspaceIcon}
-                                    className="flex-shrink-0 text-base sm:text-xl lg:text-2xl leading-none"
-                                    style={(isDarkTheme || isDarkHeader) ? undefined : { color: currentWorkspaceColor || 'var(--color-primary)' }}
-                                />
+                                <div 
+                                    className="flex-shrink-0 workspace-icon-wrapper"
+                                    style={{ 
+                                        color: currentWorkspaceColor || '#3b82f6',
+                                        ['--workspace-color' as any]: currentWorkspaceColor || '#3b82f6'
+                                    }}
+                                >
+                                    <FontAwesomeIcon
+                                        icon={workspaceIcon}
+                                        className="text-base sm:text-xl lg:text-2xl leading-none"
+                                    />
+                                </div>
                             ) : (
                                 currentWorkspaceName === 'Everything' ? (
                                     <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />

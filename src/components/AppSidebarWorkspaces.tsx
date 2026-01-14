@@ -17,8 +17,7 @@ import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
-  useCollapsible
+  CollapsibleTrigger
 } from '@/components/animate-ui/primitives/radix/collapsible';
 import {
   SidebarGroup,
@@ -124,16 +123,60 @@ const WorkspaceIconBadge = ({
   </div>
 );
 
-const KeepCollapsibleOpenOnCollapse = ({ forceOpen }: { forceOpen: boolean }) => {
-  const { setIsOpen } = useCollapsible();
+// Reusable workspace link component
+const WorkspaceLink = ({ 
+  to, 
+  icon: Icon, 
+  label, 
+  pathname, 
+  collapsed 
+}: { 
+  to: string; 
+  icon: any; 
+  label: string; 
+  pathname: string; 
+  collapsed: boolean;
+}) => {
+  const isActive = pathname === to;
+  const baseClasses = "flex items-center transition-colors rounded-[8px]";
+  const activeClasses = isActive 
+    ? "bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]" 
+    : "text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]";
+  
+  if (collapsed) {
+    return (
+      <Link
+        to={to}
+        className={`${baseClasses} ${activeClasses} justify-center`}
+        style={{ width: '32px', height: '32px' }}
+        title={label}
+      >
+        <WorkspaceIconBadge color="var(--sidebar-primary)">
+          <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+        </WorkspaceIconBadge>
+        <span className="sr-only">{label}</span>
+      </Link>
+    );
+  }
 
-  useEffect(() => {
-    if (forceOpen) {
-      setIsOpen(true);
-    }
-  }, [forceOpen, setIsOpen]);
-
-  return null;
+  return (
+    <Link
+      to={to}
+      className={`${baseClasses} ${activeClasses} relative overflow-hidden`}
+      style={{
+        height: '36px',
+        padding: '8px 12px',
+        gap: '10px',
+        fontWeight: isActive ? 600 : 500,
+        fontSize: '15px'
+      }}
+    >
+      <WorkspaceIconBadge color="var(--sidebar-primary)">
+        <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+      </WorkspaceIconBadge>
+      <span>{label}</span>
+    </Link>
+  );
 };
 
 function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon, taskCount }: SortableWorkspaceItemProps) {
@@ -407,315 +450,66 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
 
   return (
     <Collapsible defaultOpen className="group/collapsible">
-      <KeepCollapsibleOpenOnCollapse forceOpen={collapsed} />
-      {/* Everything workspace - aligned above Spaces section */}
-      {showEverythingButton && !collapsed && (
-        <div style={{ marginBottom: '8px' }}>
-          <Link
-            to={`/workspace/all`}
-            className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/workspace/all`
-                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-            }`}
-            style={{
-              height: '36px',
-              padding: '8px 12px',
-              gap: '10px',
-              boxShadow: pathname === `/workspace/all` ? '0 1px 3px rgba(0, 191, 165, 0.1)' : 'none',
-              fontWeight: pathname === `/workspace/all` ? 600 : 500,
-              fontSize: '15px'
-            }}
-          >
-            <span className="flex items-center justify-center flex-shrink-0">
-              <WorkspaceIconBadge color="var(--sidebar-primary)">
-                <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
-              </WorkspaceIconBadge>
-            </span>
-            <span>{t('sidebar.everything', 'Everything')}</span>
-          </Link>
-        </div>
-      )}
-
-      {/* Shared with me - virtual workspace */}
-      {showEverythingButton && !collapsed && (
-        <div style={{ marginBottom: '10px' }}>
-          <Link
-            to={`/shared-with-me`}
-            className={`group flex items-center relative overflow-hidden transition-colors rounded-[8px] ${pathname === `/shared-with-me`
-                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-              }`}
-            style={{
-              padding: '8px 12px',
-              gap: '10px',
-              boxShadow: pathname === `/shared-with-me` ? '0 1px 3px rgba(0, 191, 165, 0.1)' : 'none',
-              fontWeight: pathname === `/shared-with-me` ? 600 : 500,
-              fontSize: '15px'
-            }}
-          >
-            <span className="flex items-center gap-3">
-              <WorkspaceIconBadge color="var(--sidebar-primary)">
-                <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
-              </WorkspaceIconBadge>
-            </span>
-            <span>{t('sidebar.sharedWithMe', 'Shared')}</span>
-          </Link>
-        </div>
-      )}
-
-      {showEverythingButton && collapsed && !isMobile && (
-        <div className="px-2 flex justify-center" style={{ marginBottom: '8px' }}>
-          <Link
-            to={`/workspace/all`}
-            className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/workspace/all`
-                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-            }`}
-            style={{
-              width: '32px',
-              height: '32px',
-              opacity: 1
-            }}
-            title={t('sidebar.everything', 'Everything')}
-          >
-            <WorkspaceIconBadge color="var(--sidebar-primary)">
-              <Layers className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
-            </WorkspaceIconBadge>
-            <span className="sr-only">{t('sidebar.everything', 'Everything')}</span>
-          </Link>
-        </div>
-      )}
-
-      {showEverythingButton && collapsed && !isMobile && (
-        <div className="px-2 flex justify-center" style={{ marginBottom: '10px' }}>
-          <Link
-            to={`/shared-with-me`}
-            className={`flex items-center justify-center rounded-[8px] transition-colors ${pathname === `/shared-with-me`
-                ? 'bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]'
-                : 'text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]'
-              }`}
-            style={{
-              width: '32px',
-              height: '32px',
-              opacity: 1
-            }}
-            title={t('sidebar.sharedWithMe', 'Shared')}
-          >
-            <WorkspaceIconBadge color="var(--sidebar-primary)">
-              <Inbox className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
-            </WorkspaceIconBadge>
-            <span className="sr-only">{t('sidebar.sharedWithMe', 'Shared')}</span>
-          </Link>
+      {/* Virtual workspaces */}
+      {showEverythingButton && (
+        <div className={collapsed ? 'px-2 flex flex-col items-center gap-2 mb-2' : 'space-y-2 mb-2'}>
+          <WorkspaceLink 
+            to="/workspace/all" 
+            icon={Layers} 
+            label={t('sidebar.everything', 'Everything')} 
+            pathname={pathname} 
+            collapsed={collapsed} 
+          />
+          <WorkspaceLink 
+            to="/shared-with-me" 
+            icon={Inbox} 
+            label={t('sidebar.sharedWithMe', 'Shared')} 
+            pathname={pathname} 
+            collapsed={collapsed} 
+          />
         </div>
       )}
 
       <SidebarGroup>
         <SidebarGroupLabel asChild>
           <div
-            className={`flex items-center w-full ${collapsed ? 'justify-center px-0' : 'justify-between'
-              }`}
+            className={`flex items-center w-full ${collapsed ? 'justify-center px-0' : 'justify-between'}`}
             style={{ 
               borderTop: collapsed ? 'none' : `1px solid var(--sidebar-border)`,
               paddingTop: collapsed ? '0' : '8px',
-              marginTop: collapsed ? '0' : '0px',
               marginBottom: '8px'
             }}
           >
-            <>
-              {collapsed ? (
-                <CollapsibleTrigger
-                  disabled={collapsed}
-                  className="flex flex-col justify-center px-2 cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm"
-                  style={{ padding: '8px', color: 'var(--sidebar-text-primary)' }}
-                >
-                  <Briefcase className="w-5 h-5 mb-1" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
+            {collapsed ? (
+              <Briefcase className="w-5 h-5" style={{ color: 'var(--sidebar-text-primary)' }} />
+            ) : (
+              <>
+                <CollapsibleTrigger className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm flex-1 p-1 transition-all">
+                  <ChevronDown className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180 w-4 h-4 text-[var(--sidebar-text-primary)]" />
+                  <span className="pl-2 text-sm font-semibold text-[var(--sidebar-text-primary)]">
+                    {t('sidebar.spaces', 'Spaces')}
+                  </span>
                 </CollapsibleTrigger>
-              ) : (
-                <>
-                  <CollapsibleTrigger
-                    disabled={collapsed}
-                    className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm justify-start flex-1 transition-all duration-200"
-                    style={{
-                      padding: '4px 8px 4px 0',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: 'var(--sidebar-text-primary)'
-                    }}
-                  >
-                    <ChevronDown className="ease-out transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180 w-4 h-4" style={{ color: 'var(--sidebar-text-primary)', opacity: 1 }} />
-                    <span className="pl-2" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--sidebar-text-primary)' }}>
-                      {t('sidebar.spaces', 'Spaces')}
-                    </span>
-                  </CollapsibleTrigger>
-                  
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 hover:bg-transparent"
-                      title={t('sidebar.moreOptions', 'More options')}
-                      type="button"
-                      style={{ width: '20px', height: '20px', padding: 0 }}
-                    >
-                      <MoreHorizontal size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
-                      <span className="sr-only">{t('sidebar.moreOptions', 'More options')}</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 hover:bg-transparent"
-                      title={t('sidebar.search', 'Search')}
-                      type="button"
-                      style={{ width: '20px', height: '20px', padding: 0 }}
-                    >
-                      <Search size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
-                      <span className="sr-only">{t('sidebar.search', 'Search')}</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 hover:bg-transparent"
-                      title={t('sidebar.addWorkspace', 'Add Workspace')}
-                      type="button"
-                      onClick={() => setIsModalOpen(true)}
-                      style={{ width: '20px', height: '20px', padding: 0 }}
-                    >
-                      <Plus size={16} style={{ color: 'var(--sidebar-text-primary)' }} />
-                      <span className="sr-only">{t('sidebar.addWorkspace', 'Add Workspace')}</span>
-                    </Button>
-                  </div>
-                </>
-              )}
-              
-              {(!isCollapsedState || isMobile) && (
-                <Dialog open={isModalOpen} onOpenChange={(open) => {
-                  setIsModalOpen(open);
-                  if (!open) {
-                    setWorkspaceName('');
-                    setWorkspaceDescription('');
-                    setWorkspaceColor('#3b82f6');
-                    setWorkspaceType('standard');
-                  }
-                }}>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>{t('sidebar.addNewWorkspace', 'Add New Workspace')}</DialogTitle>
-                      <DialogDescription>
-                        {t('sidebar.addNewWorkspaceDescription', 'Enter the details for your new workspace. Click save when you\'re done.')}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="workspace-name" className="text-right">
-                          {t('sidebar.workspaceName', 'Name')}
-                        </Label>
-                        <Input
-                          id="workspace-name"
-                          value={workspaceName}
-                          onChange={(e) => setWorkspaceName(e.target.value)}
-                          className="col-span-3"
-                          placeholder={t('sidebar.workspaceNamePlaceholder', 'e.g., Project Phoenix')}
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="workspace-description" className="text-right">
-                          {t('sidebar.workspaceDescription', 'Description')}
-                        </Label>
-                        <Input
-                          id="workspace-description"
-                          value={workspaceDescription}
-                          onChange={(e) => setWorkspaceDescription(e.target.value)}
-                          className="col-span-3"
-                          placeholder={t('sidebar.workspaceDescriptionPlaceholder', 'e.g., For managing project tasks')}
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="workspace-color" className="text-right">
-                          {t('sidebar.workspaceColor', 'Color')}
-                        </Label>
-                        <div className="col-span-3">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                id="workspace-color"
-                                type="button"
-                                className="h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                                style={{ backgroundColor: workspaceColor }}
-                                aria-label={t('sidebar.openColorPicker', 'Open color picker')}
-                              />
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-72 pointer-events-auto select-text"
-                              align="start"
-                              side="top"
-                              sideOffset={8}
-                              avoidCollisions={false}
-                              onOpenAutoFocus={(e) => e.preventDefault()}
-                            >
-                              <ColorPicker
-                                className="max-w-xs rounded-md p-2"
-                                defaultValue={workspaceColor || "#3b82f6"}
-                                onChange={(color: ColorLike) => {
-                                  const colorInstance = new Color(color);
-                                  const hex = colorInstance.hex();
-                                  setWorkspaceColor(hex);
-                                }}
-                              >
-                                <div className="aspect-square w-full rounded-md border">
-                                  <ColorPickerSelection className="h-full w-full" />
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <ColorPickerEyeDropper />
-                                  <div className="grid w-full gap-1">
-                                    <ColorPickerHue />
-                                    <ColorPickerAlpha />
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <ColorPickerFormat />
-                                </div>
-                              </ColorPicker>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="workspace-type" className="text-right">
-                          {t('sidebar.workspaceType', 'Type')}
-                        </Label>
-                        <div className="col-span-3">
-                          <Select value={workspaceType} onValueChange={setWorkspaceType}>
-                            <SelectTrigger id="workspace-type">
-                              <SelectValue placeholder={t('sidebar.selectType', 'Select type')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="standard">{t('sidebar.workspaceTypeStandard', 'Standard')}</SelectItem>
-                              <SelectItem value="project">{t('sidebar.workspaceTypeProject', 'Project')}</SelectItem>
-                              <SelectItem value="department">{t('sidebar.workspaceTypeDepartment', 'Department')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                        {t('sidebar.cancel', 'Cancel')}
-                      </Button>
-                      <Button type="button" onClick={handleAddWorkspace}>
-                        {t('sidebar.saveWorkspace', 'Save Workspace')}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </>
+                
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0" title={t('sidebar.moreOptions', 'More options')}>
+                    <MoreHorizontal size={16} className="text-[var(--sidebar-text-primary)]" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0" title={t('sidebar.search', 'Search')}>
+                    <Search size={16} className="text-[var(--sidebar-text-primary)]" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0" onClick={() => setIsModalOpen(true)} title={t('sidebar.addWorkspace', 'Add Workspace')}>
+                    <Plus size={16} className="text-[var(--sidebar-text-primary)]" />
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </SidebarGroupLabel>
 
         <CollapsibleContent 
-          keepRendered 
+          keepRendered={true}
           forceVisible={collapsed}
-          className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up overflow-hidden transition-all duration-200"
         >
           <SidebarGroupContent className={collapsed ? 'pt-1' : 'pt-1'}>
             <DndContext
@@ -779,6 +573,117 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           </SidebarGroupContent>
         </CollapsibleContent>
       </SidebarGroup>
+
+      {/* Add Workspace Dialog */}
+      <Dialog open={isModalOpen} onOpenChange={(open) => {
+        setIsModalOpen(open);
+        if (!open) {
+          setWorkspaceName('');
+          setWorkspaceDescription('');
+          setWorkspaceColor('#3b82f6');
+          setWorkspaceType('standard');
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{t('sidebar.addNewWorkspace', 'Add New Workspace')}</DialogTitle>
+            <DialogDescription>
+              {t('sidebar.addNewWorkspaceDescription', 'Enter the details for your new workspace. Click save when you\'re done.')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="workspace-name" className="text-right">
+                {t('sidebar.workspaceName', 'Name')}
+              </Label>
+              <Input
+                id="workspace-name"
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
+                className="col-span-3"
+                placeholder={t('sidebar.workspaceNamePlaceholder', 'e.g., Project Phoenix')}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="workspace-description" className="text-right">
+                {t('sidebar.workspaceDescription', 'Description')}
+              </Label>
+              <Input
+                id="workspace-description"
+                value={workspaceDescription}
+                onChange={(e) => setWorkspaceDescription(e.target.value)}
+                className="col-span-3"
+                placeholder={t('sidebar.workspaceDescriptionPlaceholder', 'e.g., For managing project tasks')}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="workspace-color" className="text-right">
+                {t('sidebar.workspaceColor', 'Color')}
+              </Label>
+              <div className="col-span-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      id="workspace-color"
+                      type="button"
+                      className="h-9 w-16 rounded-md border border-input shadow-sm ring-offset-background transition-transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      style={{ backgroundColor: workspaceColor }}
+                      aria-label={t('sidebar.openColorPicker', 'Open color picker')}
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72" align="start" side="top">
+                    <ColorPicker
+                      className="max-w-xs rounded-md p-2"
+                      defaultValue={workspaceColor || "#3b82f6"}
+                      onChange={(color: ColorLike) => {
+                        const colorInstance = new Color(color);
+                        setWorkspaceColor(colorInstance.hex());
+                      }}
+                    >
+                      <div className="aspect-square w-full rounded-md border">
+                        <ColorPickerSelection className="h-full w-full" />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <ColorPickerEyeDropper />
+                        <div className="grid w-full gap-1">
+                          <ColorPickerHue />
+                          <ColorPickerAlpha />
+                        </div>
+                      </div>
+                      <ColorPickerFormat />
+                    </ColorPicker>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="workspace-type" className="text-right">
+                {t('sidebar.workspaceType', 'Type')}
+              </Label>
+              <div className="col-span-3">
+                <Select value={workspaceType} onValueChange={setWorkspaceType}>
+                  <SelectTrigger id="workspace-type">
+                    <SelectValue placeholder={t('sidebar.selectType', 'Select type')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">{t('sidebar.workspaceTypeStandard', 'Standard')}</SelectItem>
+                    <SelectItem value="project">{t('sidebar.workspaceTypeProject', 'Project')}</SelectItem>
+                    <SelectItem value="department">{t('sidebar.workspaceTypeDepartment', 'Department')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              {t('sidebar.cancel', 'Cancel')}
+            </Button>
+            <Button type="button" onClick={handleAddWorkspace}>
+              {t('sidebar.saveWorkspace', 'Save Workspace')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   );
 }

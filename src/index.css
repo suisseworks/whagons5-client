@@ -527,13 +527,22 @@
   header.wh-header.wh-header-dark span,
   header.wh-header.wh-header-dark p,
   header.wh-header.wh-header-dark a,
-  header.wh-header.wh-header-dark div {
+  header.wh-header.wh-header-dark div:not(.workspace-icon-wrapper) {
     color: #E8E8E8 !important;
   }
   
   header.wh-header.wh-header-dark svg {
     color: #E8E8E8 !important;
     stroke: #E8E8E8 !important;
+  }
+  
+  /* Exception: Workspace icon should keep its workspace color - override the blanket white rule */
+  header.wh-header.wh-header-dark div.flex-shrink-0.workspace-icon-wrapper svg.svg-inline--fa {
+    color: var(--workspace-color) !important;
+  }
+  
+  header.wh-header.wh-header-dark div.flex-shrink-0.workspace-icon-wrapper svg.svg-inline--fa path {
+    fill: var(--workspace-color) !important;
   }
   
   header.wh-header.wh-header-dark button {
