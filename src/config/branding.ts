@@ -14,6 +14,14 @@ export type BrandingConfig = {
   surfacePatternSize: string;
   sidebarPatternSize: string;
   notes: string;
+  // Dark mode specific colors
+  darkPrimaryColor?: string;
+  darkAccentColor?: string;
+  darkBackgroundColor?: string;
+  darkSidebarColor?: string;
+  darkTextColor?: string;
+  darkNeutralColor?: string;
+  darkGradientAccent?: string;
 };
 
 export type BrandingAssets = {
@@ -34,18 +42,26 @@ export const DEFAULT_BRANDING_CONFIG: BrandingConfig = {
   organizationName: 'Whagons',
   productLabel: 'Ops OS',
   tagline: 'Orchestrate every frontline workflow in one branded console.',
-  primaryColor: '#009579',
-  accentColor: '#2563eb',
-  backgroundColor: '#ffffff',
+  primaryColor: 'oklch(0.59 0.13 175)',
+  accentColor: 'oklch(0.55 0.22 264)',
+  backgroundColor: 'oklch(1 0 0)',
   sidebarColor: '#FAFBFC',
-  textColor: '#0f172a',
-  neutralColor: '#e2e8f0',
-  gradientAccent: 'linear-gradient(130deg, #009579 0%, #2563eb 100%)',
+  textColor: 'oklch(0.20 0.02 250)',
+  neutralColor: 'oklch(0.90 0.01 200)',
+  gradientAccent: 'linear-gradient(130deg, oklch(0.59 0.13 175) 0%, oklch(0.55 0.22 264) 100%)',
   surfacePattern: 'none',
   sidebarPattern: 'none',
   surfacePatternSize: '32px 32px',
   sidebarPatternSize: '24px 24px',
   notes: '',
+  // Dark mode defaults
+  darkPrimaryColor: 'oklch(0.70 0.13 175)',
+  darkAccentColor: 'oklch(0.65 0.11 175)',
+  darkBackgroundColor: 'oklch(0.15 0 0)',
+  darkSidebarColor: 'oklch(0.10 0 0)',
+  darkTextColor: 'oklch(0.95 0 0)',
+  darkNeutralColor: 'oklch(0.25 0 0)',
+  darkGradientAccent: 'linear-gradient(130deg, oklch(0.70 0.13 175) 0%, oklch(0.65 0.11 175) 100%)',
 };
 
 export const DEFAULT_BRANDING_ASSETS: BrandingAssets = {

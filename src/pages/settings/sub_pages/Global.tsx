@@ -1,12 +1,12 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faGlobe,
   faPalette,
-  faSwatchbook,
   faMagicWandSparkles,
   faImage
 } from "@fortawesome/free-solid-svg-icons";
+import { convert } from "colorizr";
 
 import SettingsLayout from "../components/SettingsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,9 +24,7 @@ import {
   BrandingAssets,
   BrandingConfig,
   BrandingToggles,
-  DEFAULT_BRANDING_ASSETS,
   DEFAULT_BRANDING_CONFIG,
-  DEFAULT_BRANDING_TOGGLES,
 } from "@/config/branding";
 import { LANGUAGE_OPTIONS } from "@/config/languages";
 import { useBranding } from "@/providers/BrandingProvider";
@@ -40,14 +37,27 @@ type ThemePreset = {
   id: string;
   label: string;
   description: string;
-  gradient: string;
-  palette: {
-    primary: string;
-    accent: string;
-    background: string;
-    text: string;
-    neutral: string;
-    sidebar?: string;
+  light: {
+    gradient: string;
+    palette: {
+      primary: string;
+      accent: string;
+      background: string;
+      text: string;
+      neutral: string;
+      sidebar?: string;
+    };
+  };
+  dark: {
+    gradient: string;
+    palette: {
+      primary: string;
+      accent: string;
+      background: string;
+      text: string;
+      neutral: string;
+      sidebar?: string;
+    };
   };
   badge?: string;
   sidebarTone?: 'light' | 'dark';
@@ -69,28 +79,55 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "jade-ops",
     label: "Jade Ops",
     description: "Vibrant teal primary with electric indigo highlights",
-    gradient: "linear-gradient(130deg, #27c1a7 0%, #2563eb 100%)",
-    palette: {
-      primary: "#27c1a7",
-      accent: "#2563eb",
-      background: "#f4fffb",
-      text: "#0f172a",
-      neutral: "#d7f5ef"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.72 0.12 175) 0%, oklch(0.55 0.22 264) 100%)",
+      palette: {
+        primary: "oklch(0.72 0.12 175)",
+        accent: "oklch(0.55 0.22 264)",
+        background: "oklch(0.99 0.01 175)",
+        text: "oklch(0.20 0.02 250)",
+        neutral: "oklch(0.94 0.03 175)",
+        sidebar: SIDEBAR_LIGHT
+      }
     },
-    badge: "Default",
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.75 0.15 175) 0%, oklch(0.68 0.26 250) 100%)",
+      palette: {
+        primary: "oklch(0.75 0.15 175)",
+        accent: "oklch(0.68 0.26 250)",
+        background: "oklch(0.12 0.01 180)",
+        text: "oklch(0.96 0.01 175)",
+        neutral: "oklch(0.22 0.02 180)",
+        sidebar: "oklch(0.10 0.01 180)"
+      }
+    },
     sidebarTone: "light"
   },
   {
     id: "ember",
     label: "Ember Sunrise",
     description: "Warm amber gradients with charcoal typography",
-    gradient: "linear-gradient(130deg, #f97316 0%, #ef4444 100%)",
-    palette: {
-      primary: "#f97316",
-      accent: "#ef4444",
-      background: "#fff8f3",
-      text: "#1f2937",
-      neutral: "#ffe4d5"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.70 0.19 40) 0%, oklch(0.62 0.25 25) 100%)",
+      palette: {
+        primary: "oklch(0.70 0.19 40)",
+        accent: "oklch(0.62 0.25 25)",
+        background: "oklch(0.99 0.01 40)",
+        text: "oklch(0.30 0.02 250)",
+        neutral: "oklch(0.94 0.05 40)",
+        sidebar: SIDEBAR_LIGHT
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.72 0.22 45) 0%, oklch(0.65 0.28 20) 100%)",
+      palette: {
+        primary: "oklch(0.72 0.22 45)",
+        accent: "oklch(0.65 0.28 20)",
+        background: "oklch(0.13 0.01 30)",
+        text: "oklch(0.97 0.01 50)",
+        neutral: "oklch(0.20 0.02 35)",
+        sidebar: "oklch(0.11 0.01 35)"
+      }
     },
     badge: "Popular",
     sidebarTone: "light"
@@ -99,13 +136,27 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "midnight",
     label: "Midnight Violet",
     description: "Moody violet base with neon teal accent",
-    gradient: "linear-gradient(130deg, #7c3aed 0%, #0ea5e9 100%)",
-    palette: {
-      primary: "#7c3aed",
-      accent: "#0ea5e9",
-      background: "#f5f3ff",
-      text: "#101828",
-      neutral: "#e5d9ff"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.57 0.25 290) 0%, oklch(0.67 0.17 230) 100%)",
+      palette: {
+        primary: "oklch(0.57 0.25 290)",
+        accent: "oklch(0.67 0.17 230)",
+        background: "oklch(0.98 0.02 290)",
+        text: "oklch(0.20 0.02 250)",
+        neutral: "oklch(0.92 0.06 290)",
+        sidebar: SIDEBAR_LIGHT
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.70 0.28 285) 0%, oklch(0.75 0.20 215) 100%)",
+      palette: {
+        primary: "oklch(0.70 0.28 285)",
+        accent: "oklch(0.75 0.20 215)",
+        background: "oklch(0.11 0.02 280)",
+        text: "oklch(0.95 0.02 290)",
+        neutral: "oklch(0.18 0.04 285)",
+        sidebar: "oklch(0.09 0.02 280)"
+      }
     },
     sidebarTone: "light"
   },
@@ -113,13 +164,27 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "sandstone",
     label: "Sandstone Calm",
     description: "Soft neutrals with deep emerald accents",
-    gradient: "linear-gradient(130deg, #fcd34d 0%, #0f9d58 100%)",
-    palette: {
-      primary: "#0f9d58",
-      accent: "#f97316",
-      background: "#fffef7",
-      text: "#1c1917",
-      neutral: "#f6edd3"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.88 0.14 95) 0%, oklch(0.60 0.15 155) 100%)",
+      palette: {
+        primary: "oklch(0.60 0.15 155)",
+        accent: "oklch(0.70 0.19 40)",
+        background: "oklch(0.99 0.01 95)",
+        text: "oklch(0.25 0.01 40)",
+        neutral: "oklch(0.94 0.04 85)",
+        sidebar: SIDEBAR_LIGHT
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.82 0.12 110) 0%, oklch(0.68 0.20 150) 100%)",
+      palette: {
+        primary: "oklch(0.68 0.20 150)",
+        accent: "oklch(0.78 0.16 60)",
+        background: "oklch(0.13 0.01 140)",
+        text: "oklch(0.96 0.01 100)",
+        neutral: "oklch(0.19 0.02 145)",
+        sidebar: "oklch(0.10 0.01 140)"
+      }
     },
     badge: "New",
     sidebarTone: "light"
@@ -128,14 +193,27 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "night-ops",
     label: "Night Ops",
     description: "Teal gradients with a dark command-center sidebar.",
-    gradient: "linear-gradient(130deg, #0f172a 0%, #2563eb 100%)",
-    palette: {
-      primary: "#27c1a7",
-      accent: "#22d3ee",
-      background: "#f4fffb",
-      text: "#0f172a",
-      neutral: "#d7f5ef",
-      sidebar: SIDEBAR_DARK
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.72 0.12 175) 0%, oklch(0.55 0.22 264) 100%)",
+      palette: {
+        primary: "oklch(0.72 0.12 175)",
+        accent: "oklch(0.78 0.15 210)",
+        background: "oklch(0.99 0.01 175)",
+        text: "oklch(0.20 0.02 250)",
+        neutral: "oklch(0.94 0.03 175)",
+        sidebar: SIDEBAR_DARK
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.80 0.16 180) 0%, oklch(0.75 0.18 200) 100%)",
+      palette: {
+        primary: "oklch(0.80 0.16 180)",
+        accent: "oklch(0.75 0.18 200)",
+        background: "oklch(0.08 0.01 190)",
+        text: "oklch(0.94 0.01 180)",
+        neutral: "oklch(0.15 0.01 190)",
+        sidebar: "oklch(0.05 0 0)"
+      }
     },
     badge: "Dark sidebar",
     sidebarTone: "dark"
@@ -144,16 +222,30 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "retro-grid",
     label: "Retro Grid",
     description: "80s neon palette with subtle pixel patterns on menus.",
-    gradient: "linear-gradient(130deg, #ff8fb1 0%, #7c3aed 45%, #22d3ee 100%)",
-    palette: {
-      primary: "#ff7f5f",
-      accent: "#22d3ee",
-      background: "#fff6e8",
-      text: "#20121f",
-      neutral: "#f2e4d2",
-      sidebar: "#2b1b34"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.75 0.18 350) 0%, oklch(0.57 0.25 290) 45%, oklch(0.78 0.15 210) 100%)",
+      palette: {
+        primary: "oklch(0.72 0.20 30)",
+        accent: "oklch(0.78 0.15 210)",
+        background: "oklch(0.98 0.02 60)",
+        text: "oklch(0.22 0.04 310)",
+        neutral: "oklch(0.92 0.03 60)",
+        sidebar: "oklch(0.22 0.06 310)"
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.75 0.24 335) 0%, oklch(0.68 0.28 295) 45%, oklch(0.78 0.20 200) 100%)",
+      palette: {
+        primary: "oklch(0.75 0.24 335)",
+        accent: "oklch(0.78 0.20 200)",
+        background: "oklch(0.10 0.03 310)",
+        text: "oklch(0.95 0.02 330)",
+        neutral: "oklch(0.17 0.04 315)",
+        sidebar: "oklch(0.12 0.03 310)"
+      }
     },
     badge: "Retro",
+    sidebarTone: "dark",
     patterns: {
       surface: RETRO_SURFACE_PATTERN,
       sidebar: RETRO_SIDEBAR_PATTERN,
@@ -165,14 +257,27 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "hipster-vibes",
     label: "Hipster Vibes",
     description: "Muted earthy tones with vintage mustard and dusty rose accents",
-    gradient: "linear-gradient(130deg, #d4a574 0%, #c97d60 50%, #a8b5a0 100%)",
-    palette: {
-      primary: "#d4a574",
-      accent: "#c97d60",
-      background: "#faf8f3",
-      text: "#3d3528",
-      neutral: "#e8ddd0",
-      sidebar: "#f5f1eb"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.73 0.08 65) 0%, oklch(0.65 0.10 35) 50%, oklch(0.72 0.05 130) 100%)",
+      palette: {
+        primary: "oklch(0.73 0.08 65)",
+        accent: "oklch(0.65 0.10 35)",
+        background: "oklch(0.98 0.01 65)",
+        text: "oklch(0.32 0.02 50)",
+        neutral: "oklch(0.90 0.03 60)",
+        sidebar: "oklch(0.96 0.01 60)"
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.70 0.12 70) 0%, oklch(0.62 0.15 25) 50%, oklch(0.65 0.09 120) 100%)",
+      palette: {
+        primary: "oklch(0.70 0.12 70)",
+        accent: "oklch(0.62 0.15 25)",
+        background: "oklch(0.14 0.01 45)",
+        text: "oklch(0.94 0.02 65)",
+        neutral: "oklch(0.21 0.02 50)",
+        sidebar: "oklch(0.12 0.01 45)"
+      }
     },
     badge: "Hipster",
     sidebarTone: "light"
@@ -181,14 +286,27 @@ const PRESET_THEMES: ThemePreset[] = [
     id: "star-wars",
     label: "Star Wars",
     description: "Deep space theme with Rebel Alliance blue and iconic yellow accents",
-    gradient: "linear-gradient(130deg, #0a0a0a 0%, #4A90E2 50%, #FFE81F 100%)",
-    palette: {
-      primary: "#4A90E2",
-      accent: "#FFE81F",
-      background: "#0a0a0a",
-      text: "#E8E8E8",
-      neutral: "#141414",
-      sidebar: "#000000"
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.63 0.15 250) 0%, oklch(0.92 0.18 95) 100%)",
+      palette: {
+        primary: "oklch(0.63 0.15 250)",
+        accent: "oklch(0.92 0.18 95)",
+        background: "oklch(0.98 0.01 250)",
+        text: "oklch(0.20 0 0)",
+        neutral: "oklch(0.90 0.02 250)",
+        sidebar: "oklch(0.95 0.01 250)"
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.10 0 0) 0%, oklch(0.58 0.20 245) 50%, oklch(0.88 0.22 90) 100%)",
+      palette: {
+        primary: "oklch(0.58 0.20 245)",
+        accent: "oklch(0.88 0.22 90)",
+        background: "oklch(0.08 0 0)",
+        text: "oklch(0.91 0.01 0)",
+        neutral: "oklch(0.14 0 0)",
+        sidebar: "oklch(0.05 0 0)"
+      }
     },
     badge: "Star Wars",
     sidebarTone: "dark",
@@ -203,21 +321,23 @@ const PRESET_THEMES: ThemePreset[] = [
 
 const CUSTOM_THEME_ID = "custom";
 
-const getSidebarColorForTheme = (theme: ThemePreset) => {
+const getSidebarColorForTheme = (theme: ThemePreset, mode: 'light' | 'dark' = 'light') => {
+  const palette = mode === 'dark' ? theme.dark.palette : theme.light.palette;
   if (theme.sidebarTone === 'dark') return SIDEBAR_DARK;
   if (theme.sidebarTone === 'light') return SIDEBAR_LIGHT;
-  return theme.palette.sidebar ?? SIDEBAR_LIGHT;
+  return palette.sidebar ?? SIDEBAR_LIGHT;
 };
 
 const getPresetIdForConfig = (config: BrandingConfig) => {
-  const preset = PRESET_THEMES.find(
-    (theme) =>
-      theme.palette.primary === config.primaryColor &&
-      theme.palette.accent === config.accentColor &&
-      theme.palette.background === config.backgroundColor &&
-      getSidebarColorForTheme(theme) === config.sidebarColor &&
-      theme.palette.text === config.textColor &&
-      theme.palette.neutral === config.neutralColor &&
+  const preset = PRESET_THEMES.find((theme) => {
+    const palette = theme.light.palette;
+    return (
+      palette.primary === config.primaryColor &&
+      palette.accent === config.accentColor &&
+      palette.background === config.backgroundColor &&
+      getSidebarColorForTheme(theme, 'light') === config.sidebarColor &&
+      palette.text === config.textColor &&
+      palette.neutral === config.neutralColor &&
       (theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern) ===
         (config.surfacePattern ?? DEFAULT_BRANDING_CONFIG.surfacePattern) &&
       (theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern) ===
@@ -226,7 +346,8 @@ const getPresetIdForConfig = (config: BrandingConfig) => {
         (config.surfacePatternSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize) &&
       (theme.patterns?.sidebarSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize) ===
         (config.sidebarPatternSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize)
-  );
+    );
+  });
   return preset?.id ?? CUSTOM_THEME_ID;
 };
 
@@ -334,28 +455,55 @@ function Global() {
     setHasPendingChanges(brandingChanged || assetsChanged || togglesChanged);
   }, [brand, assets, toggles, activeBrand, activeAssets, activeToggles]);
 
-  const brandTokens = useMemo(
-    () => [
-      { labelKey: "settings.global.branding.tokens.primary", fallbackLabel: "Primary", token: "--brand-primary", value: brand.primaryColor },
-      { labelKey: "settings.global.branding.tokens.accent", fallbackLabel: "Accent", token: "--brand-accent", value: brand.accentColor },
-      { labelKey: "settings.global.branding.tokens.background", fallbackLabel: "Background", token: "--brand-background", value: brand.backgroundColor },
-      { labelKey: "settings.global.branding.tokens.neutral", fallbackLabel: "Neutral", token: "--brand-neutral", value: brand.neutralColor },
-      { labelKey: "settings.global.branding.tokens.sidebar", fallbackLabel: "Sidebar", token: "--brand-sidebar", value: brand.sidebarColor },
-      { labelKey: "settings.global.branding.tokens.foreground", fallbackLabel: "Foreground", token: "--brand-foreground", value: brand.textColor }
-    ],
-    [brand]
-  );
-
   const previewGradient = useMemo(
     () => brand.gradientAccent || `linear-gradient(130deg, ${brand.primaryColor}, ${brand.accentColor})`,
     [brand.gradientAccent, brand.primaryColor, brand.accentColor]
   );
-  const surfacePattern = brand.surfacePattern ?? DEFAULT_BRANDING_CONFIG.surfacePattern;
-  const sidebarPattern = brand.sidebarPattern ?? DEFAULT_BRANDING_CONFIG.sidebarPattern;
-  const surfacePatternSize = brand.surfacePatternSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize;
-  const sidebarPatternSize = brand.sidebarPatternSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize;
-  const hasSurfacePattern = surfacePattern !== "none" && surfacePattern.trim() !== "";
-  const hasSidebarPattern = sidebarPattern !== "none" && sidebarPattern.trim() !== "";
+
+  // Helper to convert any color format to hex for color inputs using colorizr
+  const oklchToHex = useCallback((color: string): string => {
+    // If it's already hex, return it
+    if (color && color.startsWith('#')) {
+      return color;
+    }
+    
+    try {
+      // Use colorizr to convert any CSS color format to hex
+      const hexColor = convert(color, 'hex');
+      return hexColor;
+    } catch (e) {
+      console.warn('Failed to convert color to hex using colorizr:', color, e);
+      // Fallback - try canvas method
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.fillStyle = color;
+          const computedColor = ctx.fillStyle;
+          
+          if (computedColor.startsWith('#')) {
+            return computedColor;
+          }
+          
+          const match = computedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (match) {
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`;
+          }
+        }
+      } catch (err) {
+        console.warn('Canvas fallback also failed:', err);
+      }
+    }
+    
+    // Ultimate fallback
+    return '#666666';
+  }, []);
 
   const handleBrandFieldChange =
     (field: keyof BrandingConfig) =>
@@ -375,20 +523,43 @@ function Global() {
 
   const handleThemeApply = (theme: ThemePreset) => {
     setSelectedTheme(theme.id);
-    setBrand((prev) => ({
-      ...prev,
-      primaryColor: theme.palette.primary,
-      accentColor: theme.palette.accent,
-      backgroundColor: theme.palette.background,
-      sidebarColor: getSidebarColorForTheme(theme),
-      textColor: theme.palette.text,
-      neutralColor: theme.palette.neutral,
-      gradientAccent: theme.gradient,
+    const lightPalette = theme.light.palette;
+    const darkPalette = theme.dark.palette;
+    
+    const newConfig = {
+      ...brand,
+      // Light mode colors
+      primaryColor: lightPalette.primary,
+      accentColor: lightPalette.accent,
+      backgroundColor: lightPalette.background,
+      sidebarColor: getSidebarColorForTheme(theme, 'light'),
+      textColor: lightPalette.text,
+      neutralColor: lightPalette.neutral,
+      gradientAccent: theme.light.gradient,
+      // Dark mode colors
+      darkPrimaryColor: darkPalette.primary,
+      darkAccentColor: darkPalette.accent,
+      darkBackgroundColor: darkPalette.background,
+      darkSidebarColor: darkPalette.sidebar ?? getSidebarColorForTheme(theme, 'dark'),
+      darkTextColor: darkPalette.text,
+      darkNeutralColor: darkPalette.neutral,
+      darkGradientAccent: theme.dark.gradient,
+      // Patterns
       surfacePattern: theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern,
       sidebarPattern: theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern,
       surfacePatternSize: theme.patterns?.surfaceSize ?? DEFAULT_BRANDING_CONFIG.surfacePatternSize,
       sidebarPatternSize: theme.patterns?.sidebarSize ?? DEFAULT_BRANDING_CONFIG.sidebarPatternSize
-    }));
+    };
+    
+    // Update local state
+    setBrand(newConfig);
+    
+    // Apply theme immediately without confirmation
+    saveBranding({
+      config: newConfig,
+      assets: { ...assets },
+      toggles: { ...toggles }
+    });
   };
 
   const handleAssetUpload =
@@ -425,24 +596,20 @@ function Global() {
   };
 
   const handleResetBranding = () => {
-    const config = { ...DEFAULT_BRANDING_CONFIG };
-    const resetAssets = { ...DEFAULT_BRANDING_ASSETS };
-    const resetToggles = { ...DEFAULT_BRANDING_TOGGLES };
-    setBrand(config);
-    setAssets(resetAssets);
-    setToggles(resetToggles);
-    setSelectedTheme(getPresetIdForConfig(config));
-    saveBranding({
-      config,
-      assets: resetAssets,
-      toggles: resetToggles
-    });
+    // If a preset theme is selected, reset to that preset
+    // Otherwise reset to active saved branding
+    const currentTheme = PRESET_THEMES.find(t => t.id === selectedTheme);
+    
+    if (currentTheme) {
+      handleThemeApply(currentTheme);
+    } else {
+      setBrand(activeBrand);
+      setAssets(activeAssets);
+      setToggles(activeToggles);
+      setSelectedTheme(getPresetIdForConfig(activeBrand));
+    }
   };
 
-  const scrollToDesigner = () => {
-    if (typeof window === "undefined") return;
-    document.getElementById("branding-designer")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   return (
     <SettingsLayout
@@ -538,472 +705,429 @@ function Global() {
         </TabsContent>
 
         <TabsContent value="branding" className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="border-primary/30 shadow-sm">
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <div className="space-y-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FontAwesomeIcon icon={faPalette} className="text-primary" />
-                    {t("settings.global.branding.hero.cardTitle", "Branding & Identity")}
-                  </CardTitle>
-                  <CardDescription>
-                    {t(
-                      "settings.global.branding.hero.cardDescription",
-                      "Customize logos, color tokens, and gradients that propagate throughout the workspace, auth screens, and outbound emails."
-                    )}
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary">
-                  {t("settings.global.branding.hero.badge", "New")}
-                </Badge>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-3">
-                <Button onClick={scrollToDesigner}>
-                  {t("settings.global.branding.hero.openDesigner", "Open designer")}
-                </Button>
-                <Button variant="outline">
-                  {t("settings.global.branding.hero.previewButton", "Preview login screen")}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="space-y-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FontAwesomeIcon icon={faSwatchbook} className="text-muted-foreground" />
-                  {t("settings.global.branding.guidance.title", "Guidance")}
-                </CardTitle>
-                <CardDescription>
+          <Tabs defaultValue="presets" className="space-y-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
                   {t(
-                    "settings.global.branding.guidance.description",
-                    "Branding lives entirely in configuration—no redeploy required. Changes sync to every connected client within ~60 seconds."
+                    "settings.global.branding.tabs.helper",
+                    "Choose a preset theme or create a custom design with your brand colors."
                   )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="text-xs text-muted-foreground space-y-2">
-                <p>• {t("settings.global.branding.guidance.tip1", "Prefer accessible contrast ratios (4.5:1) for sidebar/background tokens.")}</p>
-                <p>• {t("settings.global.branding.guidance.tip2", "Upload SVG logos whenever possible for crisp scaling.")}</p>
-                <p>• {t("settings.global.branding.guidance.tip3", "Keep gradients subtle so content remains the hero.")}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div id="branding-designer" className="space-y-6">
-            <Tabs defaultValue="designer" className="space-y-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      "settings.global.branding.tabs.helper",
-                      "Switch between the theme designer, asset uploads, and rollout controls to keep this surface tidy."
-                    )}
-                  </p>
-                </div>
-                <TabsList className="w-full justify-start overflow-x-auto lg:w-auto">
-                  <TabsTrigger value="designer">
-                    {t("settings.global.branding.tabs.designer", "Theme designer")}
-                  </TabsTrigger>
-                  <TabsTrigger value="assets">
-                    {t("settings.global.branding.tabs.assets", "Logos & icons")}
-                  </TabsTrigger>
-                  <TabsTrigger value="rollout">
-                    {t("settings.global.branding.tabs.rollout", "Rollout controls")}
-                  </TabsTrigger>
-                </TabsList>
+                </p>
               </div>
+              <TabsList className="w-full justify-start overflow-x-auto lg:w-auto">
+                <TabsTrigger value="presets">
+                  {t("settings.global.branding.tabs.presets", "Preset Themes")}
+                </TabsTrigger>
+                <TabsTrigger value="custom">
+                  {t("settings.global.branding.tabs.custom", "Custom Designer")}
+                </TabsTrigger>
+                <TabsTrigger value="assets">
+                  {t("settings.global.branding.tabs.assets", "Logos & Icons")}
+                </TabsTrigger>
+                <TabsTrigger value="rollout">
+                  {t("settings.global.branding.tabs.rollout", "Rollout Controls")}
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-              <TabsContent value="designer" className="space-y-6">
-                <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-                  <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <FontAwesomeIcon icon={faPalette} className="text-primary" />
-                          {t("settings.global.branding.designer.brandBasics.title", "Brand basics")}
-                        </CardTitle>
-                        <CardDescription>
-                          {t(
-                            "settings.global.branding.designer.brandBasics.description",
-                            "Update names, messaging, and primary palette tokens."
-                          )}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-5">
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="organizationName">
-                              {t("settings.global.branding.designer.brandBasics.organizationLabel", "Organization name")}
-                            </Label>
-                            <Input
-                              id="organizationName"
-                              value={brand.organizationName}
-                              onChange={handleBrandFieldChange("organizationName")}
-                              placeholder={t(
-                                "settings.global.branding.designer.brandBasics.organizationPlaceholder",
-                                "Acme Utilities"
-                              )}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="productLabel">
-                              {t("settings.global.branding.designer.brandBasics.productLabel", "Product surface label")}
-                            </Label>
-                            <Input
-                              id="productLabel"
-                              value={brand.productLabel}
-                              onChange={handleBrandFieldChange("productLabel")}
-                              placeholder={t(
-                                "settings.global.branding.designer.brandBasics.productPlaceholder",
-                                "Command Center"
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="tagline">
-                            {t("settings.global.branding.designer.brandBasics.taglineLabel", "Tagline")}
-                          </Label>
-                          <Input
-                            id="tagline"
-                            value={brand.tagline}
-                            onChange={handleBrandFieldChange("tagline")}
-                            placeholder={t(
-                              "settings.global.branding.designer.brandBasics.taglinePlaceholder",
-                              "Share a short promise or mission."
-                            )}
-                          />
-                        </div>
-
-                        <Separator />
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="primaryColor">
-                              {t("settings.global.branding.designer.brandBasics.primaryLabel", "Primary color")}
-                            </Label>
-                            <Input
-                              id="primaryColor"
-                              type="color"
-                              value={brand.primaryColor}
-                              onChange={handleColorChange("primaryColor")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {t(
-                                "settings.global.branding.designer.brandBasics.primaryHelper",
-                                "Buttons, highlights, and main call-to-actions."
-                              )}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="accentColor">
-                              {t("settings.global.branding.designer.brandBasics.accentLabel", "Accent color")}
-                            </Label>
-                            <Input
-                              id="accentColor"
-                              type="color"
-                              value={brand.accentColor}
-                              onChange={handleColorChange("accentColor")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {t(
-                                "settings.global.branding.designer.brandBasics.accentHelper",
-                                "Secondary emphasis, badges, and charts."
-                              )}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="backgroundColor">
-                              {t("settings.global.branding.designer.brandBasics.backgroundLabel", "Background")}
-                            </Label>
-                            <Input
-                              id="backgroundColor"
-                              type="color"
-                              value={brand.backgroundColor}
-                              onChange={handleColorChange("backgroundColor")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {t(
-                                "settings.global.branding.designer.brandBasics.backgroundHelper",
-                                "High-level canvas for pages and cards."
-                              )}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="sidebarColor">
-                              {t("settings.global.branding.designer.brandBasics.sidebarLabel", "Sidebar")}
-                            </Label>
-                            <Input
-                              id="sidebarColor"
-                              type="color"
-                              value={brand.sidebarColor}
-                              onChange={handleColorChange("sidebarColor")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {t(
-                                "settings.global.branding.designer.brandBasics.sidebarHelper",
-                                "Navigation rails, modals, and overlays."
-                              )}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="textColor">
-                              {t("settings.global.branding.designer.brandBasics.textLabel", "Foreground")}
-                            </Label>
-                            <Input
-                              id="textColor"
-                              type="color"
-                              value={brand.textColor}
-                              onChange={handleColorChange("textColor")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {t(
-                                "settings.global.branding.designer.brandBasics.textHelper",
-                                "Main typography color."
-                              )}
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="neutralColor">
-                              {t("settings.global.branding.designer.brandBasics.neutralLabel", "Neutral")}
-                            </Label>
-                            <Input
-                              id="neutralColor"
-                              type="color"
-                              value={brand.neutralColor}
-                              onChange={handleColorChange("neutralColor")}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {t(
-                                "settings.global.branding.designer.brandBasics.neutralHelper",
-                                "Surfaces, tables, and dividers."
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="notes">
-                            {t("settings.global.branding.designer.brandBasics.notesLabel", "Launch notes")}
-                          </Label>
-                          <Textarea
-                            id="notes"
-                            value={brand.notes}
-                            onChange={handleBrandFieldChange("notes")}
-                            placeholder={t(
-                              "settings.global.branding.designer.brandBasics.notesPlaceholder",
-                              "Capture reasoning, accessibility checks, or internal review notes."
-                            )}
-                          />
-                        </div>
-
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={handleResetBranding}>
-                            {t("settings.global.branding.designer.brandBasics.reset", "Reset to default")}
-                          </Button>
-                          <Button size="sm" onClick={handleSaveBranding}>
-                            {t("settings.global.branding.designer.brandBasics.save", "Save branding draft")}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+            <TabsContent value="presets" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FontAwesomeIcon icon={faMagicWandSparkles} className="text-primary" />
+                        {t("settings.global.branding.presets.title", "Preset Themes")}
+                      </CardTitle>
+                      <CardDescription>
+                        {t(
+                          "settings.global.branding.presets.description",
+                          "Apply curated palettes instantly. Themes include both light and dark mode variants."
+                        )}
+                      </CardDescription>
+                    </div>
                   </div>
-
-                  <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {PRESET_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => handleThemeApply(theme)}
+                        className={cn(
+                          "rounded-xl border p-3 text-left transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          selectedTheme === theme.id ? "border-primary shadow-lg" : "border-muted"
+                        )}
+                      >
+                        <div className="h-20 rounded-lg mb-3 flex overflow-hidden">
+                          <div
+                            className="flex-1 rounded-l-lg flex items-center justify-center text-[10px] font-medium text-white/80"
+                            style={{ background: theme.light.gradient }}
+                          >
+                            Light
+                          </div>
+                          <div
+                            className="flex-1 rounded-r-lg flex items-center justify-center text-[10px] font-medium text-white/80"
+                            style={{ background: theme.dark.gradient }}
+                          >
+                            Dark
+                          </div>
+                        </div>
                         <div className="flex items-center justify-between">
                           <div>
-                            <CardTitle className="text-base flex items-center gap-2">
-                              <FontAwesomeIcon icon={faMagicWandSparkles} className="text-primary" />
-                              {t("settings.global.branding.designer.preview.title", "Live preview")}
-                            </CardTitle>
-                            <CardDescription>
-                              {t(
-                                "settings.global.branding.designer.preview.description",
-                                "Real-time mock of the sidebar + hero surfaces."
-                              )}
-                            </CardDescription>
+                            <p className="font-semibold text-sm">
+                              {t(`settings.global.branding.presets.${theme.id}.label`, theme.label)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {t(`settings.global.branding.presets.${theme.id}.description`, theme.description)}
+                            </p>
                           </div>
-                          <Badge variant="outline">
-                            {t("settings.global.branding.designer.preview.badge", "Preview")}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="rounded-xl border overflow-hidden shadow-sm">
-                          <div
-                            className="p-5 text-white"
-                            style={{
-                              backgroundImage: `${hasSurfacePattern ? `${surfacePattern}, ` : ""}${previewGradient}`,
-                              backgroundSize: hasSurfacePattern ? `${surfacePatternSize}, cover` : "cover",
-                              backgroundBlendMode: hasSurfacePattern ? "soft-light, normal" : undefined
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              {assets.logoLight ? (
-                                <img src={assets.logoLight} alt={t("settings.global.branding.designer.preview.brandLogoAlt", "Brand logo")} className="h-10 object-contain" />
-                              ) : (
-                                <WhagonsCheck width={120} height={28} color="#ffffff" />
-                              )}
-                              <div>
-                                <p className="text-xs uppercase tracking-wide opacity-80">
-                                  {brand.organizationName}
-                                </p>
-                                <p className="font-semibold text-lg">{brand.productLabel}</p>
-                              </div>
-                            </div>
-                            <p className="mt-4 text-sm text-white/80">{brand.tagline}</p>
-                          </div>
-
-                          <div
-                            className="p-5 space-y-4"
-                            style={{
-                              backgroundColor: brand.backgroundColor,
-                              color: brand.textColor,
-                              backgroundImage: hasSurfacePattern ? surfacePattern : undefined,
-                              backgroundSize: hasSurfacePattern ? surfacePatternSize : undefined,
-                              backgroundRepeat: hasSurfacePattern ? "repeat" : undefined,
-                              backgroundBlendMode: hasSurfacePattern ? "soft-light" : undefined
-                            }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {t("settings.global.branding.designer.preview.primaryButton", "Primary button")}
-                                </p>
-                                <p className="text-xs text-muted-foreground" style={{ color: brand.textColor, opacity: 0.7 }}>
-                                  {t("settings.global.branding.designer.preview.primaryHelper", "Uses --brand-primary")}
-                                </p>
-                              </div>
-                              <button
-                                className="px-4 py-2 rounded-md text-sm font-semibold shadow-sm"
-                                style={{ backgroundColor: brand.primaryColor, color: "#ffffff" }}
-                                onClick={handleSaveBranding}
-                              >
-                                {t("settings.global.branding.designer.preview.apply", "Apply changes")}
-                              </button>
-                            </div>
-
-                            <div className="rounded-lg p-3 text-xs" style={{ backgroundColor: brand.neutralColor, color: brand.textColor }}>
-                              {t(
-                                "settings.global.branding.designer.preview.neutralTile",
-                                "Sample notification tile using neutral token."
-                              )}
-                            </div>
-
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div
-                                className="rounded-lg p-3 text-sm text-white"
-                                style={{
-                                  backgroundColor: brand.sidebarColor,
-                                  backgroundImage: hasSidebarPattern ? sidebarPattern : undefined,
-                                  backgroundSize: hasSidebarPattern ? sidebarPatternSize : undefined,
-                                  backgroundRepeat: hasSidebarPattern ? "repeat" : undefined,
-                                  backgroundBlendMode: hasSidebarPattern ? "soft-light" : undefined
-                                }}
-                              >
-                                {t("settings.global.branding.designer.preview.sidebarSample", "Sidebar sample")}
-                              </div>
-                              <div
-                                className="rounded-lg p-3 text-sm text-white"
-                                style={{ backgroundColor: brand.accentColor }}
-                              >
-                                {t("settings.global.branding.designer.preview.accentSample", "Accent CTA")}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <FontAwesomeIcon icon={faSwatchbook} className="text-muted-foreground" />
-                          {t("settings.global.branding.designer.tokens.title", "Brand tokens")}
-                        </CardTitle>
-                        <CardDescription>
-                          {t(
-                            "settings.global.branding.designer.tokens.description",
-                            "Map UI tokens to your brand kit."
+                          {theme.badge && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {t(`settings.global.branding.presets.${theme.id}.badge`, theme.badge)}
+                            </Badge>
                           )}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {brandTokens.map((token) => (
-                          <div key={token.token} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-3">
-                              <span className="h-4 w-4 rounded-full border" style={{ backgroundColor: token.value }} />
-                              <div>
-                                <p className="font-medium">
-                                  {t(token.labelKey, token.fallbackLabel)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{token.token}</p>
-                              </div>
-                            </div>
-                            <code className="text-xs font-mono bg-muted/70 px-2 py-0.5 rounded">
-                              {token.value}
-                            </code>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
+            <TabsContent value="custom" className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <FontAwesomeIcon icon={faPalette} className="text-primary" />
-                      {t("settings.global.branding.designer.presets.title", "Preset themes")}
+                      {t("settings.global.branding.designer.brandBasics.title", "Custom Brand Design")}
                     </CardTitle>
                     <CardDescription>
                       {t(
-                        "settings.global.branding.designer.presets.description",
-                        "Apply curated palettes as a starting point."
+                        "settings.global.branding.designer.brandBasics.description",
+                        "Customize your organization's colors and identity."
                       )}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {PRESET_THEMES.map((theme) => (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => handleThemeApply(theme)}
-                          className={cn(
-                            "rounded-xl border p-3 text-left transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            selectedTheme === theme.id ? "border-primary shadow-lg" : "border-muted"
-                          )}
-                        >
-                          <div
-                            className="h-20 rounded-lg mb-3"
-                            style={{ background: theme.gradient }}
-                          />
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-sm">
-                                {t(`settings.global.branding.presets.${theme.id}.label`, theme.label)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {t(`settings.global.branding.presets.${theme.id}.description`, theme.description)}
-                              </p>
-                            </div>
-                            {theme.badge && (
-                              <Badge variant="secondary" className="text-[10px]">
-                                {t(`settings.global.branding.presets.${theme.id}.badge`, theme.badge)}
-                              </Badge>
-                            )}
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationName">
+                          {t("settings.global.branding.designer.brandBasics.organizationLabel", "Organization")}
+                        </Label>
+                        <Input
+                          id="organizationName"
+                          value={brand.organizationName}
+                          onChange={handleBrandFieldChange("organizationName")}
+                          placeholder="Acme Corp"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="productLabel">
+                          {t("settings.global.branding.designer.brandBasics.productLabel", "Product Label")}
+                        </Label>
+                        <Input
+                          id="productLabel"
+                          value={brand.productLabel}
+                          onChange={handleBrandFieldChange("productLabel")}
+                          placeholder="Ops OS"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tagline">
+                        {t("settings.global.branding.designer.brandBasics.taglineLabel", "Tagline")}
+                      </Label>
+                      <Input
+                        id="tagline"
+                        value={brand.tagline}
+                        onChange={handleBrandFieldChange("tagline")}
+                        placeholder="Your mission statement"
+                      />
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-semibold">Light Mode Colors</Label>
+                        <div className="grid gap-3 grid-cols-3 mt-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="primaryColor" className="text-xs">Primary</Label>
+                            <Input
+                              id="primaryColor"
+                              type="color"
+                              value={oklchToHex(brand.primaryColor)}
+                              onChange={handleColorChange("primaryColor")}
+                              className="h-10"
+                            />
                           </div>
-                        </button>
-                      ))}
+                          <div className="space-y-2">
+                            <Label htmlFor="accentColor" className="text-xs">Accent</Label>
+                            <Input
+                              id="accentColor"
+                              type="color"
+                              value={oklchToHex(brand.accentColor)}
+                              onChange={handleColorChange("accentColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="backgroundColor" className="text-xs">Background</Label>
+                            <Input
+                              id="backgroundColor"
+                              type="color"
+                              value={oklchToHex(brand.backgroundColor)}
+                              onChange={handleColorChange("backgroundColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="sidebarColor" className="text-xs">Sidebar</Label>
+                            <Input
+                              id="sidebarColor"
+                              type="color"
+                              value={oklchToHex(brand.sidebarColor)}
+                              onChange={handleColorChange("sidebarColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="textColor" className="text-xs">Text</Label>
+                            <Input
+                              id="textColor"
+                              type="color"
+                              value={oklchToHex(brand.textColor)}
+                              onChange={handleColorChange("textColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="neutralColor" className="text-xs">Neutral</Label>
+                            <Input
+                              id="neutralColor"
+                              type="color"
+                              value={oklchToHex(brand.neutralColor)}
+                              onChange={handleColorChange("neutralColor")}
+                              className="h-10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div>
+                        <Label className="text-sm font-semibold">Dark Mode Colors</Label>
+                        <div className="grid gap-3 grid-cols-3 mt-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="darkPrimaryColor" className="text-xs">Primary</Label>
+                            <Input
+                              id="darkPrimaryColor"
+                              type="color"
+                              value={oklchToHex(brand.darkPrimaryColor || brand.primaryColor)}
+                              onChange={handleColorChange("darkPrimaryColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="darkAccentColor" className="text-xs">Accent</Label>
+                            <Input
+                              id="darkAccentColor"
+                              type="color"
+                              value={oklchToHex(brand.darkAccentColor || brand.accentColor)}
+                              onChange={handleColorChange("darkAccentColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="darkBackgroundColor" className="text-xs">Background</Label>
+                            <Input
+                              id="darkBackgroundColor"
+                              type="color"
+                              value={oklchToHex(brand.darkBackgroundColor || '#0F0F0F')}
+                              onChange={handleColorChange("darkBackgroundColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="darkSidebarColor" className="text-xs">Sidebar</Label>
+                            <Input
+                              id="darkSidebarColor"
+                              type="color"
+                              value={oklchToHex(brand.darkSidebarColor || '#0a0a0a')}
+                              onChange={handleColorChange("darkSidebarColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="darkTextColor" className="text-xs">Text</Label>
+                            <Input
+                              id="darkTextColor"
+                              type="color"
+                              value={oklchToHex(brand.darkTextColor || '#f8fafc')}
+                              onChange={handleColorChange("darkTextColor")}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="darkNeutralColor" className="text-xs">Neutral</Label>
+                            <Input
+                              id="darkNeutralColor"
+                              type="color"
+                              value={oklchToHex(brand.darkNeutralColor || '#1F1F1F')}
+                              onChange={handleColorChange("darkNeutralColor")}
+                              className="h-10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-2 pt-2">
+                      <Button variant="outline" size="sm" onClick={handleResetBranding}>
+                        {t("settings.global.branding.designer.brandBasics.reset", "Reset")}
+                      </Button>
+                      <Button size="sm" onClick={handleSaveBranding}>
+                        {t("settings.global.branding.designer.brandBasics.save", "Save")}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
-              </TabsContent>
 
-              <TabsContent value="assets" className="space-y-6">
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FontAwesomeIcon icon={faMagicWandSparkles} className="text-primary" />
+                        Light Mode Preview
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-lg border overflow-hidden">
+                        <div
+                          className="p-3 text-white"
+                          style={{
+                            backgroundImage: previewGradient,
+                            backgroundSize: "cover"
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <WhagonsCheck width={80} height={18} color="#ffffff" />
+                          </div>
+                          <p className="mt-1 text-xs opacity-90">{brand.organizationName}</p>
+                        </div>
+
+                        <div
+                          className="p-3 space-y-2"
+                          style={{
+                            backgroundColor: brand.backgroundColor,
+                            color: brand.textColor
+                          }}
+                        >
+                          <div className="flex gap-2">
+                            <button
+                              className="px-2 py-1 rounded text-xs font-medium"
+                              style={{ backgroundColor: brand.primaryColor, color: "#ffffff" }}
+                            >
+                              Primary
+                            </button>
+                            <button
+                              className="px-2 py-1 rounded text-xs font-medium"
+                              style={{ backgroundColor: brand.accentColor, color: "#ffffff" }}
+                            >
+                              Accent
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <div
+                              className="flex-1 rounded p-1.5 text-[10px]"
+                              style={{ backgroundColor: brand.neutralColor }}
+                            >
+                              Neutral
+                            </div>
+                            <div
+                              className="flex-1 rounded p-1.5 text-[10px] text-white"
+                              style={{ backgroundColor: brand.sidebarColor }}
+                            >
+                              Sidebar
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FontAwesomeIcon icon={faMagicWandSparkles} className="text-primary" />
+                        Dark Mode Preview
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-lg border overflow-hidden">
+                        <div
+                          className="p-3 text-white"
+                          style={{
+                            backgroundImage: brand.darkGradientAccent || previewGradient,
+                            backgroundSize: "cover"
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <WhagonsCheck width={80} height={18} color="#ffffff" />
+                          </div>
+                          <p className="mt-1 text-xs opacity-90">{brand.organizationName}</p>
+                        </div>
+
+                        <div
+                          className="p-3 space-y-2"
+                          style={{
+                            backgroundColor: brand.darkBackgroundColor || '#0F0F0F',
+                            color: brand.darkTextColor || '#f8fafc'
+                          }}
+                        >
+                          <div className="flex gap-2">
+                            <button
+                              className="px-2 py-1 rounded text-xs font-medium"
+                              style={{ backgroundColor: brand.darkPrimaryColor || brand.primaryColor, color: "#ffffff" }}
+                            >
+                              Primary
+                            </button>
+                            <button
+                              className="px-2 py-1 rounded text-xs font-medium"
+                              style={{ backgroundColor: brand.darkAccentColor || brand.accentColor, color: "#ffffff" }}
+                            >
+                              Accent
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <div
+                              className="flex-1 rounded p-1.5 text-[10px]"
+                              style={{ backgroundColor: brand.darkNeutralColor || '#1F1F1F', color: '#f8fafc' }}
+                            >
+                              Neutral
+                            </div>
+                            <div
+                              className="flex-1 rounded p-1.5 text-[10px] text-white"
+                              style={{ backgroundColor: brand.darkSidebarColor || '#0a0a0a' }}
+                            >
+                              Sidebar
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="assets" className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -1105,7 +1229,6 @@ function Global() {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
         </TabsContent>
 
       </Tabs>

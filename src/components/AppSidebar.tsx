@@ -394,7 +394,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 type="button"
                 className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center w-full'} text-[var(--sidebar-text-primary)]`}
               >
-                <IconBadge color="var(--sidebar-border)" size={18}>
+                <IconBadge color="var(--sidebar-accent)" size={18}>
                   <MoreHorizontal size={12} className="w-3 h-3 block" style={{ color: 'var(--sidebar-text-primary)', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                 </IconBadge>
                 {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.more', 'More')}</span>}

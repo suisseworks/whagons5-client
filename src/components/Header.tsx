@@ -312,6 +312,98 @@ function Header() {
 
     // Subtle gradient background for workspace headers
     const headerSurfaceColor = isDarkTheme ? '#0F0F0F' : 'var(--sidebar-header)';
+    
+    // Detect if header has dark background for text contrast
+    const [isDarkHeader, setIsDarkHeader] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        const sidebarHeader = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+        // Quick check for known dark values
+        return sidebarHeader.includes('#08111f') || sidebarHeader.includes('oklch(0.0') || sidebarHeader.includes('oklch(0.1');
+    });
+    
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const checkHeaderBrightness = () => {
+            // Get the actual computed color of --sidebar-header
+            const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+            
+            // Parse and check brightness
+            let isDark = isDarkTheme;
+            
+            if (computedColor && computedColor !== '') {
+                // Quick string checks for known dark colors
+                if (computedColor.includes('#08111f') || computedColor.includes('#000000') || 
+                    computedColor.includes('oklch(0.0') || computedColor.includes('oklch(0.1')) {
+                    isDark = true;
+                } else {
+                    // Try to parse the color using canvas
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1;
+                        canvas.height = 1;
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (ctx) {
+                            ctx.fillStyle = computedColor;
+                            const computed = ctx.fillStyle;
+                            
+                            // Parse RGB
+                            const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                            if (match) {
+                                const r = parseInt(match[1]);
+                                const g = parseInt(match[2]);
+                                const b = parseInt(match[3]);
+                                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                                isDark = luminance < 0.45;
+                            }
+                        }
+                    } catch (e) {
+                        // Silent fail
+                    }
+                }
+            }
+            
+            setIsDarkHeader(isDark);
+        };
+        
+        // Check immediately
+        checkHeaderBrightness();
+        
+        // Check after styles load
+        setTimeout(checkHeaderBrightness, 50);
+        setTimeout(checkHeaderBrightness, 200);
+        setTimeout(checkHeaderBrightness, 500);
+        
+        // Re-check when theme or branding changes
+        const observer = new MutationObserver(() => {
+            checkHeaderBrightness();
+        });
+        
+        const styleObserver = new MutationObserver(() => {
+            checkHeaderBrightness();
+        });
+        
+        observer.observe(document.documentElement, { 
+            attributes: true, 
+            attributeFilter: ['style', 'class'],
+            subtree: false
+        });
+        
+        // Watch for style tag changes (branding updates)
+        const head = document.querySelector('head');
+        if (head) {
+            styleObserver.observe(head, {
+                childList: true,
+                subtree: true
+            });
+        }
+        
+        return () => {
+            observer.disconnect();
+            styleObserver.disconnect();
+        };
+    }, [isDarkTheme]);
 
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
@@ -538,7 +630,10 @@ function Header() {
 
     return (
         <>
-        <header className="sticky top-0 z-50 w-full backdrop-blur-xl wh-header" style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}>
+        <header 
+            className={`sticky top-0 z-50 w-full backdrop-blur-xl wh-header ${(isDarkTheme || isDarkHeader) ? 'wh-header-dark' : ''}`}
+            style={currentWorkspaceName ? headerBackgroundStyle : mainHeaderGradientStyle}
+        >
             {isMobile && (
                 <SidebarTrigger className='absolute left-2 top-3 z-1000 text-primary' />
             )}
@@ -552,11 +647,11 @@ function Header() {
                                 <FontAwesomeIcon
                                     icon={workspaceIcon}
                                     className="flex-shrink-0 text-base sm:text-xl lg:text-2xl leading-none"
-                                    style={{ color: currentWorkspaceColor || 'var(--color-primary)' }}
+                                    style={(isDarkTheme || isDarkHeader) ? undefined : { color: currentWorkspaceColor || 'var(--color-primary)' }}
                                 />
                             ) : (
                                 currentWorkspaceName === 'Everything' ? (
-                                    <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" style={{ color: '#27C1A7' }} />
+                                    <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
                                 ) : null
                             )}
                             <h1 className="font-title tracking-tight text-base sm:text-xl lg:text-2xl font-extrabold truncate max-w-[32rem]">

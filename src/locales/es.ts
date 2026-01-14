@@ -107,7 +107,6 @@ export const esTranslations: Record<string, string> = {
   // Preset themes
   "settings.global.branding.presets.jadeOps.label": "Jade Ops",
   "settings.global.branding.presets.jadeOps.description": "Primario verde azulado vibrante con acentos índigo eléctrico",
-  "settings.global.branding.presets.jadeOps.badge": "Predeterminado",
   "settings.global.branding.presets.ember.label": "Ember Sunrise",
   "settings.global.branding.presets.ember.description": "Gradientes ámbar cálidos con tipografía carbón",
   "settings.global.branding.presets.ember.badge": "Popular",
