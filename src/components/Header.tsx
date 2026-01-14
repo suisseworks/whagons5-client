@@ -14,8 +14,21 @@ import {
 import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
+import {
+  setFilterModel,
+  setSearchText,
+  setGroupBy,
+  setCollapseGroups,
+  setPresets,
+  selectFilterModel,
+  selectSearchText,
+  selectGroupBy,
+  selectCollapseGroups,
+  selectQuickPresets,
+  selectAllPresets,
+} from "@/store/reducers/uiStateSlice";
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { getAssetDisplayUrl } from '@/lib/assetHelpers';
@@ -36,6 +49,7 @@ import { ActiveFilterChips } from "@/components/ActiveFilterChips";
 // Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
+    const dispatch = useDispatch();
     const { firebaseUser, user, userLoading, hydrating, hydrationError } = useAuth();
     const [apiLoading, setApiLoading] = useState<boolean>(false);
     const { isMobile } = useSidebar();
@@ -47,6 +61,14 @@ function Header() {
 
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
+
+    // Redux UI state selectors
+    const currentFilterModel = useSelector(selectFilterModel);
+    const searchText = useSelector(selectSearchText);
+    const groupBy = useSelector(selectGroupBy);
+    const collapseGroups = useSelector(selectCollapseGroups);
+    const quickPresets = useSelector(selectQuickPresets);
+    const allPresets = useSelector(selectAllPresets);
 
     const isSettings = useMemo(() => location.pathname.startsWith('/settings'), [location.pathname]);
     const isAnalytics = useMemo(() => location.pathname.startsWith('/analytics'), [location.pathname]);
@@ -120,12 +142,6 @@ function Header() {
         return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
     }, [location.pathname, workspaces]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
-    const [searchText, setSearchText] = useState('');
-    const [groupBy, setGroupBy] = useState<'none' | 'spot_id' | 'status_id' | 'priority_id'>('none');
-    const [collapseGroups, setCollapseGroups] = useState<boolean>(true);
-    const [quickPresets, setQuickPresets] = useState<any[]>([]);
-    const [allPresets, setAllPresets] = useState<any[]>([]);
-    const [currentFilterModel, setCurrentFilterModel] = useState<any>(null);
 
     const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
     useEffect(() => {
@@ -150,30 +166,15 @@ function Header() {
         const key = `wh_workspace_search_global`;
         try {
             const saved = localStorage.getItem(key);
-            if (saved != null) {
-                setSearchText(saved);
-            } else {
-                setSearchText('');
+            if (saved != null && saved !== searchText) {
+                dispatch(setSearchText(saved));
+            } else if (saved === null && searchText !== '') {
+                dispatch(setSearchText(''));
             }
         } catch {}
-    }, [currentWorkspaceName]);
+    }, [currentWorkspaceName, dispatch, searchText]);
 
-    // Listen for search changes from Workspace component
-    useEffect(() => {
-        const handleSearchChange = (event: CustomEvent<{ searchText: string }>) => {
-            const newSearchText = event.detail.searchText;
-            // Only update if different to prevent unnecessary re-renders
-            if (newSearchText !== searchText) {
-                setSearchText(newSearchText);
-            }
-        };
-        window.addEventListener('workspace-search-changed', handleSearchChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-search-changed', handleSearchChange as EventListener);
-        };
-    }, [searchText]);
-
-    // Save search text to localStorage and dispatch custom event
+    // Save search text to localStorage when it changes
     useEffect(() => {
         const key = `wh_workspace_search_global`;
         try {
@@ -182,8 +183,6 @@ function Header() {
             } else {
                 localStorage.removeItem(key);
             }
-            // Dispatch custom event to notify Workspace component
-            window.dispatchEvent(new CustomEvent('workspace-search-changed', { detail: { searchText } }));
         } catch {}
     }, [searchText]);
 
@@ -196,80 +195,32 @@ function Header() {
             const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
             const savedGroup = localStorage.getItem(groupKey) as any;
             const savedCollapse = localStorage.getItem(collapseKey);
-            if (savedGroup) setGroupBy(savedGroup);
-            if (savedCollapse !== null) setCollapseGroups(savedCollapse === 'true');
+            if (savedGroup && savedGroup !== groupBy) {
+                dispatch(setGroupBy(savedGroup));
+            }
+            if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+                dispatch(setCollapseGroups(savedCollapse === 'true'));
+            }
         } catch {}
-    }, [currentWorkspaceName, currentWorkspaceId]);
+    }, [currentWorkspaceName, currentWorkspaceId, dispatch, groupBy, collapseGroups]);
 
-    const isInternalGroupChange = useRef(false);
-
-    // Listen for groupBy changes from Workspace component
+    // Save groupBy to localStorage when changed
     useEffect(() => {
-        const handleGroupChange = (event: CustomEvent<{ groupBy: string; collapseGroups?: boolean }>) => {
-            // Only update if different to prevent loops
-            if (event.detail.groupBy !== groupBy) {
-                isInternalGroupChange.current = true;
-                setGroupBy(event.detail.groupBy as any);
-                setTimeout(() => { isInternalGroupChange.current = false; }, 0);
-            }
-            if (event.detail.collapseGroups !== undefined && event.detail.collapseGroups !== collapseGroups) {
-                isInternalGroupChange.current = true;
-                setCollapseGroups(event.detail.collapseGroups);
-                setTimeout(() => { isInternalGroupChange.current = false; }, 0);
-            }
-        };
-        window.addEventListener('workspace-group-changed', handleGroupChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-group-changed', handleGroupChange as EventListener);
-        };
-    }, [groupBy, collapseGroups]);
-
-    // Listen for filter presets from Workspace component
-    useEffect(() => {
-        const handlePresetsChange = (event: CustomEvent<{ quickPresets: any[]; allPresets: any[] }>) => {
-            setQuickPresets(event.detail.quickPresets || []);
-            setAllPresets(event.detail.allPresets || []);
-        };
-        window.addEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-presets-changed', handlePresetsChange as EventListener);
-        };
-    }, []);
-
-    // Listen for filter model changes from Workspace component
-    useEffect(() => {
-        const handleFilterModelChange = (event: CustomEvent<{ filterModel: any }>) => {
-            setCurrentFilterModel(event.detail.filterModel || null);
-        };
-        window.addEventListener('workspace-filter-model-changed', handleFilterModelChange as EventListener);
-        return () => {
-            window.removeEventListener('workspace-filter-model-changed', handleFilterModelChange as EventListener);
-        };
-    }, []);
-
-    // Save groupBy and dispatch event when changed (only if changed internally)
-    useEffect(() => {
-        if (!currentWorkspaceName || isInternalGroupChange.current) return;
+        if (!currentWorkspaceName) return;
         const workspaceId = currentWorkspaceId || 'all';
         try {
             localStorage.setItem(`wh_workspace_group_by_${workspaceId}`, groupBy);
-            window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-                detail: { groupBy, collapseGroups } 
-            }));
         } catch {}
-    }, [groupBy, currentWorkspaceName, currentWorkspaceId, collapseGroups]);
+    }, [groupBy, currentWorkspaceName, currentWorkspaceId]);
 
-    // Save collapseGroups and dispatch event when changed (only if changed internally)
+    // Save collapseGroups to localStorage when changed
     useEffect(() => {
-        if (!currentWorkspaceName || isInternalGroupChange.current) return;
+        if (!currentWorkspaceName) return;
         const workspaceId = currentWorkspaceId || 'all';
         try {
             localStorage.setItem(`wh_workspace_group_collapse_${workspaceId}`, String(collapseGroups));
-            window.dispatchEvent(new CustomEvent('workspace-group-changed', { 
-                detail: { groupBy, collapseGroups } 
-            }));
         } catch {}
-    }, [collapseGroups, currentWorkspaceName, currentWorkspaceId, groupBy]);
+    }, [collapseGroups, currentWorkspaceName, currentWorkspaceId]);
 
     // Track theme changes (dark/light) so the gradient updates without hard refresh
     const [isDarkTheme, setIsDarkTheme] = useState<boolean>(() => {
@@ -371,9 +322,9 @@ function Header() {
         checkHeaderBrightness();
         
         // Check after styles load
-        setTimeout(checkHeaderBrightness, 50);
-        setTimeout(checkHeaderBrightness, 200);
-        setTimeout(checkHeaderBrightness, 500);
+        const timeout1 = setTimeout(checkHeaderBrightness, 50);
+        const timeout2 = setTimeout(checkHeaderBrightness, 200);
+        const timeout3 = setTimeout(checkHeaderBrightness, 500);
         
         // Re-check when theme or branding changes
         const observer = new MutationObserver(() => {
@@ -400,6 +351,9 @@ function Header() {
         }
         
         return () => {
+            clearTimeout(timeout1);
+            clearTimeout(timeout2);
+            clearTimeout(timeout3);
             observer.disconnect();
             styleObserver.disconnect();
         };
@@ -733,7 +687,7 @@ function Header() {
                                 placeholder="Search…"
                                 className="h-9 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
                                 value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
+                                onChange={(e) => dispatch(setSearchText(e.target.value))}
                             />
                         </div>
                     </div>
@@ -818,14 +772,29 @@ function Header() {
                             if (filterKey === 'text') {
                                 delete newModel.name;
                                 delete newModel.description;
+                                // Clear search input and signal Workspace to not re-apply the filter
+                                dispatch(setSearchText(''));
+                                const finalModel = Object.keys(newModel).length > 0 ? newModel : null;
+                                dispatch(setFilterModel(finalModel));
+                                // Dispatch to Workspace component for table update with clearSearch: true
+                                window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
+                                    detail: { filterModel: finalModel, clearSearch: true } 
+                                }));
+                                return;
                             } else {
                                 delete newModel[filterKey];
                             }
+                            const finalModel = Object.keys(newModel).length > 0 ? newModel : null;
+                            dispatch(setFilterModel(finalModel));
+                            // Dispatch to Workspace component for table update
                             window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
-                                detail: { filterModel: Object.keys(newModel).length > 0 ? newModel : null, clearSearch: false } 
+                                detail: { filterModel: finalModel, clearSearch: false } 
                             }));
                         }}
                         onClearAll={() => {
+                            dispatch(setFilterModel(null));
+                            dispatch(setSearchText(''));
+                            // Dispatch to Workspace component for table update
                             window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                 detail: { filterModel: null, clearSearch: true } 
                             }));
@@ -840,6 +809,9 @@ function Header() {
                             className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
                             title="All tasks"
                             onClick={() => {
+                                dispatch(setFilterModel(null));
+                                dispatch(setSearchText(''));
+                                // Dispatch to Workspace component for table update
                                 window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                     detail: { filterModel: null, clearSearch: true } 
                                 }));
@@ -855,6 +827,9 @@ function Header() {
                                 className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
                                 title={p.name}
                                 onClick={() => {
+                                    dispatch(setFilterModel(p.model));
+                                    dispatch(setSearchText(''));
+                                    // Dispatch to Workspace component for table update
                                     window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                         detail: { filterModel: p.model, clearSearch: true } 
                                     }));
@@ -910,7 +885,7 @@ function Header() {
                         {/* Group by control */}
                         <div className="flex items-center gap-2 ml-auto">
                             <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
-                            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
+                            <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
                                 <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
                                     <SelectValue placeholder="Group" />
                                 </SelectTrigger>
@@ -923,7 +898,7 @@ function Header() {
                             </Select>
                             {groupBy !== 'none' && (
                                 <div className="flex items-center gap-2">
-                                    <Switch checked={collapseGroups} onCheckedChange={setCollapseGroups} />
+                                    <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
                                     <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
                                 </div>
                             )}

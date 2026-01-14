@@ -6,7 +6,7 @@ import {
   faMagicWandSparkles,
   faImage
 } from "@fortawesome/free-solid-svg-icons";
-import { convert } from "colorizr";
+import { convert, luminance } from "colorizr";
 
 import SettingsLayout from "../components/SettingsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -505,6 +505,18 @@ function Global() {
     return '#666666';
   }, []);
 
+  // Helper to get contrasting text color based on background luminance
+  const getContrastingTextColor = useCallback((bgColor: string): string => {
+    try {
+      const lum = luminance(bgColor);
+      // luminance returns 0-1, use 0.5 as threshold
+      return lum > 0.5 ? '#0f172a' : '#ffffff';
+    } catch {
+      // Fallback to white for dark backgrounds (assume dark if we can't compute)
+      return '#ffffff';
+    }
+  }, []);
+
   const handleBrandFieldChange =
     (field: keyof BrandingConfig) =>
       (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -596,18 +608,11 @@ function Global() {
   };
 
   const handleResetBranding = () => {
-    // If a preset theme is selected, reset to that preset
-    // Otherwise reset to active saved branding
-    const currentTheme = PRESET_THEMES.find(t => t.id === selectedTheme);
-    
-    if (currentTheme) {
-      handleThemeApply(currentTheme);
-    } else {
-      setBrand(activeBrand);
-      setAssets(activeAssets);
-      setToggles(activeToggles);
-      setSelectedTheme(getPresetIdForConfig(activeBrand));
-    }
+    // Always reset to the last saved state
+    setBrand(activeBrand);
+    setAssets(activeAssets);
+    setToggles(activeToggles);
+    setSelectedTheme(getPresetIdForConfig(activeBrand));
   };
 
 
@@ -1046,13 +1051,13 @@ function Global() {
                           <div className="flex gap-2">
                             <div
                               className="flex-1 rounded p-1.5 text-[10px]"
-                              style={{ backgroundColor: brand.neutralColor }}
+                              style={{ backgroundColor: brand.neutralColor, color: getContrastingTextColor(brand.neutralColor) }}
                             >
                               Neutral
                             </div>
                             <div
-                              className="flex-1 rounded p-1.5 text-[10px] text-white"
-                              style={{ backgroundColor: brand.sidebarColor }}
+                              className="flex-1 rounded p-1.5 text-[10px]"
+                              style={{ backgroundColor: brand.sidebarColor, color: getContrastingTextColor(brand.sidebarColor) }}
                             >
                               Sidebar
                             </div>

@@ -59,10 +59,12 @@ function CollapsibleContent({
   keepRendered = false,
   forceVisible = false,
   transition = { duration: 0.2, ease: 'easeInOut' },
+  style,
   ...props
 }: CollapsibleContentProps) {
   const { isOpen } = useCollapsible();
   const visible = forceVisible || isOpen;
+  const mergedStyle = { overflow: 'hidden', ...style };
 
   if (keepRendered) {
     return (
@@ -75,9 +77,7 @@ function CollapsibleContent({
             opacity: visible ? 1 : 0,
           }}
           transition={transition}
-          style={{
-            overflow: 'hidden',
-          }}
+          style={mergedStyle}
           {...props}
         />
       </CollapsiblePrimitive.Content>
@@ -95,7 +95,7 @@ function CollapsibleContent({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={transition}
-            style={{ overflow: 'hidden' }}
+            style={mergedStyle}
             {...props}
           />
         </CollapsiblePrimitive.Content>

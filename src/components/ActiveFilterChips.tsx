@@ -121,7 +121,7 @@ export function ActiveFilterChips({ filterModel, onRemoveFilter, onClearAll }: A
       dueLabel = 'Overdue';
     } else if (filterModel.due_date.type === 'equals') {
       dueLabel = 'Due today';
-    } else if (filterModel.due_date.type === 'dateAfter' && filterModel.due_date.operator === 'AND') {
+    } else if (filterModel.due_date.operator === 'AND') {
       dueLabel = 'Due next 7 days';
     }
     chips.push({

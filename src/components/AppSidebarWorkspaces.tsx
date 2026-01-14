@@ -310,20 +310,31 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
         }
       }
       
-      const counts: Record<string, number> = {};
-      for (const workspace of workspaces) {
+      // Map workspaces to promises for parallel execution
+      const promises = workspaces.map(async (workspace) => {
         try {
           const result = await TasksCache.queryTasks({ 
             workspace_id: Number(workspace.id), 
             startRow: 0, 
             endRow: 0 
           });
-          counts[String(workspace.id)] = result?.rowCount || 0;
+          return { id: String(workspace.id), count: result?.rowCount || 0 };
         } catch {
-          counts[String(workspace.id)] = 0;
+          // Handle per-workspace failures by mapping to 0 counts
+          return { id: String(workspace.id), count: 0 };
         }
-      }
+      });
       
+      // Wait for all promises in parallel
+      const results = await Promise.all(promises);
+      
+      // Build counts object from results
+      const counts: Record<string, number> = {};
+      results.forEach(({ id, count }) => {
+        counts[id] = count;
+      });
+      
+      // Only call setTaskCounts if not cancelled
       if (!cancelled) {
         setTaskCounts(counts);
       }

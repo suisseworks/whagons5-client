@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { convert, lighten, darken, mix } from 'colorizr';
 import {
   BRANDING_STORAGE_KEY,
   BrandingAssets,
@@ -71,16 +72,18 @@ const rgbToHex = (r: number, g: number, b: number) => {
 };
 
 const mixColors = (source: string, target: string, amount: number): string => {
-  // If either is OKLCH, return source for now (OKLCH mixing requires color space conversion)
-  if (source.startsWith('oklch(') || target.startsWith('oklch(')) {
-    return source;
+  try {
+    // Use colorizr's mix function which handles any color format (hex, oklch, rgb, hsl, etc.)
+    // Amount is 0-1, colorizr expects percentage 0-100
+    return mix(source, target, amount * 100);
+  } catch {
+    // Fallback to hex-based mixing
+    const src = hexToRgb(source);
+    const tgt = hexToRgb(target);
+    if (!src || !tgt) return source;
+    const mixChannel = (channel: number) => src[channel] + (tgt[channel] - src[channel]) * amount;
+    return rgbToHex(mixChannel(0), mixChannel(1), mixChannel(2));
   }
-  
-  const src = hexToRgb(source);
-  const tgt = hexToRgb(target);
-  if (!src || !tgt) return source;
-  const mixChannel = (channel: number) => src[channel] + (tgt[channel] - src[channel]) * amount;
-  return rgbToHex(mixChannel(0), mixChannel(1), mixChannel(2));
 };
 
 const ensureHexColor = (color: string, fallback: string): string => {
@@ -127,39 +130,41 @@ const getAccessibleTextColor = (background: string, fallback: string): string =>
   return luminance > 0.5 ? '#0f172a' : '#f8fafc';
 };
 
-const rgba = (hexColor: string, alpha: number): string => {
-  // For OKLCH, add alpha to the color
-  if (hexColor.startsWith('oklch(')) {
-    return hexColor.replace(')', ` / ${alpha})`);
+const rgba = (color: string, alpha: number): string => {
+  try {
+    // Convert any color format to RGB using colorizr, then add alpha
+    const rgbString = convert(color, 'rgb');
+    // rgbString is like "rgb(255 0 68)", convert to rgba
+    return rgbString.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+  } catch {
+    // Fallback for edge cases
+    return color;
   }
-  
-  const rgb = hexToRgb(hexColor);
-  if (!rgb) return hexColor;
-  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 };
 
 const computeSidebarAccentColor = (sidebarColor: string): string => {
-  // Handle OKLCH colors
-  if (sidebarColor.startsWith('oklch(')) {
-    const match = sidebarColor.match(/oklch\(([\d.]+)/);
-    if (match) {
-      const lightness = parseFloat(match[1]);
-      // For dark sidebars, lighten by adding to lightness
-      if (lightness < 0.45) {
-        return sidebarColor.replace(/oklch\(([\d.]+)/, `oklch(${lightness + 0.08}`);
-      }
-      // For light sidebars, darken by subtracting from lightness
-      return sidebarColor.replace(/oklch\(([\d.]+)/, `oklch(${lightness - 0.05}`);
+  try {
+    // Convert to hex to check luminance, then use colorizr to lighten/darken
+    const hexColor = convert(sidebarColor, 'hex');
+    const rgb = hexToRgb(hexColor);
+    if (!rgb) return '#F1F3F5';
+    
+    const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
+    // For dark sidebars, lighten; for light sidebars, darken
+    if (luminance < 0.45) {
+      return lighten(sidebarColor, 8); // lighten by 8%
     }
+    return darken(sidebarColor, 5); // darken by 5%
+  } catch {
+    // Fallback to original hex-based logic
+    const rgb = hexToRgb(sidebarColor);
+    if (!rgb) return '#F1F3F5';
+    const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
+    if (luminance < 0.45) {
+      return mixColors(sidebarColor, '#ffffff', 0.15);
+    }
+    return mixColors(sidebarColor, '#000000', 0.08);
   }
-  
-  const rgb = hexToRgb(sidebarColor);
-  if (!rgb) return '#F1F3F5';
-  const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
-  if (luminance < 0.45) {
-    return mixColors(sidebarColor, '#ffffff', 0.15);
-  }
-  return mixColors(sidebarColor, '#000000', 0.08);
 };
 
 const BRANDING_STYLE_ELEMENT_ID = 'branding-theme-overrides';
