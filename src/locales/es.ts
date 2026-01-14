@@ -599,6 +599,7 @@ export const esTranslations: Record<string, string> = {
   "sidebar.sharedWithMe": "Compartido",
   "sidebar.spaces": "Espacios",
   "sidebar.more": "Más",
+  "sidebar.less": "Menos",
   "sidebar.teamConnect": "TeamConnect",
   "sidebar.compliance": "Cumplimiento",
   "sidebar.analytics": "Analítica",
