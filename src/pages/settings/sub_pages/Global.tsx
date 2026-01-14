@@ -1118,8 +1118,8 @@ function Global() {
                               Neutral
                             </div>
                             <div
-                              className="flex-1 rounded p-1.5 text-[10px] text-white"
-                              style={{ backgroundColor: brand.darkSidebarColor || '#0a0a0a' }}
+                              className="flex-1 rounded p-1.5 text-[10px]"
+                              style={{ backgroundColor: brand.darkSidebarColor || '#0a0a0a', color: getContrastingTextColor(brand.darkSidebarColor || '#0a0a0a') }}
                             >
                               Sidebar
                             </div>

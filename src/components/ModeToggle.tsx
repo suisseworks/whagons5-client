@@ -19,7 +19,7 @@ export function ModeToggle({ className }: ModeToggleProps) {
       variant="outline" 
       size="icon" 
       onClick={toggleTheme}
-      className={`relative h-7 w-7 hover:border-border hover:bg-accent hover:text-accent-foreground ${className}`}
+      className={`relative h-7 w-7 hover:border-border hover:bg-accent hover:text-accent-foreground ${className ?? ''}`}
       title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
     >
       <Sun className="h-[0.9rem] w-[0.9rem] rotate-0 scale-100 transition-all duration-500 dark:-rotate-90 dark:scale-0" />

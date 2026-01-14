@@ -12,6 +12,7 @@ import {
   Inbox,
 } from 'lucide-react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -340,8 +341,35 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       }
     };
     
+    // Initial load
     loadTaskCounts();
-    return () => { cancelled = true; };
+    
+    // Subscribe to task change events to refresh counts
+    const unsubscribeCreated = TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, () => {
+      if (!cancelled) {
+        loadTaskCounts();
+      }
+    });
+    
+    const unsubscribeUpdated = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, () => {
+      if (!cancelled) {
+        loadTaskCounts();
+      }
+    });
+    
+    const unsubscribeDeleted = TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, () => {
+      if (!cancelled) {
+        loadTaskCounts();
+      }
+    });
+    
+    // Cleanup: cancel flag and unsubscribe from all events
+    return () => {
+      cancelled = true;
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+    };
   }, [workspaces]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
