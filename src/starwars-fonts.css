@@ -1,0 +1,29 @@
+/* Star Wars Fonts Configuration */
+
+/* Star Jedi - Iconic Star Wars Title Font */
+@font-face {
+  font-family: 'Star Jedi';
+  src: url('https://db.onlinewebfonts.com/t/860c3ec7bbc5da3e97233ccecafe512e.eot');
+  src: url('https://db.onlinewebfonts.com/t/860c3ec7bbc5da3e97233ccecafe512e.eot?#iefix') format('embedded-opentype'),
+       url('https://db.onlinewebfonts.com/t/860c3ec7bbc5da3e97233ccecafe512e.woff2') format('woff2'),
+       url('https://db.onlinewebfonts.com/t/860c3ec7bbc5da3e97233ccecafe512e.woff') format('woff'),
+       url('https://db.onlinewebfonts.com/t/860c3ec7bbc5da3e97233ccecafe512e.ttf') format('truetype'),
+       url('https://db.onlinewebfonts.com/t/860c3ec7bbc5da3e97233ccecafe512e.svg#Star Jedi') format('svg');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* SF Distant Galaxy - Alternative Star Wars Font */
+@font-face {
+  font-family: 'SF Distant Galaxy';
+  src: url('https://db.onlinewebfonts.com/t/b713a4c570c72245a8ca85dc9481e8c9.eot');
+  src: url('https://db.onlinewebfonts.com/t/b713a4c570c72245a8ca85dc9481e8c9.eot?#iefix') format('embedded-opentype'),
+       url('https://db.onlinewebfonts.com/t/b713a4c570c72245a8ca85dc9481e8c9.woff2') format('woff2'),
+       url('https://db.onlinewebfonts.com/t/b713a4c570c72245a8ca85dc9481e8c9.woff') format('woff'),
+       url('https://db.onlinewebfonts.com/t/b713a4c570c72245a8ca85dc9481e8c9.ttf') format('truetype'),
+       url('https://db.onlinewebfonts.com/t/b713a4c570c72245a8ca85dc9481e8c9.svg#SF Distant Galaxy') format('svg');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}

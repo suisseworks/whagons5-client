@@ -1,7 +1,7 @@
-import { teamConnectTranslationsES } from './teamconnect';
+import { boardsTranslationsES } from './boards';
 
 export const esTranslations: Record<string, string> = {
-  ...teamConnectTranslationsES,
+  ...boardsTranslationsES,
   "settings.global.title": "Configuración global",
   "settings.global.subtitle": "Predeterminados de la organización, branding e identidad de la plataforma",
   "settings.global.intro": "Configura cómo luce y se comporta tu organización a nivel global. Cambia de pestaña para acceder a cada módulo.",
@@ -348,7 +348,7 @@ export const esTranslations: Record<string, string> = {
   "breadcrumbs.status": "Estado",
   "breadcrumbs.spot-types": "Tipos de spot",
   "breadcrumbs.job-positions": "Puestos",
-  "breadcrumbs.teamconnect": "TeamConnect",
+  "breadcrumbs.boards": "Tableros",
 
   "settings.users.title": "Usuarios",
   "settings.users.description": "Cuentas de usuario y permisos",
@@ -652,12 +652,14 @@ export const esTranslations: Record<string, string> = {
   "plugins.route": "Ruta",
   
   // Plugin names and descriptions
+  "plugins.broadcasts.title": "Difusión",
+  "plugins.broadcasts.description": "Envío de mensajes y seguimiento de confirmaciones",
   "plugins.cleaning.title": "Limpieza",
   "plugins.cleaning.description": "Flujos de trabajo, horarios y servicios de limpieza",
   "plugins.assets.title": "Activos",
   "plugins.assets.description": "Seguimiento de activos, inspecciones y mantenimiento",
-  "plugins.teamconnect.title": "TeamConnect",
-  "plugins.teamconnect.description": "Colaboración en equipo e integración de directorio",
+  "plugins.boards.title": "Tableros",
+  "plugins.boards.description": "Tableros de comunicación y anuncios del equipo",
   "plugins.compliance.title": "Cumplimiento",
   "plugins.compliance.description": "Estándares de cumplimiento, auditorías y documentación",
   "plugins.analytics.title": "Analítica",

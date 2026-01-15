@@ -1,11 +1,10 @@
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useState, useEffect } from 'react';
 import { getPluginsConfig, togglePluginEnabled, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
-import { Pin, PinOff, ArrowLeft } from 'lucide-react';
+import { Pin, PinOff } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { Button } from '@/components/ui/button';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faStar } from '@fortawesome/free-solid-svg-icons';
 
@@ -15,7 +14,6 @@ interface PluginDetails {
 }
 
 function PluginSettings() {
-	const navigate = useNavigate();
 	const { pluginId } = useParams<{ pluginId: string }>();
 	const { t } = useLanguage();
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +32,21 @@ function PluginSettings() {
 	// Plugin details for summary tab
 	const getPluginDetails = (pluginId: string): PluginDetails => {
 		const detailsMap: Record<string, PluginDetails> = {
+			broadcasts: {
+				features: [
+					'Send messages to multiple recipients (manual, role-based, or team-based)',
+					'Track acknowledgments in real-time with progress bars',
+					'Set priority levels (Low, Normal, High, Urgent)',
+					'Automated reminders for pending acknowledgments',
+					'Detailed reporting on who acknowledged and when'
+				],
+				benefits: [
+					'Ensure important messages reach everyone',
+					'Track compliance with communication requirements',
+					'Save time with automated acknowledgment tracking',
+					'Get real-time visibility into message status'
+				]
+			},
 			cleaning: {
 				features: [
 					'Automated cleaning schedules and task assignments',
@@ -195,12 +208,6 @@ function PluginSettings() {
 	if (!currentPlugin) {
 		return (
 			<div className="p-6">
-				<div className="flex items-center gap-2 mb-6">
-					<Button variant="ghost" size="sm" onClick={() => navigate('/plugins')}>
-						<ArrowLeft className="h-4 w-4 mr-2" />
-						{t('common.back', 'Back')}
-					</Button>
-				</div>
 				<Card>
 					<CardHeader>
 						<CardTitle>{t('plugins.notFound', 'Plugin not found')}</CardTitle>
@@ -222,13 +229,6 @@ function PluginSettings() {
 
 	return (
 		<div className="p-6 space-y-6">
-			<div className="flex items-center gap-4">
-				<Button variant="ghost" size="sm" onClick={() => navigate('/plugins')}>
-					<ArrowLeft className="h-4 w-4 mr-2" />
-					{t('common.back', 'Back')}
-				</Button>
-			</div>
-
 			<div className="flex items-center gap-4">
 				<div 
 					className="grid place-items-center rounded-lg flex-shrink-0"

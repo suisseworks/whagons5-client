@@ -555,8 +555,8 @@ export interface Workflow {
     updated_at: string;
 }
 
-// TeamConnect Communication Boards
-export interface TeamConnectBoard {
+// Boards (Communication Boards)
+export interface Board {
     id: number;
     name: string;
     description?: string | null;
@@ -567,7 +567,7 @@ export interface TeamConnectBoard {
     deleted_at?: string | null;
 }
 
-export interface TeamConnectBoardMember {
+export interface BoardMember {
     id: number;
     board_id: number;
     member_type: 'user' | 'team';
@@ -577,7 +577,7 @@ export interface TeamConnectBoardMember {
     updated_at: string;
 }
 
-export interface TeamConnectBoardMessage {
+export interface BoardMessage {
     id: number;
     board_id: number;
     created_by: number;

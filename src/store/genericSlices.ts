@@ -52,6 +52,10 @@ const genericSliceConfigs = [
     { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','description','approval_type','require_all','minimum_approvals','trigger_type','trigger_conditions','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','order_index','is_active','updated_at'] },
     { name: 'approvalApprovers', table: 'wh_approval_approvers', endpoint: '/approval-approvers', store: 'approval_approvers', hashFields: ['id','approval_id','approver_type','approver_id','scope','scope_id','required','order_index','created_by','updated_at'] },
     { name: 'taskApprovalInstances', table: 'wh_task_approval_instances', endpoint: '/task-approval-instances', store: 'task_approval_instances', hashFields: ['id','task_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
+    
+    // Broadcasts & Acknowledgments
+    { name: 'broadcasts', table: 'wh_broadcasts', endpoint: '/broadcasts', store: 'broadcasts', hashFields: ['id','title','message','priority','recipient_selection_type','total_recipients','total_acknowledged','due_date','status','created_by','workspace_id','updated_at'] },
+    { name: 'broadcastAcknowledgments', table: 'wh_broadcast_acknowledgments', endpoint: '/broadcast-acknowledgments', store: 'broadcast_acknowledgments', hashFields: ['id','broadcast_id','user_id','status','acknowledged_at','notified_at','updated_at'] },
     { name: 'categoryPriorities', table: 'wh_category_priority', endpoint: '/category-priorities', store: 'category_priorities', hashFields: ['id','priority_id','category_id','sla_id','updated_at'] },
     { name: 'invitations', table: 'wh_invitations', endpoint: '/invitations', store: 'invitations', hashFields: ['id','invitation_token','user_email','team_ids','tenant_domain_prefix','updated_at'] },
 
@@ -78,10 +82,10 @@ const genericSliceConfigs = [
     { name: 'workflows', table: 'wh_workflows', endpoint: '/workflows', store: 'workflows', hashFields: ['id','name','description','workspace_id','is_active','current_version_id','created_by','updated_by','activated_at','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
 
-    // TeamConnect Communication Boards
-    { name: 'teamconnectBoards', table: 'wh_teamconnect_boards', endpoint: '/teamconnect-boards', store: 'teamconnect_boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
-    { name: 'teamconnectBoardMembers', table: 'wh_teamconnect_board_members', endpoint: '/teamconnect-board-members', store: 'teamconnect_board_members', hashFields: ['id','board_id','member_type','member_id','role','updated_at'] },
-    { name: 'teamconnectBoardMessages', table: 'wh_teamconnect_board_messages', endpoint: '/teamconnect-board-messages', store: 'teamconnect_board_messages', hashFields: ['id','board_id','created_by','title','content','is_pinned','starts_at','ends_at','metadata','source_type','source_id','updated_at'] },
+    // Boards (Communication Boards)
+    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
+    { name: 'boardMembers', table: 'wh_board_members', endpoint: '/board-members', store: 'board_members', hashFields: ['id','board_id','member_type','member_id','role','updated_at'] },
+    { name: 'boardMessages', table: 'wh_board_messages', endpoint: '/board-messages', store: 'board_messages', hashFields: ['id','board_id','created_by','title','content','is_pinned','starts_at','ends_at','metadata','source_type','source_id','updated_at'] },
 
     // Job Positions
     { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
@@ -91,6 +95,10 @@ const genericSliceConfigs = [
     { name: 'complianceRequirements', table: 'wh_compliance_requirements', endpoint: '/compliance-requirements', store: 'compliance_requirements', hashFields: ['id','standard_id','clause_number','title','description','implementation_guidance','mandatory','parent_id','updated_at'] },
     { name: 'complianceMappings', table: 'wh_compliance_mappings', endpoint: '/compliance-mappings', store: 'compliance_mappings', hashFields: ['id','requirement_id','mapped_entity_type','mapped_entity_id','justification','created_by','updated_at'] },
     { name: 'complianceAudits', table: 'wh_compliance_audits', endpoint: '/compliance-audits', store: 'compliance_audits', hashFields: ['id','standard_id','name','type','status','scheduled_start_date','scheduled_end_date','actual_start_date','completed_date','auditor_id','external_auditor_name','scope','summary_findings','score','created_by','updated_at'] },
+
+    // Plugin System
+    { name: 'plugins', table: 'wh_plugins', endpoint: '/plugins', store: 'plugins', hashFields: ['id','slug','name','description','version','is_enabled','updated_at'] },
+    { name: 'pluginRoutes', table: 'wh_plugin_routes', endpoint: '/plugin-routes', store: 'plugin_routes', hashFields: ['id','plugin_id','method','path','controller','action','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -130,6 +138,8 @@ export const {
     approvals,
     approvalApprovers,
     taskApprovalInstances,
+    broadcasts,
+    broadcastAcknowledgments,
     categoryPriorities,
     invitations,
     sessionLogs,
@@ -148,15 +158,17 @@ export const {
     messages,
     workflows,
     workspaces,
-    // TeamConnect
-    teamconnectBoards,
-    teamconnectBoardMembers,
-    teamconnectBoardMessages,
+    // Boards
+    boards,
+    boardMembers,
+    boardMessages,
     jobPositions,
     complianceStandards,
     complianceRequirements,
     complianceMappings,
     complianceAudits,
+    plugins,
+    pluginRoutes,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -202,6 +214,8 @@ export const genericEventNames = {
     approvals: genericSlices.slices.approvals.eventNames,
     approvalApprovers: genericSlices.slices.approvalApprovers.eventNames,
     taskApprovalInstances: genericSlices.slices.taskApprovalInstances.eventNames,
+    broadcasts: genericSlices.slices.broadcasts.eventNames,
+    broadcastAcknowledgments: genericSlices.slices.broadcastAcknowledgments.eventNames,
     categoryPriorities: genericSlices.slices.categoryPriorities.eventNames,
     invitations: genericSlices.slices.invitations.eventNames,
     sessionLogs: genericSlices.slices.sessionLogs.eventNames,
@@ -220,15 +234,17 @@ export const genericEventNames = {
     messages: genericSlices.slices.messages.eventNames,
     workflows: genericSlices.slices.workflows.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
-    // TeamConnect
-    teamconnectBoards: genericSlices.slices.teamconnectBoards.eventNames,
-    teamconnectBoardMembers: genericSlices.slices.teamconnectBoardMembers.eventNames,
-    teamconnectBoardMessages: genericSlices.slices.teamconnectBoardMessages.eventNames,
+    // Boards
+    boards: genericSlices.slices.boards.eventNames,
+    boardMembers: genericSlices.slices.boardMembers.eventNames,
+    boardMessages: genericSlices.slices.boardMessages.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
     complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
     complianceMappings: genericSlices.slices.complianceMappings.eventNames,
     complianceAudits: genericSlices.slices.complianceAudits.eventNames,
+    plugins: genericSlices.slices.plugins.eventNames,
+    pluginRoutes: genericSlices.slices.pluginRoutes.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -265,6 +281,8 @@ export const genericActions = {
     approvals: genericSlices.slices.approvals.actions,
     approvalApprovers: genericSlices.slices.approvalApprovers.actions,
     taskApprovalInstances: genericSlices.slices.taskApprovalInstances.actions,
+    broadcasts: genericSlices.slices.broadcasts.actions,
+    broadcastAcknowledgments: genericSlices.slices.broadcastAcknowledgments.actions,
     categoryPriorities: genericSlices.slices.categoryPriorities.actions,
     invitations: genericSlices.slices.invitations.actions,
     sessionLogs: genericSlices.slices.sessionLogs.actions,
@@ -283,13 +301,15 @@ export const genericActions = {
     messages: genericSlices.slices.messages.actions,
     workflows: genericSlices.slices.workflows.actions,
     workspaces: genericSlices.slices.workspaces.actions,
-    // TeamConnect
-    teamconnectBoards: genericSlices.slices.teamconnectBoards.actions,
-    teamconnectBoardMembers: genericSlices.slices.teamconnectBoardMembers.actions,
-    teamconnectBoardMessages: genericSlices.slices.teamconnectBoardMessages.actions,
+    // Boards
+    boards: genericSlices.slices.boards.actions,
+    boardMembers: genericSlices.slices.boardMembers.actions,
+    boardMessages: genericSlices.slices.boardMessages.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,
     complianceRequirements: genericSlices.slices.complianceRequirements.actions,
     complianceMappings: genericSlices.slices.complianceMappings.actions,
     complianceAudits: genericSlices.slices.complianceAudits.actions,
+    plugins: genericSlices.slices.plugins.actions,
+    pluginRoutes: genericSlices.slices.pluginRoutes.actions,
 } as const;

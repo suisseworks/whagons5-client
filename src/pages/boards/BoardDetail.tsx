@@ -9,7 +9,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
-import { TeamConnectBoard, TeamConnectBoardMessage } from '@/store/types';
+import { Board, BoardMessage } from '@/store/types';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
-function TeamConnectBoardDetail() {
+function BoardDetail() {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const dispatch = useDispatch();
@@ -35,9 +35,9 @@ function TeamConnectBoardDetail() {
   const { boardId } = useParams<{ boardId: string }>();
 
   // Redux state
-  const { value: boards } = useSelector((state: RootState) => (state as any).teamconnectBoards || { value: [] });
-  const { value: messages, loading: messagesLoading } = useSelector((state: RootState) => (state as any).teamconnectBoardMessages || { value: [], loading: false });
-  const { value: members } = useSelector((state: RootState) => (state as any).teamconnectBoardMembers || { value: [] });
+  const { value: boards } = useSelector((state: RootState) => (state as any).boards || { value: [] });
+  const { value: messages, loading: messagesLoading } = useSelector((state: RootState) => (state as any).boardMessages || { value: [], loading: false });
+  const { value: members } = useSelector((state: RootState) => (state as any).boardMembers || { value: [] });
   const { value: users } = useSelector((state: RootState) => state.users || { value: [] });
   const { value: teams } = useSelector((state: RootState) => (state as any).teams || { value: [] });
 
@@ -60,12 +60,12 @@ function TeamConnectBoardDetail() {
   const [showMembers, setShowMembers] = useState(false);
 
   // Find current board
-  const board = boards.find((b: TeamConnectBoard) => b.id === parseInt(boardId || '0'));
+  const board = boards.find((b: Board) => b.id === parseInt(boardId || '0'));
 
   // Filter messages for this board
   const boardMessages = messages
-    .filter((m: TeamConnectBoardMessage) => m.board_id === parseInt(boardId || '0'))
-    .sort((a: TeamConnectBoardMessage, b: TeamConnectBoardMessage) => {
+    .filter((m: BoardMessage) => m.board_id === parseInt(boardId || '0'))
+    .sort((a: BoardMessage, b: BoardMessage) => {
       // Pinned first, then by created_at descending
       if (a.is_pinned && !b.is_pinned) return -1;
       if (!a.is_pinned && b.is_pinned) return 1;
@@ -77,15 +77,15 @@ function TeamConnectBoardDetail() {
 
   // Load data on mount
   useEffect(() => {
-    dispatch(genericActions.teamconnectBoards.getFromIndexedDB());
-    dispatch(genericActions.teamconnectBoardMessages.getFromIndexedDB());
-    dispatch(genericActions.teamconnectBoardMembers.getFromIndexedDB());
+    dispatch(genericActions.boards.getFromIndexedDB());
+    dispatch(genericActions.boardMessages.getFromIndexedDB());
+    dispatch(genericActions.boardMembers.getFromIndexedDB());
     dispatch(genericActions.users.getFromIndexedDB());
     
     // Fetch from API
-    dispatch(genericActions.teamconnectBoards.fetchFromAPI());
-    dispatch(genericActions.teamconnectBoardMessages.fetchFromAPI());
-    dispatch(genericActions.teamconnectBoardMembers.fetchFromAPI());
+    dispatch(genericActions.boards.fetchFromAPI());
+    dispatch(genericActions.boardMessages.fetchFromAPI());
+    dispatch(genericActions.boardMembers.fetchFromAPI());
     dispatch(genericActions.users.fetchFromAPI());
   }, [dispatch, boardId]);
 
@@ -103,10 +103,10 @@ function TeamConnectBoardDetail() {
         title: messageFormData.title || null,
       };
       
-      await dispatch(genericActions.teamconnectBoardMessages.addAsync(messageData) as any);
+      await dispatch(genericActions.boardMessages.addAsync(messageData) as any);
       
       // Refresh messages from API to ensure sync
-      await dispatch(genericActions.teamconnectBoardMessages.fetchFromAPI() as any);
+      await dispatch(genericActions.boardMessages.fetchFromAPI() as any);
       
       setIsCreateMessageOpen(false);
       setMessageFormData({
@@ -128,14 +128,14 @@ function TeamConnectBoardDetail() {
 
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.teamconnectBoardMembers.addAsync({
+      await dispatch(genericActions.boardMembers.addAsync({
         ...memberFormData,
         board_id: parseInt(boardId || '0'),
         member_id: parseInt(memberFormData.member_id),
       }) as any);
       
       // Refresh members from API to ensure sync
-      await dispatch(genericActions.teamconnectBoardMembers.fetchFromAPI() as any);
+      await dispatch(genericActions.boardMembers.fetchFromAPI() as any);
       
       setIsAddMemberOpen(false);
       setMemberFormData({
@@ -154,7 +154,7 @@ function TeamConnectBoardDetail() {
     if (!confirm(t('teamconnect.members.confirmRemove', 'Are you sure you want to remove this member?'))) return;
     
     try {
-      await dispatch(genericActions.teamconnectBoardMembers.removeAsync(memberId) as any);
+      await dispatch(genericActions.boardMembers.removeAsync(memberId) as any);
     } catch (error) {
       console.error('Failed to remove member:', error);
     }
@@ -668,4 +668,4 @@ function TeamConnectBoardDetail() {
   );
 }
 
-export default TeamConnectBoardDetail;
+export default BoardDetail;

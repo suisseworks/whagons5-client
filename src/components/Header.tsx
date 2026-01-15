@@ -155,11 +155,11 @@ function Header() {
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
         const allMatch = /^\/workspace\/all/.test(location.pathname);
         if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
-        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
+        if (allMatch) return { currentWorkspaceName: t('sidebar.everything', 'Everything'), currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
         const wid = parseInt(numMatch![1], 10);
         const ws = workspaces.find((w: any) => w.id === wid);
         return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
-    }, [location.pathname, workspaces]);
+    }, [location.pathname, workspaces, t]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
 
     const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
@@ -630,7 +630,7 @@ function Header() {
                                     />
                                 </div>
                             ) : (
-                                currentWorkspaceName === 'Everything' ? (
+                                currentWorkspaceName === t('sidebar.everything', 'Everything') ? (
                                     <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
                                 ) : null
                             )}
@@ -714,7 +714,7 @@ function Header() {
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-2">
-                    {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === 'Everything') && (
+                    {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === t('sidebar.everything', 'Everything')) && (
                         <button
                             className="group inline-flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97]"
                             onClick={() => setOpenCreateTask(true)}
@@ -930,7 +930,7 @@ function Header() {
         {typeof currentWorkspaceId === 'number' && (
             <TaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} mode="create" workspaceId={currentWorkspaceId} />
         )}
-        {currentWorkspaceName === 'Everything' && (
+        {currentWorkspaceName === t('sidebar.everything', 'Everything') && (
             <TaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} mode="create-all" />
         )}
 

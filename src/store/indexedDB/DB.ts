@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.16';
+const CURRENT_DB_VERSION = '1.11.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -236,6 +236,28 @@ export class DB {
             db.createObjectStore('task_approval_instances', { keyPath: 'id' });
           }
 
+          // Broadcasts & Acknowledgments
+          if (!db.objectStoreNames.contains('broadcasts')) {
+            db.createObjectStore('broadcasts', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('broadcast_acknowledgments')) {
+            const store = db.createObjectStore('broadcast_acknowledgments', { keyPath: 'id' });
+            store.createIndex('broadcast_id', 'broadcast_id', { unique: false });
+            store.createIndex('user_id', 'user_id', { unique: false });
+            store.createIndex('status', 'status', { unique: false });
+          }
+
+          // Plugin System
+          if (!db.objectStoreNames.contains('plugins')) {
+            const store = db.createObjectStore('plugins', { keyPath: 'id' });
+            store.createIndex('slug', 'slug', { unique: true });
+            store.createIndex('is_enabled', 'is_enabled', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('plugin_routes')) {
+            const store = db.createObjectStore('plugin_routes', { keyPath: 'id' });
+            store.createIndex('plugin_id', 'plugin_id', { unique: false });
+          }
+
           // Custom Fields & Values
           if (!db.objectStoreNames.contains('spot_custom_fields')) {
             db.createObjectStore('spot_custom_fields', { keyPath: 'id' });
@@ -291,15 +313,15 @@ export class DB {
             db.createObjectStore('exceptions', { keyPath: 'id' });
           }
 
-          // TeamConnect Communication Boards
-          if (!db.objectStoreNames.contains('teamconnect_boards')) {
-            db.createObjectStore('teamconnect_boards', { keyPath: 'id' });
+          // Boards (Communication Boards)
+          if (!db.objectStoreNames.contains('boards')) {
+            db.createObjectStore('boards', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('teamconnect_board_members')) {
-            db.createObjectStore('teamconnect_board_members', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('board_members')) {
+            db.createObjectStore('board_members', { keyPath: 'id' });
           }
-          if (!db.objectStoreNames.contains('teamconnect_board_messages')) {
-            db.createObjectStore('teamconnect_board_messages', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('board_messages')) {
+            db.createObjectStore('board_messages', { keyPath: 'id' });
           }
 
           // Avatar image cache (base64 or blob references)
@@ -508,6 +530,10 @@ export class DB {
       | 'status_transition_groups'
       | 'approval_approvers'
       | 'task_approval_instances'
+      | 'broadcasts'
+      | 'broadcast_acknowledgments'
+      | 'plugins'
+      | 'plugin_routes'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -567,6 +593,10 @@ export class DB {
       | 'status_transition_groups'
       | 'approval_approvers'
       | 'task_approval_instances'
+      | 'broadcasts'
+      | 'broadcast_acknowledgments'
+      | 'plugins'
+      | 'plugin_routes'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'

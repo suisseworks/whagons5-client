@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -20,8 +20,99 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import api from '@/api/whagonsApi';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const PLUGINS_ORDER_KEY = 'wh-plugins-order-v1';
+const CUSTOM_PLUGINS_KEY = 'wh-custom-plugins-v1';
+
+interface CustomPlugin {
+	id: string;
+	title: string;
+	description: string;
+	color: string;
+	iconName: string;
+	route: string;
+}
+
+// Color and icon options for custom plugins
+const PLUGIN_COLORS = [
+	{ name: 'Amber', value: 'text-amber-500', hex: '#f59e0b' },
+	{ name: 'Blue', value: 'text-blue-500', hex: '#3b82f6' },
+	{ name: 'Emerald', value: 'text-emerald-500', hex: '#10b981' },
+	{ name: 'Indigo', value: 'text-indigo-500', hex: '#6366f1' },
+	{ name: 'Orange', value: 'text-orange-500', hex: '#f97316' },
+	{ name: 'Pink', value: 'text-pink-500', hex: '#ec4899' },
+	{ name: 'Purple', value: 'text-purple-500', hex: '#a855f7' },
+	{ name: 'Red', value: 'text-red-500', hex: '#ef4444' },
+	{ name: 'Sky', value: 'text-sky-500', hex: '#0ea5e9' },
+	{ name: 'Teal', value: 'text-teal-500', hex: '#14b8a6' },
+	{ name: 'Violet', value: 'text-violet-500', hex: '#8b5cf6' },
+	{ name: 'Yellow', value: 'text-yellow-500', hex: '#eab308' },
+];
+
+const PLUGIN_ICONS = [
+	{ name: 'Puzzle Piece', icon: faPuzzlePiece },
+	{ name: 'Star', icon: faStar },
+	{ name: 'Cog', icon: faCog },
+	{ name: 'Bell', icon: faBell },
+	{ name: 'Chart', icon: faChartBar },
+	{ name: 'File', icon: faFileAlt },
+	{ name: 'Users', icon: faUsers },
+	{ name: 'Hammer', icon: faHammer },
+	{ name: 'Clock', icon: faClock },
+	{ name: 'Boxes', icon: faBoxesStacked },
+	{ name: 'Warehouse', icon: faWarehouse },
+	{ name: 'Broom', icon: faBroom },
+	{ name: 'Dollar', icon: faDollarSign },
+];
+
+// Custom plugin management functions
+const loadCustomPlugins = (): CustomPlugin[] => {
+	try {
+		const raw = localStorage.getItem(CUSTOM_PLUGINS_KEY);
+		if (!raw) return [];
+		return JSON.parse(raw);
+	} catch {
+		return [];
+	}
+};
+
+const saveCustomPlugins = (plugins: CustomPlugin[]) => {
+	try {
+		localStorage.setItem(CUSTOM_PLUGINS_KEY, JSON.stringify(plugins));
+	} catch (error) {
+		console.error('Error saving custom plugins:', error);
+	}
+};
+
+const addCustomPlugin = (plugin: Omit<CustomPlugin, 'id'>): CustomPlugin => {
+	const plugins = loadCustomPlugins();
+	const newPlugin: CustomPlugin = {
+		...plugin,
+		id: `custom-${Date.now()}`,
+	};
+	plugins.push(newPlugin);
+	saveCustomPlugins(plugins);
+	return newPlugin;
+};
+
+const updateCustomPlugin = (id: string, updates: Partial<Omit<CustomPlugin, 'id'>>) => {
+	const plugins = loadCustomPlugins();
+	const index = plugins.findIndex(p => p.id === id);
+	if (index !== -1) {
+		plugins[index] = { ...plugins[index], ...updates };
+		saveCustomPlugins(plugins);
+	}
+};
+
+const deleteCustomPlugin = (id: string) => {
+	const plugins = loadCustomPlugins();
+	const filtered = plugins.filter(p => p.id !== id);
+	saveCustomPlugins(filtered);
+};
 
 interface PluginCard {
 	id: string;
@@ -32,6 +123,8 @@ interface PluginCard {
 	onClick?: () => void;
 	configurable?: boolean;
 	is_enabled?: boolean;
+	isCustom?: boolean;
+	route?: string;
 }
 
 interface BackendPlugin {
@@ -58,6 +151,8 @@ interface SortablePluginCardProps {
 	onPluginClick: (id: string, isEnabled: boolean) => void;
 	pluginStatuses: Record<string, boolean>;
 	t: (key: string, fallback?: string) => string;
+	onEditCustomPlugin?: (e: React.MouseEvent, plugin: CustomPlugin) => void;
+	onDeleteCustomPlugin?: (e: React.MouseEvent, pluginId: string) => void;
 }
 
 interface PluginCardDisplayProps {
@@ -68,6 +163,8 @@ interface PluginCardDisplayProps {
 	isDragging?: boolean;
 	pluginStatuses: Record<string, boolean>;
 	t: (key: string, fallback?: string) => string;
+	onEditCustomPlugin?: (e: React.MouseEvent, plugin: CustomPlugin) => void;
+	onDeleteCustomPlugin?: (e: React.MouseEvent, pluginId: string) => void;
 }
 
 function PluginCardDisplay({
@@ -78,6 +175,8 @@ function PluginCardDisplay({
 	isDragging = false,
 	pluginStatuses,
 	t,
+	onEditCustomPlugin,
+	onDeleteCustomPlugin,
 }: PluginCardDisplayProps) {
 	const isPinned = plugin.configurable && pluginsConfig.find(p => p.id === plugin.id)?.pinned;
 	const isEnabled = pluginStatuses[plugin.id] ?? true; // Default to true if not found
@@ -85,9 +184,10 @@ function PluginCardDisplay({
 	// Get border color for each plugin (for hover effects)
 	const getPluginBorderColor = (pluginId: string) => {
 		const borderColors: Record<string, string> = {
+			broadcasts: 'hover:border-amber-500/40 hover:shadow-amber-500/20',
 			cleaning: 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
 			assets: 'hover:border-sky-500/40 hover:shadow-sky-500/20',
-			teamconnect: 'hover:border-violet-500/40 hover:shadow-violet-500/20',
+			boards: 'hover:border-violet-500/40 hover:shadow-violet-500/20',
 			compliance: 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
 			analytics: 'hover:border-purple-500/40 hover:shadow-purple-500/20',
 			clockin: 'hover:border-indigo-500/40 hover:shadow-indigo-500/20',
@@ -128,10 +228,15 @@ function PluginCardDisplay({
 			`}>
 				{/* Top corner badges */}
 				<div className="absolute top-2 right-2 flex items-center gap-2 z-20">
-					{!isEnabled && (
+					{!isEnabled && !plugin.isCustom && (
 						<div className="bg-destructive/90 text-destructive-foreground px-2 py-0.5 rounded-md text-xs font-semibold flex items-center gap-1">
 							<FontAwesomeIcon icon={faLock} className="text-xs" />
 							{t('plugins.disabled', 'Disabled')}
+						</div>
+					)}
+					{plugin.isCustom && (
+						<div className="bg-primary/90 text-primary-foreground px-2 py-0.5 rounded-md text-xs font-semibold">
+							{t('plugins.custom', 'Custom')}
 						</div>
 					)}
 					{isPinned && <Pin className={`h-3.5 w-3.5 ${plugin.color} drop-shadow-md`} />}
@@ -141,6 +246,32 @@ function PluginCardDisplay({
 						</div>
 					)}
 				</div>
+
+				{/* Custom plugin edit/delete buttons */}
+				{plugin.isCustom && onEditCustomPlugin && onDeleteCustomPlugin && (
+					<div className="absolute bottom-2 right-2 flex items-center gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								onEditCustomPlugin(e, plugin as any);
+							}}
+							className="p-1.5 rounded-md bg-primary/20 hover:bg-primary/30 text-primary transition-colors"
+							title={t('common.edit', 'Edit')}
+						>
+							<FontAwesomeIcon icon={faEdit} className="text-xs" />
+						</button>
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								onDeleteCustomPlugin(e, plugin.id);
+							}}
+							className="p-1.5 rounded-md bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors"
+							title={t('common.delete', 'Delete')}
+						>
+							<FontAwesomeIcon icon={faTrash} className="text-xs" />
+						</button>
+					</div>
+				)}
 
 				{/* Content container */}
 				<div className="relative z-10 h-full flex flex-col items-center justify-center p-4">
@@ -192,7 +323,7 @@ function PluginCardDisplay({
 	);
 }
 
-function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatuses, t }: SortablePluginCardProps) {
+function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatuses, t, onEditCustomPlugin, onDeleteCustomPlugin }: SortablePluginCardProps) {
 	const {
 		attributes,
 		listeners,
@@ -223,6 +354,8 @@ function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatus
 				isDragging={isDragging}
 				pluginStatuses={pluginStatuses}
 				t={t}
+				onEditCustomPlugin={onEditCustomPlugin}
+				onDeleteCustomPlugin={onDeleteCustomPlugin}
 			/>
 		</div>
 	);
@@ -313,6 +446,192 @@ function PluginModal({ plugin, isOpen, onClose, t }: { plugin: PluginModalData |
 	);
 }
 
+// Custom Plugin Dialog Component
+function CustomPluginDialog({ 
+	isOpen, 
+	onClose, 
+	onSave, 
+	editingPlugin,
+	t 
+}: { 
+	isOpen: boolean; 
+	onClose: () => void; 
+	onSave: (plugin: Omit<CustomPlugin, 'id'>) => void;
+	editingPlugin?: CustomPlugin | null;
+	t: (key: string, fallback?: string) => string;
+}) {
+	const [formData, setFormData] = useState<Omit<CustomPlugin, 'id'>>({
+		title: '',
+		description: '',
+		color: PLUGIN_COLORS[0].value,
+		iconName: PLUGIN_ICONS[0].name,
+		route: '',
+	});
+
+	useEffect(() => {
+		if (editingPlugin) {
+			setFormData({
+				title: editingPlugin.title,
+				description: editingPlugin.description,
+				color: editingPlugin.color,
+				iconName: editingPlugin.iconName,
+				route: editingPlugin.route,
+			});
+		} else {
+			setFormData({
+				title: '',
+				description: '',
+				color: PLUGIN_COLORS[0].value,
+				iconName: PLUGIN_ICONS[0].name,
+				route: '',
+			});
+		}
+	}, [editingPlugin, isOpen]);
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!formData.title.trim() || !formData.route.trim()) {
+			toast.error('Please fill in all required fields');
+			return;
+		}
+		onSave(formData);
+	};
+
+	const selectedIcon = PLUGIN_ICONS.find(i => i.name === formData.iconName)?.icon || faPuzzlePiece;
+
+	return (
+		<Dialog open={isOpen} onOpenChange={onClose}>
+			<DialogContent className="max-w-2xl">
+				<DialogHeader>
+					<DialogTitle>
+						{editingPlugin 
+							? t('plugins.editCustomPlugin', 'Edit Custom Plugin')
+							: t('plugins.addCustomPlugin', 'Add Custom Plugin')
+						}
+					</DialogTitle>
+					<DialogDescription>
+						{t('plugins.customPluginDescription', 'Create a custom plugin to organize and access your features')}
+					</DialogDescription>
+				</DialogHeader>
+
+				<form onSubmit={handleSubmit} className="space-y-4">
+					{/* Preview */}
+					<div className="p-4 border border-border rounded-lg bg-muted/30">
+						<p className="text-xs text-muted-foreground mb-2">{t('plugins.preview', 'Preview')}</p>
+						<div className="flex items-center gap-3">
+							<div className={`${formData.color} text-3xl`}>
+								<FontAwesomeIcon icon={selectedIcon} />
+							</div>
+							<div>
+								<h3 className="font-bold">{formData.title || t('plugins.untitled', 'Untitled Plugin')}</h3>
+								<p className="text-sm text-muted-foreground">{formData.description || t('plugins.noDescription', 'No description')}</p>
+							</div>
+						</div>
+					</div>
+
+					{/* Title */}
+					<div className="space-y-2">
+						<Label htmlFor="title">{t('plugins.pluginName', 'Plugin Name')} *</Label>
+						<Input
+							id="title"
+							value={formData.title}
+							onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+							placeholder={t('plugins.pluginNamePlaceholder', 'My Custom Plugin')}
+							required
+						/>
+					</div>
+
+					{/* Description */}
+					<div className="space-y-2">
+						<Label htmlFor="description">{t('plugins.description', 'Description')}</Label>
+						<Textarea
+							id="description"
+							value={formData.description}
+							onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+							placeholder={t('plugins.descriptionPlaceholder', 'A brief description of what this plugin does')}
+							rows={2}
+						/>
+					</div>
+
+					{/* Route */}
+					<div className="space-y-2">
+						<Label htmlFor="route">{t('plugins.route', 'Route')} *</Label>
+						<Input
+							id="route"
+							value={formData.route}
+							onChange={(e) => setFormData({ ...formData, route: e.target.value })}
+							placeholder={t('plugins.routePlaceholder', '/my-custom-page')}
+							required
+						/>
+						<p className="text-xs text-muted-foreground">
+							{t('plugins.routeHelp', 'The URL path for this plugin (e.g., /inventory, /reports)')}
+						</p>
+					</div>
+
+					{/* Icon Selection */}
+					<div className="space-y-2">
+						<Label>{t('plugins.icon', 'Icon')}</Label>
+						<div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+							{PLUGIN_ICONS.map((iconOption) => (
+								<button
+									key={iconOption.name}
+									type="button"
+									onClick={() => setFormData({ ...formData, iconName: iconOption.name })}
+									className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+										formData.iconName === iconOption.name
+											? 'border-primary bg-primary/10'
+											: 'border-border hover:border-primary/50'
+									}`}
+									title={iconOption.name}
+								>
+									<FontAwesomeIcon icon={iconOption.icon} className="text-lg" />
+								</button>
+							))}
+						</div>
+					</div>
+
+					{/* Color Selection */}
+					<div className="space-y-2">
+						<Label>{t('plugins.color', 'Color')}</Label>
+						<div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+							{PLUGIN_COLORS.map((colorOption) => (
+								<button
+									key={colorOption.value}
+									type="button"
+									onClick={() => setFormData({ ...formData, color: colorOption.value })}
+									className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+										formData.color === colorOption.value
+											? 'border-primary'
+											: 'border-border hover:border-primary/50'
+									}`}
+									title={colorOption.name}
+								>
+									<div 
+										className="w-6 h-6 rounded-full mx-auto"
+										style={{ backgroundColor: colorOption.hex }}
+									/>
+								</button>
+							))}
+						</div>
+					</div>
+
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={onClose}>
+							{t('common.cancel', 'Cancel')}
+						</Button>
+						<Button type="submit">
+							{editingPlugin 
+								? t('common.save', 'Save')
+								: t('common.create', 'Create')
+							}
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 const loadOrder = (key: string): string[] => {
 	try {
 		const raw = localStorage.getItem(key);
@@ -338,6 +657,9 @@ function Plugins() {
 	const [loadingStatuses, setLoadingStatuses] = useState(true);
 	const [selectedPlugin, setSelectedPlugin] = useState<PluginModalData | null>(null);
 	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [customPlugins, setCustomPlugins] = useState<CustomPlugin[]>(loadCustomPlugins());
+	const [isCustomPluginDialogOpen, setIsCustomPluginDialogOpen] = useState(false);
+	const [editingCustomPlugin, setEditingCustomPlugin] = useState<CustomPlugin | null>(null);
 
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
@@ -373,6 +695,21 @@ function Plugins() {
 		if (!plugin) return null;
 
 		const detailsMap: Record<string, { features: string[]; benefits: string[] }> = {
+			broadcasts: {
+				features: [
+					'Send messages to multiple recipients (manual, role-based, or team-based)',
+					'Track acknowledgments in real-time with progress bars',
+					'Set priority levels (Low, Normal, High, Urgent)',
+					'Automated reminders for pending acknowledgments',
+					'Detailed reporting on who acknowledged and when'
+				],
+				benefits: [
+					'Ensure important messages reach everyone',
+					'Track compliance with communication requirements',
+					'Save time with automated acknowledgment tracking',
+					'Get real-time visibility into message status'
+				]
+			},
 			cleaning: {
 				features: [
 					'Automated cleaning schedules and task assignments',
@@ -519,81 +856,146 @@ function Plugins() {
 		}
 	};
 
-	// Define all plugins
-	const allPlugins: PluginCard[] = useMemo(() => [
-		{
-			id: 'cleaning',
-			title: t('plugins.cleaning.title', 'Cleaning'),
-			description: t('plugins.cleaning.description', 'Cleaning workflows, schedules and services'),
-			icon: faBroom,
-			color: 'text-emerald-500',
-			configurable: true,
-		},
-		{
-			id: 'assets',
-			title: t('plugins.assets.title', 'Assets'),
-			description: t('plugins.assets.description', 'Asset tracking, inspections and maintenance'),
-			icon: faBoxesStacked,
-			color: 'text-sky-500',
-			configurable: true,
-		},
-		{
-			id: 'teamconnect',
-			title: t('plugins.teamconnect.title', 'TeamConnect'),
-			description: t('plugins.teamconnect.description', 'Team collaboration and directory integration'),
-			icon: faUsers,
-			color: 'text-violet-500',
-			configurable: true,
-		},
-		{
-			id: 'compliance',
-			title: t('plugins.compliance.title', 'Compliance'),
-			description: t('plugins.compliance.description', 'Compliance standards, audits and documentation'),
-			icon: faFileAlt,
-			color: 'text-emerald-500',
-			configurable: true,
-		},
-		{
-			id: 'analytics',
-			title: t('plugins.analytics.title', 'Analytics'),
-			description: t('plugins.analytics.description', 'Data insights, reports and performance metrics'),
-			icon: faChartBar,
-			color: 'text-purple-500',
-			configurable: true,
-		},
-		{
-			id: 'clockin',
-			title: t('plugins.clockin.title', 'Clock-In'),
-			description: t('plugins.clockin.description', 'Time tracking, shift planning and attendance insights'),
-			icon: faClock,
-			color: 'text-indigo-500',
-			configurable: true,
-		},
-		{
-			id: 'costs',
-			title: t('plugins.costs.title', 'Costs'),
-			description: t('plugins.costs.description', 'Cost management, budgeting and reporting'),
-			icon: faDollarSign,
-			color: 'text-amber-500',
-			configurable: true,
-		},
-		{
-			id: 'inventory',
-			title: t('plugins.inventory.title', 'Inventory management'),
-			description: t('plugins.inventory.description', 'Track stock levels, manage inventory and optimize supply chains'),
-			icon: faWarehouse,
-			color: 'text-teal-500',
-			configurable: true,
-		},
-		{
-			id: 'tools',
-			title: t('plugins.tools.title', 'Tools'),
-			description: t('plugins.tools.description', 'Tool lending, equipment borrowing and maintenance tool tracking'),
-			icon: faHammer,
-			color: 'text-orange-500',
-			configurable: true,
-		},
-	], [t]);
+	const handleAddCustomPlugin = () => {
+		setEditingCustomPlugin(null);
+		setIsCustomPluginDialogOpen(true);
+	};
+
+	const handleEditCustomPlugin = (e: React.MouseEvent, plugin: CustomPlugin) => {
+		e.stopPropagation();
+		setEditingCustomPlugin(plugin);
+		setIsCustomPluginDialogOpen(true);
+	};
+
+	const handleDeleteCustomPlugin = (e: React.MouseEvent, pluginId: string) => {
+		e.stopPropagation();
+		if (confirm(t('plugins.confirmDelete', 'Are you sure you want to delete this custom plugin?'))) {
+			deleteCustomPlugin(pluginId);
+			setCustomPlugins(loadCustomPlugins());
+			toast.success(t('plugins.pluginDeleted', 'Plugin deleted successfully'));
+		}
+	};
+
+	const handleSaveCustomPlugin = (pluginData: Omit<CustomPlugin, 'id'>) => {
+		try {
+			if (editingCustomPlugin) {
+				updateCustomPlugin(editingCustomPlugin.id, pluginData);
+				toast.success(t('plugins.pluginUpdated', 'Plugin updated successfully'));
+			} else {
+				addCustomPlugin(pluginData);
+				toast.success(t('plugins.pluginCreated', 'Plugin created successfully'));
+			}
+			setCustomPlugins(loadCustomPlugins());
+			setIsCustomPluginDialogOpen(false);
+			setEditingCustomPlugin(null);
+		} catch (error) {
+			toast.error(t('plugins.errorSaving', 'Error saving plugin'));
+		}
+	};
+
+	// Define all plugins (built-in + custom)
+	const allPlugins: PluginCard[] = useMemo(() => {
+		const builtInPlugins: PluginCard[] = [
+			{
+				id: 'broadcasts',
+				title: t('plugins.broadcasts.title', 'Broadcasts'),
+				description: t('plugins.broadcasts.description', 'Send messages and track acknowledgments'),
+				icon: faBell,
+				color: 'text-amber-500',
+				configurable: true,
+			},
+			{
+				id: 'cleaning',
+				title: t('plugins.cleaning.title', 'Cleaning'),
+				description: t('plugins.cleaning.description', 'Cleaning workflows, schedules and services'),
+				icon: faBroom,
+				color: 'text-emerald-500',
+				configurable: true,
+			},
+			{
+				id: 'assets',
+				title: t('plugins.assets.title', 'Assets'),
+				description: t('plugins.assets.description', 'Asset tracking, inspections and maintenance'),
+				icon: faBoxesStacked,
+				color: 'text-sky-500',
+				configurable: true,
+			},
+			{
+				id: 'boards',
+				title: t('plugins.boards.title', 'Boards'),
+				description: t('plugins.boards.description', 'Team communication boards and announcements'),
+				icon: faUsers,
+				color: 'text-violet-500',
+				configurable: true,
+			},
+			{
+				id: 'compliance',
+				title: t('plugins.compliance.title', 'Compliance'),
+				description: t('plugins.compliance.description', 'Compliance standards, audits and documentation'),
+				icon: faFileAlt,
+				color: 'text-emerald-500',
+				configurable: true,
+			},
+			{
+				id: 'analytics',
+				title: t('plugins.analytics.title', 'Analytics'),
+				description: t('plugins.analytics.description', 'Data insights, reports and performance metrics'),
+				icon: faChartBar,
+				color: 'text-purple-500',
+				configurable: true,
+			},
+			{
+				id: 'clockin',
+				title: t('plugins.clockin.title', 'Clock-In'),
+				description: t('plugins.clockin.description', 'Time tracking, shift planning and attendance insights'),
+				icon: faClock,
+				color: 'text-indigo-500',
+				configurable: true,
+			},
+			{
+				id: 'costs',
+				title: t('plugins.costs.title', 'Costs'),
+				description: t('plugins.costs.description', 'Cost management, budgeting and reporting'),
+				icon: faDollarSign,
+				color: 'text-amber-500',
+				configurable: true,
+			},
+			{
+				id: 'inventory',
+				title: t('plugins.inventory.title', 'Inventory management'),
+				description: t('plugins.inventory.description', 'Track stock levels, manage inventory and optimize supply chains'),
+				icon: faWarehouse,
+				color: 'text-teal-500',
+				configurable: true,
+			},
+			{
+				id: 'tools',
+				title: t('plugins.tools.title', 'Tools'),
+				description: t('plugins.tools.description', 'Tool lending, equipment borrowing and maintenance tool tracking'),
+				icon: faHammer,
+				color: 'text-orange-500',
+				configurable: true,
+			},
+		];
+
+		// Convert custom plugins to PluginCard format
+		const customPluginCards: PluginCard[] = customPlugins.map(cp => {
+			const iconOption = PLUGIN_ICONS.find(i => i.name === cp.iconName);
+			return {
+				id: cp.id,
+				title: cp.title,
+				description: cp.description,
+				icon: iconOption?.icon || faPuzzlePiece,
+				color: cp.color,
+				configurable: false,
+				isCustom: true,
+				route: cp.route,
+				onClick: () => navigate(cp.route),
+			};
+		});
+
+		return [...builtInPlugins, ...customPluginCards];
+	}, [t, customPlugins, navigate]);
 
 	// Order state
 	const [pluginOrder, setPluginOrder] = useState<string[]>(() => {
@@ -705,9 +1107,6 @@ function Plugins() {
 							<FontAwesomeIcon icon={faCog} className="text-xs" />
 							{t('plugins.manage', 'Manage Plugins')}
 						</button>
-						<button className="text-sm underline" onClick={() => navigate(-1)}>
-							{t('common.back', 'Back')}
-						</button>
 					</div>
 				</div>
 
@@ -731,8 +1130,36 @@ function Plugins() {
 										onPluginClick={handlePluginClick}
 										pluginStatuses={pluginStatuses}
 										t={t}
+										onEditCustomPlugin={handleEditCustomPlugin}
+										onDeleteCustomPlugin={handleDeleteCustomPlugin}
 									/>
 								))}
+								
+								{/* Add Custom Plugin Card */}
+								<div
+									onClick={handleAddCustomPlugin}
+									className="cursor-pointer transition-all duration-300 group select-none relative hover:scale-105"
+								>
+									<div className="
+										relative rounded-xl overflow-hidden
+										bg-card/30 backdrop-blur-sm
+										border-2 border-dashed border-border/60
+										transition-all duration-300
+										hover:shadow-2xl hover:border-primary/50
+										h-[180px]
+										flex flex-col items-center justify-center
+									">
+										<div className="text-muted-foreground/50 group-hover:text-primary transition-colors text-5xl mb-3">
+											<FontAwesomeIcon icon={faPlus} />
+										</div>
+										<h3 className="font-semibold text-base text-center mb-1">
+											{t('plugins.addCustomPlugin', 'Add Custom Plugin')}
+										</h3>
+										<p className="text-xs text-center text-muted-foreground px-4">
+											{t('plugins.addCustomPluginDescription', 'Create a custom plugin for your needs')}
+										</p>
+									</div>
+								</div>
 							</div>
 						</SortableContext>
 					</DndContext>
@@ -744,6 +1171,18 @@ function Plugins() {
 				plugin={selectedPlugin}
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
+				t={t}
+			/>
+
+			{/* Custom Plugin Dialog */}
+			<CustomPluginDialog
+				isOpen={isCustomPluginDialogOpen}
+				onClose={() => {
+					setIsCustomPluginDialogOpen(false);
+					setEditingCustomPlugin(null);
+				}}
+				onSave={handleSaveCustomPlugin}
+				editingPlugin={editingCustomPlugin}
 				t={t}
 			/>
 		</>

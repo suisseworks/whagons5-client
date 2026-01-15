@@ -1,11 +1,12 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
+@import "./starwars-fonts.css";
 
 /* 
   Add this to your HTML head instead of importing here:
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Audiowide&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Audiowide&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 */
 
 /* #root, body, html, .flex, .flex-1, .h-full {
@@ -248,11 +249,18 @@
   --accent-warning: #FFE81F;
 }
 
+/* Star Wars font applied to all text elements */
+.starwars,
+.starwars * {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+}
+
 .starwars h1, .starwars h2, .starwars h3, .starwars h4, .starwars h5, .starwars h6 {
-  font-family: 'Audiowide', sans-serif;
+  font-family: 'Star Jedi', 'SF Distant Galaxy', 'Orbitron', sans-serif !important;
   font-weight: 400;
   color: #FFE81F; /* Yellow for headings */
-  letter-spacing: 2px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
 }
 
 /* Mixed-surfaces: make the workspace grid a readable light panel inside Star Wars chrome */
@@ -281,10 +289,19 @@
 /* Improve text readability */
 .starwars {
   color: var(--foreground);
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
 }
 
 .starwars p, .starwars span, .starwars div, .starwars li {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   color: var(--foreground);
+  letter-spacing: 0.3px;
+}
+
+.starwars label {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  letter-spacing: 0.5px;
+  font-weight: 500;
 }
 
 /* Yellow accents for important text */
@@ -345,6 +362,12 @@
 }
 
 /* Star Wars button styling */
+.starwars button,
+.starwars [role="button"] {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  letter-spacing: 0.5px;
+}
+
 .starwars button.btn-primary,
 .starwars [role="button"].btn-primary {
   background: linear-gradient(135deg, #4A90E2 0%, #2E5C8A 100%);
@@ -699,7 +722,7 @@
   .starwars [data-sidebar="sidebar"] div,
   .starwars [data-sidebar="sidebar"] span,
   .starwars .text-sidebar-foreground {
-    font-family: 'Audiowide', 'Inter', system-ui, -apple-system, sans-serif !important;
+    font-family: 'Orbitron', 'SF Distant Galaxy', system-ui, -apple-system, sans-serif !important;
     color: var(--sidebar-text-primary);
   }
 
@@ -933,6 +956,14 @@
   --ag-range-selection-border-color: #4A90E2;
   --ag-input-focus-border-color: #4A90E2;
   --ag-accent-color: #4A90E2;
+  --ag-font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif;
+}
+
+.starwars .ag-theme-quartz .ag-cell,
+.starwars .ag-theme-quartz .ag-header-cell,
+.starwars .ag-theme-quartz .ag-header-group-cell {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  letter-spacing: 0.3px;
 }
 
 /* Cleaner workspace grid: remove heavy borders/lines */
@@ -1220,6 +1251,7 @@
 }
 
 .starwars .wh-modern-grid .ag-center-cols-container .ag-row {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   background-color: #141414;
   border: none;
   border-bottom: 1px solid rgba(74, 144, 226, 0.15);
@@ -1228,6 +1260,7 @@
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
+  letter-spacing: 0.3px;
 }
 
 .starwars .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
@@ -1249,10 +1282,11 @@
 }
 
 .starwars .wh-modern-grid .ag-header-cell-text {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   color: #FFE81F;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
 }
 
 /* When Star Wars uses a light panel for the grid, render the grid with readable light styles */
@@ -1297,9 +1331,11 @@
 .starwars input,
 .starwars textarea,
 .starwars select {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   background-color: #1a1a1a;
   border-color: rgba(74, 144, 226, 0.2);
   color: #E8E8E8;
+  letter-spacing: 0.3px;
 }
 
 .starwars input::placeholder,
@@ -1323,19 +1359,25 @@
 .starwars [data-radix-popper-content-wrapper] [role="tooltip"],
 .starwars [role="tooltip"],
 html.starwars [data-radix-popper-content-wrapper] [role="tooltip"] {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   background-color: #4A90E2 !important;
   color: #ffffff !important;
   border-color: rgba(74, 144, 226, 0.5) !important;
   box-shadow: 0 0 15px rgba(74, 144, 226, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+  letter-spacing: 0.3px;
 }
 
 /* Star Wars popover styling */
 .starwars [data-radix-popper-content-wrapper] [data-radix-popover-content],
-html.starwars [data-radix-popper-content-wrapper] [data-radix-popover-content] {
+html.starwars [data-radix-popper-content-wrapper] [data-radix-popover-content],
+.starwars [data-radix-popper-content-wrapper] [data-radix-popover-content] *,
+html.starwars [data-radix-popper-content-wrapper] [data-radix-popover-content] * {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   background-color: #141414 !important;
   color: #E8E8E8 !important;
   border-color: rgba(74, 144, 226, 0.3) !important;
   box-shadow: 0 0 20px rgba(74, 144, 226, 0.3), 0 10px 15px -3px rgba(0, 0, 0, 0.4) !important;
+  letter-spacing: 0.3px;
 }
 
 /* Star Wars dropdown menu styling */
@@ -1349,7 +1391,9 @@ html.starwars [data-radix-popper-content-wrapper] [role="menu"] {
 
 .starwars [data-radix-popper-content-wrapper] [role="menuitem"],
 html.starwars [data-radix-popper-content-wrapper] [role="menuitem"] {
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
   color: #E8E8E8 !important;
+  letter-spacing: 0.3px;
 }
 
 .starwars [data-radix-popper-content-wrapper] [role="menuitem"]:hover,

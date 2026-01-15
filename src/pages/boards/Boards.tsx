@@ -10,7 +10,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
-import { TeamConnectBoard } from '@/store/types';
+import { Board } from '@/store/types';
 import {
   Dialog,
   DialogContent,
@@ -29,14 +29,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-function TeamConnect() {
+function Boards() {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   // Redux state
-  const { value: boards, loading, error } = useSelector((state: RootState) => (state as any).teamconnectBoards || { value: [], loading: false, error: null });
+  const { value: boards, loading, error } = useSelector((state: RootState) => (state as any).boards || { value: [], loading: false, error: null });
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,28 +47,38 @@ function TeamConnect() {
     visibility: 'private' as 'public' | 'private',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isButtonAnimating, setIsButtonAnimating] = useState(false);
 
   // Load boards on mount
   useEffect(() => {
-    dispatch(genericActions.teamconnectBoards.getFromIndexedDB());
-    dispatch(genericActions.teamconnectBoards.fetchFromAPI());
+    dispatch(genericActions.boards.getFromIndexedDB());
+    dispatch(genericActions.boards.fetchFromAPI());
   }, [dispatch]);
 
-  // Filter boards based on search
-  const filteredBoards = boards.filter((board: TeamConnectBoard) =>
-    board.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (board.description && board.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Filter boards based on search (excluding soft-deleted boards)
+  const filteredBoards = boards.filter((board: Board) => {
+    // Exclude soft-deleted boards
+    if (board.deleted_at !== null && board.deleted_at !== undefined) {
+      return false;
+    }
+    
+    // Apply search filter
+    return board.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (board.description && board.description.toLowerCase().includes(searchQuery.toLowerCase()));
+  });
 
   const handleCreateBoard = async () => {
     if (!formData.name.trim()) return;
 
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.teamconnectBoards.addAsync(formData) as any);
+      console.log('[Boards] Creating board with data:', formData);
+      const result = await dispatch(genericActions.boards.addAsync(formData) as any);
+      console.log('[Boards] Board created, result:', result);
+      console.log('[Boards] Current boards in state:', boards);
       setIsCreateDialogOpen(false);
       setFormData({ name: '', description: '', visibility: 'private' });
+      // Note: We rely on the optimistic update from addAsync
+      // No need to call fetchFromAPI as it might prune the board if there's a timing issue
     } catch (error) {
       console.error('Failed to create board:', error);
     } finally {
@@ -77,15 +87,11 @@ function TeamConnect() {
   };
 
   const handleBoardClick = (boardId: number) => {
-    navigate(`/teamconnect/${boardId}`);
+    navigate(`/boards/${boardId}`);
   };
 
   const handleCreateButtonClick = () => {
-    setIsButtonAnimating(true);
-    setTimeout(() => {
-      setIsButtonAnimating(false);
-      setIsCreateDialogOpen(true);
-    }, 200);
+    setIsCreateDialogOpen(true);
   };
 
   return (
@@ -100,28 +106,10 @@ function TeamConnect() {
             {t('teamconnect.boards.subtitle', 'Team-wide announcements and updates')}
           </p>
         </div>
-        <button
-          onClick={handleCreateButtonClick}
-          style={{ 
-            backgroundColor: '#ef4444',
-            color: 'white',
-            padding: '0.75rem 1.5rem',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            transform: isButtonAnimating ? 'scale(0.95)' : 'scale(1)',
-            transition: 'transform 0.2s ease-in-out',
-          }}
-        >
+        <Button onClick={handleCreateButtonClick}>
           <Plus className="w-5 h-5" />
           {t('teamconnect.boards.create', 'Create Board')}
-        </button>
+        </Button>
       </div>
 
       {/* Search */}
@@ -150,34 +138,15 @@ function TeamConnect() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               {t('teamconnect.boards.emptyDescription', 'Create your first communication board to share updates with your team')}
             </p>
-            <button
-              onClick={handleCreateButtonClick}
-              style={{ 
-                backgroundColor: '#ef4444',
-                color: 'white',
-                padding: '0.75rem 2rem',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                margin: '0 auto',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                transform: isButtonAnimating ? 'scale(0.95)' : 'scale(1)',
-                transition: 'transform 0.2s ease-in-out',
-              }}
-            >
+            <Button onClick={handleCreateButtonClick} className="mx-auto">
               <Plus className="w-5 h-5" />
               {t('teamconnect.boards.create', 'Create Board')}
-            </button>
+            </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredBoards.map((board: TeamConnectBoard) => (
+          {filteredBoards.map((board: Board) => (
             <Card
               key={board.id}
               className="cursor-pointer hover:shadow-lg transition-shadow"
@@ -268,54 +237,23 @@ function TeamConnect() {
               </Select>
             </div>
 
-            {/* BUTTONS - MOVED HERE SO THEY'RE VISIBLE */}
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'row', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              gap: '1rem',
-              paddingTop: '2rem',
-              marginTop: '2rem',
-              borderTop: '2px solid #e5e7eb',
-              width: '100%'
-            }}>
-              <button
+            <DialogFooter>
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setIsCreateDialogOpen(false)}
                 disabled={isSubmitting}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  border: '2px solid #d1d5db',
-                  borderRadius: '8px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: '600'
-                }}
               >
-                {t('teamConnect.cancel', '❌ Cancel')}
-              </button>
-              <button
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button
                 type="button"
                 onClick={handleCreateBoard}
                 disabled={!formData.name.trim() || isSubmitting}
-                style={{ 
-                  backgroundColor: !formData.name.trim() || isSubmitting ? '#fca5a5' : '#ef4444',
-                  color: 'white',
-                  padding: '0.75rem 2rem',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: !formData.name.trim() || isSubmitting ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '18px',
-                  minWidth: '200px',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-                }}
               >
-                {isSubmitting ? t('teamConnect.saving', '⏳ Saving...') : t('teamConnect.createBoard', '✅ CREATE BOARD')}
-              </button>
-            </div>
+                {isSubmitting ? t('common.creating', 'Creating...') : t('common.create', 'Create')}
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
@@ -323,4 +261,4 @@ function TeamConnect() {
   );
 }
 
-export default TeamConnect;
+export default Boards;

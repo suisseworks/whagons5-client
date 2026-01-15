@@ -26,11 +26,10 @@ import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Approvals from '@/pages/settings/sub_pages/Approvals';
 import Global from '@/pages/settings/sub_pages/Global';
-import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 // Messages removed
-import TeamConnect from '@/pages/teamconnect/TeamConnect';
-import TeamConnectBoardDetail from '@/pages/teamconnect/TeamConnectBoardDetail';
+import Boards from '@/pages/boards/Boards';
+import BoardDetail from '@/pages/boards/BoardDetail';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
 import PluginSettings from '@/pages/PluginSettings';
@@ -38,6 +37,7 @@ import PluginManagement from '@/pages/admin/PluginManagement';
 import { ComplianceStandards } from '@/pages/compliance/ComplianceStandards';
 import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardDetail';
 import SharedWithMe from '@/pages/shared/SharedWithMe';
+import BroadcastsPage from '@/pages/broadcasts/BroadcastsPage';
 
 
 const pages = [
@@ -77,12 +77,12 @@ export const HomeRoutes = () => {
           <Route path="/stripe" element={<Stripe />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/stuff" element={<Stuff />} />
-          <Route path="/analytics" element={<Analytics />} />
           <Route path="/plugins" element={<Plugins />} />
           <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
           <Route path="/admin/plugins" element={<PluginManagement />} />
-          <Route path="/teamconnect" element={<TeamConnect />} />
-          <Route path="/teamconnect/:boardId" element={<TeamConnectBoardDetail />} />
+          <Route path="/boards" element={<Boards />} />
+          <Route path="/boards/:boardId" element={<BoardDetail />} />
+          <Route path="/broadcasts" element={<BroadcastsPage />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />

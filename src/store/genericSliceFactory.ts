@@ -280,7 +280,10 @@ let inflightLoad: Promise<T[]> | null = null;
                 }
             },
             removeItem: (state, action: PayloadAction<number | string>) => {
+                console.log(`[${name}] removeItem called for ID:`, action.payload);
+                console.log(`[${name}] Current items before remove:`, state.value.map((item: any) => ({ id: item.id, name: item.name })));
                 state.value = state.value.filter((item: any) => (item as any).id !== action.payload) as unknown as typeof state.value;
+                console.log(`[${name}] Items after remove:`, state.value.map((item: any) => ({ id: item.id, name: item.name })));
             },
         },
         extraReducers: (builder) => {
@@ -307,6 +310,8 @@ let inflightLoad: Promise<T[]> | null = null;
                     state.error = null;
                 })
                 .addCase(fetchFromAPI.fulfilled, (state, action: PayloadAction<T[]>) => {
+                    console.log(`[${name}] fetchFromAPI.fulfilled - replacing state with ${action.payload.length} items`);
+                    console.log(`[${name}] New items:`, (action.payload as any[]).map((item: any) => ({ id: item.id, name: item.name || item.title })));
                     state.loading = false;
                     state.value = action.payload as unknown as typeof state.value;
                     state.error = null;

@@ -1,0 +1,213 @@
+// Boards translations - English (default)
+export const boardsTranslations = {
+  // Sidebar
+  "sidebar.boards": "Boards",
+  "sidebar.broadcasts": "Broadcasts",
+  
+  // Navigation
+  "boards.nav.title": "Boards",
+  "boards.nav.subtitle": "Communication boards",
+  
+  // Board List
+  "boards.boards.title": "Communication Boards",
+  "boards.boards.subtitle": "Team-wide announcements and updates",
+  "boards.boards.create": "Create Board",
+  "boards.boards.search": "Search boards...",
+  "boards.boards.empty": "No boards found",
+  "boards.boards.emptyDescription": "Create your first communication board to share updates with your team",
+  "boards.boards.visibility.public": "Public",
+  "boards.boards.visibility.private": "Private",
+  
+  // Board Form
+  "boards.board.create.title": "Create Board",
+  "boards.board.edit.title": "Edit Board",
+  "boards.board.name": "Board Name",
+  "boards.board.namePlaceholder": "e.g., Company Updates, Team News",
+  "boards.board.description": "Description",
+  "boards.board.descriptionPlaceholder": "What is this board for?",
+  "boards.board.visibility": "Visibility",
+  "boards.board.visibility.publicLabel": "Public - All users can view",
+  "boards.board.visibility.privateLabel": "Private - Members only",
+  "boards.board.save": "Save Board",
+  "boards.board.cancel": "Cancel",
+  "boards.board.delete": "Delete Board",
+  "boards.board.deleteConfirm": "Are you sure you want to delete this board?",
+  
+  // Members
+  "boards.members.title": "Members",
+  "boards.members.add": "Add Members",
+  "boards.members.admin": "Admin",
+  "boards.members.member": "Member",
+  "boards.members.type.user": "User",
+  "boards.members.type.team": "Team",
+  "boards.members.role": "Role",
+  "boards.members.remove": "Remove",
+  "boards.members.empty": "No members yet",
+  "boards.members.selectUser": "Select User",
+  "boards.members.selectTeam": "Select Team",
+  "boards.members.type": "Member Type",
+  "boards.members.confirmRemove": "Are you sure you want to remove this member?",
+  "boards.members.adding": "Adding...",
+  "boards.members.addMember": "ADD MEMBER",
+  
+  // Messages
+  "boards.messages.title": "Messages",
+  "boards.messages.create": "Post Message",
+  "boards.messages.edit": "Edit Message",
+  "boards.messages.delete": "Delete Message",
+  "boards.messages.deleteConfirm": "Are you sure you want to delete this message?",
+  "boards.messages.title.label": "Title (optional)",
+  "boards.messages.title.placeholder": "Message title",
+  "boards.messages.content": "Content",
+  "boards.messages.contentPlaceholder": "Write your message here...",
+  "boards.messages.pin": "Pin Message",
+  "boards.messages.unpin": "Unpin Message",
+  "boards.messages.pinned": "Pinned",
+  "boards.messages.startsAt": "Start Date (optional)",
+  "boards.messages.endsAt": "End Date (optional)",
+  "boards.messages.empty": "No messages yet",
+  "boards.messages.emptyDescription": "Be the first to post a message",
+  "boards.messages.postedBy": "Posted by",
+  "boards.messages.adminOnly": "Only admins can post messages",
+  
+  // Actions
+  "boards.actions.save": "Save",
+  "boards.actions.cancel": "Cancel",
+  "boards.actions.delete": "Delete",
+  "boards.actions.edit": "Edit",
+  "boards.actions.back": "Back to Boards",
+  
+  // Errors
+  "boards.error.loadBoards": "Failed to load boards",
+  "boards.error.loadMessages": "Failed to load messages",
+  "boards.error.createBoard": "Failed to create board",
+  "boards.error.updateBoard": "Failed to update board",
+  "boards.error.deleteBoard": "Failed to delete board",
+  "boards.error.postMessage": "Failed to post message",
+  "boards.error.noAccess": "You don't have access to this board",
+  
+  // Success
+  "boards.success.boardCreated": "Board created successfully",
+  "boards.success.boardUpdated": "Board updated successfully",
+  "boards.success.boardDeleted": "Board deleted successfully",
+  "boards.success.messagePosted": "Message posted successfully",
+  "boards.success.messageUpdated": "Message updated successfully",
+  "boards.success.messageDeleted": "Message deleted successfully",
+  
+  // Boards form buttons
+  "boards.cancel": "❌ Cancel",
+  "boards.createBoard": "✅ CREATE BOARD",
+  "boards.saving": "⏳ Saving...",
+  
+  // Plugin translations
+  "plugins.manage": "Manage Plugins",
+  "plugins.disabled": "Disabled",
+  "plugin.keyFeatures": "Key Features",
+  "plugin.whatYoullGet": "What You'll Get",
+  "plugins.contactSalesDescription": "Contact sales to enable this plugin",
+  "plugins.contactSalesButton": "Contact Sales",
+  "plugins.pluginInquirySubject": "Plugin Inquiry: {title}",
+  
+  // Boards plugin (in Plugins page)
+  "plugins.boards.title": "Boards",
+  "plugins.boards.description": "Team communication boards and announcements",
+};
+
+// Spanish translations
+export const boardsTranslationsES = {
+  "sidebar.boards": "Tableros",
+  "sidebar.broadcasts": "Difusión",
+  
+  "boards.nav.title": "Tableros",
+  "boards.nav.subtitle": "Tableros de comunicación",
+  
+  "boards.boards.title": "Tableros de Comunicación",
+  "boards.boards.subtitle": "Anuncios y actualizaciones para todo el equipo",
+  "boards.boards.create": "Crear Tablero",
+  "boards.boards.search": "Buscar tableros...",
+  "boards.boards.empty": "No se encontraron tableros",
+  "boards.boards.emptyDescription": "Crea tu primer tablero de comunicación para compartir actualizaciones con tu equipo",
+  "boards.boards.visibility.public": "Público",
+  "boards.boards.visibility.private": "Privado",
+  
+  "boards.board.create.title": "Crear Tablero",
+  "boards.board.edit.title": "Editar Tablero",
+  "boards.board.name": "Nombre del Tablero",
+  "boards.board.namePlaceholder": "ej., Actualizaciones de la Empresa, Noticias del Equipo",
+  "boards.board.description": "Descripción",
+  "boards.board.descriptionPlaceholder": "¿Para qué sirve este tablero?",
+  "boards.board.visibility": "Visibilidad",
+  "boards.board.visibility.publicLabel": "Público - Todos los usuarios pueden ver",
+  "boards.board.visibility.privateLabel": "Privado - Solo miembros",
+  "boards.board.save": "Guardar Tablero",
+  "boards.board.cancel": "Cancelar",
+  "boards.board.delete": "Eliminar Tablero",
+  "boards.board.deleteConfirm": "¿Estás seguro de que quieres eliminar este tablero?",
+  
+  "boards.members.title": "Miembros",
+  "boards.members.add": "Agregar Miembros",
+  "boards.members.admin": "Administrador",
+  "boards.members.member": "Miembro",
+  "boards.members.type.user": "Usuario",
+  "boards.members.type.team": "Equipo",
+  "boards.members.role": "Rol",
+  "boards.members.remove": "Eliminar",
+  "boards.members.empty": "Aún no hay miembros",
+  "boards.members.selectUser": "Seleccionar Usuario",
+  "boards.members.selectTeam": "Seleccionar Equipo",
+  "boards.members.type": "Tipo de Miembro",
+  "boards.members.confirmRemove": "¿Estás seguro de que quieres eliminar este miembro?",
+  "boards.members.adding": "Agregando...",
+  "boards.members.addMember": "AGREGAR MIEMBRO",
+  
+  "boards.messages.title": "Mensajes",
+  "boards.messages.create": "Publicar Mensaje",
+  "boards.messages.edit": "Editar Mensaje",
+  "boards.messages.delete": "Eliminar Mensaje",
+  "boards.messages.deleteConfirm": "¿Estás seguro de que quieres eliminar este mensaje?",
+  "boards.messages.title.label": "Título (opcional)",
+  "boards.messages.title.placeholder": "Título del mensaje",
+  "boards.messages.content": "Contenido",
+  "boards.messages.contentPlaceholder": "Escribe tu mensaje aquí...",
+  "boards.messages.pin": "Fijar Mensaje",
+  "boards.messages.unpin": "Desfijar Mensaje",
+  "boards.messages.pinned": "Fijado",
+  "boards.messages.startsAt": "Fecha de inicio (opcional)",
+  "boards.messages.endsAt": "Fecha de fin (opcional)",
+  "boards.messages.empty": "Aún no hay mensajes",
+  "boards.messages.emptyDescription": "Sé el primero en publicar un mensaje",
+  "boards.messages.postedBy": "Publicado por",
+  "boards.messages.adminOnly": "Solo los administradores pueden publicar mensajes",
+  "boards.messages.posting": "PUBLICANDO...",
+  "boards.messages.postMessage": "PUBLICAR MENSAJE",
+  
+  "boards.actions.save": "Guardar",
+  "boards.actions.cancel": "Cancelar",
+  "boards.actions.delete": "Eliminar",
+  "boards.actions.edit": "Editar",
+  "boards.actions.back": "Volver a Tableros",
+  
+  "boards.error.loadBoards": "No se pudieron cargar los tableros",
+  "boards.error.loadMessages": "No se pudieron cargar los mensajes",
+  "boards.error.createBoard": "No se pudo crear el tablero",
+  "boards.error.updateBoard": "No se pudo actualizar el tablero",
+  "boards.error.deleteBoard": "No se pudo eliminar el tablero",
+  "boards.error.postMessage": "No se pudo publicar el mensaje",
+  "boards.error.noAccess": "No tienes acceso a este tablero",
+  
+  "boards.success.boardCreated": "Tablero creado exitosamente",
+  "boards.success.boardUpdated": "Tablero actualizado exitosamente",
+  "boards.success.boardDeleted": "Tablero eliminado exitosamente",
+  "boards.success.messagePosted": "Mensaje publicado exitosamente",
+  "boards.success.messageUpdated": "Mensaje actualizado exitosamente",
+  "boards.success.messageDeleted": "Mensaje eliminado exitosamente",
+  
+  // Boards form buttons
+  "boards.cancel": "❌ Cancelar",
+  "boards.createBoard": "✅ CREAR TABLERO",
+  "boards.saving": "⏳ GUARDANDO...",
+  
+  // Boards plugin (in Plugins page)
+  "plugins.boards.title": "Tableros",
+  "plugins.boards.description": "Tableros de comunicación y anuncios del equipo",
+};

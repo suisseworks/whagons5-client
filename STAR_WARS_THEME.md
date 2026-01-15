@@ -75,9 +75,21 @@ All components automatically adapt to the Star Wars theme when active:
 - **Sidebar**: Deep black with yellow text
 - **Scrollbars**: Blue glowing scrollbars
 
-## Font
+## Fonts
 
-The theme uses **Audiowide** font family, a bold futuristic sans-serif font that captures the Star Wars aesthetic. The font is automatically loaded via Google Fonts when the theme is active.
+The theme uses authentic **Star Wars** fonts throughout the application:
+
+- **Star Jedi**: The iconic Star Wars title font used for all headings (h1-h6)
+- **SF Distant Galaxy**: Alternative Star Wars font for special elements
+- **Orbitron**: Futuristic sans-serif font from Google Fonts used for body text, buttons, inputs, and general UI elements
+
+These fonts are automatically loaded when the theme is active, providing an immersive Star Wars experience across all text elements including:
+- Headings and titles
+- Navigation and sidebar
+- Buttons and form inputs
+- Body text and paragraphs
+- Data grid headers
+- Labels and UI components
 
 ## Browser Support
 

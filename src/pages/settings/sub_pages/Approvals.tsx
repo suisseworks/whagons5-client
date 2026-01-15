@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { faSquareCheck, faUsers, faPlus, faTrash, faCircleQuestion, faBook, faCheckCircle, faClock, faExclamationTriangle, faInfoCircle, faLock, faGripVertical } from "@fortawesome/free-solid-svg-icons";
+import { faSquareCheck, faUsers, faPlus, faTrash, faCircleQuestion, faBook, faCheckCircle, faClock, faExclamationTriangle, faInfoCircle, faLock, faGripVertical, faBolt } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Approval, ApprovalApprover, ApprovalCondition, CustomField, Status } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -26,6 +26,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ApprovalActionsDialog } from "./approvals/ApprovalActionsDialog";
 
 // Compact name/description cell similar to Teams with type indicator (S/P)
 const NameCell = (props: ICellRendererParams) => {
@@ -85,6 +86,8 @@ type ApprovalFormState = {
   deadline_value: string;
   order_index: number;
   is_active: boolean;
+  on_approved_actions?: any[];
+  on_rejected_actions?: any[];
 };
 
 const CONDITION_OPERATORS_BY_TYPE: Record<ConditionValueType, ConditionOperator[]> = {
@@ -676,6 +679,8 @@ function Approvals() {
   const [approversApproval, setApproversApproval] = useState<Approval | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [summaryApproval, setSummaryApproval] = useState<Approval | null>(null);
+  const [isActionsDialogOpen, setIsActionsDialogOpen] = useState(false);
+  const [actionsApproval, setActionsApproval] = useState<Approval | null>(null);
   const { value: approvalApprovers } = useSelector((s: RootState) => s.approvalApprovers) as { value: ApprovalApprover[] };
   const { value: statuses } = useSelector((s: RootState) => (s as any).statuses || { value: [] }) as { value: Status[] };
   const { value: customFields } = useSelector((s: RootState) => (s as any).customFields || { value: [] }) as { value: CustomField[] };
@@ -710,6 +715,11 @@ function Approvals() {
   const openManageApprovers = useCallback((approval: Approval) => {
     setApproversApproval(approval);
     setIsApproversDialogOpen(true);
+  }, []);
+
+  const openManageActions = useCallback((approval: Approval) => {
+    setActionsApproval(approval);
+    setIsActionsDialogOpen(true);
   }, []);
 
   const openSummary = useCallback((approval: Approval) => {
@@ -790,6 +800,7 @@ function Approvals() {
     const noLabel = ta('grid.values.no', 'No');
     const manageApproversLabel = ta('actions.manageApprovers', 'Approvers');
     const manageApproversWithCount = ta('actions.manageApproversWithCount', 'Approvers ({count})');
+    const manageActionsLabel = ta('actions.manageActions', 'Actions');
 
     return [
       {
@@ -879,19 +890,27 @@ function Approvals() {
       {
         field: 'actions',
         headerName: columnLabels.actions,
-        width: 220,
+        width: 280,
         cellRenderer: createActionsCellRenderer({
-          customActions: [{
-            icon: faUsers,
-            label: (row: any) => {
-              const count = approverCountByApproval.get(Number(row?.id)) || 0;
-              return count > 0 ? formatTemplate(manageApproversWithCount, { count }) : manageApproversLabel;
+          customActions: [
+            {
+              icon: faUsers,
+              label: (row: any) => {
+                const count = approverCountByApproval.get(Number(row?.id)) || 0;
+                return count > 0 ? formatTemplate(manageApproversWithCount, { count }) : manageApproversLabel;
+              },
+              variant: 'outline',
+              onClick: (row: any) => openManageApprovers(row as Approval),
+              className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[120px]'
             },
-            variant: 'outline',
-            onClick: (row: any) => openManageApprovers(row as Approval),
-            className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[150px]'
-          }],
-          onEdit: handleEdit,
+            {
+              icon: faBolt,
+              label: manageActionsLabel,
+              variant: 'outline',
+              onClick: (row: any) => openManageActions(row as Approval),
+              className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[90px]'
+            }
+          ],
         }),
         sortable: false,
         filter: false,
@@ -899,7 +918,7 @@ function Approvals() {
         pinned: 'right',
       },
     ];
-  }, [handleEdit, renderDeadline, approverCountByApproval, openManageApprovers, ta, getTriggerTypeLabel]);
+  }, [handleEdit, renderDeadline, approverCountByApproval, openManageApprovers, openManageActions, ta, getTriggerTypeLabel]);
 
   // Form state
   const [createFormData, setCreateFormData] = useState<ApprovalFormState>(() => createEmptyFormState());
@@ -1851,6 +1870,13 @@ function Approvals() {
         open={isApproversDialogOpen}
         onOpenChange={(open) => { if (!open) { setIsApproversDialogOpen(false); setApproversApproval(null); } else { setIsApproversDialogOpen(true); } }}
         approval={approversApproval}
+      />
+
+      {/* Manage Actions Dialog */}
+      <ApprovalActionsDialog
+        open={isActionsDialogOpen}
+        onOpenChange={(open) => { if (!open) { setIsActionsDialogOpen(false); setActionsApproval(null); } else { setIsActionsDialogOpen(true); } }}
+        approval={actionsApproval}
       />
 
       {/* Summary Dialog */}

@@ -24,6 +24,7 @@ import {
   FileText, // Add FileText icon
   MoreHorizontal,
   Sparkles,
+  Bell, // Add Bell icon for broadcasts
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -96,13 +97,22 @@ const pluginConfigCallbacks: ((configs: PluginConfig[]) => void)[] = [];
 
 const getDefaultPluginsConfig = (): PluginConfig[] => [
   {
-    id: 'teamconnect',
+    id: 'broadcasts',
     enabled: true,
     pinned: false,
-    name: 'TeamConnect',
+    name: 'Broadcasts',
+    icon: Bell,
+    iconColor: '#8b5cf6',
+    route: '/broadcasts',
+  },
+  {
+    id: 'boards',
+    enabled: true,
+    pinned: false,
+    name: 'Boards',
     icon: Users2,
     iconColor: '#3b82f6',
-    route: '/teamconnect',
+    route: '/boards',
   },
   {
     id: 'compliance',
@@ -112,15 +122,6 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     icon: FileText,
     iconColor: '#10b981',
     route: '/compliance/standards',
-  },
-  {
-    id: 'analytics',
-    enabled: true,
-    pinned: false,
-    name: 'Analytics',
-    icon: BarChart3,
-    iconColor: '#8b5cf6',
-    route: '/analytics',
   },
 ];
 
