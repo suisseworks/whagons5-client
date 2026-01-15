@@ -1,4 +1,7 @@
+import { teamConnectTranslationsES } from './teamconnect';
+
 export const esTranslations: Record<string, string> = {
+  ...teamConnectTranslationsES,
   "settings.global.title": "Configuración global",
   "settings.global.subtitle": "Predeterminados de la organización, branding e identidad de la plataforma",
   "settings.global.intro": "Configura cómo luce y se comporta tu organización a nivel global. Cambia de pestaña para acceder a cada módulo.",
@@ -324,6 +327,7 @@ export const esTranslations: Record<string, string> = {
   "breadcrumbs.tasks": "Tareas",
   "breadcrumbs.workspace": "Workspace",
   "breadcrumbs.settings": "Configuración",
+  "breadcrumbs.plugins": "Complementos",
   "breadcrumbs.categories": "Categorías",
   "breadcrumbs.templates": "Plantillas",
   "breadcrumbs.teams": "Equipos",
@@ -344,6 +348,7 @@ export const esTranslations: Record<string, string> = {
   "breadcrumbs.status": "Estado",
   "breadcrumbs.spot-types": "Tipos de spot",
   "breadcrumbs.job-positions": "Puestos",
+  "breadcrumbs.teamconnect": "TeamConnect",
 
   "settings.users.title": "Usuarios",
   "settings.users.description": "Cuentas de usuario y permisos",
@@ -601,6 +606,7 @@ export const esTranslations: Record<string, string> = {
   "sidebar.more": "Más",
   "sidebar.less": "Menos",
   "sidebar.teamConnect": "TeamConnect",
+  "sidebar.teamconnect": "TeamConnect",
   "sidebar.compliance": "Cumplimiento",
   "sidebar.analytics": "Analítica",
   "sidebar.plugins": "Complementos",
@@ -629,4 +635,44 @@ export const esTranslations: Record<string, string> = {
   "sidebar.workspaceDescriptionPlaceholder": "p. ej., Para gestionar tareas del proyecto",
   "sidebar.pleaseEnterWorkspaceName": "Por favor ingresa un nombre de espacio.",
   "sidebar.failedToCreateWorkspace": "Error al crear el espacio. Por favor, inténtalo de nuevo.",
+
+  // Plugins translations
+  "plugins.title": "Complementos",
+  "plugins.dragHint": "Arrastra las tarjetas para reordenarlas.",
+  "plugins.settings": "Configuración",
+  "plugins.configureDescription": "Configura la visibilidad del plugin y opciones de anclaje",
+  "plugins.enabled": "Habilitado",
+  "plugins.enabledDescription": "Mostrar este plugin en la barra lateral",
+  "plugins.pinned": "Anclado",
+  "plugins.pinnedDescription": "Anclar este plugin debajo de los espacios en la barra lateral",
+  "plugins.notFound": "Plugin no encontrado",
+  "plugins.notFoundDescription": "No se pudo encontrar el plugin solicitado",
+  "plugins.visibility": "Visibilidad",
+  "plugins.visibilityDescription": "Controla cómo aparece este plugin en tu barra lateral",
+  "plugins.about": "Acerca de",
+  "plugins.pluginId": "ID del plugin",
+  "plugins.route": "Ruta",
+  
+  // Plugin names and descriptions
+  "plugins.cleaning.title": "Limpieza",
+  "plugins.cleaning.description": "Flujos de trabajo, horarios y servicios de limpieza",
+  "plugins.assets.title": "Activos",
+  "plugins.assets.description": "Seguimiento de activos, inspecciones y mantenimiento",
+  "plugins.teamconnect.title": "TeamConnect",
+  "plugins.teamconnect.description": "Colaboración en equipo e integración de directorio",
+  "plugins.compliance.title": "Cumplimiento",
+  "plugins.compliance.description": "Estándares de cumplimiento, auditorías y documentación",
+  "plugins.analytics.title": "Analítica",
+  "plugins.analytics.description": "Información de datos, reportes y métricas de rendimiento",
+  "plugins.clockin.title": "Control de Tiempo",
+  "plugins.clockin.description": "Seguimiento de tiempo, planificación de turnos e información de asistencia",
+  "plugins.costs.title": "Costos",
+  "plugins.costs.description": "Gestión de costos, presupuestos y reportes",
+  "plugins.inventory.title": "Gestión de inventario",
+  "plugins.inventory.description": "Rastrea niveles de stock, gestiona inventario y optimiza cadenas de suministro",
+  "plugins.tools.title": "Herramientas",
+  "plugins.tools.description": "Préstamo de herramientas, préstamo de equipos y seguimiento de herramientas de mantenimiento",
+  
+  // Common translations
+  "common.back": "Volver",
 };

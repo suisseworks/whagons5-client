@@ -555,3 +555,41 @@ export interface Workflow {
     updated_at: string;
 }
 
+// TeamConnect Communication Boards
+export interface TeamConnectBoard {
+    id: number;
+    name: string;
+    description?: string | null;
+    visibility: 'public' | 'private';
+    created_by: number;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface TeamConnectBoardMember {
+    id: number;
+    board_id: number;
+    member_type: 'user' | 'team';
+    member_id: number;
+    role: 'admin' | 'member';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface TeamConnectBoardMessage {
+    id: number;
+    board_id: number;
+    created_by: number;
+    title?: string | null;
+    content: string;
+    is_pinned: boolean;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    metadata?: Record<string, any> | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}

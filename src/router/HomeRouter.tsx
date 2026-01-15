@@ -30,8 +30,11 @@ import Analytics from '@/pages/analytics/Analytics';
 import Home from '@/pages/home/Home';
 // Messages removed
 import TeamConnect from '@/pages/teamconnect/TeamConnect';
+import TeamConnectBoardDetail from '@/pages/teamconnect/TeamConnectBoardDetail';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
+import PluginSettings from '@/pages/PluginSettings';
+import PluginManagement from '@/pages/admin/PluginManagement';
 import { ComplianceStandards } from '@/pages/compliance/ComplianceStandards';
 import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardDetail';
 import SharedWithMe from '@/pages/shared/SharedWithMe';
@@ -76,7 +79,10 @@ export const HomeRoutes = () => {
           <Route path="/stuff" element={<Stuff />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/plugins" element={<Plugins />} />
+          <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
+          <Route path="/admin/plugins" element={<PluginManagement />} />
           <Route path="/teamconnect" element={<TeamConnect />} />
+          <Route path="/teamconnect/:boardId" element={<TeamConnectBoardDetail />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />

@@ -78,6 +78,11 @@ const genericSliceConfigs = [
     { name: 'workflows', table: 'wh_workflows', endpoint: '/workflows', store: 'workflows', hashFields: ['id','name','description','workspace_id','is_active','current_version_id','created_by','updated_by','activated_at','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
 
+    // TeamConnect Communication Boards
+    { name: 'teamconnectBoards', table: 'wh_teamconnect_boards', endpoint: '/teamconnect-boards', store: 'teamconnect_boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
+    { name: 'teamconnectBoardMembers', table: 'wh_teamconnect_board_members', endpoint: '/teamconnect-board-members', store: 'teamconnect_board_members', hashFields: ['id','board_id','member_type','member_id','role','updated_at'] },
+    { name: 'teamconnectBoardMessages', table: 'wh_teamconnect_board_messages', endpoint: '/teamconnect-board-messages', store: 'teamconnect_board_messages', hashFields: ['id','board_id','created_by','title','content','is_pinned','starts_at','ends_at','metadata','source_type','source_id','updated_at'] },
+
     // Job Positions
     { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
 
@@ -143,6 +148,10 @@ export const {
     messages,
     workflows,
     workspaces,
+    // TeamConnect
+    teamconnectBoards,
+    teamconnectBoardMembers,
+    teamconnectBoardMessages,
     jobPositions,
     complianceStandards,
     complianceRequirements,
@@ -211,6 +220,10 @@ export const genericEventNames = {
     messages: genericSlices.slices.messages.eventNames,
     workflows: genericSlices.slices.workflows.eventNames,
     workspaces: genericSlices.slices.workspaces.eventNames,
+    // TeamConnect
+    teamconnectBoards: genericSlices.slices.teamconnectBoards.eventNames,
+    teamconnectBoardMembers: genericSlices.slices.teamconnectBoardMembers.eventNames,
+    teamconnectBoardMessages: genericSlices.slices.teamconnectBoardMessages.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
     complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
@@ -270,6 +283,10 @@ export const genericActions = {
     messages: genericSlices.slices.messages.actions,
     workflows: genericSlices.slices.workflows.actions,
     workspaces: genericSlices.slices.workspaces.actions,
+    // TeamConnect
+    teamconnectBoards: genericSlices.slices.teamconnectBoards.actions,
+    teamconnectBoardMembers: genericSlices.slices.teamconnectBoardMembers.actions,
+    teamconnectBoardMessages: genericSlices.slices.teamconnectBoardMessages.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,
     complianceRequirements: genericSlices.slices.complianceRequirements.actions,

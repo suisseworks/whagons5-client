@@ -649,34 +649,23 @@ function Global() {
 
         <TabsContent value="defaults">
           <Card>
-            <CardHeader>
-              <CardTitle>{t("settings.global.defaults.cardTitle", "Platform defaults")}</CardTitle>
-              <CardDescription>
-                {t(
-                  "settings.global.defaults.cardDescription",
-                  "Manage workspace-wide toggles, automations, and baseline behavior. This module is in progress."
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-sm text-muted-foreground space-y-3">
-                <p>
-                  {t(
-                    "settings.global.defaults.body1",
-                    "Soon you will be able to define cascading defaults (locale, time zone, automation policies, SLA templates, etc.) that every workspace inherits."
-                  )}
-                </p>
-                <p>
-                  {t("settings.global.defaults.trackingPrefix", "Tracking item:")}
-                  {" "}
-                  <Badge variant="secondary">GLOBAL-42</Badge>.{" "}
-                  {t(
-                    "settings.global.defaults.trackingSuffix",
-                    "Ping the platform team if you need early access."
-                  )}
-                </p>
+            <div className="h-48 relative overflow-hidden">
+              <img 
+                src="https://images.unsplash.com/photo-1645736315000-6f788915923b?auto=format&fit=crop&w=1920&q=80"
+                alt="Warehouse operations"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <FontAwesomeIcon icon={faGlobe} className="text-5xl mb-2 opacity-90" />
+                  <h3 className="text-xl font-semibold">
+                    {t("settings.global.defaults.cardTitle", "Platform defaults")}
+                  </h3>
+                </div>
               </div>
-
+            </div>
+            <CardContent className="pt-6">
               <div className="space-y-2">
                 <Label htmlFor="preferredLanguage">
                   {t("settings.global.defaults.languageLabel", "Preferred language")}
@@ -698,12 +687,6 @@ function Global() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  {t(
-                    "settings.global.defaults.languageHelper",
-                    "This language will be suggested across new workspaces until localization rules are wired to the API."
-                  )}
-                </p>
               </div>
             </CardContent>
           </Card>

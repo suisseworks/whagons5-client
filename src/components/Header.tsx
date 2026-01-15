@@ -62,6 +62,10 @@ function Header() {
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
 
+    // Get TeamConnect boards for breadcrumb
+    const teamconnectBoardsState = useSelector((s: RootState) => (s as any).teamconnectBoards);
+    const { value: teamconnectBoards = [] } = teamconnectBoardsState || {};
+
     // Redux UI state selectors
     const currentFilterModel = useSelector(selectFilterModel);
     const searchText = useSelector(selectSearchText);
@@ -102,34 +106,49 @@ function Header() {
             statuses: 'Statuses',
             status: 'Status',
             'spot-types': 'Spot Types',
+            teamconnect: 'TeamConnect',
+            plugins: 'Plugins',
         };
-        const getLabel = (seg: string) => {
+        const getLabel = (seg: string, index: number) => {
+            // Special handling for teamconnect board ID
+            if (parts[0] === 'teamconnect' && index === 1 && !isNaN(Number(seg))) {
+                const boardId = parseInt(seg);
+                const board = teamconnectBoards.find((b: any) => b.id === boardId);
+                return board?.name || seg;
+            }
             const fallback = labelDefaults[seg] ?? seg.charAt(0).toUpperCase() + seg.slice(1);
             return t(`breadcrumbs.${seg}`, fallback);
         };
         const acc: Array<{ label: string; to?: string }> = [];
         let path = '';
 
-        // Special handling for settings subpages
-        if (parts[0] === 'settings' && parts.length > 1) {
+        // Special handling for plugin settings pages
+        if (parts[0] === 'plugins' && parts.length === 3 && parts[2] === 'settings') {
+            // For plugin settings, show: Plugins > Plugin Name (skip "settings")
+            const pluginId = parts[1];
+            const pluginName = t(`plugins.${pluginId}.title`, pluginId.charAt(0).toUpperCase() + pluginId.slice(1));
+            acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+            acc.push({ label: pluginName, to: location.pathname });
+        } else if (parts[0] === 'settings' && parts.length > 1) {
             // For settings subpages, create breadcrumbs like: Settings > Subpage
             acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
             for (let i = 1; i < parts.length; i++) {
                 const seg = parts[i];
                 path += `/${seg}`;
-                const label = getLabel(seg);
+                const label = getLabel(seg, i);
                 acc.push({ label, to: `/settings${path}` });
             }
         } else {
             // Regular breadcrumbs for non-settings pages
-            for (const seg of parts) {
+            for (let i = 0; i < parts.length; i++) {
+                const seg = parts[i];
                 path += `/${seg}`;
-                const label = getLabel(seg);
+                const label = getLabel(seg, i);
                 acc.push({ label, to: path });
             }
         }
         return acc;
-    }, [location.pathname, t]);
+    }, [location.pathname, t, teamconnectBoards]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
@@ -166,13 +185,13 @@ function Header() {
         const key = `wh_workspace_search_global`;
         try {
             const saved = localStorage.getItem(key);
-            if (saved != null && saved !== searchText) {
+            if (saved != null) {
                 dispatch(setSearchText(saved));
-            } else if (saved === null && searchText !== '') {
+            } else {
                 dispatch(setSearchText(''));
             }
         } catch {}
-    }, [currentWorkspaceName, dispatch, searchText]);
+    }, [currentWorkspaceName, dispatch]);
 
     // Save search text to localStorage when it changes
     useEffect(() => {
@@ -195,14 +214,14 @@ function Header() {
             const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
             const savedGroup = localStorage.getItem(groupKey) as any;
             const savedCollapse = localStorage.getItem(collapseKey);
-            if (savedGroup && savedGroup !== groupBy) {
+            if (savedGroup) {
                 dispatch(setGroupBy(savedGroup));
             }
-            if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+            if (savedCollapse !== null) {
                 dispatch(setCollapseGroups(savedCollapse === 'true'));
             }
         } catch {}
-    }, [currentWorkspaceName, currentWorkspaceId, dispatch, groupBy, collapseGroups]);
+    }, [currentWorkspaceName, currentWorkspaceId, dispatch]);
 
     // Save groupBy to localStorage when changed
     useEffect(() => {

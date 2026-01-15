@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.15';
+const CURRENT_DB_VERSION = '1.9.16';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -290,6 +290,18 @@ export class DB {
           if (!db.objectStoreNames.contains('exceptions')) {
             db.createObjectStore('exceptions', { keyPath: 'id' });
           }
+
+          // TeamConnect Communication Boards
+          if (!db.objectStoreNames.contains('teamconnect_boards')) {
+            db.createObjectStore('teamconnect_boards', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('teamconnect_board_members')) {
+            db.createObjectStore('teamconnect_board_members', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('teamconnect_board_messages')) {
+            db.createObjectStore('teamconnect_board_messages', { keyPath: 'id' });
+          }
+
           // Avatar image cache (base64 or blob references)
           if (!db.objectStoreNames.contains('avatars')) {
             db.createObjectStore('avatars', { keyPath: 'id' });

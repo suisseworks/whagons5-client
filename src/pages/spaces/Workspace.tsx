@@ -274,14 +274,14 @@ export const Workspace = () => {
       const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
       const savedGroup = localStorage.getItem(groupKey) as any;
       const savedCollapse = localStorage.getItem(collapseKey);
-      if (savedGroup && savedGroup !== groupBy) {
+      if (savedGroup) {
         dispatch(setGroupBy(savedGroup));
       }
-      if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+      if (savedCollapse !== null) {
         dispatch(setCollapseGroups(savedCollapse === 'true'));
       }
     } catch {}
-  }, [id, isAllWorkspaces, dispatch, groupBy, collapseGroups]);
+  }, [id, isAllWorkspaces, dispatch]);
 
   // Listen for filter apply events from Header component
   useEffect(() => {
@@ -448,9 +448,6 @@ export const Workspace = () => {
       rowCache.current.clear();
     }
   }, [id, location.pathname]);
-  // Debug logging
-  console.log('Workspace component - id:', id, 'typeof:', typeof id);
-  console.log('Current path:', location.pathname);
 
   
 
@@ -505,11 +502,11 @@ export const Workspace = () => {
     const key = `wh_workspace_search_global`;
     try {
       const saved = localStorage.getItem(key);
-      if (saved != null && saved !== searchText) {
+      if (saved != null) {
         dispatch(setSearchText(saved));
       }
     } catch {}
-  }, [dispatch, searchText]);
+  }, [dispatch]);
 
   // Save search text to localStorage when it changes
   useEffect(() => {

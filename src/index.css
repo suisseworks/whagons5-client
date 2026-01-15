@@ -5,7 +5,7 @@
   Add this to your HTML head instead of importing here:
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Audiowide&display=swap" rel="stylesheet">
 */
 
 /* #root, body, html, .flex, .flex-1, .h-full {
@@ -249,10 +249,10 @@
 }
 
 .starwars h1, .starwars h2, .starwars h3, .starwars h4, .starwars h5, .starwars h6 {
-  font-family: 'Orbitron', sans-serif;
-  font-weight: 700;
+  font-family: 'Audiowide', sans-serif;
+  font-weight: 400;
   color: #FFE81F; /* Yellow for headings */
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
 }
 
 /* Mixed-surfaces: make the workspace grid a readable light panel inside Star Wars chrome */
@@ -699,7 +699,7 @@
   .starwars [data-sidebar="sidebar"] div,
   .starwars [data-sidebar="sidebar"] span,
   .starwars .text-sidebar-foreground {
-    font-family: 'Orbitron', 'Inter', system-ui, -apple-system, sans-serif !important;
+    font-family: 'Audiowide', 'Inter', system-ui, -apple-system, sans-serif !important;
     color: var(--sidebar-text-primary);
   }
 
