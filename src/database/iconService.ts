@@ -46,6 +46,12 @@ class IconService {
   private db!: IDBPDatabase<IconDatabase>;
   private initialized = false;
   private faMetadata: FontAwesomeMetadata | null = null;
+  
+  // Icon name aliases for icons that don't exist or have different names
+  private iconAliases: Map<string, string> = new Map([
+    ['settings', 'cog'], // faSettings doesn't exist, use faCog instead
+    ['gear', 'cog'], // Alternative name for cog
+  ]);
 
   constructor() {
     // Clear outdated icons on startup
@@ -122,6 +128,9 @@ class IconService {
 
   private async loadIconFromFontAwesome(iconName: string): Promise<any> {
     try {
+      // Check for icon alias first
+      const actualIconName = this.iconAliases.get(iconName.toLowerCase()) || iconName;
+      
       // Convert iconName to the expected format (fa + PascalCase)
       // For hyphenated names like "clock-seven", convert to "faClockSeven"
       const toPascalCase = (str: string) => {
@@ -130,20 +139,43 @@ class IconService {
         ).join('');
       };
       
-      const faIconName = 'fa' + toPascalCase(iconName);
+      const faIconName = 'fa' + toPascalCase(actualIconName);
 
-      // Dynamically import only the specific icon we need
-      // Avoid importing the full module to prevent circular dependency issues
+      // Try pro-regular-svg-icons first (outline style)
       try {
-        const iconModule = await import(/* @vite-ignore */ `@fortawesome/pro-regular-svg-icons/${faIconName}.js`);
-        return iconModule[faIconName];
-      } catch (specificError) {
-        // Don't fall back to full module import - it causes circular dependency crashes
-        // Just return null and let the default icon be used
-        console.warn(`Could not load icon ${iconName} (${faIconName}):`, specificError);
-        return null;
+        const proRegularIcons = await import('@fortawesome/pro-regular-svg-icons');
+        const icon = (proRegularIcons as any)[faIconName];
+        if (icon) {
+          return icon;
+        }
+      } catch {
+        // Package not available
       }
 
+      // Try free-regular-svg-icons (outline style)
+      try {
+        const regularIcons = await import('@fortawesome/free-regular-svg-icons');
+        const icon = (regularIcons as any)[faIconName];
+        if (icon) {
+          return icon;
+        }
+      } catch {
+        // Package not available
+      }
+
+      // Fallback to free-solid-svg-icons (filled style, but has most icons)
+      try {
+        const solidIcons = await import('@fortawesome/free-solid-svg-icons');
+        const icon = (solidIcons as any)[faIconName];
+        if (icon) {
+          return icon;
+        }
+      } catch {
+        // Package not available
+      }
+
+      // Icon not found in any package
+      console.warn(`✗ Icon ${iconName} (${faIconName}) not found in any FontAwesome package`);
       return null;
     } catch (error) {
       console.error(`Error loading icon ${iconName} from Font Awesome:`, error);
@@ -213,7 +245,7 @@ class IconService {
 
   /**
    * Get all available icons with lazy loading (only loads when needed)
-   * Returns a subset of commonly used icons to avoid circular dependency issues
+   * Loads all Font Awesome icons from metadata
    */
   async getAllIcons(): Promise<IconItem[]> {
     if (this.allIconsPromise) {
@@ -229,14 +261,83 @@ class IconService {
       return this.allIconsCache;
     }
 
-    // For now, return a curated list of common icons instead of loading all FontAwesome icons
-    // This avoids the circular dependency issues during build
-    this.allIconsCache = await this.getCuratedIconList();
+    // Load metadata first to get all icon names
+    await this.loadFontAwesomeMetadata();
+    
+    // Load all icons from metadata
+    this.allIconsCache = await this.loadAllIconsFromMetadata();
     return this.allIconsCache;
   }
 
   /**
-   * Get a curated list of common icons without loading the entire FontAwesome module
+   * Load all icons from FontAwesome metadata file
+   */
+  private async loadAllIconsFromMetadata(): Promise<IconItem[]> {
+    try {
+      // Load icon keywords metadata for better search
+      let keywordsMetadata: any = null;
+      try {
+        const keywordsResponse = await fetch('/metadata/icon-keywords.json');
+        if (keywordsResponse.ok) {
+          keywordsMetadata = await keywordsResponse.json();
+        }
+      } catch (error) {
+        console.warn('Could not load icon keywords metadata:', error);
+      }
+
+      // Get all icon names from metadata
+      const allIconNames: string[] = [];
+      let metadata: any = null;
+      
+      if (this.faMetadata) {
+        metadata = this.faMetadata;
+      } else {
+        // Load metadata directly
+        const response = await fetch('/metadata/icon-families.json');
+        if (response.ok) {
+          metadata = await response.json();
+          this.faMetadata = metadata;
+        } else {
+          console.warn('Could not load icon metadata, falling back to curated list');
+          return this.getCuratedIconList();
+        }
+      }
+
+      // Extract icon names from metadata (keys are icon names)
+      // Include all icons that have metadata (they're all valid Font Awesome icons)
+      Object.keys(metadata).forEach(iconName => {
+        const iconData = metadata[iconName];
+        // Include if it has familyStylesByLicense (free or pro), or if it has search terms/label
+        if (iconData && (iconData.familyStylesByLicense || iconData.search || iconData.label)) {
+          allIconNames.push(iconName);
+        }
+      });
+
+      console.log(`Found ${allIconNames.length} icons in Font Awesome metadata`);
+
+      // Build icon list with metadata (but don't load icon definitions yet - lazy load on demand)
+      const iconList: IconItem[] = allIconNames.map(iconName => {
+        // Get keywords from metadata
+        const keywords = this.getIconKeywords(iconName, keywordsMetadata?.[iconName]);
+        
+        return {
+          name: iconName,
+          icon: null, // Will be loaded lazily when needed
+          keywords: keywords,
+        };
+      });
+
+      // Sort by name
+      return iconList.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      console.error('Error loading all icons from metadata:', error);
+      // Fallback to curated list on error
+      return this.getCuratedIconList();
+    }
+  }
+
+  /**
+   * Get a curated list of common icons as fallback
    */
   private async getCuratedIconList(): Promise<IconItem[]> {
     const commonIconNames = [
@@ -301,27 +402,26 @@ class IconService {
   /**
    * Get keywords for an icon, preferring official FontAwesome terms
    */
-  private getIconKeywords(iconName: string): string[] {
+  private getIconKeywords(iconName: string, keywordsData?: any): string[] {
     const keywordSet = new Set<string>();
     
     // Add the base icon name
     keywordSet.add(iconName);
     
-    // Try to get official FontAwesome keywords first
-    if (this.faMetadata && this.faMetadata[iconName]?.search?.terms) {
-      const officialTerms = this.faMetadata[iconName].search.terms;
-      officialTerms.forEach(term => keywordSet.add(term));
-      // console.log(`Using official keywords for ${iconName}:`, officialTerms);
-      
-      // Even with official keywords, add some basic variations for better search
-      this.addBasicVariations(iconName, keywordSet);
-      return Array.from(keywordSet);
+    // Try to get official FontAwesome keywords from keywords metadata first
+    if (keywordsData?.en && Array.isArray(keywordsData.en)) {
+      keywordsData.en.forEach((term: string) => keywordSet.add(term.toLowerCase()));
     }
     
-    // Fall back to generated keywords if official ones aren't available
-    // console.log(`No official keywords found for ${iconName}, generating keywords`);
+    // Try to get official FontAwesome keywords from metadata
+    if (this.faMetadata && this.faMetadata[iconName]?.search?.terms) {
+      const officialTerms = this.faMetadata[iconName].search.terms;
+      officialTerms.forEach(term => keywordSet.add(term.toLowerCase()));
+    }
     
+    // Add basic variations for better search
     this.addBasicVariations(iconName, keywordSet);
+    
     return Array.from(keywordSet);
   }
 
@@ -396,13 +496,13 @@ class IconService {
     const allIcons = await this.getAllIcons();
     const searchTermLower = searchTerm.toLowerCase();
 
-    return allIcons.filter((iconItem) => {
-      //if broom print all keywords
-      if (iconItem.name === 'broom') {
-        console.log("keywords", iconItem.keywords);
-      }
+    // Filter icons by keywords (don't load icon definitions yet - lazy load on display)
+    const matchingIcons = allIcons.filter((iconItem) => {
       return iconItem.keywords.some((keyword) => keyword.includes(searchTermLower));
     });
+
+    // Return icons with metadata (icons will be loaded lazily when displayed)
+    return matchingIcons;
   }
 
   /**

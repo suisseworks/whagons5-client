@@ -27,6 +27,7 @@ export const loadAgGridModules = async (): Promise<boolean> => {
       'MultiFilterModule',
       'AdvancedFilterModule',
       'ServerSideRowModelModule',
+      'ContextMenuModule',
     ]
       .map((n) => pick(community, n) || pick(enterprise, n))
       .filter(Boolean);
@@ -55,7 +56,6 @@ export const createDefaultColDef = () => ({
   resizable: true,
   floatingFilter: false,
   // Disable menu icon (ellipsis) on columns to prevent it appearing next to priority tags
-  suppressMenuIcon: true,
   suppressHeaderMenuButton: true,
 });
 
@@ -80,15 +80,13 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     maxBlocksInCache: 70,
     getRowId: (params: any) => String(params?.data?.id ?? params?.data?.ID ?? params?.node?.id ?? ''),
   }),
-  // Default sort by created_at descending (newest first)
-  sortModel: [{ colId: 'created_at', sort: 'desc' }],
+  // Note: Default sort is set via applyColumnState in WorkspaceTable
   animateRows: false, // Disabled for scroll performance
   suppressColumnVirtualisation: false,
   suppressNoRowsOverlay: false,
   loading: false,
   suppressScrollOnNewData: true, // Prevent scroll jumps
   debounceVerticalScrollbar: false,
-  // Disable context menu and menu icons to prevent ellipsis appearing next to priority tags
-  suppressContextMenu: true,
+  // Note: Context menu behavior is controlled by WorkspaceTable props (`getContextMenuItems`, `suppressContextMenu`)
   suppressMenuHide: true,
 });

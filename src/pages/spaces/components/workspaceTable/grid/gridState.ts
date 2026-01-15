@@ -1,11 +1,13 @@
 // Redux state management and derived state utilities for WorkspaceTable
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import type { User } from '@/store/types';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { GRID_CONSTANTS } from './gridConfig';
+import { refreshClientSideGrid } from './dataSource';
+import type React from 'react';
 
 export interface GridStateOptions {
   workspaceId: string;
@@ -118,4 +120,89 @@ export const useMetadataLoadedFlags = (reduxState: ReturnType<typeof useGridRedu
     spotsLoaded: !!(spots && spots.length > 0),
     usersLoaded: !!(users && users.length > 0),
   }), [statuses, priorities, spots, users]);
+};
+
+export interface WorkspaceTableModeParams {
+  gridApi?: any;
+  workspaceId: string;
+  searchText: string;
+  groupBy: 'none' | 'spot_id' | 'status_id' | 'priority_id';
+  onModeChange?: (info: { useClientSide: boolean; totalFiltered: number }) => void;
+  workspaceRef: React.MutableRefObject<string>;
+  statusMapRef: React.MutableRefObject<any>;
+  priorityMapRef: React.MutableRefObject<any>;
+  spotMapRef: React.MutableRefObject<any>;
+  userMapRef: React.MutableRefObject<any>;
+  tagMapRef: React.MutableRefObject<any>;
+  taskTagsRef: React.MutableRefObject<any>;
+}
+
+/**
+ * Enforces current mode behavior:
+ * - Grouping => client-side row model (load all rows)
+ * - No grouping => infinite row model (do not load all rows)
+ */
+export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
+  const [useClientSide, setUseClientSide] = useState(false);
+  const [clientRows, setClientRows] = useState<any[]>([]);
+
+  useEffect(() => {
+    const run = async () => {
+      // When grouping is enabled we must use client-side row model
+      if (params.groupBy && params.groupBy !== 'none') {
+        setUseClientSide(true);
+        try {
+          if (!TasksCache.initialized) await TasksCache.init();
+          const sortModel = [{ colId: 'created_at', sort: 'desc' }];
+          const { rows, totalFiltered } = await refreshClientSideGrid(params.gridApi, TasksCache, {
+            search: params.searchText,
+            workspaceRef: params.workspaceRef,
+            statusMapRef: params.statusMapRef,
+            priorityMapRef: params.priorityMapRef,
+            spotMapRef: params.spotMapRef,
+            userMapRef: params.userMapRef,
+            tagMapRef: params.tagMapRef,
+            taskTagsRef: params.taskTagsRef,
+            sortModel,
+          });
+          setClientRows(rows || []);
+          try {
+            params.onModeChange?.({ useClientSide: true, totalFiltered });
+          } catch {
+            // ignore
+          }
+        } catch (e) {
+          console.warn('Failed to load client-side rows for grouping', e);
+          setClientRows([]);
+        }
+        return;
+      }
+
+      // No grouping: always use infinite row model to avoid client-side filter quirks
+      setUseClientSide(false);
+      setClientRows([]);
+      try {
+        params.onModeChange?.({ useClientSide: false, totalFiltered: 0 });
+      } catch {
+        // ignore
+      }
+    };
+
+    run();
+  }, [
+    params.groupBy,
+    params.gridApi,
+    params.onModeChange,
+    params.searchText,
+    params.taskTagsRef,
+    params.tagMapRef,
+    params.priorityMapRef,
+    params.spotMapRef,
+    params.statusMapRef,
+    params.userMapRef,
+    params.workspaceId,
+    params.workspaceRef,
+  ]);
+
+  return { useClientSide, clientRows, setClientRows, setUseClientSide };
 };

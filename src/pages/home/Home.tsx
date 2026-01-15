@@ -155,6 +155,7 @@ function Home() {
               size="lg"
               className="cursor-pointer bg-primary text-white hover:bg-primary/90"
               onClick={() => navigate('/workspace/all', { replace: true })}
+              cypress-id="get-started-button"
             >
               {t('home.getStarted', 'Get Started')}
             </Button>

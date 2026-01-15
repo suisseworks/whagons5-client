@@ -280,23 +280,28 @@ function Header() {
         };
     }, []);
 
-    // Subtle gradient background for workspace headers
-    const headerSurfaceColor = isDarkTheme ? '#0F0F0F' : 'var(--sidebar-header)';
+    // Use navbar/header background color, not sidebar header
+    // Use CSS variable directly so it updates reactively when branding changes
+    const headerSurfaceColor = 'var(--header-background, var(--navbar, var(--sidebar-header)))';
     
     // Detect if header has dark background for text contrast
     const [isDarkHeader, setIsDarkHeader] = useState(() => {
         if (typeof window === 'undefined') return false;
-        const sidebarHeader = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+        const headerBg = getComputedStyle(document.documentElement).getPropertyValue('--header-background').trim() || 
+                         getComputedStyle(document.documentElement).getPropertyValue('--navbar').trim();
         // Quick check for known dark values
-        return sidebarHeader.includes('#08111f') || sidebarHeader.includes('oklch(0.0') || sidebarHeader.includes('oklch(0.1');
+        return headerBg.includes('#08111f') || headerBg.includes('oklch(0.0') || headerBg.includes('oklch(0.1') || 
+               headerBg.includes('#0F0F0F') || headerBg.includes('#0a0a0a');
     });
     
     useEffect(() => {
         if (typeof window === 'undefined') return;
         
         const checkHeaderBrightness = () => {
-            // Get the actual computed color of --sidebar-header
-            const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+            // Get the actual computed color of --header-background or --navbar
+            const headerBg = getComputedStyle(document.documentElement).getPropertyValue('--header-background').trim() || 
+                           getComputedStyle(document.documentElement).getPropertyValue('--navbar').trim();
+            const computedColor = headerBg;
             
             // Parse and check brightness
             let isDark = isDarkTheme;
@@ -380,8 +385,12 @@ function Header() {
 
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
-        return { backgroundColor: headerSurfaceColor } as React.CSSProperties;
-    }, [currentWorkspaceName, headerSurfaceColor]);
+        // Use CSS variable directly - browser will handle gradients automatically
+        return { 
+            background: 'var(--header-background, var(--navbar, var(--sidebar-header)))',
+            backgroundSize: 'cover'
+        } as React.CSSProperties;
+    }, [currentWorkspaceName]);
 
     // Track API GET requests for syncing indicator (debounced to prevent flickering)
     useEffect(() => {
@@ -563,10 +572,14 @@ function Header() {
         return user?.name || user?.email || 'User';
     };
 
-    // Loading/error header gradient style
+    // Loading/error header gradient style - use CSS variable directly
     const loadingHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        return { backgroundColor: headerSurfaceColor };
-    }, [headerSurfaceColor]);
+        // Use CSS variable directly - browser will handle gradients automatically
+        return { 
+            background: 'var(--header-background, var(--navbar, var(--sidebar-header)))',
+            backgroundSize: 'cover'
+        };
+    }, []);
 
     if (!firebaseUser || userLoading) {
         return (
@@ -596,10 +609,14 @@ function Header() {
         );
     }
 
-    // Main header gradient style - soft gradient for settings pages
+    // Main header gradient style - use CSS variable directly
     const mainHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        return { backgroundColor: headerSurfaceColor };
-    }, [headerSurfaceColor]);
+        // Use CSS variable directly - browser will handle gradients automatically
+        return { 
+            background: 'var(--header-background, var(--navbar, var(--sidebar-header)))',
+            backgroundSize: 'cover'
+        };
+    }, []);
 
     return (
         <>

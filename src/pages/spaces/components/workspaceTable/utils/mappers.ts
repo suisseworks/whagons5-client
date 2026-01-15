@@ -1,40 +1,34 @@
 // Pure mapping utilities for WorkspaceTable
 import type { User } from '@/store/types';
 
-export function createStatusMap(globalStatuses: any[]): Record<number, any> {
-  const m: Record<number, any> = {};
-  for (const st of globalStatuses || []) {
-    const anySt: any = st as any;
-    if (anySt && typeof anySt.id !== 'undefined') {
-      const idNum = Number(anySt.id);
-      m[idNum] = { name: anySt.name || `Status ${idNum}`, color: anySt.color, icon: anySt.icon, action: anySt.action } as any;
-    }
+function createRecordMap<T>(items: any[], getId: (item: any) => number | undefined, getValue: (item: any, id: number) => T): Record<number, T> {
+  const m: Record<number, T> = {};
+  for (const item of items || []) {
+    const id = getId(item);
+    if (id != null && Number.isFinite(id)) m[id] = getValue(item, id);
   }
   return m;
+}
+
+export function createStatusMap(globalStatuses: any[]): Record<number, any> {
+  return createRecordMap(globalStatuses,
+    (st) => st && typeof st.id !== 'undefined' ? Number(st.id) : undefined,
+    (st, id) => ({ name: st.name || `Status ${id}`, color: st.color, icon: st.icon, action: st.action })
+  );
 }
 
 export function createPriorityMap(priorities: any[]): Record<number, any> {
-  const m: Record<number, any> = {};
-  for (const priority of priorities || []) {
-    const anyPriority: any = priority as any;
-    if (anyPriority && typeof anyPriority.id !== 'undefined') {
-      const idNum = Number(anyPriority.id);
-      m[idNum] = { name: anyPriority.name || `Priority ${idNum}`, color: anyPriority.color, level: anyPriority.level } as any;
-    }
-  }
-  return m;
+  return createRecordMap(priorities,
+    (p) => p && typeof p.id !== 'undefined' ? Number(p.id) : undefined,
+    (p, id) => ({ name: p.name || `Priority ${id}`, color: p.color, level: p.level })
+  );
 }
 
 export function createSpotMap(spots: any[]): Record<number, any> {
-  const m: Record<number, any> = {};
-  for (const spot of spots || []) {
-    const anySpot: any = spot as any;
-    if (anySpot && typeof anySpot.id !== 'undefined') {
-      const idNum = Number(anySpot.id);
-      m[idNum] = { name: anySpot.name || `Spot ${idNum}`, description: anySpot.description } as any;
-    }
-  }
-  return m;
+  return createRecordMap(spots,
+    (s) => s && typeof s.id !== 'undefined' ? Number(s.id) : undefined,
+    (s, id) => ({ name: s.name || `Spot ${id}`, description: s.description })
+  );
 }
 
 export function createUserMap(users: any[]): Record<number, User> {
@@ -90,19 +84,10 @@ export function createFilteredPriorities(priorities: any[], defaultCategoryId: n
 }
 
 export function createTagMap(tags: any[]): Record<number, any> {
-  const m: Record<number, any> = {};
-  for (const tag of tags || []) {
-    const anyTag: any = tag as any;
-    if (anyTag && typeof anyTag.id !== 'undefined') {
-      const idNum = Number(anyTag.id);
-      m[idNum] = { 
-        name: anyTag.name || `Tag ${idNum}`, 
-        color: anyTag.color || '#6B7280',
-        icon: anyTag.icon || null
-      };
-    }
-  }
-  return m;
+  return createRecordMap(tags,
+    (t) => t && typeof t.id !== 'undefined' ? Number(t.id) : undefined,
+    (t, id) => ({ name: t.name || `Tag ${id}`, color: t.color || '#6B7280', icon: t.icon || null })
+  );
 }
 
 

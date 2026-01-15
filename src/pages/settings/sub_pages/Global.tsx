@@ -1,4 +1,4 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faGlobe,
@@ -7,6 +7,7 @@ import {
   faImage
 } from "@fortawesome/free-solid-svg-icons";
 import { convert, luminance } from "colorizr";
+import Color from "color";
 
 import SettingsLayout from "../components/SettingsLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,17 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import {
+  ColorPicker,
+  ColorPickerSelection,
+  ColorPickerHue,
+  ColorPickerAlpha,
+  ColorPickerFormat,
+  ColorPickerEyeDropper,
+  ColorPickerOutput,
+} from "@/components/ui/shadcn-io/color-picker";
 import { cn } from "@/lib/utils";
 import WhagonsCheck from "@/assets/WhagonsCheck";
 import {
@@ -46,6 +58,7 @@ type ThemePreset = {
       text: string;
       neutral: string;
       sidebar?: string;
+      navbar?: string;
     };
   };
   dark: {
@@ -57,6 +70,7 @@ type ThemePreset = {
       text: string;
       neutral: string;
       sidebar?: string;
+      navbar?: string;
     };
   };
   badge?: string;
@@ -87,7 +101,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.99 0.01 175)",
         text: "oklch(0.20 0.02 250)",
         neutral: "oklch(0.94 0.03 175)",
-        sidebar: SIDEBAR_LIGHT
+        sidebar: SIDEBAR_LIGHT,
+        navbar: SIDEBAR_LIGHT
       }
     },
     dark: {
@@ -98,7 +113,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.12 0.01 180)",
         text: "oklch(0.96 0.01 175)",
         neutral: "oklch(0.22 0.02 180)",
-        sidebar: "oklch(0.10 0.01 180)"
+        sidebar: "oklch(0.10 0.01 180)",
+        navbar: "oklch(0.10 0.01 180)"
       }
     },
     sidebarTone: "light"
@@ -115,7 +131,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.99 0.01 40)",
         text: "oklch(0.30 0.02 250)",
         neutral: "oklch(0.94 0.05 40)",
-        sidebar: SIDEBAR_LIGHT
+        sidebar: SIDEBAR_LIGHT,
+        navbar: SIDEBAR_LIGHT
       }
     },
     dark: {
@@ -126,7 +143,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.13 0.01 30)",
         text: "oklch(0.97 0.01 50)",
         neutral: "oklch(0.20 0.02 35)",
-        sidebar: "oklch(0.11 0.01 35)"
+        sidebar: "oklch(0.11 0.01 35)",
+        navbar: "oklch(0.11 0.01 35)"
       }
     },
     badge: "Popular",
@@ -144,7 +162,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.98 0.02 290)",
         text: "oklch(0.20 0.02 250)",
         neutral: "oklch(0.92 0.06 290)",
-        sidebar: SIDEBAR_LIGHT
+        sidebar: SIDEBAR_LIGHT,
+        navbar: SIDEBAR_LIGHT
       }
     },
     dark: {
@@ -155,7 +174,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.11 0.02 280)",
         text: "oklch(0.95 0.02 290)",
         neutral: "oklch(0.18 0.04 285)",
-        sidebar: "oklch(0.09 0.02 280)"
+        sidebar: "oklch(0.09 0.02 280)",
+        navbar: "oklch(0.09 0.02 280)"
       }
     },
     sidebarTone: "light"
@@ -172,7 +192,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.99 0.01 95)",
         text: "oklch(0.25 0.01 40)",
         neutral: "oklch(0.94 0.04 85)",
-        sidebar: SIDEBAR_LIGHT
+        sidebar: SIDEBAR_LIGHT,
+        navbar: SIDEBAR_LIGHT
       }
     },
     dark: {
@@ -183,7 +204,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.13 0.01 140)",
         text: "oklch(0.96 0.01 100)",
         neutral: "oklch(0.19 0.02 145)",
-        sidebar: "oklch(0.10 0.01 140)"
+        sidebar: "oklch(0.10 0.01 140)",
+        navbar: "oklch(0.10 0.01 140)"
       }
     },
     badge: "New",
@@ -201,7 +223,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.99 0.01 175)",
         text: "oklch(0.20 0.02 250)",
         neutral: "oklch(0.94 0.03 175)",
-        sidebar: SIDEBAR_DARK
+        sidebar: SIDEBAR_DARK,
+        navbar: SIDEBAR_DARK
       }
     },
     dark: {
@@ -212,7 +235,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.08 0.01 190)",
         text: "oklch(0.94 0.01 180)",
         neutral: "oklch(0.15 0.01 190)",
-        sidebar: "oklch(0.05 0 0)"
+        sidebar: "oklch(0.05 0 0)",
+        navbar: "oklch(0.05 0 0)"
       }
     },
     badge: "Dark sidebar",
@@ -230,7 +254,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.98 0.02 60)",
         text: "oklch(0.22 0.04 310)",
         neutral: "oklch(0.92 0.03 60)",
-        sidebar: "oklch(0.22 0.06 310)"
+        sidebar: "oklch(0.22 0.06 310)",
+        navbar: "oklch(0.22 0.06 310)"
       }
     },
     dark: {
@@ -241,7 +266,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.10 0.03 310)",
         text: "oklch(0.95 0.02 330)",
         neutral: "oklch(0.17 0.04 315)",
-        sidebar: "oklch(0.12 0.03 310)"
+        sidebar: "oklch(0.12 0.03 310)",
+        navbar: "oklch(0.12 0.03 310)"
       }
     },
     badge: "Retro",
@@ -265,7 +291,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.98 0.01 65)",
         text: "oklch(0.32 0.02 50)",
         neutral: "oklch(0.90 0.03 60)",
-        sidebar: "oklch(0.96 0.01 60)"
+        sidebar: "oklch(0.96 0.01 60)",
+        navbar: "oklch(0.96 0.01 60)"
       }
     },
     dark: {
@@ -276,7 +303,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.14 0.01 45)",
         text: "oklch(0.94 0.02 65)",
         neutral: "oklch(0.21 0.02 50)",
-        sidebar: "oklch(0.12 0.01 45)"
+        sidebar: "oklch(0.12 0.01 45)",
+        navbar: "oklch(0.12 0.01 45)"
       }
     },
     badge: "Hipster",
@@ -294,7 +322,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.98 0.01 250)",
         text: "oklch(0.20 0 0)",
         neutral: "oklch(0.90 0.02 250)",
-        sidebar: "oklch(0.95 0.01 250)"
+        sidebar: "oklch(0.95 0.01 250)",
+        navbar: "oklch(0.95 0.01 250)"
       }
     },
     dark: {
@@ -305,7 +334,8 @@ const PRESET_THEMES: ThemePreset[] = [
         background: "oklch(0.08 0 0)",
         text: "oklch(0.91 0.01 0)",
         neutral: "oklch(0.14 0 0)",
-        sidebar: "oklch(0.05 0 0)"
+        sidebar: "oklch(0.05 0 0)",
+        navbar: "oklch(0.05 0 0)"
       }
     },
     badge: "Star Wars",
@@ -323,9 +353,21 @@ const CUSTOM_THEME_ID = "custom";
 
 const getSidebarColorForTheme = (theme: ThemePreset, mode: 'light' | 'dark' = 'light') => {
   const palette = mode === 'dark' ? theme.dark.palette : theme.light.palette;
+  
+  // For dark mode, always use the dark palette's sidebar value
+  if (mode === 'dark') {
+    return palette.sidebar ?? SIDEBAR_DARK;
+  }
+  
+  // For light mode, check sidebarTone first, then fall back to palette
   if (theme.sidebarTone === 'dark') return SIDEBAR_DARK;
   if (theme.sidebarTone === 'light') return SIDEBAR_LIGHT;
   return palette.sidebar ?? SIDEBAR_LIGHT;
+};
+
+const getNavbarColorForTheme = (theme: ThemePreset, mode: 'light' | 'dark' = 'light') => {
+  // Navbar should always match sidebar
+  return getSidebarColorForTheme(theme, mode);
 };
 
 const getPresetIdForConfig = (config: BrandingConfig) => {
@@ -349,6 +391,505 @@ const getPresetIdForConfig = (config: BrandingConfig) => {
     );
   });
   return preset?.id ?? CUSTOM_THEME_ID;
+};
+
+// ColorPickerField component for compact color selection with optional gradient support
+type ColorPickerFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+  allowGradients?: boolean; // If false, only solid colors are allowed
+};
+
+const ColorPickerField = ({ label, value, onChange, id, allowGradients = true }: ColorPickerFieldProps) => {
+  const [open, setOpen] = useState(false);
+  const isInternalUpdateRef = useRef(false);
+  
+  // Detect if value is a gradient
+  const isGradient = useMemo(() => {
+    return allowGradients && value && value.startsWith('linear-gradient');
+  }, [value, allowGradients]);
+
+  // Parse gradient string to extract colors and angle
+  const parseGradient = useCallback((gradientStr: string | undefined) => {
+    if (!gradientStr || !gradientStr.startsWith('linear-gradient')) {
+      return null;
+    }
+    
+    // Match linear-gradient(angle, color1, color2)
+    const match = gradientStr.match(/linear-gradient\((\d+)deg,\s*(.+?),\s*(.+?)\)/);
+    if (match) {
+      return {
+        angle: parseInt(match[1], 10),
+        startColor: match[2].trim(),
+        endColor: match[3].trim()
+      };
+    }
+    
+    return null;
+  }, []);
+
+  // Get solid color value (extract from gradient or use value directly)
+  const solidColorValue = useMemo(() => {
+    if (isGradient) {
+      const parsed = parseGradient(value);
+      return parsed?.startColor || '#000000';
+    }
+    return value || '#000000';
+  }, [value, isGradient, parseGradient]);
+
+  // Convert OKLCH or hex to hex using colorizr, then to Color object for ColorPicker
+  const colorValue = useMemo(() => {
+    try {
+      const inputValue = solidColorValue;
+      let hexValue: string;
+      
+      // If it's already hex, use it directly
+      if (inputValue.startsWith('#')) {
+        hexValue = inputValue;
+      } else {
+        // Convert from OKLCH (or other format) to hex using colorizr
+        try {
+          hexValue = convert(inputValue, 'hex');
+        } catch {
+          // Fallback to default if conversion fails
+          hexValue = '#000000';
+        }
+      }
+      
+      // Convert hex to Color object for ColorPicker component
+      return Color(hexValue);
+    } catch {
+      return Color('#000000');
+    }
+  }, [solidColorValue]);
+
+  // Get hex value for display using colorizr
+  const displayHex = useMemo(() => {
+    try {
+      const inputValue = solidColorValue;
+      if (inputValue.startsWith('#')) {
+        return inputValue;
+      }
+      // Convert from OKLCH to hex using colorizr
+      try {
+        return convert(inputValue, 'hex');
+      } catch {
+        return '#000000';
+      }
+    } catch {
+      return '#000000';
+    }
+  }, [solidColorValue]);
+
+  // Gradient state
+  const gradientData = useMemo(() => {
+    if (isGradient) {
+      const parsed = parseGradient(value);
+      if (parsed) {
+        return parsed;
+      }
+    }
+    return {
+      startColor: solidColorValue,
+      endColor: solidColorValue,
+      angle: 130
+    };
+  }, [value, isGradient, solidColorValue, parseGradient]);
+
+  const [startColor, setStartColor] = useState(gradientData.startColor);
+  const [endColor, setEndColor] = useState(gradientData.endColor);
+  const [angle, setAngle] = useState(gradientData.angle);
+  const [mode, setMode] = useState<'solid' | 'gradient'>(
+    allowGradients && isGradient ? 'gradient' : 'solid'
+  );
+
+  // Update local state when value prop changes (but not if it's our own update)
+  useEffect(() => {
+    if (isInternalUpdateRef.current) {
+      isInternalUpdateRef.current = false;
+      return;
+    }
+    
+    if (allowGradients && isGradient) {
+      const parsed = parseGradient(value);
+      if (parsed) {
+        setStartColor(parsed.startColor);
+        setEndColor(parsed.endColor);
+        setAngle(parsed.angle);
+        setMode('gradient');
+      }
+    } else {
+      setMode('solid');
+      // If gradients not allowed but value is gradient, extract solid color
+      if (!allowGradients && value && value.startsWith('linear-gradient')) {
+        const parsed = parseGradient(value);
+        if (parsed) {
+          handleColorChange(Color(parsed.startColor));
+        }
+      }
+    }
+  }, [value, isGradient, parseGradient, allowGradients]);
+
+  // Convert Color object back to OKLCH format using colorizr (brand config uses OKLCH)
+  const handleColorChange = useCallback((color: Parameters<typeof Color.rgb>[0]) => {
+    try {
+      // ColorPicker actually passes a Color object (despite the type signature)
+      // Handle both Color object and other formats
+      let hex: string;
+      
+      if (typeof color === 'object' && color !== null && 'hex' in color) {
+        // It's a Color object
+        hex = (color as ReturnType<typeof Color>).hex();
+      } else {
+        // It's a string or array, convert to Color then hex
+        const colorObj = Color(color);
+        hex = colorObj.hex();
+      }
+      
+      // Convert hex to OKLCH using colorizr to match brand config format
+      try {
+        const oklch = convert(hex, 'oklch');
+        onChange(oklch);
+      } catch (e) {
+        // Fallback to hex if conversion fails
+        console.warn('Failed to convert hex to OKLCH using colorizr:', hex, e);
+        onChange(hex);
+      }
+    } catch (e) {
+      console.warn('Failed to process color change:', e);
+      onChange('#000000');
+    }
+  }, [onChange]);
+
+  // Handle gradient color changes - use refs to avoid stale closures during drag
+  const startColorRef = useRef(startColor);
+  const endColorRef = useRef(endColor);
+  const angleRef = useRef(angle);
+  
+  useEffect(() => {
+    startColorRef.current = startColor;
+    endColorRef.current = endColor;
+    angleRef.current = angle;
+  }, [startColor, endColor, angle]);
+
+  // Helper to convert color to CSS-compatible format (hex or rgb)
+  const getCssColor = useCallback((color: string): string => {
+    try {
+      // If it's already hex, use it
+      if (color.startsWith('#')) {
+        return color;
+      }
+      // Convert OKLCH to hex for CSS compatibility
+      try {
+        return convert(color, 'hex');
+      } catch {
+        // If conversion fails, try to use as-is (might be rgb or other format)
+        return color;
+      }
+    } catch {
+      return '#000000';
+    }
+  }, []);
+
+  const handleGradientColorChange = useCallback((color: Parameters<typeof Color.rgb>[0], which: 'start' | 'end') => {
+    try {
+      let hex: string;
+      
+      if (typeof color === 'object' && color !== null && 'hex' in color) {
+        hex = (color as ReturnType<typeof Color>).hex();
+      } else {
+        hex = Color(color).hex();
+      }
+      
+      try {
+        const oklch = convert(hex, 'oklch');
+        // Store OKLCH for internal state, convert to CSS-compatible format for gradient
+        const cssNewColor = getCssColor(oklch);
+        
+        if (which === 'start') {
+          const newStartColor = oklch;
+          setStartColor(newStartColor);
+          startColorRef.current = newStartColor;
+          const cssEndColor = getCssColor(endColorRef.current);
+          isInternalUpdateRef.current = true;
+          // Use CSS-compatible colors in gradient string: start, end
+          const gradientStr = `linear-gradient(${angleRef.current}deg, ${cssNewColor}, ${cssEndColor})`;
+          onChange(gradientStr);
+        } else {
+          const newEndColor = oklch;
+          setEndColor(newEndColor);
+          endColorRef.current = newEndColor;
+          const cssStartColor = getCssColor(startColorRef.current);
+          isInternalUpdateRef.current = true;
+          // Use CSS-compatible colors in gradient string: start, end
+          const gradientStr = `linear-gradient(${angleRef.current}deg, ${cssStartColor}, ${cssNewColor})`;
+          onChange(gradientStr);
+        }
+      } catch {
+        // Fallback to hex
+        const cssNewColor = hex;
+        
+        if (which === 'start') {
+          const newStartColor = hex;
+          setStartColor(newStartColor);
+          startColorRef.current = newStartColor;
+          const cssEndColor = getCssColor(endColorRef.current);
+          isInternalUpdateRef.current = true;
+          const gradientStr = `linear-gradient(${angleRef.current}deg, ${cssNewColor}, ${cssEndColor})`;
+          onChange(gradientStr);
+        } else {
+          const newEndColor = hex;
+          setEndColor(newEndColor);
+          endColorRef.current = newEndColor;
+          const cssStartColor = getCssColor(startColorRef.current);
+          isInternalUpdateRef.current = true;
+          const gradientStr = `linear-gradient(${angleRef.current}deg, ${cssStartColor}, ${cssNewColor})`;
+          onChange(gradientStr);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to process gradient color change:', e);
+    }
+  }, [onChange, getCssColor]);
+
+  // Handle angle change
+  const handleAngleChange = useCallback((newAngle: number) => {
+    setAngle(newAngle);
+    angleRef.current = newAngle;
+    isInternalUpdateRef.current = true;
+    // Convert colors to CSS-compatible format
+    const cssStartColor = getCssColor(startColorRef.current);
+    const cssEndColor = getCssColor(endColorRef.current);
+    const gradientStr = `linear-gradient(${newAngle}deg, ${cssStartColor}, ${cssEndColor})`;
+    onChange(gradientStr);
+  }, [onChange, getCssColor]);
+
+  // Get hex for gradient colors
+  const getGradientHex = useCallback((color: string): string => {
+    try {
+      if (color.startsWith('#')) {
+        return color;
+      }
+      return convert(color, 'hex');
+    } catch {
+      return '#000000';
+    }
+  }, []);
+
+  const startHex = useMemo(() => getGradientHex(startColor), [startColor, getGradientHex]);
+  const endHex = useMemo(() => getGradientHex(endColor), [endColor, getGradientHex]);
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-xs">{label}</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            variant="outline"
+            className={cn(
+              "w-full h-10 justify-start text-left font-normal p-0 overflow-hidden",
+              "hover:bg-accent hover:text-accent-foreground"
+            )}
+          >
+            {mode === 'gradient' ? (
+              <div
+                className="w-full h-full flex items-center justify-between px-3"
+                style={{
+                  background: value || `linear-gradient(130deg, ${getCssColor(startColor)}, ${getCssColor(endColor)})`
+                }}
+              >
+                <span className="text-xs text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  Gradient {angle}°
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 w-full px-3">
+                <div
+                  className="h-5 w-5 rounded border border-border"
+                  style={{ backgroundColor: displayHex }}
+                />
+                <span className="text-xs text-muted-foreground truncate">
+                  {displayHex}
+                </span>
+              </div>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent 
+          className="w-auto p-4" 
+          align="start"
+          onInteractOutside={(e) => {
+            // Prevent popover from closing when interacting with color picker
+            const target = e.target as HTMLElement;
+            if (target.closest('[role="slider"]') || 
+                target.closest('.cursor-crosshair') ||
+                target.closest('[class*="ColorPicker"]')) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div className="space-y-4">
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={mode === 'solid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setMode('solid');
+                  // Convert gradient to solid color (use start color)
+                  if (isGradient) {
+                    onChange(startColor);
+                  }
+                }}
+                className="flex-1"
+              >
+                Solid
+              </Button>
+              <Button
+                type="button"
+                variant={mode === 'gradient' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setMode('gradient');
+                  // Convert solid color to gradient
+                  if (!isGradient) {
+                    const currentColor = value || '#000000';
+                    // Convert to OKLCH for storage, but use hex for gradient
+                    let cssColor = currentColor;
+                    try {
+                      if (!currentColor.startsWith('#')) {
+                        cssColor = convert(currentColor, 'hex');
+                      }
+                      const oklch = convert(cssColor, 'oklch');
+                      setStartColor(oklch);
+                      setEndColor(oklch);
+                      startColorRef.current = oklch;
+                      endColorRef.current = oklch;
+                    } catch {
+                      setStartColor(currentColor);
+                      setEndColor(currentColor);
+                      startColorRef.current = currentColor;
+                      endColorRef.current = currentColor;
+                    }
+                    setAngle(130);
+                    angleRef.current = 130;
+                    isInternalUpdateRef.current = true;
+                    // Use hex for gradient string
+                    const gradientStr = `linear-gradient(130deg, ${cssColor}, ${cssColor})`;
+                    onChange(gradientStr);
+                  }
+                }}
+                className="flex-1"
+              >
+                Gradient
+              </Button>
+            </div>
+
+            {(!allowGradients || mode === 'solid') ? (
+              <div style={{ pointerEvents: 'auto', touchAction: 'none', userSelect: 'none' }}>
+                <ColorPicker
+                  value={colorValue}
+                  onChange={handleColorChange}
+                  className="w-[240px]"
+                >
+                  <div className="space-y-3" style={{ touchAction: 'none', userSelect: 'none' }}>
+                    <ColorPickerSelection 
+                      className="h-[150px] rounded-md cursor-crosshair"
+                    />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <ColorPickerHue className="flex-1" />
+                      <ColorPickerEyeDropper />
+                    </div>
+                    <ColorPickerAlpha />
+                    <div className="flex items-center gap-2">
+                      <ColorPickerFormat className="flex-1" />
+                      <ColorPickerOutput />
+                    </div>
+                    </div>
+                  </div>
+                </ColorPicker>
+              </div>
+            ) : (
+              <div className="space-y-4 w-[280px]">
+                {/* Gradient Preview */}
+                <div
+                  className="h-20 rounded-md border"
+                  style={{
+                    background: `linear-gradient(${angle}deg, ${getCssColor(startColor)}, ${getCssColor(endColor)})`
+                  }}
+                />
+                
+                {/* Start Color */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Start Color</Label>
+                  <div style={{ pointerEvents: 'auto', touchAction: 'none', userSelect: 'none' }}>
+                    <ColorPicker
+                      defaultValue={startHex}
+                      onChange={(color) => handleGradientColorChange(color, 'start')}
+                      className="w-full"
+                    >
+                      <div className="space-y-2" style={{ touchAction: 'none', userSelect: 'none' }}>
+                        <ColorPickerSelection 
+                      className="h-[100px] rounded-md cursor-crosshair"
+                        />
+                        <div className="flex items-center gap-2">
+                          <ColorPickerHue className="flex-1" />
+                          <ColorPickerEyeDropper />
+                        </div>
+                      </div>
+                    </ColorPicker>
+                  </div>
+                </div>
+
+                {/* End Color */}
+                <div className="space-y-2">
+                  <Label className="text-xs">End Color</Label>
+                  <div style={{ pointerEvents: 'auto', touchAction: 'none', userSelect: 'none' }}>
+                    <ColorPicker
+                      defaultValue={endHex}
+                      onChange={(color) => handleGradientColorChange(color, 'end')}
+                      className="w-full"
+                    >
+                      <div className="space-y-2" style={{ touchAction: 'none', userSelect: 'none' }}>
+                        <ColorPickerSelection 
+                      className="h-[100px] rounded-md cursor-crosshair"
+                        />
+                        <div className="flex items-center gap-2">
+                          <ColorPickerHue className="flex-1" />
+                          <ColorPickerEyeDropper />
+                        </div>
+                      </div>
+                    </ColorPicker>
+                  </div>
+                </div>
+
+                {/* Angle Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Angle</Label>
+                    <span className="text-xs text-muted-foreground">{angle}°</span>
+                  </div>
+                  <Slider
+                    value={[angle]}
+                    onValueChange={([newAngle]) => handleAngleChange(newAngle)}
+                    min={0}
+                    max={360}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 };
 
 const TOGGLE_CONFIG: Array<{
@@ -455,55 +996,67 @@ function Global() {
     setHasPendingChanges(brandingChanged || assetsChanged || togglesChanged);
   }, [brand, assets, toggles, activeBrand, activeAssets, activeToggles]);
 
-  const previewGradient = useMemo(
-    () => brand.gradientAccent || `linear-gradient(130deg, ${brand.primaryColor}, ${brand.accentColor})`,
-    [brand.gradientAccent, brand.primaryColor, brand.accentColor]
-  );
+  // Helper to check if a color value is a gradient
+  const isGradientValue = useCallback((color: string | undefined): boolean => {
+    return !!(color && color.startsWith('linear-gradient'));
+  }, []);
 
-  // Helper to convert any color format to hex for color inputs using colorizr
-  const oklchToHex = useCallback((color: string): string => {
-    // If it's already hex, return it
-    if (color && color.startsWith('#')) {
+  // Helper to get CSS-compatible color or gradient
+  const getCssColorOrGradient = useCallback((color: string | undefined, fallback: string): string => {
+    if (!color) return fallback;
+    if (isGradientValue(color)) {
+      // It's already a gradient string, use it directly
       return color;
     }
-    
+    // Convert OKLCH to hex if needed
     try {
-      // Use colorizr to convert any CSS color format to hex
-      const hexColor = convert(color, 'hex');
-      return hexColor;
-    } catch (e) {
-      console.warn('Failed to convert color to hex using colorizr:', color, e);
-      // Fallback - try canvas method
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 1;
-        const ctx = canvas.getContext('2d');
-        
-        if (ctx) {
-          ctx.fillStyle = color;
-          const computedColor = ctx.fillStyle;
-          
-          if (computedColor.startsWith('#')) {
-            return computedColor;
-          }
-          
-          const match = computedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-          if (match) {
-            const r = parseInt(match[1]).toString(16).padStart(2, '0');
-            const g = parseInt(match[2]).toString(16).padStart(2, '0');
-            const b = parseInt(match[3]).toString(16).padStart(2, '0');
-            return `#${r}${g}${b}`;
-          }
-        }
-      } catch (err) {
-        console.warn('Canvas fallback also failed:', err);
+      if (color.startsWith('#')) {
+        return color;
       }
+      return convert(color, 'hex');
+    } catch {
+      return color;
     }
-    
-    // Ultimate fallback
-    return '#666666';
-  }, []);
+  }, [isGradientValue]);
+
+  const previewGradient = useMemo(() => {
+    // Use headerBackgroundGradient if set, otherwise use navbarColor, otherwise create from primary/accent
+    if (brand.headerBackgroundGradient) {
+      return brand.headerBackgroundGradient;
+    }
+    if (brand.navbarColor) {
+      // Check if navbarColor is a gradient
+      if (isGradientValue(brand.navbarColor)) {
+        return brand.navbarColor;
+      }
+      // Use solid navbarColor as background
+      return getCssColorOrGradient(brand.navbarColor, '#ffffff');
+    }
+    // Fallback to gradient between primary and accent
+    const primaryHex = getCssColorOrGradient(brand.primaryColor, '#000000');
+    const accentHex = getCssColorOrGradient(brand.accentColor, '#000000');
+    return `linear-gradient(130deg, ${primaryHex}, ${accentHex})`;
+  }, [brand.headerBackgroundGradient, brand.navbarColor, brand.primaryColor, brand.accentColor, getCssColorOrGradient, isGradientValue]);
+
+  const darkPreviewGradient = useMemo(() => {
+    // Use darkHeaderBackgroundGradient if set, otherwise use darkNavbarColor, otherwise create from dark primary/accent
+    if (brand.darkHeaderBackgroundGradient) {
+      return brand.darkHeaderBackgroundGradient;
+    }
+    if (brand.darkNavbarColor) {
+      // Check if darkNavbarColor is a gradient
+      if (isGradientValue(brand.darkNavbarColor)) {
+        return brand.darkNavbarColor;
+      }
+      // Use solid darkNavbarColor as background
+      return getCssColorOrGradient(brand.darkNavbarColor, '#0F0F0F');
+    }
+    // Fallback to gradient between dark primary and accent, or light colors
+    const darkPrimaryHex = getCssColorOrGradient(brand.darkPrimaryColor || brand.primaryColor, '#000000');
+    const darkAccentHex = getCssColorOrGradient(brand.darkAccentColor || brand.accentColor, '#000000');
+    return `linear-gradient(130deg, ${darkPrimaryHex}, ${darkAccentHex})`;
+  }, [brand.darkHeaderBackgroundGradient, brand.darkNavbarColor, brand.darkPrimaryColor, brand.darkAccentColor, brand.primaryColor, brand.accentColor, getCssColorOrGradient, isGradientValue]);
+
 
   // Helper to get contrasting text color based on background luminance
   const getContrastingTextColor = useCallback((bgColor: string): string => {
@@ -525,18 +1078,20 @@ function Global() {
         setSelectedTheme(CUSTOM_THEME_ID);
       };
 
-  const handleColorChange =
-    (field: keyof BrandingConfig) =>
-      (event: ChangeEvent<HTMLInputElement>) => {
-        const { value } = event.target;
-        setBrand((prev) => ({ ...prev, [field]: value }));
-        setSelectedTheme(CUSTOM_THEME_ID);
-      };
-
   const handleThemeApply = (theme: ThemePreset) => {
     setSelectedTheme(theme.id);
     const lightPalette = theme.light.palette;
     const darkPalette = theme.dark.palette;
+    
+    // Get sidebar and navbar colors (navbar matches sidebar)
+    const lightSidebarColor = getSidebarColorForTheme(theme, 'light');
+    const lightNavbarColor = getNavbarColorForTheme(theme, 'light');
+    
+    // For dark mode, always use the palette values directly
+    // All presets now have explicit sidebar and navbar values that match
+    const darkSidebarColor = darkPalette.sidebar || getSidebarColorForTheme(theme, 'dark');
+    // Ensure navbar always matches sidebar in dark mode
+    const darkNavbarColor = darkPalette.navbar || darkSidebarColor;
     
     const newConfig = {
       ...brand,
@@ -544,18 +1099,24 @@ function Global() {
       primaryColor: lightPalette.primary,
       accentColor: lightPalette.accent,
       backgroundColor: lightPalette.background,
-      sidebarColor: getSidebarColorForTheme(theme, 'light'),
+      sidebarColor: lightSidebarColor,
+      navbarColor: lightNavbarColor,
       textColor: lightPalette.text,
       neutralColor: lightPalette.neutral,
       gradientAccent: theme.light.gradient,
-      // Dark mode colors
+      // Clear header gradients - use solid colors from presets
+      headerBackgroundGradient: undefined,
+      // Dark mode colors - explicitly set all values
       darkPrimaryColor: darkPalette.primary,
       darkAccentColor: darkPalette.accent,
       darkBackgroundColor: darkPalette.background,
-      darkSidebarColor: darkPalette.sidebar ?? getSidebarColorForTheme(theme, 'dark'),
+      darkSidebarColor: darkSidebarColor,
+      darkNavbarColor: darkNavbarColor, // Always set to match sidebar
       darkTextColor: darkPalette.text,
       darkNeutralColor: darkPalette.neutral,
       darkGradientAccent: theme.dark.gradient,
+      // Clear dark header gradients - use solid colors from presets
+      darkHeaderBackgroundGradient: undefined,
       // Patterns
       surfacePattern: theme.patterns?.surface ?? DEFAULT_BRANDING_CONFIG.surfacePattern,
       sidebarPattern: theme.patterns?.sidebar ?? DEFAULT_BRANDING_CONFIG.sidebarPattern,
@@ -786,7 +1347,8 @@ function Global() {
             </TabsContent>
 
             <TabsContent value="custom" className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-6">
+                {/* Brand Basics */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -837,157 +1399,111 @@ function Global() {
                         placeholder="Your mission statement"
                       />
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <Separator />
-
-                    <div className="space-y-4">
+                {/* Light Mode Section */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FontAwesomeIcon icon={faPalette} className="text-primary" />
+                        Light Mode Colors
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                       <div>
                         <Label className="text-sm font-semibold">Light Mode Colors</Label>
                         <div className="grid gap-3 grid-cols-3 mt-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="primaryColor" className="text-xs">Primary</Label>
-                            <Input
-                              id="primaryColor"
-                              type="color"
-                              value={oklchToHex(brand.primaryColor)}
-                              onChange={handleColorChange("primaryColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="accentColor" className="text-xs">Accent</Label>
-                            <Input
-                              id="accentColor"
-                              type="color"
-                              value={oklchToHex(brand.accentColor)}
-                              onChange={handleColorChange("accentColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="backgroundColor" className="text-xs">Background</Label>
-                            <Input
-                              id="backgroundColor"
-                              type="color"
-                              value={oklchToHex(brand.backgroundColor)}
-                              onChange={handleColorChange("backgroundColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="sidebarColor" className="text-xs">Sidebar</Label>
-                            <Input
-                              id="sidebarColor"
-                              type="color"
-                              value={oklchToHex(brand.sidebarColor)}
-                              onChange={handleColorChange("sidebarColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="textColor" className="text-xs">Text</Label>
-                            <Input
-                              id="textColor"
-                              type="color"
-                              value={oklchToHex(brand.textColor)}
-                              onChange={handleColorChange("textColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="neutralColor" className="text-xs">Neutral</Label>
-                            <Input
-                              id="neutralColor"
-                              type="color"
-                              value={oklchToHex(brand.neutralColor)}
-                              onChange={handleColorChange("neutralColor")}
-                              className="h-10"
-                            />
-                          </div>
+                          <ColorPickerField
+                            id="primaryColor"
+                            label="Primary"
+                            value={brand.primaryColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, primaryColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                          <ColorPickerField
+                            id="accentColor"
+                            label="Accent"
+                            value={brand.accentColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, accentColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                          <ColorPickerField
+                            id="textColor"
+                            label="Text"
+                            value={brand.textColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, textColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                          <ColorPickerField
+                            id="neutralColor"
+                            label="Neutral"
+                            value={brand.neutralColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, neutralColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
                         </div>
                       </div>
 
                       <Separator />
 
                       <div>
-                        <Label className="text-sm font-semibold">Dark Mode Colors</Label>
+                        <Label className="text-sm font-semibold">Background Colors</Label>
                         <div className="grid gap-3 grid-cols-3 mt-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="darkPrimaryColor" className="text-xs">Primary</Label>
-                            <Input
-                              id="darkPrimaryColor"
-                              type="color"
-                              value={oklchToHex(brand.darkPrimaryColor || brand.primaryColor)}
-                              onChange={handleColorChange("darkPrimaryColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="darkAccentColor" className="text-xs">Accent</Label>
-                            <Input
-                              id="darkAccentColor"
-                              type="color"
-                              value={oklchToHex(brand.darkAccentColor || brand.accentColor)}
-                              onChange={handleColorChange("darkAccentColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="darkBackgroundColor" className="text-xs">Background</Label>
-                            <Input
-                              id="darkBackgroundColor"
-                              type="color"
-                              value={oklchToHex(brand.darkBackgroundColor || '#0F0F0F')}
-                              onChange={handleColorChange("darkBackgroundColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="darkSidebarColor" className="text-xs">Sidebar</Label>
-                            <Input
-                              id="darkSidebarColor"
-                              type="color"
-                              value={oklchToHex(brand.darkSidebarColor || '#0a0a0a')}
-                              onChange={handleColorChange("darkSidebarColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="darkTextColor" className="text-xs">Text</Label>
-                            <Input
-                              id="darkTextColor"
-                              type="color"
-                              value={oklchToHex(brand.darkTextColor || '#f8fafc')}
-                              onChange={handleColorChange("darkTextColor")}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="darkNeutralColor" className="text-xs">Neutral</Label>
-                            <Input
-                              id="darkNeutralColor"
-                              type="color"
-                              value={oklchToHex(brand.darkNeutralColor || '#1F1F1F')}
-                              onChange={handleColorChange("darkNeutralColor")}
-                              className="h-10"
-                            />
-                          </div>
+                          <ColorPickerField
+                            id="backgroundColor"
+                            label="Body"
+                            value={brand.backgroundColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, backgroundColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                          />
+                          <ColorPickerField
+                            id="sidebarColor"
+                            label="Sidebar"
+                            value={brand.sidebarColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, sidebarColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                          />
+                          <ColorPickerField
+                            id="headerBackgroundGradient"
+                            label="Navbar/Header"
+                            value={brand.headerBackgroundGradient || brand.navbarColor || '#ffffff'}
+                            onChange={(value) => {
+                              setBrand((prev) => {
+                                // If it's a gradient, set headerBackgroundGradient and use fallback for navbarColor
+                                // If it's a solid color, set navbarColor and clear headerBackgroundGradient
+                                const isGradient = value && value.startsWith('linear-gradient');
+                                return {
+                                  ...prev,
+                                  headerBackgroundGradient: isGradient ? value : undefined,
+                                  navbarColor: isGradient ? '#ffffff' : value
+                                };
+                              });
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                          />
                         </div>
                       </div>
-                    </div>
+                    </CardContent>
+                  </Card>
 
-                    <div className="flex flex-wrap justify-end gap-2 pt-2">
-                      <Button variant="outline" size="sm" onClick={handleResetBranding}>
-                        {t("settings.global.branding.designer.brandBasics.reset", "Reset")}
-                      </Button>
-                      <Button size="sm" onClick={handleSaveBranding}>
-                        {t("settings.global.branding.designer.brandBasics.save", "Save")}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-4">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2">
@@ -997,54 +1513,190 @@ function Global() {
                     </CardHeader>
                     <CardContent>
                       <div className="rounded-lg border overflow-hidden">
+                        {/* Navbar/Header */}
                         <div
-                          className="p-3 text-white"
+                          className="p-2 text-white border-b"
                           style={{
-                            backgroundImage: previewGradient,
-                            backgroundSize: "cover"
+                            ...(isGradientValue(previewGradient)
+                              ? { backgroundImage: previewGradient, backgroundSize: "cover" }
+                              : { backgroundColor: previewGradient })
                           }}
                         >
                           <div className="flex items-center gap-2">
-                            <WhagonsCheck width={80} height={18} color="#ffffff" />
+                            <WhagonsCheck width={60} height={14} color="#ffffff" />
+                            <span className="text-[10px] opacity-90">{brand.organizationName}</span>
                           </div>
-                          <p className="mt-1 text-xs opacity-90">{brand.organizationName}</p>
                         </div>
 
-                        <div
-                          className="p-3 space-y-2"
-                          style={{
-                            backgroundColor: brand.backgroundColor,
-                            color: brand.textColor
-                          }}
-                        >
-                          <div className="flex gap-2">
-                            <button
-                              className="px-2 py-1 rounded text-xs font-medium"
-                              style={{ backgroundColor: brand.primaryColor, color: "#ffffff" }}
-                            >
-                              Primary
-                            </button>
-                            <button
-                              className="px-2 py-1 rounded text-xs font-medium"
-                              style={{ backgroundColor: brand.accentColor, color: "#ffffff" }}
-                            >
-                              Accent
-                            </button>
-                          </div>
-                          <div className="flex gap-2">
-                            <div
-                              className="flex-1 rounded p-1.5 text-[10px]"
-                              style={{ backgroundColor: brand.neutralColor, color: getContrastingTextColor(brand.neutralColor) }}
-                            >
-                              Neutral
-                            </div>
-                            <div
-                              className="flex-1 rounded p-1.5 text-[10px]"
-                              style={{ backgroundColor: brand.sidebarColor, color: getContrastingTextColor(brand.sidebarColor) }}
-                            >
-                              Sidebar
+                        {/* Main Layout: Sidebar + Body */}
+                        <div className="flex">
+                          {/* Sidebar */}
+                          <div
+                            className="w-16 p-2 border-r min-h-[120px]"
+                            style={{
+                              ...(isGradientValue(brand.sidebarColor)
+                                ? { backgroundImage: getCssColorOrGradient(brand.sidebarColor, '#FAFBFC') }
+                                : { backgroundColor: getCssColorOrGradient(brand.sidebarColor, '#FAFBFC') }),
+                              color: getContrastingTextColor(getCssColorOrGradient(brand.sidebarColor, '#FAFBFC'))
+                            }}
+                          >
+                            <div className="text-[8px] font-medium mb-1">Sidebar</div>
+                            <div className="space-y-1">
+                              <div className="h-1 rounded bg-current opacity-20"></div>
+                              <div className="h-1 rounded bg-current opacity-30"></div>
+                              <div className="h-1 rounded bg-current opacity-20"></div>
                             </div>
                           </div>
+
+                          {/* Body Content */}
+                          <div
+                            className="flex-1 p-2 space-y-2"
+                            style={{
+                              ...(isGradientValue(brand.backgroundColor) 
+                                ? { backgroundImage: getCssColorOrGradient(brand.backgroundColor, '#ffffff') }
+                                : { backgroundColor: getCssColorOrGradient(brand.backgroundColor, '#ffffff') }),
+                              color: getCssColorOrGradient(brand.textColor, '#000000')
+                            }}
+                          >
+                            <div className="flex gap-1.5">
+                              <button
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                style={{
+                                  ...(isGradientValue(brand.primaryColor)
+                                    ? { backgroundImage: getCssColorOrGradient(brand.primaryColor, '#000000') }
+                                    : { backgroundColor: getCssColorOrGradient(brand.primaryColor, '#000000') }),
+                                  color: "#ffffff"
+                                }}
+                              >
+                                Primary
+                              </button>
+                              <button
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                style={{
+                                  ...(isGradientValue(brand.accentColor)
+                                    ? { backgroundImage: getCssColorOrGradient(brand.accentColor, '#000000') }
+                                    : { backgroundColor: getCssColorOrGradient(brand.accentColor, '#000000') }),
+                                  color: "#ffffff"
+                                }}
+                              >
+                                Accent
+                              </button>
+                            </div>
+                            <div
+                              className="rounded p-1 text-[9px]"
+                              style={{
+                                ...(isGradientValue(brand.neutralColor)
+                                  ? { backgroundImage: getCssColorOrGradient(brand.neutralColor, '#f0f0f0') }
+                                  : { backgroundColor: getCssColorOrGradient(brand.neutralColor, '#f0f0f0') }),
+                                color: getContrastingTextColor(getCssColorOrGradient(brand.neutralColor, '#f0f0f0'))
+                              }}
+                            >
+                              Neutral surface
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Dark Mode Section */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FontAwesomeIcon icon={faPalette} className="text-primary" />
+                        Dark Mode Colors
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-semibold">Dark Mode Colors</Label>
+                        <div className="grid gap-3 grid-cols-3 mt-2">
+                          <ColorPickerField
+                            id="darkPrimaryColor"
+                            label="Primary"
+                            value={brand.darkPrimaryColor || brand.primaryColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, darkPrimaryColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                          <ColorPickerField
+                            id="darkAccentColor"
+                            label="Accent"
+                            value={brand.darkAccentColor || brand.accentColor}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, darkAccentColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                          <ColorPickerField
+                            id="darkTextColor"
+                            label="Text"
+                            value={brand.darkTextColor || '#f8fafc'}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, darkTextColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                          <ColorPickerField
+                            id="darkNeutralColor"
+                            label="Neutral"
+                            value={brand.darkNeutralColor || '#1F1F1F'}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, darkNeutralColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                            allowGradients={false}
+                          />
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div>
+                        <Label className="text-sm font-semibold">Background Colors</Label>
+                        <div className="grid gap-3 grid-cols-3 mt-2">
+                          <ColorPickerField
+                            id="darkBackgroundColor"
+                            label="Body"
+                            value={brand.darkBackgroundColor || '#0F0F0F'}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, darkBackgroundColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                          />
+                          <ColorPickerField
+                            id="darkSidebarColor"
+                            label="Sidebar"
+                            value={brand.darkSidebarColor || '#0a0a0a'}
+                            onChange={(value) => {
+                              setBrand((prev) => ({ ...prev, darkSidebarColor: value }));
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                          />
+                          <ColorPickerField
+                            id="darkHeaderBackgroundGradient"
+                            label="Navbar/Header"
+                            value={brand.darkHeaderBackgroundGradient || brand.darkNavbarColor || '#0F0F0F'}
+                            onChange={(value) => {
+                              setBrand((prev) => {
+                                // If it's a gradient, set darkHeaderBackgroundGradient and clear darkNavbarColor
+                                // If it's a solid color, set darkNavbarColor and clear darkHeaderBackgroundGradient
+                                const isGradient = value && value.startsWith('linear-gradient');
+                                return {
+                                  ...prev,
+                                  darkHeaderBackgroundGradient: isGradient ? value : undefined,
+                                  darkNavbarColor: isGradient ? undefined : value
+                                };
+                              });
+                              setSelectedTheme(CUSTOM_THEME_ID);
+                            }}
+                          />
                         </div>
                       </div>
                     </CardContent>
@@ -1059,52 +1711,85 @@ function Global() {
                     </CardHeader>
                     <CardContent>
                       <div className="rounded-lg border overflow-hidden">
+                        {/* Navbar/Header */}
                         <div
-                          className="p-3 text-white"
+                          className="p-2 text-white border-b"
                           style={{
-                            backgroundImage: brand.darkGradientAccent || previewGradient,
-                            backgroundSize: "cover"
+                            ...(isGradientValue(darkPreviewGradient)
+                              ? { backgroundImage: darkPreviewGradient, backgroundSize: "cover" }
+                              : { backgroundColor: darkPreviewGradient })
                           }}
                         >
                           <div className="flex items-center gap-2">
-                            <WhagonsCheck width={80} height={18} color="#ffffff" />
+                            <WhagonsCheck width={60} height={14} color="#ffffff" />
+                            <span className="text-[10px] opacity-90">{brand.organizationName}</span>
                           </div>
-                          <p className="mt-1 text-xs opacity-90">{brand.organizationName}</p>
                         </div>
 
-                        <div
-                          className="p-3 space-y-2"
-                          style={{
-                            backgroundColor: brand.darkBackgroundColor || '#0F0F0F',
-                            color: brand.darkTextColor || '#f8fafc'
-                          }}
-                        >
-                          <div className="flex gap-2">
-                            <button
-                              className="px-2 py-1 rounded text-xs font-medium"
-                              style={{ backgroundColor: brand.darkPrimaryColor || brand.primaryColor, color: "#ffffff" }}
-                            >
-                              Primary
-                            </button>
-                            <button
-                              className="px-2 py-1 rounded text-xs font-medium"
-                              style={{ backgroundColor: brand.darkAccentColor || brand.accentColor, color: "#ffffff" }}
-                            >
-                              Accent
-                            </button>
+                        {/* Main Layout: Sidebar + Body */}
+                        <div className="flex">
+                          {/* Sidebar */}
+                          <div
+                            className="w-16 p-2 border-r min-h-[120px]"
+                            style={{
+                              ...(isGradientValue(brand.darkSidebarColor)
+                                ? { backgroundImage: getCssColorOrGradient(brand.darkSidebarColor, '#0a0a0a') }
+                                : { backgroundColor: getCssColorOrGradient(brand.darkSidebarColor || '#0a0a0a', '#0a0a0a') }),
+                              color: getContrastingTextColor(getCssColorOrGradient(brand.darkSidebarColor || '#0a0a0a', '#0a0a0a'))
+                            }}
+                          >
+                            <div className="text-[8px] font-medium mb-1">Sidebar</div>
+                            <div className="space-y-1">
+                              <div className="h-1 rounded bg-current opacity-20"></div>
+                              <div className="h-1 rounded bg-current opacity-30"></div>
+                              <div className="h-1 rounded bg-current opacity-20"></div>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <div
-                              className="flex-1 rounded p-1.5 text-[10px]"
-                              style={{ backgroundColor: brand.darkNeutralColor || '#1F1F1F', color: '#f8fafc' }}
-                            >
-                              Neutral
+
+                          {/* Body Content */}
+                          <div
+                            className="flex-1 p-2 space-y-2"
+                            style={{
+                              ...(isGradientValue(brand.darkBackgroundColor)
+                                ? { backgroundImage: getCssColorOrGradient(brand.darkBackgroundColor, '#0F0F0F') }
+                                : { backgroundColor: getCssColorOrGradient(brand.darkBackgroundColor || '#0F0F0F', '#0F0F0F') }),
+                              color: getCssColorOrGradient(brand.darkTextColor || '#f8fafc', '#f8fafc')
+                            }}
+                          >
+                            <div className="flex gap-1.5">
+                              <button
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                style={{
+                                  ...(isGradientValue(brand.darkPrimaryColor || brand.primaryColor)
+                                    ? { backgroundImage: getCssColorOrGradient(brand.darkPrimaryColor || brand.primaryColor, '#000000') }
+                                    : { backgroundColor: getCssColorOrGradient(brand.darkPrimaryColor || brand.primaryColor, '#000000') }),
+                                  color: "#ffffff"
+                                }}
+                              >
+                                Primary
+                              </button>
+                              <button
+                                className="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                                style={{
+                                  ...(isGradientValue(brand.darkAccentColor || brand.accentColor)
+                                    ? { backgroundImage: getCssColorOrGradient(brand.darkAccentColor || brand.accentColor, '#000000') }
+                                    : { backgroundColor: getCssColorOrGradient(brand.darkAccentColor || brand.accentColor, '#000000') }),
+                                  color: "#ffffff"
+                                }}
+                              >
+                                Accent
+                              </button>
                             </div>
                             <div
-                              className="flex-1 rounded p-1.5 text-[10px]"
-                              style={{ backgroundColor: brand.darkSidebarColor || '#0a0a0a', color: getContrastingTextColor(brand.darkSidebarColor || '#0a0a0a') }}
+                              className="rounded p-1 text-[9px]"
+                              style={{
+                                ...(isGradientValue(brand.darkNeutralColor)
+                                  ? { backgroundImage: getCssColorOrGradient(brand.darkNeutralColor, '#1F1F1F') }
+                                  : { backgroundColor: getCssColorOrGradient(brand.darkNeutralColor || '#1F1F1F', '#1F1F1F') }),
+                                color: '#f8fafc'
+                              }}
                             >
-                              Sidebar
+                              Neutral surface
                             </div>
                           </div>
                         </div>
@@ -1112,6 +1797,20 @@ function Global() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Action Buttons */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={handleResetBranding}>
+                        {t("settings.global.branding.designer.brandBasics.reset", "Reset")}
+                      </Button>
+                      <Button size="sm" onClick={handleSaveBranding}>
+                        {t("settings.global.branding.designer.brandBasics.save", "Save")}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 

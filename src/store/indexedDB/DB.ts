@@ -868,10 +868,11 @@ export class DB {
       if (DB.isEncryptionEnabledForStore(storeName)) {
         const env = await DB.encryptEnvelope(storeName, rowCopy);
         if (!env) {
-          console.warn(`[DB] Not storing ${storeName} row due to encryption failure (no envelope)`);
-          return; // Don't store the data
+          console.warn(`[DB] Storing ${storeName} row unencrypted due to encryption failure (CEK may not be ready yet)`);
+          payload = rowCopy; // Store unencrypted as fallback to prevent data loss
+        } else {
+          payload = env;
         }
-        payload = env;
         // Extra debug: post-encrypt envelope check
         try {
           const dbg = localStorage.getItem('wh-debug-cache') === 'true';
@@ -969,17 +970,19 @@ export class DB {
       let payloads: any[] = rows;
       if (DB.isEncryptionEnabledForStore(storeName)) {
         const envelopes: any[] = [];
+        let encryptionFailed = false;
         for (const r of rows) {
           const env = await DB.encryptEnvelope(storeName, r);
           if (env !== null) {
             envelopes.push(env);
           } else {
-            console.warn(`[DB] Skipping ${storeName} row due to encryption failure`);
+            // Encryption failed - store unencrypted as fallback to prevent data loss
+            envelopes.push(r);
+            encryptionFailed = true;
           }
         }
-        if (envelopes.length === 0) {
-          console.warn(`[DB] No ${storeName} rows stored due to encryption failures`);
-          return;
+        if (encryptionFailed) {
+          console.warn(`[DB] Some ${storeName} rows stored unencrypted due to encryption failures (CEK may not be ready yet)`);
         }
         payloads = envelopes;
       }
