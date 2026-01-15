@@ -326,6 +326,19 @@ api.interceptors.response.use(
     console.log('error interceptor triggered:', error.response?.status, error.config?.url);
     const originalRequest = error.config;
 
+    // Handle 503 errors on /users/me (tenant database doesn't exist or is down)
+    // Fall back to landlord by clearing subdomain and retrying
+    if (
+      error.response?.status === 503 &&
+      originalRequest.url === '/users/me' &&
+      !originalRequest._retryWithoutSubdomain
+    ) {
+      console.warn('503 on /users/me - tenant database unavailable, falling back to landlord');
+      setSubdomain('');
+      originalRequest._retryWithoutSubdomain = true;
+      return api(originalRequest);
+    }
+
     // Handle tenant-related 404s on login (either tenant missing or user missing in tenant)
     const tenantErrorMessages = [
       'Tenant not found for this domain.',

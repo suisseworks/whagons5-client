@@ -65,6 +65,7 @@ export class DataManager {
   }
 
   async validateAndRefresh() {
+    console.log('🔍 [DataManager] validateAndRefresh() CALLED');
     // Batch validate all entities (including tasks) using ONE batch endpoint call
     // Retry logic for transient DB closure errors
     const maxRetries = 2;

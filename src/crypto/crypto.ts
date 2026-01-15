@@ -47,6 +47,18 @@ export class CryptoHandler {
   static kid: string | null = null;
   static expIso: string | null = null;
   static initPromise: Promise<void> | null = null;
+  // Tenant mode flag - only proceed with device registration if true
+  private static _tenantMode = false;
+
+  /** Set tenant mode - call with true when user has a tenant, false otherwise */
+  public static setTenantMode(hasTenant: boolean): void {
+    CryptoHandler._tenantMode = hasTenant;
+  }
+
+  /** Check if we're in tenant mode */
+  public static get tenantMode(): boolean {
+    return CryptoHandler._tenantMode;
+  }
 
   public static reset(): void {
     CryptoHandler.inited = false;
@@ -55,6 +67,12 @@ export class CryptoHandler {
   }
 
   public static async init(){
+    // Skip device registration if not in tenant mode (e.g., during onboarding)
+    if (!CryptoHandler._tenantMode) {
+      console.debug('[CryptoHandler] Skipping init - not in tenant mode');
+      return;
+    }
+
     // If already initialized, return immediately
     if (CryptoHandler.inited) {
       const kekPresent = await hasKEK().catch(() => false);

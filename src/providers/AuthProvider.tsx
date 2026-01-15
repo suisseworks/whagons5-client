@@ -163,10 +163,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [hydrating, setHydrating] = useState<boolean>(false);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  // Only access userTeams if user has a tenant (avoid fetching during onboarding)
+  // Must check user state OUTSIDE of useSelector to avoid triggering slice auto-fetch
+  const hasTenant = user?.tenant_domain_prefix;
   const userTeams = useSelector(
-    (state: RootState) => ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>
+    (state: RootState) => {
+      if (!hasTenant) {
+        return [] as Array<{ team_id?: number }>;
+      }
+      return ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>;
+    }
   );
   const teamKey = useMemo(() => {
+    if (!hasTenant) return '';
     const ids = Array.from(
       new Set(
         (userTeams || [])
@@ -175,7 +184,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       )
     ).sort((a, b) => a - b);
     return ids.join(',');
-  }, [userTeams]);
+  }, [userTeams, hasTenant]);
   const prevTeamKeyRef = useRef<string | null>(null);
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
@@ -233,8 +242,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               setHydrating(true);
               setHydrationError(null);
               if (!userData?.tenant_domain_prefix) {
+                // Ensure crypto knows we're not in tenant mode
+                CryptoHandler.setTenantMode(false);
                 return;
               }
+              // Enable tenant mode for crypto operations
+              CryptoHandler.setTenantMode(true);
               console.log(firebaseUser.uid);
               const result = await DB.init(firebaseUser.uid);
               console.log('DB.init: result', result);
@@ -352,6 +365,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         // User logged out - clear user data, crypto keys, IndexedDB and Redux state
         setUser(null);
+        CryptoHandler.setTenantMode(false);
         setHydrating(false);
         setHydrationError(null);
         try {
@@ -386,11 +400,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Always refresh userTeams from API after hydration so membership changes (e.g., leaving a team) propagate to the cache/state
   useEffect(() => {
-    if (loading || userLoading || hydrating || !firebaseUser) return;
+    // Skip if no tenant - don't call tenant APIs during onboarding
+    if (loading || userLoading || hydrating || !firebaseUser || !user?.tenant_domain_prefix) return;
     dispatch(genericActions.userTeams.fetchFromAPI?.() as any).catch((err: any) => {
       console.warn('AuthProvider: failed to refresh userTeams from API', err);
     });
-  }, [loading, userLoading, hydrating, firebaseUser, dispatch]);
+  }, [loading, userLoading, hydrating, firebaseUser, user?.tenant_domain_prefix, dispatch]);
 
   // Refresh tasks when the user's team memberships change so stale team tasks disappear from local cache
   useEffect(() => {

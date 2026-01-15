@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.11.0';
+const CURRENT_DB_VERSION = '1.12.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -322,6 +322,25 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('board_messages')) {
             db.createObjectStore('board_messages', { keyPath: 'id' });
+          }
+
+          // Workflows
+          if (!db.objectStoreNames.contains('workflows')) {
+            db.createObjectStore('workflows', { keyPath: 'id' });
+          }
+
+          // Compliance Module
+          if (!db.objectStoreNames.contains('compliance_standards')) {
+            db.createObjectStore('compliance_standards', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('compliance_requirements')) {
+            db.createObjectStore('compliance_requirements', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('compliance_mappings')) {
+            db.createObjectStore('compliance_mappings', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('compliance_audits')) {
+            db.createObjectStore('compliance_audits', { keyPath: 'id' });
           }
 
           // Avatar image cache (base64 or blob references)

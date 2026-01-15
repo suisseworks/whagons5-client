@@ -253,18 +253,27 @@ export class GenericCache {
 
 	// --- Integrity validation ---
 	async validate(serverGlobalHash?: string | null, serverBlockCount?: number | null): Promise<boolean> {
+		console.log(`🔍 [GenericCache:${this.store}] validate() CALLED`);
 		try {
-			if (this.validating) { this.dlog('validate: already running'); return true; }
+			if (this.validating) { 
+				console.log(`🔍 [GenericCache:${this.store}] already validating, returning`);
+				this.dlog('validate: already running'); 
+				return true; 
+			}
 			this.validating = true;
 			const t0 = performance.now();
 			
 			// CRITICAL: Check if cache is empty FIRST, before checking integrity hashing
 			// This ensures we fetch data even when integrity hashing isn't set up
+			console.log(`🔍 [GenericCache:${this.store}] checking if cache is empty...`);
 			const preRows = await this.getAll();
+			console.log(`🔍 [GenericCache:${this.store}] cache has ${preRows.length} rows`);
 			if (preRows.length === 0) {
+				console.log(`🔍 [GenericCache:${this.store}] cache empty, calling fetchAll()`);
 				this.dlog('no local rows; fetchAll bootstrap');
 				try {
 					await this.fetchAll();
+					console.log(`🔍 [GenericCache:${this.store}] fetchAll() completed`);
 					// Warm-read to ensure writes are committed and CEK is ready before returning
 					try { await this.getAll(); } catch {}
 				} catch (e) {
@@ -273,6 +282,8 @@ export class GenericCache {
 				this.validating = false; 
 				return true;
 			}
+			console.log(`🔍 [GenericCache:${this.store}] cache has data, proceeding with integrity check`);
+
 			
 			// First check if integrity hashing is set up for this table
 			// If not, skip validation entirely to avoid clearing the store
@@ -522,51 +533,82 @@ export class GenericCache {
 	static async validateMultiple(caches: GenericCache[], additionalTables: string[] = []): Promise<{ results: Record<string, boolean>; serverMap: Record<string, { global_hash?: string; block_count?: number } | null> }> {
 		if (!caches.length && !additionalTables.length) return { results: {}, serverMap: {} };
 		// Compute local global hashes SEQUENTIALLY to avoid cross-store races
+		// For empty caches, skip hash computation and just validate directly
+		console.log(`🔍 [GenericCache.validateMultiple] Starting with ${caches.length} caches`);
 		const locals: Array<{ cache: GenericCache; table: string; localGlobal: string; blockCount: number }> = [];
 		for (const c of caches) {
 			try {
+				// Check if cache is empty first - if so, skip hash computation
+				console.log(`🔍 [GenericCache.validateMultiple] Calling getAll() for ${c.getTableName()}...`);
+				const rows = await c.getAll();
+				console.log(`🔍 [GenericCache.validateMultiple] Cache ${c.getTableName()} has ${rows.length} rows`);
+				if (rows.length === 0) {
+					console.log(`🔍 [GenericCache.validateMultiple] Cache ${c.getTableName()} is empty, will validate directly`);
+					// Add with empty hash so it will call validate() which will fetch
+					locals.push({ cache: c, table: c.getTableName(), localGlobal: '', blockCount: 0 });
+					continue;
+				}
+				
 				const blocks = await c.computeLocalBlockHashes();
 				const concat = blocks.map(b => b.block_hash).join('');
 				const global = await c.sha256Hex(concat);
+				console.log(`🔍 [GenericCache.validateMultiple] Cache ${c.getTableName()} has ${blocks.length} blocks, hash: ${global.slice(0, 16)}...`);
 				locals.push({ cache: c, table: c.getTableName(), localGlobal: global, blockCount: blocks.length });
 			} catch (e: any) {
+				console.error(`🔍 [GenericCache.validateMultiple] ERROR for ${c.getTableName()}:`, {
+					errorName: e?.name,
+					errorMessage: e?.message,
+					errorStack: e?.stack?.split('\n').slice(0, 3),
+					isInvalidState: e?.name === 'InvalidStateError',
+					isClosing: e?.message?.includes('connection is closing')
+				});
 				// Handle transient DB errors - skip this cache but continue with others
 				if (e?.name === 'InvalidStateError' || e?.message?.includes('connection is closing')) {
-					console.warn(`GenericCache.validateMultiple: DB error for ${c.getTableName()}, skipping`, e);
+					console.warn(`❌ GenericCache.validateMultiple: DB error for ${c.getTableName()}, SKIPPING THIS CACHE`, e?.message);
 					// Don't add to locals, so it won't be validated
 					continue;
 				}
-				// Re-throw other errors
-				throw e;
+				// For OTHER errors (like encryption errors), still add to locals with empty hash
+				// so validate() can try to fetch
+				console.warn(`⚠️ GenericCache.validateMultiple: Non-DB error for ${c.getTableName()}, adding to locals anyway`, e?.message);
+				locals.push({ cache: c, table: c.getTableName(), localGlobal: '', blockCount: 0 });
 			}
 		}
 
 		// Include additional tables (like wh_tasks) in batch call
 		const tables = [...locals.map(l => l.table), ...additionalTables];
+		console.log(`🔍 [GenericCache.validateMultiple] Calling batch integrity for tables:`, tables);
 		let serverMap: Record<string, { global_hash?: string; block_count?: number } | null> = {};
 		try {
 			const resp = await api.get('/integrity/global/batch', { params: { tables: tables.join(',') } });
 			serverMap = (resp.data?.data || {}) as typeof serverMap;
+			console.log(`🔍 [GenericCache.validateMultiple] Batch response:`, serverMap);
 		} catch (_e) {
+			console.warn(`🔍 [GenericCache.validateMultiple] Batch call failed:`, _e);
 			// Fallback: empty map -> all will individually validate
 		}
 
 		const results: Record<string, boolean> = {};
 		
+		console.log(`🔍 [GenericCache.validateMultiple] Starting individual validations for ${locals.length} caches`);
 		// Execute validations in parallel to avoid slow sequential startup
 		await Promise.all(locals.map(async (l) => {
 			const s = serverMap[l.table] ?? null;
+			console.log(`🔍 [GenericCache.validateMultiple] ${l.table}: server=${s ? 'has data' : 'null'}, localHash=${l.localGlobal.slice(0, 16) || 'empty'}`);
 			// If server returns null, table doesn't have integrity hashing
 			// Still call validate() to ensure empty caches get populated
 			if (s === null) {
+				console.log(`🔍 [GenericCache.validateMultiple] ${l.table}: calling validate() (no server integrity)`);
 				// Call validate() which will check for empty cache and fetch if needed
 				results[l.table] = await l.cache.validate();
 				return;
 			}
 			// Strict short-circuit: use ONLY global hash equality to skip per-table calls
 			if (s && s.global_hash && s.global_hash === l.localGlobal) {
+				console.log(`🔍 [GenericCache.validateMultiple] ${l.table}: hashes match, skipping validation`);
 				results[l.table] = true;
 			} else {
+				console.log(`🔍 [GenericCache.validateMultiple] ${l.table}: calling validate() (hash mismatch or empty)`);
 				// Run full validate when mismatch (parallel)
 				results[l.table] = await l.cache.validate();
 			}
