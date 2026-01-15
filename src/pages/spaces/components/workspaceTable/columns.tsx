@@ -3,111 +3,18 @@ import dayjs from 'dayjs';
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Flag, CheckCircle2, Clock, XCircle, MessageSquare, MoreVertical } from 'lucide-react';
+import { Flag, CheckCircle2, Clock, XCircle, MessageSquare } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import api from '@/api/whagonsApi';
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTags } from "@fortawesome/free-solid-svg-icons";
-import { iconService } from '@/database/iconService';
-import { useEffect, useState, memo } from 'react';
+import { memo, useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTags } from '@fortawesome/free-solid-svg-icons';
+import { getContrastTextColor } from './columnUtils/color';
+import { useIconDefinition } from './columnUtils/icon';
+import { promptForComment } from './columnUtils/promptForComment';
 
-// ---------------------------------------------------------------------------
-// Icon cache to prevent reloading icons when components remount
-const iconCache = new Map<string, any>();
-const iconLoadingPromises = new Map<string, Promise<any>>();
-
-// ---------------------------------------------------------------------------
-type MetricAgg = { count: number; total: number; max: number };
-const rowMetricTotals: Map<string, MetricAgg> = new Map();
-function recordMetric(segment: string, dt: number) {
-  const m = rowMetricTotals.get(segment) || { count: 0, total: 0, max: 0 };
-  m.count += 1;
-  m.total += dt;
-  if (dt > m.max) m.max = dt;
-  rowMetricTotals.set(segment, m);
-}
-declare global {
-  interface Window {
-    whRowMetricsDump?: () => void;
-    whRowMetricsReset?: () => void;
-  }
-}
-if (typeof window !== 'undefined') {
-  (window as any).whRowMetricsDump = () => {
-    const rows = Array.from(rowMetricTotals.entries()).map(([segment, m]) => ({
-      segment,
-      count: m.count,
-      total_ms: Number(m.total.toFixed(2)),
-      avg_ms: Number((m.total / Math.max(1, m.count)).toFixed(3)),
-      max_ms: Number(m.max.toFixed(3)),
-    })).sort((a, b) => b.total_ms - a.total_ms);
-    console.table(rows);
-  };
-  (window as any).whRowMetricsReset = () => rowMetricTotals.clear();
-}
-
-// Calculate text color based on background color luminance
-function getContrastTextColor(backgroundColor: string): string {
-  if (!backgroundColor) return '#1a1a1a';
-  
-  let r = 0, g = 0, b = 0;
-  
-  // Handle hex colors (#RRGGBB or #RGB)
-  if (backgroundColor.startsWith('#')) {
-    const hex = backgroundColor.slice(1);
-    
-    if (hex.length === 3) {
-      // 3-digit hex (#RGB)
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-    } else if (hex.length === 6) {
-      // 6-digit hex (#RRGGBB)
-      r = parseInt(hex.substring(0, 2), 16);
-      g = parseInt(hex.substring(2, 4), 16);
-      b = parseInt(hex.substring(4, 6), 16);
-    }
-  } else if (backgroundColor.startsWith('rgb')) {
-    // Handle rgb/rgba colors
-    const matches = backgroundColor.match(/\d+/g);
-    if (matches && matches.length >= 3) {
-      r = parseInt(matches[0], 10);
-      g = parseInt(matches[1], 10);
-      b = parseInt(matches[2], 10);
-    }
-  }
-  
-  // Validate RGB values
-  if (isNaN(r) || isNaN(g) || isNaN(b)) {
-    return '#1a1a1a'; // Default to dark text
-  }
-  
-  // Calculate relative luminance (per WCAG 2.1)
-  // Normalize RGB values to 0-1 range
-  const normalize = (val: number) => {
-    val = val / 255;
-    return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
-  };
-  
-  const rNorm = normalize(r);
-  const gNorm = normalize(g);
-  const bNorm = normalize(b);
-  
-  const luminance = 0.2126 * rNorm + 0.7152 * gNorm + 0.0722 * bNorm;
-  
-  // Return white for dark backgrounds (luminance < 0.5), dark for light backgrounds
-  return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
-}
-
-function isRowDebugEnabled(): boolean {
-  try {
-    return localStorage.getItem('wh-debug-rows') === 'true';
-  } catch {
-    return false;
-  }
-}
 
 export function buildWorkspaceColumns(opts: any) {
   const {
@@ -140,6 +47,8 @@ export function buildWorkspaceColumns(opts: any) {
     taskAttachments,
     approvalApprovers,
     currentUserId,
+    approvalMap = {},
+    taskApprovalInstances = [],
     onDeleteTask,
     onLogTask,
     slaMap = {},
@@ -188,57 +97,6 @@ export function buildWorkspaceColumns(opts: any) {
     return palette;
   };
 
-  // Lightweight modal prompt for rejection comment (no global state needed)
-  const promptForComment = (title: string, message: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const overlay = document.createElement('div');
-      overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/40';
-      overlay.innerHTML = `
-        <div class="bg-card text-card-foreground rounded-lg shadow-xl w-[360px] max-w-[90%] border border-border">
-          <div class="px-4 py-3 border-b border-border">
-            <h3 class="text-sm font-semibold">${title}</h3>
-            <p class="text-xs text-muted-foreground mt-1">${message}</p>
-          </div>
-          <div class="p-4 space-y-3">
-            <textarea class="w-full border border-input bg-background text-foreground rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring" rows="3" placeholder="Enter your comment"></textarea>
-          </div>
-          <div class="px-4 pb-4 flex justify-end gap-2">
-            <button class="wh-modal-cancel px-3 py-1.5 text-sm border border-border rounded-md text-foreground bg-background hover:bg-muted">Cancel</button>
-            <button class="wh-modal-ok px-3 py-1.5 text-sm border border-border rounded-md text-primary-foreground bg-primary hover:opacity-90">Submit</button>
-          </div>
-        </div>
-      `;
-      const textarea = overlay.querySelector('textarea') as HTMLTextAreaElement | null;
-      const btnCancel = overlay.querySelector('.wh-modal-cancel') as HTMLButtonElement | null;
-      const btnOk = overlay.querySelector('.wh-modal-ok') as HTMLButtonElement | null;
-
-      const cleanup = () => {
-        overlay.remove();
-      };
-      btnCancel?.addEventListener('click', () => {
-        cleanup();
-        resolve(null);
-      });
-      btnOk?.addEventListener('click', () => {
-        const val = textarea?.value?.trim() || '';
-        if (!val) {
-          (textarea as any)?.focus?.();
-          return;
-        }
-        cleanup();
-        resolve(val);
-      });
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          cleanup();
-          resolve(null);
-        }
-      });
-
-      document.body.appendChild(overlay);
-      textarea?.focus();
-    });
-  };
 
   const userNameCache = new Map<number, string>();
   const getCachedUserName = (user: any): string => {
@@ -266,97 +124,9 @@ export function buildWorkspaceColumns(opts: any) {
   const CategoryIconSmall = memo((props: { iconClass?: string; color?: string }) => {
     const iconColor = props.color || '#6b7280';
     const iconCls = (props.iconClass || '').trim();
-    const [iconDef, setIconDef] = useState<any>(() => {
-      // Check cache immediately on mount
-      if (iconCls && iconCache.has(iconCls)) {
-        return iconCache.get(iconCls);
-      }
-      return null;
-    });
-
-    useEffect(() => {
-      let cancelled = false;
-      
-      const loadIcon = async () => {
-        // Don't set anything if iconClass is not available yet - wait for it to load
-        if (!iconCls) {
-          if (!cancelled) {
-            setIconDef(null);
-          }
-          return;
-        }
-
-        // Check cache first - instant return if already loaded
-        if (iconCache.has(iconCls)) {
-          if (!cancelled) {
-            setIconDef(iconCache.get(iconCls));
-          }
-          return;
-        }
-
-        // Check if already loading this icon
-        if (iconLoadingPromises.has(iconCls)) {
-          try {
-            const icon = await iconLoadingPromises.get(iconCls);
-            if (!cancelled) {
-              setIconDef(icon);
-            }
-          } catch {
-            if (!cancelled) {
-              setIconDef(faTags);
-            }
-          }
-          return;
-        }
-
-        // Normalize FontAwesome class formats to the raw icon name
-        let parsed = iconCls;
-        const faClassMatch = iconCls.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
-        if (faClassMatch) {
-          parsed = faClassMatch[2];
-        } else if (iconCls.startsWith('fa-')) {
-          parsed = iconCls.substring(3);
-        }
-
-        // Create loading promise and cache it
-        const loadPromise = (async () => {
-          try {
-            const icon = await iconService.getIcon(parsed);
-            const finalIcon = icon || faTags;
-            iconCache.set(iconCls, finalIcon);
-            iconLoadingPromises.delete(iconCls);
-            return finalIcon;
-          } catch {
-            iconCache.set(iconCls, faTags);
-            iconLoadingPromises.delete(iconCls);
-            return faTags;
-          }
-        })();
-
-        iconLoadingPromises.set(iconCls, loadPromise);
-
-        try {
-          const icon = await loadPromise;
-          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
-            setIconDef(icon);
-          }
-        } catch {
-          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
-            setIconDef(faTags);
-          }
-        }
-      };
-
-      loadIcon();
-      return () => { 
-        cancelled = true;
-      };
-    }, [iconCls, props.iconClass]);
-
-    // Don't render anything until we have an iconClass prop and icon is loaded
-    if (!iconCls || !iconDef) {
-      return null;
-    }
+    const iconDef = useIconDefinition(iconCls, null);
+    
+    if (!iconCls || !iconDef) return null;
 
     return (
       <div 
@@ -374,81 +144,21 @@ export function buildWorkspaceColumns(opts: any) {
   
   CategoryIconSmall.displayName = 'CategoryIconSmall';
 
+  // Header component for ID column - just the text, no checkbox
+  const IdHeaderComponent = memo((params: any) => {
+    return (
+      <div className="flex items-center justify-center h-full w-full">
+        <span className="text-sm font-medium">ID</span>
+      </div>
+    );
+  });
+  
+  IdHeaderComponent.displayName = 'IdHeaderComponent';
+
   // Tag icon component for inline use in tag badges
   const TagIconSmall = (props: { iconClass?: string | null; color?: string }) => {
     const iconCls = (props.iconClass || '').trim();
-    const [iconDef, setIconDef] = useState<any>(() => {
-      if (iconCls && iconCache.has(iconCls)) {
-        return iconCache.get(iconCls);
-      }
-      return faTags;
-    });
-
-    useEffect(() => {
-      let cancelled = false;
-
-      const loadIcon = async () => {
-        if (!iconCls) {
-          if (!cancelled) setIconDef(faTags);
-          return;
-        }
-
-        if (iconCache.has(iconCls)) {
-          if (!cancelled) setIconDef(iconCache.get(iconCls));
-          return;
-        }
-
-        if (iconLoadingPromises.has(iconCls)) {
-          try {
-            const icon = await iconLoadingPromises.get(iconCls);
-            if (!cancelled) setIconDef(icon || faTags);
-          } catch {
-            if (!cancelled) setIconDef(faTags);
-          }
-          return;
-        }
-
-        let parsed = iconCls;
-        const faClassMatch = iconCls.match(/^(fas|far|fal|fat|fab|fad|fass)\s+fa-(.+)$/);
-        if (faClassMatch) {
-          parsed = faClassMatch[2];
-        } else if (iconCls.startsWith('fa-')) {
-          parsed = iconCls.substring(3);
-        }
-
-        const loadPromise = (async () => {
-          try {
-            const icon = await iconService.getIcon(parsed);
-            const finalIcon = icon || faTags;
-            iconCache.set(iconCls, finalIcon);
-            iconLoadingPromises.delete(iconCls);
-            return finalIcon;
-          } catch {
-            iconCache.set(iconCls, faTags);
-            iconLoadingPromises.delete(iconCls);
-            return faTags;
-          }
-        })();
-
-        iconLoadingPromises.set(iconCls, loadPromise);
-
-        try {
-          const icon = await loadPromise;
-          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
-            setIconDef(icon || faTags);
-          }
-        } catch {
-          if (!cancelled && iconCls === (props.iconClass || '').trim()) {
-            setIconDef(faTags);
-          }
-        }
-      };
-
-      loadIcon();
-      return () => {
-        cancelled = true;
-      };
-    }, [iconCls, props.iconClass]);
+    const iconDef = useIconDefinition(iconCls, faTags);
 
     return (
       <FontAwesomeIcon 
@@ -459,28 +169,11 @@ export function buildWorkspaceColumns(opts: any) {
     );
   };
 
-  // Always render initials instead of profile pictures
-  const getContrastingTextColor = (hexColor?: string | null): string | undefined => {
-    if (!hexColor) return undefined;
-    const hex = hexColor.replace('#', '');
-    const normalized = hex.length === 3
-      ? hex.split('').map(ch => ch + ch).join('')
-      : hex;
-    if (normalized.length !== 6) return undefined;
-    const r = parseInt(normalized.substring(0, 2), 16);
-    const g = parseInt(normalized.substring(2, 4), 16);
-    const b = parseInt(normalized.substring(4, 6), 16);
-    if ([r, g, b].some((v) => Number.isNaN(v))) return undefined;
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    // Dark text on light backgrounds, white text on dark backgrounds
-    return luminance > 0.7 ? '#111827' : '#ffffff';
-  };
-
   const getUserColorStyle = (color?: string | null) => {
     if (!color) return {};
     return {
       backgroundColor: color,
-      color: getContrastingTextColor(color),
+      color: getContrastTextColor(color),
     };
   };
 
@@ -598,10 +291,6 @@ export function buildWorkspaceColumns(opts: any) {
     const row = p?.data || {};
     const approvalId = row?.approval_id;
     const approvalStatus = row?.approval_status;
-    const approvalTriggeredAt = row?.approval_triggered_at;
-    const approvalMap = (opts as any)?.approvalMap || {};
-    const taskApprovalInstances = (opts as any)?.taskApprovalInstances || [];
-    const categoryMap = (opts as any)?.categoryMap || {};
     const categoryId = row?.category_id;
     const category = categoryId ? categoryMap[Number(categoryId)] : null;
     const slaId = row?.sla_id ?? category?.sla_id;
@@ -619,11 +308,6 @@ export function buildWorkspaceColumns(opts: any) {
       (normalizedApprovalStatus ? normalizedApprovalStatus.charAt(0).toUpperCase() + normalizedApprovalStatus.slice(1) : 'Approval pending');
     
     // Calculate approval progress
-    let totalApprovers = 0;
-    let approvedCount = 0;
-    let rejectedCount = 0;
-    let pendingCount = 0;
-    let progressPercent = 0;
     
     let approverDetails: Array<{
       id: number | string;
@@ -642,11 +326,6 @@ export function buildWorkspaceColumns(opts: any) {
       const instances = taskApprovalInstances
         .filter((inst: any) => Number(inst.task_id) === taskRowId)
         .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
-      totalApprovers = instances.length;
-      approvedCount = instances.filter((inst: any) => String(inst.status).toLowerCase() === 'approved').length;
-      rejectedCount = instances.filter((inst: any) => String(inst.status).toLowerCase() === 'rejected').length;
-      pendingCount = instances.filter((inst: any) => !inst.status || String(inst.status).toLowerCase() === 'pending').length;
-      progressPercent = totalApprovers > 0 ? Math.round((approvedCount / totalApprovers) * 100) : 0;
       
       approverDetails = instances.map((inst: any, idx: number) => {
         const userRecord = inst.approver_user_id != null
@@ -711,43 +390,10 @@ export function buildWorkspaceColumns(opts: any) {
       }
     }
 
-    const isApprovalActive = approval 
-      ? (approval.trigger_type === 'ON_CREATE' 
-          ? (approvalStatus === 'pending' || approvalStatus === null)
-          : !!approvalTriggeredAt && (approvalStatus === 'pending' || approvalStatus === null))
-      : (hasApproval && (!normalizedApprovalStatus || normalizedApprovalStatus === 'pending'));
-    
-    // Calculate deadline
-    let deadline: Date | null = null;
-    let deadlineDisplay: string | null = null;
-    
-    if (approval && approval.deadline_value) {
-      if (approval.deadline_type === 'hours') {
-        const triggerTime = approvalTriggeredAt 
-          ? approvalTriggeredAt 
-          : (approval.trigger_type === 'ON_CREATE' && p.data?.created_at ? p.data.created_at : null);
-        
-        if (triggerTime) {
-          const triggered = new Date(triggerTime);
-          const deadlineHours = Number(approval.deadline_value);
-          if (Number.isFinite(deadlineHours)) {
-            deadline = new Date(triggered.getTime() + deadlineHours * 60 * 60 * 1000);
-          }
-        } else {
-          deadlineDisplay = `${approval.deadline_value} hours`;
-        }
-      } else if (approval.deadline_type === 'date') {
-        deadline = new Date(approval.deadline_value);
-        deadlineDisplay = deadline.toLocaleDateString();
-      }
-    }
-    const triggerTypeDisplay = approval?.trigger_type 
-      ? approval.trigger_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
-      : null;
-    const canAct = !!(opts as any)?.currentUserId && approverDetails.some((d) => {
+    const canAct = !!currentUserId && approverDetails.some((d) => {
       const uid = Number(d.approverUserId);
       const pendingLike = !d.status || d.status === 'pending' || d.status === 'not started';
-      return Number.isFinite(uid) && uid === Number((opts as any).currentUserId) && pendingLike;
+      return Number.isFinite(uid) && uid === Number(currentUserId) && pendingLike;
     });
     const submitDecision = async (decision: 'approved' | 'rejected') => {
       let comment: string | null = null;
@@ -756,7 +402,7 @@ export function buildWorkspaceColumns(opts: any) {
         if (comment === null) return;
       }
       // Find the pending instance for the current user (best effort)
-      const currentUid = Number((opts as any).currentUserId);
+      const currentUid = Number(currentUserId);
       const myInstance = approverDetails.find((d) => Number(d.approverUserId) === currentUid);
       const approverUserIdToSend = myInstance?.approverUserId ?? (Number.isFinite(currentUid) ? currentUid : null);
       if (!approverUserIdToSend) {
@@ -967,49 +613,90 @@ export function buildWorkspaceColumns(opts: any) {
     {
       field: 'id',
       headerName: 'ID',
-      width: 80,
+      width: 75,
       minWidth: 70,
-      maxWidth: 100,
+      maxWidth: 85,
       sortable: true,
       filter: 'agNumberColumnFilter',
       cellClass: 'wh-id-cell',
       valueFormatter: (p: any) => (p?.value ?? ''),
-      cellStyle: { overflow: 'visible' },
+      cellStyle: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'visible',
+        paddingRight: '4px',
+      },
+      suppressHeaderMenuButton: false,
       cellRenderer: (p: any) => {
         const id = p?.value;
         const taskId = Number(p?.data?.id);
         const hasValidId = Number.isFinite(taskId);
+        const api = p?.api;
+        const node = p?.node;
+        const isSelected = node?.isSelected?.() ?? false;
         
         if (!hasValidId) {
           return (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
-              {id ?? ''}
-            </span>
+            <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
+              <span className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
+                {id ?? ''}
+              </span>
+              <div className="flex items-center justify-center w-6 h-6">
+                <div className="w-5 h-5 rounded-full border-2 border-muted bg-background opacity-50" />
+              </div>
+            </div>
           );
         }
         
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary focus-visible:ring-offset-background focus-visible:border-primary"
-                aria-label="Task actions"
-              >
-                {id ?? ''}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
-                Log
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                  aria-label="Task actions"
+                >
+                  {id ?? ''}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
+                  Log
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Custom circular checkbox - prevents row click */}
+            <div 
+              className="flex items-center justify-center w-6 h-6 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (node) {
+                  node.setSelected(!isSelected);
+                  requestAnimationFrame(() => {
+                    api?.refreshCells?.({ rowNodes: [node], force: true });
+                  });
+                }
+              }}
+            >
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                isSelected 
+                  ? 'bg-primary border-primary' 
+                  : 'bg-background border-border hover:border-primary/50'
+              }`}>
+                {isSelected && (
+                  <div className="w-2.5 h-2.5 rounded-full bg-white dark:bg-background" />
+                )}
+              </div>
+            </div>
+          </div>
         );
       },
     },
@@ -1031,35 +718,26 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         const name = p.data?.name || '';
         const description = p.data?.description || '';
-        const cat = (opts as any)?.categoryMap?.[Number(p.data?.category_id)];
-        if (dbg) recordMetric('name:meta', Number((performance.now() - t0).toFixed(2)));
+        const cat = categoryMap?.[Number(p.data?.category_id)];
         
         // Skip heavy approval progress calculations during render for performance
         
         // Get tags for this task
         const taskId = Number(p.data?.id);
-        const ttStart = dbg ? performance.now() : 0;
         const latestComment = density === 'compact'
           ? ''
           : ((latestNoteByTaskId.get(taskId)?.text || '') as string).trim();
         const taskTagIds = (taskTagsMap && taskTagsMap.get(taskId)) || [];
-        if (dbg) recordMetric('name:taskTagIds', Number((performance.now() - ttStart).toFixed(2)));
-        const mapStart = dbg ? performance.now() : 0;
         const taskTagsData = (taskTagIds || [])
           .map((tagId: number) => {
             const tag = tagMap?.[tagId];
             return tag && tag.name ? { ...tag, id: tagId } : null;
           })
           .filter((tag: any) => tag !== null);
-        if (dbg) recordMetric('name:mapTags', Number((performance.now() - mapStart).toFixed(2)));
         // Show all tags (they will wrap naturally; limit display work)
 
-        const jsxStart = dbg ? performance.now() : 0;
         const node = (
           <div className="flex flex-col gap-1.5 py-1.5 min-w-0">
             {/* Name row with category icon */}
@@ -1146,10 +824,6 @@ export function buildWorkspaceColumns(opts: any) {
             )}
           </div>
         );
-        if (dbg) {
-          recordMetric('name:buildJSX', Number((performance.now() - jsxStart).toFixed(2)));
-          recordMetric('name:total', Number((performance.now() - t0).toFixed(2)));
-        }
         const shouldShowHoverDescription = !!description && (density === 'compact' || density === 'comfortable');
         if (shouldShowHoverDescription) {
           return (
@@ -1271,16 +945,12 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         const row = p.data;
         if (!statusesLoaded || !row) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const meta: any = statusMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const approvalRequired = !!row.approval_id;
         const normalizedApprovalStatus = String(row.approval_status || '').toLowerCase().trim();
-        const approvalApproved = normalizedApprovalStatus === 'approved';
         const approvalPending = approvalRequired && normalizedApprovalStatus === 'pending';
         const approvalRejected = approvalRequired && normalizedApprovalStatus === 'rejected';
         const allowedNext = getAllowedNextStatuses(row);
@@ -1309,7 +979,6 @@ export function buildWorkspaceColumns(opts: any) {
             taskId={row?.id}
           />
         );
-        if (dbg) recordMetric('status:total', Number((performance.now() - t0).toFixed(2)));
         return node;
       },
       onCellClicked: (params: any) => {
@@ -1329,7 +998,6 @@ export function buildWorkspaceColumns(opts: any) {
       sortable: true,
       filter: 'agSetColumnFilter',
       suppressHeaderMenuButton: true,
-      suppressMenuIcon: true,
       suppressHeaderFilterButton: true,
       // Allow the priority pill to render without AG Grid's default ellipsis clipping
       cellStyle: {
@@ -1360,9 +1028,6 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         if (!prioritiesLoaded || p.value == null) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
         const meta: any = priorityMap[p.value as number];
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
@@ -1379,7 +1044,6 @@ export function buildWorkspaceColumns(opts: any) {
             </span>
           </div>
         );
-        if (dbg) recordMetric('priority:total', Number((performance.now() - t0).toFixed(2)));
         return pill;
       },
       width: 110,
@@ -1423,9 +1087,6 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         if (!usersLoaded) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const userIds = p.data?.user_ids;
         if (userIds == null) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
@@ -1478,7 +1139,6 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           </div>
         );
-        if (dbg) recordMetric('owner:total', Number((performance.now() - t0).toFixed(2)));
         return node;
       },
       minWidth: 140,
@@ -1524,9 +1184,6 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         const dueDate = p.data?.due_date;
         if (!dueDate) {
           return (
@@ -1556,7 +1213,6 @@ export function buildWorkspaceColumns(opts: any) {
             </Tooltip>
           </TooltipProvider>
         );
-        if (dbg) recordMetric('due_date:total', Number((performance.now() - t0).toFixed(2)));
         return node;
       },
       width: 120,
@@ -1593,9 +1249,6 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         if (!spotsLoaded) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
         if (p.value == null) return (<div className="flex items-center h-full py-2"><span className="text-[12px] text-muted-foreground"></span></div>);
         const meta: any = spotMap[p.value as number];
@@ -1609,7 +1262,6 @@ export function buildWorkspaceColumns(opts: any) {
         const node = (
           <div className="flex items-center h-full py-1">{tag}</div>
         );
-        if (dbg) recordMetric('spot:total', Number((performance.now() - t0).toFixed(2)));
         return node;
       },
       flex: 2,
@@ -1644,9 +1296,6 @@ export function buildWorkspaceColumns(opts: any) {
             </div>
           );
         }
-        const dbg = isRowDebugEnabled();
-        let t0 = 0;
-        if (dbg) t0 = performance.now();
         // Explicitly read from updated_at field (last modified), not from p.value which might be corrupted
         const updatedAt = p.data?.updated_at || p.data?.created_at;
         if (!updatedAt) {
@@ -1672,7 +1321,6 @@ export function buildWorkspaceColumns(opts: any) {
             </Tooltip>
           </TooltipProvider>
         );
-        if (dbg) recordMetric('created_at:total', Number((performance.now() - t0).toFixed(2)));
         return node;
       },
       width: 120,
@@ -1680,6 +1328,61 @@ export function buildWorkspaceColumns(opts: any) {
       maxWidth: 160,
     },
   ]);
+
+  // Helper functions for custom field columns
+  const createCustomFieldValueGetter = (fieldId: number, field: any, taskCustomFieldValueMap: any) => {
+    return (p: any) => {
+      const taskId = Number(p.data?.id);
+      if (!Number.isFinite(taskId) || !taskCustomFieldValueMap) return null;
+      const key = `${taskId}:${fieldId}`;
+      const row = taskCustomFieldValueMap.get(key);
+      if (!row) return null;
+      const fieldType = String(row.type || row.field_type || field.type || '').toLowerCase();
+      if (fieldType === 'number' || fieldType === 'numeric') {
+        if (row.value_numeric != null) return row.value_numeric;
+        if (row.value != null) return Number(row.value);
+      }
+      if (fieldType === 'date' || fieldType === 'datetime') {
+        if (row.value_date != null) return row.value_date;
+        if (row.value != null) return row.value;
+      }
+      if (fieldType === 'json') {
+        if (row.value_json != null) return row.value_json;
+        if (row.value != null) return row.value;
+      }
+      if (row.value_numeric != null) return row.value_numeric;
+      if (row.value_date != null) return row.value_date;
+      if (row.value_json != null) return row.value_json;
+      if (row.value_text != null) return row.value_text;
+      if (row.value != null) return row.value;
+      return null;
+    };
+  };
+
+  const createCustomFieldCellRenderer = () => {
+    return (p: any) => {
+      const v = p.value;
+      if (v === null || v === undefined || v === '') {
+        return (
+          <div className="flex items-center h-full py-2">
+            <span className="text-[12px] text-muted-foreground">—</span>
+          </div>
+        );
+      }
+      if (typeof v === 'number') {
+        return (
+          <div className="flex items-center h-full py-2">
+            <span className="text-[12px] truncate max-w-full">{v.toLocaleString()}</span>
+          </div>
+        );
+      }
+      return (
+        <div className="flex items-center h-full py-2">
+          <span className="text-[12px] truncate max-w-full">{String(v)}</span>
+        </div>
+      );
+    };
+  };
 
   // Append dynamic custom-field columns (per-workspace)
   const customFieldCols: any[] = [];
@@ -1714,66 +1417,10 @@ export function buildWorkspaceColumns(opts: any) {
         headerName,
         sortable: false,
         filter: false,
-        // keep fixed row height for performance
         minWidth: 160,
         flex: 2,
-        valueGetter: (p: any) => {
-          const taskId = Number(p.data?.id);
-          if (!Number.isFinite(taskId) || !taskCustomFieldValueMap) return null;
-          const key = `${taskId}:${fieldId}`;
-          const row = taskCustomFieldValueMap.get(key);
-          if (!row) return null;
-          // Get field type from row, field metadata, or fallback
-          const fieldType = String(row.type || row.field_type || field.type || '').toLowerCase();
-          
-          // Try typed value fields first based on field type
-          if (fieldType === 'number' || fieldType === 'numeric') {
-            if (row.value_numeric != null) return row.value_numeric;
-            if (row.value != null) return Number(row.value);
-          }
-          if (fieldType === 'date' || fieldType === 'datetime') {
-            if (row.value_date != null) return row.value_date;
-            if (row.value != null) return row.value;
-          }
-          if (fieldType === 'json') {
-            if (row.value_json != null) return row.value_json;
-            if (row.value != null) return row.value;
-          }
-          
-          // Fallback: try all value fields in order of preference
-          if (row.value_numeric != null) return row.value_numeric;
-          if (row.value_date != null) return row.value_date;
-          if (row.value_json != null) return row.value_json;
-          if (row.value_text != null) return row.value_text;
-          if (row.value != null) return row.value;
-          
-          return null;
-        },
-        cellRenderer: (p: any) => {
-          const v = p.value;
-          // Check for null/undefined/empty string, but allow 0 and false
-          if (v === null || v === undefined || v === '') {
-            return (
-              <div className="flex items-center h-full py-2">
-                <span className="text-[12px] text-muted-foreground">—</span>
-              </div>
-            );
-          }
-          // Format numeric values appropriately
-          if (typeof v === 'number') {
-            return (
-              <div className="flex items-center h-full py-2">
-                <span className="text-[12px] truncate max-w-full">{v.toLocaleString()}</span>
-              </div>
-            );
-          }
-          // Simple text rendering for other types
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="text-[12px] truncate max-w-full">{String(v)}</span>
-            </div>
-          );
-        },
+        valueGetter: createCustomFieldValueGetter(fieldId, field, taskCustomFieldValueMap),
+        cellRenderer: createCustomFieldCellRenderer(),
       });
     }
   }
@@ -1830,63 +1477,8 @@ export function buildWorkspaceColumns(opts: any) {
         filter: false,
         minWidth: 160,
         flex: 2,
-        valueGetter: (p: any) => {
-          const taskId = Number(p.data?.id);
-          if (!Number.isFinite(taskId) || !taskCustomFieldValueMap) return null;
-          const key = `${taskId}:${fieldId}`;
-          const row = taskCustomFieldValueMap.get(key);
-          if (!row) return null;
-          // Get field type from row, field metadata, or fallback
-          const fieldType = String(row.type || row.field_type || field.type || '').toLowerCase();
-          
-          // Try typed value fields first based on field type
-          if (fieldType === 'number' || fieldType === 'numeric') {
-            if (row.value_numeric != null) return row.value_numeric;
-            if (row.value != null) return Number(row.value);
-          }
-          if (fieldType === 'date' || fieldType === 'datetime') {
-            if (row.value_date != null) return row.value_date;
-            if (row.value != null) return row.value;
-          }
-          if (fieldType === 'json') {
-            if (row.value_json != null) return row.value_json;
-            if (row.value != null) return row.value;
-          }
-          
-          // Fallback: try all value fields in order of preference
-          if (row.value_numeric != null) return row.value_numeric;
-          if (row.value_date != null) return row.value_date;
-          if (row.value_json != null) return row.value_json;
-          if (row.value_text != null) return row.value_text;
-          if (row.value != null) return row.value;
-          
-          return null;
-        },
-        cellRenderer: (p: any) => {
-          const v = p.value;
-          // Check for null/undefined/empty string, but allow 0 and false
-          if (v === null || v === undefined || v === '') {
-            return (
-              <div className="flex items-center h-full py-2">
-                <span className="text-[12px] text-muted-foreground">—</span>
-              </div>
-            );
-          }
-          // Format numeric values appropriately
-          if (typeof v === 'number') {
-            return (
-              <div className="flex items-center h-full py-2">
-                <span className="text-[12px] truncate max-w-full">{v.toLocaleString()}</span>
-              </div>
-            );
-          }
-          // Simple text rendering for other types
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="text-[12px] truncate max-w-full">{String(v)}</span>
-            </div>
-          );
-        },
+        valueGetter: createCustomFieldValueGetter(fieldId, field, taskCustomFieldValueMap),
+        cellRenderer: createCustomFieldCellRenderer(),
       });
     }
   }

@@ -899,6 +899,8 @@
   --ag-font-size: inherit; /* Use app's font size */
   --ag-grid-size: var(--radius-sm); /* Controls spacing/padding, link to radius */
   --ag-border-radius: var(--radius-md);
+  /* Remove cell focus border */
+  --ag-range-selection-border-style: none;
 }
 
 .dark .ag-theme-quartz {
@@ -913,6 +915,8 @@
   --ag-row-hover-color: #222222;
   --ag-column-hover-color: #222222;
   --ag-header-column-hover-color: #222222;
+  /* Remove cell focus border */
+  --ag-range-selection-border-style: none;
 }
 
 .starwars .ag-theme-quartz {
@@ -975,6 +979,8 @@
 /* Remove left padding from pinned left container */
 .wh-workspace-grid .ag-pinned-left-cols-container {
   padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* Remove left padding from the first pinned column */
@@ -982,6 +988,84 @@
   padding-left: 0 !important;
   margin-left: 0 !important;
 }
+
+/* Remove gap between pinned left and center columns */
+.wh-workspace-grid .ag-pinned-left-cols-container .ag-row > .ag-cell:last-child,
+.wh-modern-grid .ag-pinned-left-cols-container .ag-row > .ag-cell:last-child {
+  padding-right: 0 !important;
+  margin-right: -1px !important;
+  border-right: none !important;
+}
+
+.wh-workspace-grid .ag-center-cols-container .ag-row > .ag-cell:first-child,
+.wh-modern-grid .ag-center-cols-container .ag-row > .ag-cell:first-child {
+  padding-left: 12px !important;
+}
+
+/* Remove border between pinned and center sections */
+.wh-workspace-grid .ag-pinned-left-cols-container,
+.wh-modern-grid .ag-pinned-left-cols-container {
+  border-right: none !important;
+  margin-right: -1px !important;
+}
+
+.wh-workspace-grid .ag-center-cols-viewport,
+.wh-modern-grid .ag-center-cols-viewport {
+  margin-left: -1px !important;
+}
+
+.wh-workspace-grid .ag-center-cols-clipper,
+.wh-modern-grid .ag-center-cols-clipper {
+  margin-left: -1px !important;
+}
+
+/* Remove any box shadow or border on pinned columns */
+.wh-workspace-grid .ag-pinned-left-cols-container,
+.wh-modern-grid .ag-pinned-left-cols-container {
+  box-shadow: none !important;
+}
+
+.wh-workspace-grid .ag-pinned-left-header,
+.wh-modern-grid .ag-pinned-left-header {
+  border-right: none !important;
+  margin-right: -1px !important;
+}
+
+.wh-workspace-grid .ag-header-row .ag-header-cell[col-id="id"],
+.wh-modern-grid .ag-header-row .ag-header-cell[col-id="id"] {
+  border-right: none !important;
+  padding-right: 0 !important;
+}
+
+/* ID column selection highlighting - match exactly with other columns */
+.wh-workspace-grid .ag-row-selected .ag-cell[col-id="id"],
+.wh-modern-grid .ag-row-selected .ag-cell[col-id="id"] {
+  background-color: var(--ag-selected-row-background-color) !important;
+}
+
+/* Dark mode - match the bluish tint of other selected cells */
+.dark .wh-workspace-grid .ag-row-selected .ag-cell[col-id="id"],
+.dark .wh-modern-grid .ag-row-selected .ag-cell[col-id="id"] {
+  background-color: oklch(0.28 0.03 255) !important;
+}
+
+/* Center ID column header text */
+.wh-workspace-grid .ag-header-cell[col-id="id"] .ag-header-cell-label,
+.wh-modern-grid .ag-header-cell[col-id="id"] .ag-header-cell-label {
+  justify-content: center !important;
+}
+
+/* Remove left gap from first column */
+.wh-workspace-grid .ag-center-cols-container .ag-row > .ag-cell:first-child,
+.wh-modern-grid .ag-center-cols-container .ag-row > .ag-cell:first-child {
+  padding-left: 4px !important;
+}
+
+.wh-workspace-grid .ag-header-row > .ag-header-cell:first-child,
+.wh-modern-grid .ag-header-row > .ag-header-cell:first-child {
+  padding-left: 4px !important;
+}
+
 
 .ag-theme-quartz-dark {
   /* Reuse most light theme mappings, but reference .dark variables implicitly via CSS cascade */
@@ -1214,7 +1298,6 @@
 /* Row as card: rounded, subtle elevation, divider-less */
 .wh-modern-grid .ag-center-cols-container .ag-row {
   /* Use horizontal margins only to avoid AG Grid row stacking issues */
-  margin: 0 8px 2px 8px;
   border-radius: 0;
   background-color: #ffffff;
   border: none;
@@ -1579,18 +1662,30 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
-/* Better keyboard focus ring on cells */
-.wh-modern-grid .ag-cell:focus-within {
-  outline: 1px solid var(--color-border);
-  outline-offset: -1px;
-  border-radius: calc(var(--radius-md) - 2px);
-  /* Only transition focus, not during scroll */
-  transition: outline 0.1s ease;
+/* Remove focus outline on cells */
+.wh-modern-grid .ag-cell:focus,
+.wh-modern-grid .ag-cell:focus-within,
+.wh-workspace-grid .ag-cell:focus,
+.wh-workspace-grid .ag-cell:focus-within {
+  outline: none !important;
+  border: none !important;
 }
 
-/* When a row is selected, remove the teal focus outline to avoid left glow */
-.wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell:focus-within {
-  outline: none;
+/* Remove AG Grid default focus styles */
+.ag-theme-quartz .ag-cell-focus,
+.ag-theme-quartz-dark .ag-cell-focus,
+.wh-modern-grid .ag-cell-focus,
+.wh-workspace-grid .ag-cell-focus {
+  outline: none !important;
+  border: none !important;
+}
+
+.ag-theme-quartz .ag-cell-inline-editing,
+.ag-theme-quartz-dark .ag-cell-inline-editing,
+.wh-modern-grid .ag-cell-inline-editing,
+.wh-workspace-grid .ag-cell-inline-editing {
+  outline: none !important;
+  border: none !important;
 }
 
 /* Density controls */
@@ -1600,7 +1695,6 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 .wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 12px; }
 .wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 10px; }
 
-.wh-modern-grid.wh-density-spacious .ag-center-cols-container .ag-row { margin: 0 18px; }
 .wh-modern-grid.wh-density-spacious .ag-cell { padding-block: 16px; }
 
 

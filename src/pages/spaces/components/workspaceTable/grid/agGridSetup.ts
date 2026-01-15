@@ -57,7 +57,6 @@ export const createDefaultColDef = () => ({
   floatingFilter: false,
   // Disable menu icon (ellipsis) on columns to prevent it appearing next to priority tags
   suppressHeaderMenuButton: true,
-  suppressMenu: true,
 });
 
 export const createGridOptions = (useClientSide: boolean, clientRows: any[] = [], collapseGroups: boolean = true) => ({
@@ -88,7 +87,6 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
   loading: false,
   suppressScrollOnNewData: true, // Prevent scroll jumps
   debounceVerticalScrollbar: false,
-  // Disable context menu and menu icons to prevent ellipsis appearing next to priority tags
-  suppressContextMenu: true,
+  // Note: Context menu behavior is controlled by WorkspaceTable props (`getContextMenuItems`, `suppressContextMenu`)
   suppressMenuHide: true,
 });

@@ -5,6 +5,52 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { iconService } from '@/database/iconService';
 
+// Lazy-loading icon button component
+function IconButton({ iconName, icon: initialIcon, onClick, title }: { 
+  iconName: string; 
+  icon: any; 
+  onClick: () => void; 
+  title: string;
+}) {
+  const [icon, setIcon] = useState<any>(initialIcon);
+  const [loading, setLoading] = useState(!initialIcon);
+  
+  useEffect(() => {
+    // Always load icon by name to ensure we get the correct one
+    if (iconName) {
+      setLoading(true);
+      iconService.getIcon(iconName).then(loadedIcon => {
+        setIcon(loadedIcon);
+        setLoading(false);
+      }).catch(() => {
+        setLoading(false);
+      });
+    }
+  }, [iconName]); // Only depend on iconName, not icon state
+  
+  if (loading || !icon) {
+    return (
+      <button
+        onClick={onClick}
+        className="w-8 h-8 text-sm hover:bg-accent rounded-md transition-colors flex items-center justify-center"
+        title={title}
+      >
+        <div className="w-4 h-4 border border-muted-foreground rounded animate-pulse" />
+      </button>
+    );
+  }
+  
+  return (
+    <button
+      onClick={onClick}
+      className="w-8 h-8 text-sm hover:bg-accent rounded-md transition-colors flex items-center justify-center"
+      title={title}
+    >
+      <FontAwesomeIcon icon={icon} />
+    </button>
+  );
+}
+
 // Popular icons list to show initially
 const POPULAR_ICONS = [
   'building', 'briefcase', 'user', 'users', 'settings', 'home', 'folder',
@@ -109,19 +155,14 @@ export function IconPicker({
           const endIndex = Math.min(startIndex + ICONS_PER_PAGE, totalIconsCount);
           const iconsToLoad = allIconsMetadata.slice(startIndex, endIndex);
           
-          // Load the actual icon data for this batch
-          const loadedIconsData = await Promise.all(
-            iconsToLoad.map(async (iconMeta) => {
-              const icon = await iconService.getIcon(iconMeta.name);
-              return {
-                name: iconMeta.name,
-                icon: icon,
-                keywords: iconMeta.keywords
-              };
-            })
-          );
+          // Add icons to display (they will be lazy-loaded by IconButton component)
+          const iconsToAdd = iconsToLoad.map((iconMeta) => ({
+            name: iconMeta.name,
+            icon: iconMeta.icon || null, // Will be lazy-loaded
+            keywords: iconMeta.keywords
+          }));
           
-          setDisplayedIcons(prev => [...prev, ...loadedIconsData]);
+          setDisplayedIcons(prev => [...prev, ...iconsToAdd]);
           setLoadedIconsCount(endIndex);
         } catch (error) {
           console.error('Error loading more icons:', error);
@@ -147,8 +188,20 @@ export function IconPicker({
       setLoadingIcons(true);
       try {
         const searchResults = await iconService.searchIcons(iconSearch);
-        setDisplayedIcons(searchResults);
-        setLoadedIconsCount(searchResults.length);
+        // Load icon definitions for search results (lazy load)
+        const loadedResults = await Promise.all(
+          searchResults.slice(0, 200).map(async (iconMeta) => {
+            // If icon is already loaded, use it; otherwise load it
+            const icon = iconMeta.icon || await iconService.getIcon(iconMeta.name);
+            return {
+              name: iconMeta.name,
+              icon: icon,
+              keywords: iconMeta.keywords
+            };
+          })
+        );
+        setDisplayedIcons(loadedResults);
+        setLoadedIconsCount(loadedResults.length);
       } catch (error) {
         console.error('Error searching icons:', error);
         setDisplayedIcons([]);
@@ -217,15 +270,17 @@ export function IconPicker({
       </div>
       
       {showDropdown && (
-        <div className="absolute top-full left-0 mt-2 w-96 bg-popover text-popover-foreground border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
+        <div className="absolute bottom-full right-0 mb-2 w-80 bg-popover text-popover-foreground border rounded-lg shadow-lg z-50 max-h-[400px] overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2">
           <div className="p-3">
+            {/* Search input at the top */}
             <Input
               placeholder="Search icons... (e.g., heart, user, star)"
               value={iconSearch}
               onChange={(e) => setIconSearch(e.target.value)}
-              className="mb-3"
+              className="mb-2"
               autoFocus
             />
+            
             <div className="text-xs text-muted-foreground mb-2">
               {loadingIcons ? 'Searching icons...' : 
                isSearching ? 
@@ -234,50 +289,30 @@ export function IconPicker({
             </div>
             <div 
               ref={scrollContainerRef}
-              className="grid grid-cols-10 gap-1 overflow-y-auto pr-2"
+              className="grid grid-cols-8 gap-1 overflow-y-auto"
               style={{ 
-                height: (() => {
-                  const iconsPerRow = 10;
-                  const totalRows = Math.ceil(displayedIcons.length / iconsPerRow);
-                  const iconHeight = 32;
-                  const gapSize = 4;
-                  const calculatedHeight = totalRows * iconHeight + Math.max(0, totalRows - 1) * gapSize;
-                  if (displayedIcons.length > 50 || (!isSearching && loadedIconsCount > 50)) {
-                    return '240px';
-                  } else if (totalRows <= 3) {
-                    return `${calculatedHeight}px`;
-                  } else {
-                    return 'auto';
-                  }
-                })(),
-                maxHeight: '240px',
-                minHeight: (() => {
-                  if (displayedIcons.length > 50 || (!isSearching && loadedIconsCount > 50)) {
-                    return '240px';
-                  }
-                  return 'auto';
-                })()
+                maxHeight: '260px',
+                minHeight: '100px'
               }}
               onScroll={handleIconScroll}
             >
               {loadingIcons ? (
-                <div className="col-span-10 text-center py-4">
+                <div className="col-span-8 text-center py-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
                 </div>
               ) : (
                 <>
                   {displayedIcons.map((item, index) => (
-                    <button
+                    <IconButton
                       key={`${item.name}-${index}`}
+                      iconName={item.name}
+                      icon={item.icon}
                       onClick={() => handleIconSelect(item.name)}
-                      className="w-8 h-8 text-sm hover:bg-accent rounded-md transition-colors flex items-center justify-center"
                       title={item.name}
-                    >
-                      <FontAwesomeIcon icon={item.icon} />
-                    </button>
+                    />
                   ))}
                   {loadingMoreIcons && (
-                    <div className="col-span-10 text-center py-2">
+                    <div className="col-span-8 text-center py-2">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
                     </div>
                   )}

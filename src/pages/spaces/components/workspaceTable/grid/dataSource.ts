@@ -1,13 +1,20 @@
 // Datasource and refresh helpers for WorkspaceTable
 
+import type React from 'react';
+
+const DEFAULT_SORT = [{ colId: 'created_at', sort: 'desc' }];
+const getSort = (s?: any[]) => Array.isArray(s) && s.length > 0 ? s : DEFAULT_SORT;
+const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: any, um: any, tm: any, tt: any) => {
+  const p: any = { __statusMap: sm.current, __priorityMap: pm.current, __spotMap: spm.current, __userMap: um.current, __tagMap: tm.current, __taskTags: tt.current };
+  if (wr.current === 'shared') p.shared_with_me = true;
+  else if (wr.current !== 'all') p.workspace_id = wr.current;
+  return p;
+};
+
 export function buildGetRows(TasksCache: any, refs: any) {
   const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible } = refs;
   return async (params: any) => {
-   // Default sortModel to created_at desc if not provided
-    const sortModel = params.sortModel && params.sortModel.length > 0 
-      ? params.sortModel 
-      : [{ colId: 'created_at', sort: 'desc' }];
-    
+    const sortModel = getSort(params.sortModel);
     const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(sortModel)}-${searchRef.current}`;
     if (rowCache.current.has(cacheKey)) {
       const cachedData = rowCache.current.get(cacheKey)!;
@@ -60,19 +67,9 @@ export function buildGetRows(TasksCache: any, refs: any) {
       const queryParams: any = {
         ...normalized,
         search: searchRef.current,
-        sortModel: sortModel, // Always include sortModel, defaulting to created_at desc
+        sortModel,
+        ...buildParams(workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef),
       };
-      if (workspaceRef.current === 'shared') {
-        queryParams.shared_with_me = true;
-      } else if (workspaceRef.current !== 'all') {
-        queryParams.workspace_id = workspaceRef.current;
-      }
-      queryParams.__statusMap = statusMapRef.current;
-      queryParams.__priorityMap = priorityMapRef.current;
-      queryParams.__spotMap = spotMapRef.current;
-      queryParams.__userMap = userMapRef.current;
-      queryParams.__tagMap = tagMapRef.current;
-      queryParams.__taskTags = taskTagsRef.current;
 
       const result = await TasksCache.queryTasks(queryParams);
       const rows = result?.rows || [];
@@ -90,23 +87,20 @@ export function buildGetRows(TasksCache: any, refs: any) {
 }
 
 export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
-  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef } = params;
-  const baseParams: any = { search };
-  if (workspaceRef.current === 'shared') baseParams.shared_with_me = true;
-  else if (workspaceRef.current !== 'all') baseParams.workspace_id = workspaceRef.current;
-  baseParams.__statusMap = statusMapRef.current;
-  baseParams.__priorityMap = priorityMapRef.current;
-  baseParams.__spotMap = spotMapRef.current;
-  baseParams.__userMap = userMapRef.current;
-  baseParams.__tagMap = tagMapRef.current;
-  baseParams.__taskTags = taskTagsRef.current;
+  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, sortModel } = params;
+  const baseParams: any = { search, ...buildParams(workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef) };
+  const effectiveSortModel = getSort(sortModel);
 
-  const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+  const countResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;
-  const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: totalFiltered });
+  const rowsResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: totalFiltered });
   const rows = rowsResp?.rows || [];
-  gridApi.setGridOption('rowData', rows);
-  return rows;
+  try {
+    gridApi?.setGridOption?.('rowData', rows);
+  } catch {
+    // ignore
+  }
+  return { rows, totalFiltered };
 }
 
 

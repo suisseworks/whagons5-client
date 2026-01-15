@@ -8,7 +8,7 @@ import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
 import dayjs from "dayjs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getUserDisplayName, getUserInitials } from "./workspaceTable/userUtils";
+import { getUserDisplayName, getUserInitials } from "./workspaceTable/utils/userUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 

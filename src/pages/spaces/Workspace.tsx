@@ -28,7 +28,7 @@ import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { motion } from 'motion/react';
 import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
-import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
+import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/utils/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
@@ -592,8 +592,10 @@ export const Workspace = () => {
               dispatch(setFilterModel(model || null));
             }}
             onSelectionChanged={setSelectedIds}
-            onRowDoubleClicked={(task) => {
+            onOpenTaskDialog={(task) => {
               setSelectedTask(task);
+              // Perf mark: used by TaskDialog to measure click→animationstart
+              (window as any).__taskDialogClickTime = performance.now();
               setOpenEditTask(true);
             }}
             rowHeight={computedRowHeight}
@@ -905,7 +907,16 @@ export const Workspace = () => {
             <CalendarDays className="h-4 w-4 mr-1" /> Reschedule
           </Button>
           <div className="ml-auto" />
-          <Button variant="outline" size="sm" onClick={() => setSelectedIds([])}>Clear selection</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              tableRef.current?.clearSelection?.();
+              setSelectedIds([]);
+            }}
+          >
+            Clear selection
+          </Button>
         </div>
       )}
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
