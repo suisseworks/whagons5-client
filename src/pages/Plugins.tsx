@@ -57,6 +57,7 @@ interface SortablePluginCardProps {
 	pluginsConfig: any[];
 	onPluginClick: (id: string, isEnabled: boolean) => void;
 	pluginStatuses: Record<string, boolean>;
+	t: (key: string, fallback?: string) => string;
 }
 
 interface PluginCardDisplayProps {
@@ -66,6 +67,7 @@ interface PluginCardDisplayProps {
 	showDragHandle?: boolean;
 	isDragging?: boolean;
 	pluginStatuses: Record<string, boolean>;
+	t: (key: string, fallback?: string) => string;
 }
 
 function PluginCardDisplay({
@@ -75,6 +77,7 @@ function PluginCardDisplay({
 	showDragHandle = false,
 	isDragging = false,
 	pluginStatuses,
+	t,
 }: PluginCardDisplayProps) {
 	const isPinned = plugin.configurable && pluginsConfig.find(p => p.id === plugin.id)?.pinned;
 	const isEnabled = pluginStatuses[plugin.id] ?? true; // Default to true if not found
@@ -128,7 +131,7 @@ function PluginCardDisplay({
 					{!isEnabled && (
 						<div className="bg-destructive/90 text-destructive-foreground px-2 py-0.5 rounded-md text-xs font-semibold flex items-center gap-1">
 							<FontAwesomeIcon icon={faLock} className="text-xs" />
-							Disabled
+							{t('plugins.disabled', 'Disabled')}
 						</div>
 					)}
 					{isPinned && <Pin className={`h-3.5 w-3.5 ${plugin.color} drop-shadow-md`} />}
@@ -189,7 +192,7 @@ function PluginCardDisplay({
 	);
 }
 
-function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatuses }: SortablePluginCardProps) {
+function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatuses, t }: SortablePluginCardProps) {
 	const {
 		attributes,
 		listeners,
@@ -219,13 +222,14 @@ function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatus
 				showDragHandle
 				isDragging={isDragging}
 				pluginStatuses={pluginStatuses}
+				t={t}
 			/>
 		</div>
 	);
 }
 
 // Plugin Modal Component
-function PluginModal({ plugin, isOpen, onClose }: { plugin: PluginModalData | null; isOpen: boolean; onClose: () => void }) {
+function PluginModal({ plugin, isOpen, onClose, t }: { plugin: PluginModalData | null; isOpen: boolean; onClose: () => void; t: (key: string, fallback?: string) => string }) {
 	if (!isOpen || !plugin) return null;
 
 	return (
@@ -260,7 +264,7 @@ function PluginModal({ plugin, isOpen, onClose }: { plugin: PluginModalData | nu
 					<div>
 						<h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
 							<FontAwesomeIcon icon={faStar} className="text-amber-500" />
-							Key Features
+							{t('plugin.keyFeatures', 'Key Features')}
 						</h3>
 						<ul className="space-y-2">
 							{plugin.features.map((feature, index) => (
@@ -274,7 +278,7 @@ function PluginModal({ plugin, isOpen, onClose }: { plugin: PluginModalData | nu
 
 					{/* Benefits Section */}
 					<div>
-						<h3 className="text-lg font-semibold mb-3">What You'll Get</h3>
+						<h3 className="text-lg font-semibold mb-3">{t('plugin.whatYoullGet', "What You'll Get")}</h3>
 						<ul className="space-y-2">
 							{plugin.benefits.map((benefit, index) => (
 								<li key={index} className="flex items-start gap-2 text-sm">
@@ -289,15 +293,17 @@ function PluginModal({ plugin, isOpen, onClose }: { plugin: PluginModalData | nu
 					<div className="pt-4 border-t border-border">
 						<div className="flex items-center justify-between gap-4">
 							<div>
-								<p className="text-sm text-muted-foreground">Contact sales to enable this plugin</p>
+								<p className="text-sm text-muted-foreground">{t('plugins.contactSalesDescription', 'Contact sales to enable this plugin')}</p>
 							</div>
 							<Button 
 								className="bg-primary hover:bg-primary/90"
 								onClick={() => {
-									window.open('mailto:sales@whagons.com?subject=Plugin Inquiry: ' + plugin.title, '_blank');
+									const subjectTemplate = t('plugins.pluginInquirySubject', 'Plugin Inquiry: {title}');
+									const subject = subjectTemplate.replace('{title}', plugin.title);
+									window.open(`mailto:sales@whagons.com?subject=${encodeURIComponent(subject)}`, '_blank');
 								}}
 							>
-								Contact Sales
+								{t('plugins.contactSalesButton', 'Contact Sales')}
 							</Button>
 						</div>
 					</div>
@@ -697,7 +703,7 @@ function Plugins() {
 							onClick={() => navigate('/admin/plugins')}
 						>
 							<FontAwesomeIcon icon={faCog} className="text-xs" />
-							Manage Plugins
+							{t('plugins.manage', 'Manage Plugins')}
 						</button>
 						<button className="text-sm underline" onClick={() => navigate(-1)}>
 							{t('common.back', 'Back')}
@@ -724,6 +730,7 @@ function Plugins() {
 										pluginsConfig={pluginsConfig}
 										onPluginClick={handlePluginClick}
 										pluginStatuses={pluginStatuses}
+										t={t}
 									/>
 								))}
 							</div>
@@ -737,6 +744,7 @@ function Plugins() {
 				plugin={selectedPlugin}
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
+				t={t}
 			/>
 		</>
 	);

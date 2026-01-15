@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pin, Edit, Trash2, Users, Globe, Lock, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Pin, Trash2, User, Users, Globe, Lock, Calendar } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -316,7 +316,7 @@ function TeamConnectBoardDetail() {
                   <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
                       {member.member_type === 'user' ? (
-                        <Users className="w-5 h-5 text-muted-foreground" />
+                        <User className="w-5 h-5 text-muted-foreground" />
                       ) : (
                         <Users className="w-5 h-5 text-muted-foreground" />
                       )}
@@ -534,7 +534,7 @@ function TeamConnectBoardDetail() {
                 opacity: !messageFormData.content.trim() || isSubmitting ? 0.5 : 1
               }}
             >
-              {isSubmitting ? 'POSTING...' : 'POST MESSAGE'}
+              {isSubmitting ? t('teamconnect.messages.posting', 'POSTING...') : t('teamconnect.messages.postMessage', 'POST MESSAGE')}
             </button>
           </div>
         </DialogContent>
@@ -659,7 +659,7 @@ function TeamConnectBoardDetail() {
                 opacity: !memberFormData.member_id || isSubmitting ? 0.5 : 1
               }}
             >
-              {isSubmitting ? 'Adding...' : 'ADD MEMBER'}
+              {isSubmitting ? t('teamconnect.members.adding', 'Adding...') : t('teamconnect.members.addMember', 'ADD MEMBER')}
             </button>
           </div>
         </DialogContent>

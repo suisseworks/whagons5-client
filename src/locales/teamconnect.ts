@@ -46,6 +46,8 @@ export const teamConnectTranslations = {
   "teamconnect.members.selectTeam": "Select Team",
   "teamconnect.members.type": "Member Type",
   "teamconnect.members.confirmRemove": "Are you sure you want to remove this member?",
+  "teamconnect.members.adding": "Adding...",
+  "teamconnect.members.addMember": "ADD MEMBER",
   
   // Messages
   "teamconnect.messages.title": "Messages",
@@ -90,6 +92,20 @@ export const teamConnectTranslations = {
   "teamconnect.success.messagePosted": "Message posted successfully",
   "teamconnect.success.messageUpdated": "Message updated successfully",
   "teamconnect.success.messageDeleted": "Message deleted successfully",
+  
+  // TeamConnect form buttons
+  "teamConnect.cancel": "❌ Cancel",
+  "teamConnect.createBoard": "✅ CREATE BOARD",
+  "teamConnect.saving": "⏳ Saving...",
+  
+  // Plugin translations
+  "plugins.manage": "Manage Plugins",
+  "plugins.disabled": "Disabled",
+  "plugin.keyFeatures": "Key Features",
+  "plugin.whatYoullGet": "What You'll Get",
+  "plugins.contactSalesDescription": "Contact sales to enable this plugin",
+  "plugins.contactSalesButton": "Contact Sales",
+  "plugins.pluginInquirySubject": "Plugin Inquiry: {title}",
 };
 
 // Spanish translations
@@ -135,6 +151,8 @@ export const teamConnectTranslationsES = {
   "teamconnect.members.selectTeam": "Seleccionar Equipo",
   "teamconnect.members.type": "Tipo de Miembro",
   "teamconnect.members.confirmRemove": "¿Estás seguro de que quieres eliminar este miembro?",
+  "teamconnect.members.adding": "Agregando...",
+  "teamconnect.members.addMember": "AGREGAR MIEMBRO",
   
   "teamconnect.messages.title": "Mensajes",
   "teamconnect.messages.create": "Publicar Mensaje",
@@ -154,6 +172,8 @@ export const teamConnectTranslationsES = {
   "teamconnect.messages.emptyDescription": "Sé el primero en publicar un mensaje",
   "teamconnect.messages.postedBy": "Publicado por",
   "teamconnect.messages.adminOnly": "Solo los administradores pueden publicar mensajes",
+  "teamconnect.messages.posting": "PUBLICANDO...",
+  "teamconnect.messages.postMessage": "PUBLICAR MENSAJE",
   
   "teamconnect.actions.save": "Guardar",
   "teamconnect.actions.cancel": "Cancelar",
@@ -175,4 +195,9 @@ export const teamConnectTranslationsES = {
   "teamconnect.success.messagePosted": "Mensaje publicado exitosamente",
   "teamconnect.success.messageUpdated": "Mensaje actualizado exitosamente",
   "teamconnect.success.messageDeleted": "Mensaje eliminado exitosamente",
+  
+  // TeamConnect form buttons
+  "teamConnect.cancel": "❌ Cancelar",
+  "teamConnect.createBoard": "✅ CREAR TABLERO",
+  "teamConnect.saving": "⏳ GUARDANDO...",
 };

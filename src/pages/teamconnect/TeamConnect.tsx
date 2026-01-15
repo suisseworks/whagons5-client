@@ -294,7 +294,7 @@ function TeamConnect() {
                   fontWeight: '600'
                 }}
               >
-                ❌ Cancelar
+                {t('teamConnect.cancel', '❌ Cancel')}
               </button>
               <button
                 type="button"
@@ -313,7 +313,7 @@ function TeamConnect() {
                   boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
                 }}
               >
-                {isSubmitting ? '⏳ GUARDANDO...' : '✅ CREAR TABLERO'}
+                {isSubmitting ? t('teamConnect.saving', '⏳ Saving...') : t('teamConnect.createBoard', '✅ CREATE BOARD')}
               </button>
             </div>
           </div>

@@ -223,6 +223,127 @@ const IconBadge = ({
   </div>
 );
 
+// Plugin menu item component - moved outside AppSidebar to prevent recreation on every render
+const PluginMenuItem = ({ 
+  plugin, 
+  isCollapsed, 
+  isMobile, 
+  pathname, 
+  t 
+}: { 
+  plugin: PluginConfig; 
+  isCollapsed: boolean; 
+  isMobile: boolean; 
+  pathname: string; 
+  t: (key: string, fallback?: string) => string;
+}) => {
+  const Icon = plugin.icon;
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        tooltip={isCollapsed && !isMobile ? t(`sidebar.${plugin.id}`, plugin.name) : undefined}
+        className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+        style={{
+          height: '30px',
+          padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+          gap: '8px',
+          fontWeight: pathname.startsWith(plugin.route) || pathname === plugin.route ? 600 : 400,
+          fontSize: '12px',
+          boxShadow: pathname.startsWith(plugin.route) || pathname === plugin.route ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+        }}
+      >
+        <Link
+          to={plugin.route}
+          className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+        >
+          <IconBadge color={plugin.iconColor} size={18}>
+            <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+          </IconBadge>
+          {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+};
+
+// Sortable plugin menu item component - moved outside AppSidebar to prevent recreation on every render
+const SortablePluginMenuItem = ({ 
+  plugin, 
+  isCollapsed, 
+  isMobile, 
+  pathname, 
+  t 
+}: { 
+  plugin: PluginConfig; 
+  isCollapsed: boolean; 
+  isMobile: boolean; 
+  pathname: string; 
+  t: (key: string, fallback?: string) => string;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: plugin.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1,
+  };
+
+  const Icon = plugin.icon;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="cursor-grab active:cursor-grabbing"
+    >
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          tooltip={isCollapsed && !isMobile ? t(`sidebar.${plugin.id}`, plugin.name) : undefined}
+          className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+          style={{
+            height: '30px',
+            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+            gap: '8px',
+            fontWeight: pathname.startsWith(plugin.route) || pathname === plugin.route ? 600 : 400,
+            fontSize: '12px',
+            boxShadow: pathname.startsWith(plugin.route) || pathname === plugin.route ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+          }}
+        >
+          <Link
+            to={plugin.route}
+            onClick={(e) => {
+              if (isDragging) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+            style={{
+              pointerEvents: isDragging ? 'none' : 'auto',
+            }}
+          >
+            <IconBadge color={plugin.iconColor} size={18}>
+              <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+            </IconBadge>
+            {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </div>
+  );
+};
+
 const MoreMenuTriggerContent = ({ isCollapsed, isMobile }: { isCollapsed: boolean; isMobile: boolean }) => {
   const { isOpen } = useCollapsible();
   const { t } = useLanguage();
@@ -542,103 +663,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     setActivePluginId(null);
   };
 
-  // Component to render a plugin menu item
-  const PluginMenuItem = ({ plugin }: { plugin: PluginConfig }) => {
-    const Icon = plugin.icon;
-    return (
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          asChild
-          tooltip={isCollapsed && !isMobile ? t(`sidebar.${plugin.id}`, plugin.name) : undefined}
-          className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-          style={{
-            height: '30px',
-            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
-            gap: '8px',
-            fontWeight: pathname.startsWith(plugin.route) || pathname === plugin.route ? 600 : 400,
-            fontSize: '12px',
-            boxShadow: pathname.startsWith(plugin.route) || pathname === plugin.route ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-          }}
-        >
-          <Link
-            to={plugin.route}
-            className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
-          >
-            <IconBadge color={plugin.iconColor} size={18}>
-              <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-            </IconBadge>
-            {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  };
-
-  // Sortable plugin menu item for pinned plugins
-  const SortablePluginMenuItem = ({ plugin }: { plugin: PluginConfig }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: plugin.id });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0 : 1,
-    };
-
-    const Icon = plugin.icon;
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        className="cursor-grab active:cursor-grabbing"
-      >
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            asChild
-            tooltip={isCollapsed && !isMobile ? t(`sidebar.${plugin.id}`, plugin.name) : undefined}
-            className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-            style={{
-              height: '30px',
-              padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
-              gap: '8px',
-              fontWeight: pathname.startsWith(plugin.route) || pathname === plugin.route ? 600 : 400,
-              fontSize: '12px',
-              boxShadow: pathname.startsWith(plugin.route) || pathname === plugin.route ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-            }}
-          >
-            <Link
-              to={plugin.route}
-              onClick={(e) => {
-                if (isDragging) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }
-              }}
-              className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
-              style={{
-                pointerEvents: isDragging ? 'none' : 'auto',
-              }}
-            >
-              <IconBadge color={plugin.iconColor} size={18}>
-                <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-              </IconBadge>
-              {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </div>
-    );
-  };
-
   return (
     <Sidebar
       collapsible="icon"
@@ -710,7 +734,14 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   >
                     <SidebarMenu className="space-y-1">
                       {pinnedPlugins.map(plugin => (
-                        <SortablePluginMenuItem key={plugin.id} plugin={plugin} />
+                        <SortablePluginMenuItem 
+                          key={plugin.id} 
+                          plugin={plugin}
+                          isCollapsed={isCollapsed}
+                          isMobile={isMobile}
+                          pathname={pathname}
+                          t={t}
+                        />
                       ))}
                     </SidebarMenu>
                   </SortableContext>
@@ -760,7 +791,14 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 <SidebarMenu className="space-y-1">
                   {/* Unpinned plugins */}
                   {unpinnedPlugins.map(plugin => (
-                    <PluginMenuItem key={plugin.id} plugin={plugin} />
+                    <PluginMenuItem 
+                      key={plugin.id} 
+                      plugin={plugin}
+                      isCollapsed={isCollapsed}
+                      isMobile={isMobile}
+                      pathname={pathname}
+                      t={t}
+                    />
                   ))}
 
                   <SidebarMenuItem>

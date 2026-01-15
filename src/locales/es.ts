@@ -605,8 +605,6 @@ export const esTranslations: Record<string, string> = {
   "sidebar.spaces": "Espacios",
   "sidebar.more": "Más",
   "sidebar.less": "Menos",
-  "sidebar.teamConnect": "TeamConnect",
-  "sidebar.teamconnect": "TeamConnect",
   "sidebar.compliance": "Cumplimiento",
   "sidebar.analytics": "Analítica",
   "sidebar.plugins": "Complementos",
@@ -672,6 +670,15 @@ export const esTranslations: Record<string, string> = {
   "plugins.inventory.description": "Rastrea niveles de stock, gestiona inventario y optimiza cadenas de suministro",
   "plugins.tools.title": "Herramientas",
   "plugins.tools.description": "Préstamo de herramientas, préstamo de equipos y seguimiento de herramientas de mantenimiento",
+  
+  // Plugin modal translations
+  "plugins.manage": "Gestionar Complementos",
+  "plugins.disabled": "Deshabilitado",
+  "plugin.keyFeatures": "Características Clave",
+  "plugin.whatYoullGet": "Lo que Obtendrás",
+  "plugins.contactSalesDescription": "Contacta con ventas para habilitar este complemento",
+  "plugins.contactSalesButton": "Contactar Ventas",
+  "plugins.pluginInquirySubject": "Consulta de Complemento: {title}",
   
   // Common translations
   "common.back": "Volver",

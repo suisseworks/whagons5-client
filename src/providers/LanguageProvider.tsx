@@ -10,13 +10,14 @@ import {
 
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "@/config/languages";
 import { esTranslations } from "@/locales/es";
+import { enTranslations } from "@/locales/en";
 import { teamConnectTranslations } from "@/locales/teamconnect";
 
 type TranslationDictionary = Record<string, string>;
 
 const TRANSLATION_REGISTRY: Record<string, TranslationDictionary> = {
-  "en-US": teamConnectTranslations,
-  "en-GB": teamConnectTranslations,
+  "en-US": { ...enTranslations, ...teamConnectTranslations },
+  "en-GB": { ...enTranslations, ...teamConnectTranslations },
   es: esTranslations,
   "es-ES": esTranslations,
 };
