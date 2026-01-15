@@ -855,7 +855,9 @@ function Teams() {
                       return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
                     })
                     .map((u: any) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
-                  const roleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+                  // Filter roles to only show TEAM scope roles when associating users to teams
+                  const teamRoles = roles.filter((r) => r.scope === 'TEAM');
+                  const roleOptions = teamRoles.map((r) => ({ value: String(r.id), label: r.name }));
                   const hasCurrentUser = assignment.userId && userOptions.some((opt: { value: string }) => opt.value === assignment.userId);
                   const hasCurrentRole = assignment.roleId && roleOptions.some((opt) => opt.value === assignment.roleId);
                   return (

@@ -225,6 +225,7 @@ export interface Role {
     id: number;
     name: string;
     description?: string | null;
+    scope?: 'GLOBAL' | 'TEAM';
     workspace_id?: number | null;
     created_at: string;
     updated_at: string;

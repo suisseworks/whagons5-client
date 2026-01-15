@@ -1251,7 +1251,9 @@ function Users() {
                     ? baseTeamOptions
                     : [{ value: assignment.teamId, label: tu('dialogs.manageTeams.unknownTeam', `Team ${assignment.teamId}`) }, ...baseTeamOptions];
 
-                  const baseRoleOptions = roles.map((r) => ({ value: String(r.id), label: r.name }));
+                  // Filter roles to only show TEAM scope roles when associating teams
+                  const teamRoles = roles.filter((r) => r.scope === 'TEAM');
+                  const baseRoleOptions = teamRoles.map((r) => ({ value: String(r.id), label: r.name }));
                   const hasCurrentRole = assignment.roleId && baseRoleOptions.some((opt) => opt.value === assignment.roleId);
                   const roleOptions = hasCurrentRole || !assignment.roleId
                     ? baseRoleOptions
