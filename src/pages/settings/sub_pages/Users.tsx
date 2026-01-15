@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import api from "@/api/whagonsApi";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
@@ -37,6 +38,7 @@ interface UserData {
   has_active_subscription?: boolean;
   url_picture?: string | null;
   color?: string | null;
+  global_roles?: string[];
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -142,6 +144,7 @@ function Users() {
 
   // Selected teams state (using string IDs for MultiSelect)
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedGlobalRoles, setSelectedGlobalRoles] = useState<string[]>([]);
   const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isTeamsDialogOpen, setIsTeamsDialogOpen] = useState(false);
@@ -184,9 +187,13 @@ function Users() {
       // Load existing user-team relationships
       const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
       setSelectedTeams(existingUserTeams.map((ut: UserTeam) => ut.team_id.toString()));
+
+      // Load existing global roles - already included in editingUser from UserResource
+      setSelectedGlobalRoles(editingUser.global_roles || []);
     } else {
-      // Reset selected teams when dialog closes
+      // Reset selected teams and global roles when dialog closes
       setSelectedTeams([]);
+      setSelectedGlobalRoles([]);
     }
   }, [editingUser, userTeams]);
 
@@ -335,14 +342,11 @@ function Users() {
       email: tu('grid.columns.email', 'Email'),
       teams: tu('grid.columns.teams', 'Teams'),
       jobPosition: tu('grid.columns.jobPosition', 'Job Position'),
-      role: tu('grid.columns.role', 'Role'),
       subscription: tu('grid.columns.subscription', 'Subscription'),
       actions: tu('grid.columns.actions', 'Actions')
     };
     const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
     const noJobPositionLabel = tu('grid.values.noJobPosition', 'No Job Position');
-    const adminLabel = tu('grid.values.admin', 'Admin');
-    const userLabel = tu('grid.values.user', 'User');
     const activeLabel = tu('grid.values.active', 'Active');
     const inactiveLabel = tu('grid.values.inactive', 'Inactive');
     const manageTeamsLabel = tu('grid.actions.manageTeams', 'Teams');
@@ -445,14 +449,6 @@ function Users() {
           const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
           return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
         }
-      },
-      {
-        field: 'is_admin',
-        headerName: columnLabels.role,
-        flex: 0.8,
-        minWidth: 130,
-        cellRenderer: (params: ICellRendererParams) =>
-          params.value ? <Badge variant="default">{adminLabel}</Badge> : <Badge variant="outline">{userLabel}</Badge>
       },
       {
         field: 'has_active_subscription',
@@ -1060,6 +1056,24 @@ function Users() {
         }
       }
 
+      // Handle global roles synchronization
+      // Get all current user roles (including non-global ones)
+      const currentUserRolesResponse = await api.get(`/users/${editingUser.id}/roles`);
+      const allCurrentRoles = currentUserRolesResponse.data?.roles || [];
+      
+      // Filter out global roles and keep only non-global ones
+      const nonGlobalRoles = allCurrentRoles.filter((roleName: string) => {
+        const role = roles.find((r: Role) => r.name === roleName && r.scope !== 'GLOBAL');
+        return role !== undefined;
+      });
+      
+      // Combine non-global roles with selected global roles
+      const rolesToSync = [...nonGlobalRoles, ...selectedGlobalRoles];
+      
+      await api.put(`/users/${editingUser.id}/roles`, {
+        roles: rolesToSync
+      });
+
       // Refresh userTeams cache to reflect changes
       dispatch((genericActions as any).userTeams.getFromIndexedDB());
     } catch (error: any) {
@@ -1527,7 +1541,7 @@ function Users() {
                 {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
               </TabsTrigger>
               <TabsTrigger value="permissions" className="flex-1 px-6 py-2.5">
-                {tu('dialogs.editUser.tabs.permissions', 'Permissions & Teams')}
+                {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="basic" className="mt-4 min-h-[200px]">
@@ -1583,34 +1597,22 @@ function Users() {
             </TabsContent>
             <TabsContent value="permissions" className="mt-4 min-h-[200px]">
               <div className="grid gap-4">
-                <CheckboxField
-                  id="edit-is_admin"
-                  label={tu('dialogs.editUser.fields.admin', 'Admin')}
-                  checked={editFormData.is_admin}
-                  onChange={(checked) => setEditFormData(prev => ({ ...prev, is_admin: checked }))}
-                  description={tu('dialogs.editUser.fields.adminDescription', 'Grant admin role')}
-                />
-                <CheckboxField
-                  id="edit-has_active_subscription"
-                  label={tu('dialogs.editUser.fields.subscription', 'Subscription')}
-                  checked={editFormData.has_active_subscription}
-                  onChange={(checked) => setEditFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-                  description={tu('dialogs.editUser.fields.subscriptionDescription', 'Active subscription')}
-                />
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">{tu('dialogs.editUser.fields.teams', 'Teams')}</Label>
+                  <Label className="text-right pt-2">{tu('dialogs.editUser.fields.globalRoles', 'Roles Globales')}</Label>
                   <div className="col-span-3">
                     <MultiSelect
-                      options={teams.map((team: Team) => ({
-                        value: team.id.toString(),
-                        label: team.name
-                      }))}
-                      onValueChange={setSelectedTeams}
-                      defaultValue={selectedTeams}
+                      options={roles
+                        .filter((role: Role) => role.scope === 'GLOBAL')
+                        .map((role: Role) => ({
+                          value: role.name,
+                          label: role.name
+                        }))}
+                      onValueChange={setSelectedGlobalRoles}
+                      defaultValue={selectedGlobalRoles}
                       placeholder={
-                        teamsLoading && teams.length === 0
-                          ? tu('multiSelect.loadingTeams', 'Loading teams...')
-                          : tu('multiSelect.selectTeams', 'Select teams...')
+                        roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
+                          ? tu('multiSelect.noGlobalRoles', 'No global roles available')
+                          : tu('multiSelect.selectGlobalRoles', 'Select global roles...')
                       }
                       maxCount={10}
                       className="w-full"
