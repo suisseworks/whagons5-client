@@ -258,6 +258,22 @@ export class GenericCache {
 			this.validating = true;
 			const t0 = performance.now();
 			
+			// CRITICAL: Check if cache is empty FIRST, before checking integrity hashing
+			// This ensures we fetch data even when integrity hashing isn't set up
+			const preRows = await this.getAll();
+			if (preRows.length === 0) {
+				this.dlog('no local rows; fetchAll bootstrap');
+				try {
+					await this.fetchAll();
+					// Warm-read to ensure writes are committed and CEK is ready before returning
+					try { await this.getAll(); } catch {}
+				} catch (e) {
+					console.warn(`[GenericCache:${this.store}] Bootstrap fetchAll failed`, e);
+				}
+				this.validating = false; 
+				return true;
+			}
+			
 			// First check if integrity hashing is set up for this table
 			// If not, skip validation entirely to avoid clearing the store
 			try {
@@ -279,18 +295,6 @@ export class GenericCache {
 				}
 				// For other errors (network, 500, etc), continue with validation
 				console.warn(`[GenericCache:${this.store}] Integrity check failed but continuing validation`, { table: this.table, error: e });
-			}
-			
-			// If no local rows, fetch once then exit
-			const preRows = await this.getAll();
-			if (preRows.length === 0) {
-				this.dlog('no local rows; fetchAll bootstrap');
-				try {
-					await this.fetchAll();
-					// Warm-read to ensure writes are committed and CEK is ready before returning
-					try { await this.getAll(); } catch {}
-				} catch {}
-				this.validating = false; return true;
 			}
 
 			// If local rows exist but appear to be from a different store (corrupted/mismatched), reset and fetch
@@ -552,9 +556,11 @@ export class GenericCache {
 		// Execute validations in parallel to avoid slow sequential startup
 		await Promise.all(locals.map(async (l) => {
 			const s = serverMap[l.table] ?? null;
-			// If server returns null, table doesn't have integrity hashing - skip validation
+			// If server returns null, table doesn't have integrity hashing
+			// Still call validate() to ensure empty caches get populated
 			if (s === null) {
-				results[l.table] = true; // Skip validation, keep existing data
+				// Call validate() which will check for empty cache and fetch if needed
+				results[l.table] = await l.cache.validate();
 				return;
 			}
 			// Strict short-circuit: use ONLY global hash equality to skip per-table calls

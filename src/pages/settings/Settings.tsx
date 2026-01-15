@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from 'motion/react';
@@ -43,6 +43,7 @@ import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { genericActions } from "@/store/genericSlices";
 
 
 const STORAGE_KEYS = {
@@ -256,6 +257,8 @@ const SETTINGS_TAB_STORAGE_KEY = 'wh_settings_last_tab';
 
 function Settings() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
   const { t } = useLanguage();
   
   // Load last selected tab from localStorage, or default to 'basics'
@@ -272,17 +275,33 @@ function Settings() {
   const [prevActiveTab, setPrevActiveTab] = useState<SettingsTabKey>(activeTab);
 
   // Sync activeTab with URL on initial load (URL takes precedence)
-  // Only syncs from URL, not localStorage (localStorage handled by onValueChange)
+  // If no tab in URL and we're on the main settings page, restore from localStorage and update URL
   useEffect(() => {
     try {
+      // Only restore tab if we're on the exact /settings path (not a subpage)
+      if (location.pathname !== '/settings') {
+        return;
+      }
+      
       const urlParams = new URLSearchParams(window.location.search);
       const tabFromUrl = urlParams.get('tab');
       if (tabFromUrl === 'advanced' || tabFromUrl === 'basics' || tabFromUrl === 'favorites') {
         setActiveTab(tabFromUrl as SettingsTabKey);
         setPrevActiveTab(tabFromUrl as SettingsTabKey);
+      } else {
+        // No tab in URL - restore from localStorage and update URL
+        const saved = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
+        if (saved === 'advanced' || saved === 'basics' || saved === 'favorites') {
+          const savedTab = saved as SettingsTabKey;
+          setActiveTab(savedTab);
+          setPrevActiveTab(savedTab);
+          // Update URL to reflect the saved tab
+          urlParams.set('tab', savedTab);
+          navigate(`/settings?${urlParams.toString()}`, { replace: true });
+        }
       }
     } catch {}
-  }, []);
+  }, [navigate, location.pathname]);
 
 
 
@@ -808,6 +827,7 @@ function Settings() {
   const favoriteBadgeLabel = t('settings.cards.favorite.badge', 'Favorite');
   const favoritesEmptyLabel = t('settings.cards.favorites.empty', 'Star a settings card to see it here.');
   const favoritesHelperLabel = t('settings.cards.favorites.helper', 'Use the star icon on any card to pin it to this list.');
+
 
   const mainSettingsTabs = [
     {

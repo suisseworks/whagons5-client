@@ -26,6 +26,7 @@ import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Approvals from '@/pages/settings/sub_pages/Approvals';
 import Global from '@/pages/settings/sub_pages/Global';
+import BoardsSettings from '@/pages/settings/sub_pages/Boards';
 import Home from '@/pages/home/Home';
 // Messages removed
 import Boards from '@/pages/boards/Boards';
@@ -101,6 +102,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/workflows" element={<Workflows />} />
           <Route path="/settings/approvals" element={<Approvals />} />
           <Route path="/settings/global" element={<Global />} />
+          <Route path="/settings/boards" element={<BoardsSettings />} />
           <Route path="/settings/test" element={<TestPage />} />
           
           {/* Compliance Routes */}

@@ -81,22 +81,24 @@ function BoardDetail() {
     dispatch(genericActions.boardMessages.getFromIndexedDB());
     dispatch(genericActions.boardMembers.getFromIndexedDB());
     dispatch(genericActions.users.getFromIndexedDB());
-    
-    // Fetch from API
-    dispatch(genericActions.boards.fetchFromAPI());
-    dispatch(genericActions.boardMessages.fetchFromAPI());
-    dispatch(genericActions.boardMembers.fetchFromAPI());
-    dispatch(genericActions.users.fetchFromAPI());
   }, [dispatch, boardId]);
 
   const handleCreateMessage = async () => {
     if (!messageFormData.content.trim()) return;
 
+    // Validate boardId is available
+    const currentBoardId = boardId ? parseInt(boardId) : null;
+    if (!currentBoardId || currentBoardId <= 0) {
+      console.error('Invalid board ID:', boardId);
+      alert(t('boards.error.invalidBoard', 'Invalid board ID. Please refresh the page.'));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const messageData: any = {
         ...messageFormData,
-        board_id: parseInt(boardId || '0'),
+        board_id: currentBoardId,
         // Convert empty strings to null for optional date fields
         starts_at: messageFormData.starts_at || null,
         ends_at: messageFormData.ends_at || null,
@@ -104,9 +106,6 @@ function BoardDetail() {
       };
       
       await dispatch(genericActions.boardMessages.addAsync(messageData) as any);
-      
-      // Refresh messages from API to ensure sync
-      await dispatch(genericActions.boardMessages.fetchFromAPI() as any);
       
       setIsCreateMessageOpen(false);
       setMessageFormData({
@@ -116,8 +115,14 @@ function BoardDetail() {
         starts_at: '',
         ends_at: '',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create message:', error);
+      // Extract error message from various possible error formats
+      const errorMessage = error?.payload || 
+                          error?.response?.data?.message || 
+                          error?.message || 
+                          t('boards.error.postMessage', 'Failed to post message');
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -133,9 +138,6 @@ function BoardDetail() {
         board_id: parseInt(boardId || '0'),
         member_id: parseInt(memberFormData.member_id),
       }) as any);
-      
-      // Refresh members from API to ensure sync
-      await dispatch(genericActions.boardMembers.fetchFromAPI() as any);
       
       setIsAddMemberOpen(false);
       setMemberFormData({
@@ -233,44 +235,21 @@ function BoardDetail() {
             )}
           </div>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="outline"
               onClick={() => setShowMembers(!showMembers)}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '2px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
             >
               <Users className="w-4 h-4" />
               {t('teamconnect.members.title', 'Members')} ({boardMembers.length})
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="destructive"
               onClick={() => setIsCreateMessageOpen(true)}
-              style={{
-                backgroundColor: '#ef4444',
-                color: 'white',
-                padding: '0.5rem 1.5rem',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              }}
+              size="lg"
             >
               <Plus className="w-4 h-4" />
               📝 {t('teamconnect.messages.create', 'Post Message')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -283,26 +262,13 @@ function BoardDetail() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>{t('teamconnect.members.title', 'Members')}</CardTitle>
-              <button
+              <Button
+                variant="destructive"
                 onClick={() => setIsAddMemberOpen(true)}
-                style={{
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                }}
               >
                 <Plus className="w-4 h-4" />
                 👥 {t('teamconnect.members.add', 'Add Members')}
-              </button>
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -368,31 +334,19 @@ function BoardDetail() {
               <p className="text-muted-foreground mb-4">
                 {t('teamconnect.messages.emptyDescription', 'Be the first to post a message')}
               </p>
-              <button
+              <Button
+                variant="destructive"
                 onClick={() => setIsCreateMessageOpen(true)}
-                style={{
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  padding: '0.75rem 1.5rem',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  margin: '0 auto',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                }}
+                size="lg"
+                className="mx-auto"
               >
                 <Plus className="w-4 h-4" />
                 📝 {t('teamconnect.messages.create', 'Post Message')}
-              </button>
+              </Button>
             </CardContent>
           </Card>
         ) : (
-          boardMessages.map((message: TeamConnectBoardMessage) => (
+          boardMessages.map((message: BoardMessage) => (
             <Card key={message.id} className={message.is_pinned ? 'border-2' : ''} style={message.is_pinned ? { borderColor: 'var(--brand-accent)' } : {}}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -495,48 +449,24 @@ function BoardDetail() {
               </Label>
             </div>
           </div>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            gap: '0.5rem',
-            paddingTop: '1.5rem',
-            marginTop: '1.5rem',
-            borderTop: '1px solid #e5e7eb'
-          }}>
-            <button
+          <DialogFooter>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setIsCreateMessageOpen(false)}
               disabled={isSubmitting}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                cursor: 'pointer'
-              }}
             >
               {t('teamconnect.actions.cancel', 'Cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               onClick={handleCreateMessage}
               disabled={!messageFormData.content.trim() || isSubmitting}
-              style={{ 
-                backgroundColor: '#ef4444',
-                color: 'white',
-                padding: '0.5rem 1.5rem',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                opacity: !messageFormData.content.trim() || isSubmitting ? 0.5 : 1
-              }}
             >
               {isSubmitting ? t('teamconnect.messages.posting', 'POSTING...') : t('teamconnect.messages.postMessage', 'POST MESSAGE')}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -620,48 +550,24 @@ function BoardDetail() {
               </select>
             </div>
           </div>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            gap: '0.5rem',
-            paddingTop: '1.5rem',
-            marginTop: '1.5rem',
-            borderTop: '1px solid #e5e7eb'
-          }}>
-            <button
+          <DialogFooter>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setIsAddMemberOpen(false)}
               disabled={isSubmitting}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                cursor: 'pointer'
-              }}
             >
               {t('teamconnect.actions.cancel', 'Cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               onClick={handleAddMember}
               disabled={!memberFormData.member_id || isSubmitting}
-              style={{ 
-                backgroundColor: '#ef4444',
-                color: 'white',
-                padding: '0.5rem 1.5rem',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                opacity: !memberFormData.member_id || isSubmitting ? 0.5 : 1
-              }}
             >
               {isSubmitting ? t('teamconnect.members.adding', 'Adding...') : t('teamconnect.members.addMember', 'ADD MEMBER')}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -66,6 +66,10 @@ function Header() {
     const teamconnectBoardsState = useSelector((s: RootState) => (s as any).teamconnectBoards);
     const { value: teamconnectBoards = [] } = teamconnectBoardsState || {};
 
+    // Get boards for breadcrumb
+    const boardsState = useSelector((s: RootState) => (s as any).boards);
+    const { value: boards = [] } = boardsState || {};
+
     // Redux UI state selectors
     const currentFilterModel = useSelector(selectFilterModel);
     const searchText = useSelector(selectSearchText);
@@ -110,6 +114,12 @@ function Header() {
             plugins: 'Plugins',
         };
         const getLabel = (seg: string, index: number) => {
+            // Special handling for boards board ID
+            if (parts[0] === 'boards' && index === 1 && !isNaN(Number(seg))) {
+                const boardId = parseInt(seg);
+                const board = boards.find((b: any) => b.id === boardId);
+                return board?.name || seg;
+            }
             // Special handling for teamconnect board ID
             if (parts[0] === 'teamconnect' && index === 1 && !isNaN(Number(seg))) {
                 const boardId = parseInt(seg);
@@ -148,7 +158,7 @@ function Header() {
             }
         }
         return acc;
-    }, [location.pathname, t, teamconnectBoards]);
+    }, [location.pathname, t, teamconnectBoards, boards]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {

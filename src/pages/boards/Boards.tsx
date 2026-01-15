@@ -51,7 +51,6 @@ function Boards() {
   // Load boards on mount
   useEffect(() => {
     dispatch(genericActions.boards.getFromIndexedDB());
-    dispatch(genericActions.boards.fetchFromAPI());
   }, [dispatch]);
 
   // Filter boards based on search (excluding soft-deleted boards)

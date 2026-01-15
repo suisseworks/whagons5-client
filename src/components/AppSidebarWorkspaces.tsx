@@ -6,8 +6,6 @@ import {
   Plus,
   ChevronDown,
   Briefcase,
-  Search,
-  MoreHorizontal,
   Layers,
   Inbox,
 } from 'lucide-react';
@@ -531,12 +529,6 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 </CollapsibleTrigger>
                 
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0" title={t('sidebar.moreOptions', 'More options')}>
-                    <MoreHorizontal size={16} className="text-[var(--sidebar-text-primary)]" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0" title={t('sidebar.search', 'Search')}>
-                    <Search size={16} className="text-[var(--sidebar-text-primary)]" />
-                  </Button>
                   <Button variant="ghost" size="icon" className="h-5 w-5 p-0" onClick={() => setIsModalOpen(true)} title={t('sidebar.addWorkspace', 'Add Workspace')}>
                     <Plus size={16} className="text-[var(--sidebar-text-primary)]" />
                   </Button>

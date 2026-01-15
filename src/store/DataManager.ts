@@ -29,6 +29,21 @@ const coreKeys = [
   'customFields',
   'categoryCustomFields',
   'tags',
+  'broadcasts',
+  'boards',
+  // Plugin tables
+  'plugins',
+  'pluginRoutes',
+  'broadcastAcknowledgments',
+  'boardMembers',
+  'boardMessages',
+  'workspaceChat',
+  'messages',
+  'workflows',
+  'complianceStandards',
+  'complianceRequirements',
+  'complianceMappings',
+  'complianceAudits',
 ] as const;
 
 export class DataManager {

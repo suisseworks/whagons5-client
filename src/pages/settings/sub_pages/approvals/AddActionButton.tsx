@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ApprovalActionType, ACTION_TYPE_LABELS, ACTION_TYPE_ICONS } from './ApprovalActionTypes';
+import { ApprovalActionType, ACTION_TYPE_LABELS, ACTION_TYPE_ICONS, ACTION_TYPE_COLORS } from './ApprovalActionTypes';
 
 interface AddActionButtonProps {
   onSelectAction: (actionType: ApprovalActionType) => void;
@@ -42,7 +42,10 @@ export function AddActionButton({ onSelectAction }: AddActionButtonProps) {
             onClick={() => onSelectAction(actionType)}
             className="cursor-pointer"
           >
-            <span className="mr-2 text-lg">{ACTION_TYPE_ICONS[actionType]}</span>
+            <FontAwesomeIcon 
+              icon={ACTION_TYPE_ICONS[actionType]} 
+              className={`mr-2 ${ACTION_TYPE_COLORS[actionType]}`} 
+            />
             {ACTION_TYPE_LABELS[actionType]}
           </DropdownMenuItem>
         ))}

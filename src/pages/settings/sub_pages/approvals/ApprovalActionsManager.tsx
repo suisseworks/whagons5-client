@@ -4,7 +4,7 @@ import { faPlus, faTrash, faGripVertical, faToggleOn, faToggleOff, faEdit } from
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ApprovalAction, ACTION_TYPE_LABELS, ACTION_TYPE_ICONS } from './ApprovalActionTypes';
+import { ApprovalAction, ACTION_TYPE_LABELS, ACTION_TYPE_ICONS, ACTION_TYPE_COLORS } from './ApprovalActionTypes';
 import { ActionEditor } from './ActionEditor';
 import { AddActionButton } from './AddActionButton';
 
@@ -116,7 +116,10 @@ export function ApprovalActionsManager({
             
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{ACTION_TYPE_ICONS[action.action]}</span>
+                <FontAwesomeIcon 
+                  icon={ACTION_TYPE_ICONS[action.action]} 
+                  className={`text-lg ${ACTION_TYPE_COLORS[action.action]}`} 
+                />
                 <span className="font-medium">{ACTION_TYPE_LABELS[action.action]}</span>
                 <Badge variant="outline" className="text-xs">
                   Order: {action.order + 1}

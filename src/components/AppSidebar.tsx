@@ -4,7 +4,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -14,10 +13,6 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Settings,
-  Plus,
-  ChevronDown,
-  BarChart3,
-  Layers,
   Plug,
   Users2,
   Globe,
@@ -45,6 +40,7 @@ import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
+import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
 import {
@@ -430,6 +426,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [pluginsConfig, setPluginsConfigState] = useState<PluginConfig[]>(getPluginsConfig());
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
+  const [pinnedBoards, setPinnedBoardsState] = useState<number[]>([]);
+  const [pinnedBoardsOrder, setPinnedBoardsOrderState] = useState<number[]>([]);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
   // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
@@ -439,6 +437,31 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     (state: RootState) => state.workspaces
   );
   const { value: workspaces = [] } = workspacesState || {};
+
+  // Boards state
+  const boardsState = useSelector(
+    (state: RootState) => (state as any).boards || { value: [] }
+  );
+  const { value: boards = [] } = boardsState;
+
+  // Load boards on mount if boards plugin is enabled
+  useEffect(() => {
+    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
+    if (boardsPlugin?.enabled && boards.length === 0) {
+      // Try to load boards from IndexedDB
+      const loadBoards = async () => {
+        try {
+          const cache = (genericCaches as any)?.boards;
+          if (cache && typeof cache.getAll === 'function') {
+            await cache.getAll();
+          }
+        } catch (error) {
+          console.error('Error loading boards:', error);
+        }
+      };
+      loadBoards();
+    }
+  }, [pluginsConfig, boards.length]);
 
   // Local-first: read workspaces directly from IndexedDB to render immediately, then let Redux take over
   const [initialWorkspaces, setInitialWorkspaces] = useState<Workspace[] | null>(null);
@@ -493,6 +516,47 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   useEffect(() => {
     const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
     return unsubscribe;
+  }, []);
+
+  // Load pinned boards from localStorage
+  useEffect(() => {
+    const loadPinnedBoards = () => {
+      try {
+        const stored = localStorage.getItem('pinnedBoards');
+        const storedOrder = localStorage.getItem('pinnedBoardsOrder');
+        if (stored) {
+          setPinnedBoardsState(JSON.parse(stored));
+        }
+        if (storedOrder) {
+          setPinnedBoardsOrderState(JSON.parse(storedOrder));
+        }
+      } catch (error) {
+        console.error('Error loading pinned boards:', error);
+      }
+    };
+    
+    loadPinnedBoards();
+    
+    // Listen for storage changes (when boards are pinned/unpinned from settings)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'pinnedBoards' || e.key === 'pinnedBoardsOrder') {
+        loadPinnedBoards();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events (same-window updates)
+    const handleCustomStorageChange = () => {
+      loadPinnedBoards();
+    };
+    
+    window.addEventListener('pinnedBoardsChanged', handleCustomStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('pinnedBoardsChanged', handleCustomStorageChange);
+    };
   }, []);
 
   // Load default icon
@@ -614,12 +678,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   }
   */
 
-  // Separate pinned and unpinned plugins
+  // Separate pinned and unpinned plugins (excluding boards since it's now a collapsible section)
   const [pinnedPluginsOrder, setPinnedPluginsOrderState] = useState<string[]>(getPinnedPluginsOrder());
   
-  // Sort pinned plugins by saved order
+  // Sort pinned plugins by saved order (excluding boards)
   const pinnedPlugins = useMemo(() => {
-    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned);
+    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned && p.id !== 'boards');
     const order = pinnedPluginsOrder;
     
     if (order.length === 0) return pinned;
@@ -635,7 +699,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     });
   }, [pluginsConfig, pinnedPluginsOrder]);
   
-  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned);
+  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned && p.id !== 'boards');
+
+  // Check if boards plugin is enabled
+  const boardsPluginEnabled = useMemo(() => {
+    return pluginsConfig.find(p => p.id === 'boards')?.enabled ?? false;
+  }, [pluginsConfig]);
 
   // DnD sensors for pinned plugins
   const sensors = useSensors(
@@ -740,6 +809,17 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               showEverythingButton={true}
             />
             
+            {/* Boards section - shown below workspaces if boards plugin is enabled */}
+            {boardsPluginEnabled && (
+              <>
+                <SidebarSeparator className="my-2 border-[var(--sidebar-border)]" />
+                <AppSidebarBoards
+                  boards={boards}
+                  pathname={pathname}
+                />
+              </>
+            )}
+            
             {/* Pinned plugins - shown below workspaces */}
             {pinnedPlugins.length > 0 && (
               <>
@@ -800,6 +880,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                 </DndContext>
               </>
             )}
+
           </div>
         </SidebarGroup>
       </SidebarContent>
