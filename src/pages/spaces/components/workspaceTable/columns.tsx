@@ -970,7 +970,6 @@ export function buildWorkspaceColumns(opts: any) {
       width: 80,
       minWidth: 70,
       maxWidth: 100,
-      pinned: 'left',
       sortable: true,
       filter: 'agNumberColumnFilter',
       cellClass: 'wh-id-cell',
@@ -1318,12 +1317,6 @@ export function buildWorkspaceColumns(opts: any) {
         if (params.event) {
           params.event.stopPropagation();
           params.event.preventDefault();
-        }
-      },
-      onCellMouseDown: (params: any) => {
-        // Also prevent on mouse down to catch the event earlier
-        if (params.event) {
-          params.event.stopPropagation();
         }
       },
       width: 170,

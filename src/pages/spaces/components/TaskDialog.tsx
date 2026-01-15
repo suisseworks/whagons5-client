@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addTaskAsync, updateTaskAsync } from '@/store/reducers/tasksSlice';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import toast from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { iconService } from '@/database/iconService';
@@ -16,7 +16,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ChevronUp, Plus, ShieldCheck, Clock, GripVertical, Info } from 'lucide-react';
+import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '@/providers/AuthProvider';
 import { genericActions } from '@/store/genericSlices';
@@ -1456,6 +1456,9 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId: prop
               </span>
             )}
           </div>
+          <SheetDescription className="sr-only">
+            {mode === 'edit' ? 'Edit task details including name, description, status, priority, and more.' : 'Create a new task with details like name, description, status, priority, and assignments.'}
+          </SheetDescription>
         </SheetHeader>
 
         {/* Content Area - Scrollable */}

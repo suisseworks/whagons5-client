@@ -811,10 +811,10 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex flex-wrap items-start gap-3 -mt-1 mb-3">
+      <div className="flex items-start gap-3 -mt-1 mb-3">
         {showHeaderKpis && (
-          <div className="flex-1 min-w-[280px]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {kpiCards.map((card) => (
                 <div
                   key={card.key}
@@ -822,24 +822,24 @@ export const Workspace = () => {
                 >
                   <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass}`} />
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <div className={`flex items-center justify-center rounded-lg p-2 border ${card.badgeClass} workspace-kpi-icon`}>
+                    <div className={`flex items-center justify-center flex-shrink-0 rounded-lg p-2 border ${card.badgeClass} workspace-kpi-icon`}>
                       {card.icon}
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/90">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/90 truncate">
                         {card.label}
                       </div>
-                      <div className="text-xl font-semibold leading-tight text-foreground">
+                      <div className="text-xl font-semibold leading-tight text-foreground truncate">
                         {card.value}
                       </div>
                       {card.helperText ? (
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-[11px] text-muted-foreground truncate">
                           {card.helperText}
                         </div>
                       ) : null}
                     </div>
                     {card.sparkline ? (
-                      <div className="ml-auto w-24 sm:w-28">
+                      <div className="flex-shrink-0 w-24 sm:w-28">
                         {card.sparkline}
                       </div>
                     ) : null}
@@ -850,7 +850,7 @@ export const Workspace = () => {
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-3 pr-2">
+        <div className="flex-shrink-0 flex items-center gap-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

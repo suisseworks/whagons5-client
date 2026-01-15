@@ -1351,8 +1351,15 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           suppressContextMenu={false}
           getContextMenuItems={getContextMenuItems}
           autoGroupColumnDef={(useClientSide && groupBy !== 'none') ? autoGroupColumnDef : undefined}
-          rowSelection={'multiple'}
-          suppressRowClickSelection={true}
+          rowSelection={{ 
+            mode: 'multiRow', 
+            enableClickSelection: false,
+            checkboxes: true,
+            headerCheckbox: true,
+            columnWidth: 44,
+            checkboxLocation: 'first',
+            pinned: 'left'
+          }}
           getRowStyle={getRowStyle}
           onGridReady={onGridReady}
           onFirstDataRendered={() => {
@@ -1385,19 +1392,19 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             onSelectionChanged(ids);
           } catch { onSelectionChanged([] as number[]); }
         }}
-        onRowDoubleClicked={(e: any) => {
-          // Don't open edit task if double click was on status column
+        onRowClicked={(e: any) => {
+          // Don't open edit task if click was on status column or checkbox column
           const target = e?.event?.target as HTMLElement;
           if (target) {
-            const cellElement = target.closest('[col-id="status_id"]');
             const statusCell = target.closest('.ag-cell[col-id="status_id"]');
-            if (cellElement || statusCell) {
-              return; // Ignore double clicks on status column
+            const checkboxCell = target.closest('.ag-cell[col-id="ag-Grid-SelectionColumn"]');
+            if (statusCell || checkboxCell) {
+              return; // Ignore clicks on status or checkbox columns
             }
           }
           // Also check the column property if available
-          if (e?.column?.colId === 'status_id') {
-            return; // Ignore double clicks on status column
+          if (e?.column?.colId === 'status_id' || e?.column?.colId === 'ag-Grid-SelectionColumn') {
+            return; // Ignore clicks on status or checkbox columns
           }
           // Call the handler if provided
           if (onRowDoubleClicked && e?.data) {
@@ -1413,28 +1420,6 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         }}
         onColumnVisible={(e: any) => {
           handleColumnOrderChanged(e?.columnApi);
-        }}
-        onCellDoubleClicked={(e: any) => {
-          // Fallback: handle double click at cell level if row-level doesn't work
-          // Only process if it's not the status column
-          if (e?.column?.colId === 'status_id') {
-            return; // Ignore double clicks on status column
-          }
-          // Prevent multiple calls for the same row (onCellDoubleClicked fires for each cell)
-          const rowId = e?.data?.id;
-          const now = Date.now();
-          if (lastDoubleClickRef.current && lastDoubleClickRef.current.rowId === rowId && now - lastDoubleClickRef.current.timestamp < 100) {
-            return; // Already handled this row's double-click
-          }
-          lastDoubleClickRef.current = { rowId, timestamp: now };
-          // Call the handler if provided
-          if (onRowDoubleClicked && e?.data) {
-            onRowDoubleClicked(e.data);
-          }
-        }}
-        onRowClicked={(_e: any) => {
-          // Prevent single click from doing anything (we only want double click)
-          // But still allow row selection
         }}
         animateRows={false}
         suppressColumnVirtualisation={false}

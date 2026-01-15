@@ -166,13 +166,13 @@ function Header() {
         const key = `wh_workspace_search_global`;
         try {
             const saved = localStorage.getItem(key);
-            if (saved != null && saved !== searchText) {
+            if (saved != null) {
                 dispatch(setSearchText(saved));
-            } else if (saved === null && searchText !== '') {
+            } else {
                 dispatch(setSearchText(''));
             }
         } catch {}
-    }, [currentWorkspaceName, dispatch, searchText]);
+    }, [currentWorkspaceName, dispatch]);
 
     // Save search text to localStorage when it changes
     useEffect(() => {
@@ -195,14 +195,14 @@ function Header() {
             const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
             const savedGroup = localStorage.getItem(groupKey) as any;
             const savedCollapse = localStorage.getItem(collapseKey);
-            if (savedGroup && savedGroup !== groupBy) {
+            if (savedGroup) {
                 dispatch(setGroupBy(savedGroup));
             }
-            if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+            if (savedCollapse !== null) {
                 dispatch(setCollapseGroups(savedCollapse === 'true'));
             }
         } catch {}
-    }, [currentWorkspaceName, currentWorkspaceId, dispatch, groupBy, collapseGroups]);
+    }, [currentWorkspaceName, currentWorkspaceId, dispatch]);
 
     // Save groupBy to localStorage when changed
     useEffect(() => {
