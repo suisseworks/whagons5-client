@@ -46,6 +46,7 @@ import { Workspace } from '@/store/types';
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useBranding } from '@/providers/BrandingProvider';
 
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
@@ -158,6 +159,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const pathname = location.pathname;
   const isCollapsed = state === 'collapsed';
   const { t } = useLanguage();
+  const { config } = useBranding();
+  
+  // Check if primary color is a gradient
+  const isPrimaryGradient = useMemo(() => {
+    const primaryColor = config.primaryColor || '';
+    return primaryColor.trim().startsWith('linear-gradient');
+  }, [config.primaryColor]);
 
   // Extract toggleSidebar to suppress unused warning
   // const { toggleSidebar } = useSidebar();
@@ -369,12 +377,26 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <WhagonsCheck
               width={showExpandedContent ? 40 : 28}
               height={showExpandedContent ? 18 : 14}
-              color={'var(--sidebar-primary)'}
+              color={config.primaryColor || 'var(--sidebar-primary)'}
             />
             {showExpandedContent && (
               <div
-                className="pl-2 font-semibold text-[var(--sidebar-primary)]"
-                style={{ fontFamily: 'Montserrat', fontSize: '20px', fontWeight: 600 }}
+                className="pl-2 font-semibold"
+                style={{
+                  fontFamily: 'Montserrat',
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  ...(isPrimaryGradient
+                    ? {
+                        background: 'var(--sidebar-primary)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                      }
+                    : {
+                        color: 'var(--sidebar-primary)',
+                      }),
+                }}
               >
                 Whagons
               </div>

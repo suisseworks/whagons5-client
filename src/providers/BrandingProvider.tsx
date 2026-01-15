@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { convert, lighten, darken, mix } from 'colorizr';
+import { convert, lighten, darken, mix, luminance } from 'colorizr';
 import {
   BRANDING_STORAGE_KEY,
   BrandingAssets,
@@ -54,21 +54,39 @@ const isLegacyColor = (value?: string, legacy?: string) => {
 };
 
 const hexToRgb = (hex: string): [number, number, number] | null => {
-  const normalized = normalizeHex(hex);
-  if (!normalized) return null;
-  const bigint = Number.parseInt(normalized, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return [r, g, b];
+  try {
+    // Use colorizr to convert hex to rgb
+    const rgbString = convert(hex, 'rgb');
+    // rgbString is like "rgb(255 0 68)" - extract numbers
+    const match = rgbString.match(/rgb\((\d+)\s+(\d+)\s+(\d+)\)/);
+    if (match) {
+      return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
+    }
+    return null;
+  } catch {
+    // Fallback to manual parsing if colorizr fails
+    const normalized = normalizeHex(hex);
+    if (!normalized) return null;
+    const bigint = Number.parseInt(normalized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return [r, g, b];
+  }
 };
 
 const rgbToHex = (r: number, g: number, b: number) => {
-  const toHex = (value: number) => {
-    const clamped = Math.max(0, Math.min(255, Math.round(value)));
-    return clamped.toString(16).padStart(2, '0');
-  };
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  try {
+    // Use colorizr to convert rgb to hex
+    return convert(`rgb(${r} ${g} ${b})`, 'hex');
+  } catch {
+    // Fallback to manual conversion if colorizr fails
+    const toHex = (value: number) => {
+      const clamped = Math.max(0, Math.min(255, Math.round(value)));
+      return clamped.toString(16).padStart(2, '0');
+    };
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
 };
 
 const mixColors = (source: string, target: string, amount: number): string => {
@@ -77,57 +95,149 @@ const mixColors = (source: string, target: string, amount: number): string => {
     // Amount is 0-1, colorizr expects percentage 0-100
     return mix(source, target, amount * 100);
   } catch {
-    // Fallback to hex-based mixing
-    const src = hexToRgb(source);
-    const tgt = hexToRgb(target);
-    if (!src || !tgt) return source;
-    const mixChannel = (channel: number) => src[channel] + (tgt[channel] - src[channel]) * amount;
-    return rgbToHex(mixChannel(0), mixChannel(1), mixChannel(2));
+    // Fallback: try converting both to hex first, then use colorizr mix
+    try {
+      const sourceHex = convert(source, 'hex');
+      const targetHex = convert(target, 'hex');
+      return mix(sourceHex, targetHex, amount * 100);
+    } catch {
+      // Final fallback to manual hex-based mixing
+      const src = hexToRgb(source);
+      const tgt = hexToRgb(target);
+      if (!src || !tgt) return source;
+      const mixChannel = (channel: number) => src[channel] + (tgt[channel] - src[channel]) * amount;
+      return rgbToHex(mixChannel(0), mixChannel(1), mixChannel(2));
+    }
   }
 };
 
-const ensureHexColor = (color: string, fallback: string): string => {
-  // If color is already in OKLCH or other CSS format, pass it through
-  if (color && (color.startsWith('oklch(') || color.startsWith('rgb(') || color.startsWith('hsl('))) {
-    return color;
-  }
-  
-  const normalized = normalizeHex(color);
-  if (normalized) {
-    return `#${normalized}`;
-  }
-  
-  // Check if fallback is OKLCH or other CSS format
-  if (fallback && (fallback.startsWith('oklch(') || fallback.startsWith('rgb(') || fallback.startsWith('hsl('))) {
+const isGradient = (color: string | undefined): boolean => {
+  return !!(color && color.trim().startsWith('linear-gradient'));
+};
+
+/**
+ * Extracts a solid color from a gradient by parsing the first color stop.
+ * Used for primary/accent colors which should always be solid.
+ */
+const extractSolidColorFromGradient = (gradient: string, fallback: string): string => {
+  if (!isGradient(gradient)) {
     return fallback;
   }
   
-  const fallbackNormalized = normalizeHex(fallback);
-  return fallbackNormalized ? `#${fallbackNormalized}` : fallback;
+  try {
+    const match = gradient.match(/linear-gradient\([^,]+,\s*([^,%)\s]+(?:\s+\d+%)?)/);
+    if (match && match[1]) {
+      let firstColor = match[1].trim().replace(/\s+\d+%$/, '').trim();
+      
+      if (isGradient(firstColor)) {
+        return fallback;
+      }
+      
+      // Use colorizr to convert any color format to hex
+      try {
+        const hex = convert(firstColor, 'hex');
+        // Ensure it's properly formatted as hex
+        return hex.startsWith('#') ? hex : `#${hex}`;
+      } catch {
+        // If colorizr can't convert it, try to use as-is if it looks valid
+        if (firstColor.startsWith('oklch(') || firstColor.startsWith('rgb(') || firstColor.startsWith('hsl(') || firstColor.startsWith('#')) {
+          return firstColor;
+        }
+        return fallback;
+      }
+    }
+  } catch {
+    // If parsing fails, return fallback
+  }
+  
+  return fallback;
 };
 
-const getLuminance = (r: number, g: number, b: number) => {
-  const srgb = [r, g, b].map((value) => {
-    const channel = value / 255;
-    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+const ensureHexColor = (color: string, fallback: string, allowGradients: boolean = false): string => {
+  // For primary/accent colors, always extract solid color from gradients
+  if (isGradient(color)) {
+    if (allowGradients) {
+      return color; // Allow gradients for backgrounds
+    }
+    return extractSolidColorFromGradient(color, fallback);
+  }
+  
+  // Use colorizr to convert any color format to hex
+  try {
+    // Try to convert using colorizr (handles hex, oklch, rgb, hsl, etc.)
+    const hex = convert(color, 'hex');
+    // Ensure it's properly formatted as hex
+    return hex.startsWith('#') ? hex : `#${hex}`;
+  } catch {
+    // If colorizr fails, check if it's already a valid hex
+    const normalized = normalizeHex(color);
+    if (normalized) {
+      return `#${normalized}`;
+    }
+    
+    // If color is invalid, try fallback
+    if (isGradient(fallback)) {
+      if (allowGradients) {
+        return fallback;
+      }
+      return extractSolidColorFromGradient(fallback, fallback);
+    }
+    
+    // Try to convert fallback using colorizr
+    try {
+      const fallbackHex = convert(fallback, 'hex');
+      return fallbackHex.startsWith('#') ? fallbackHex : `#${fallbackHex}`;
+    } catch {
+      // Final fallback: use fallback as-is if it looks like a valid color format
+      if (fallback && (fallback.startsWith('oklch(') || fallback.startsWith('rgb(') || fallback.startsWith('hsl(') || fallback.startsWith('#'))) {
+        return fallback;
+      }
+      const fallbackNormalized = normalizeHex(fallback);
+      return fallbackNormalized ? `#${fallbackNormalized}` : fallback;
+    }
+  }
 };
 
 const getAccessibleTextColor = (background: string, fallback: string): string => {
-  // For OKLCH, use lightness value to determine text color
-  if (background.startsWith('oklch(')) {
-    const match = background.match(/oklch\(([\d.]+)/);
-    if (match) {
-      const lightness = parseFloat(match[1]);
-      return lightness > 0.5 ? '#0f172a' : '#f8fafc';
-    }
+  // If it's a gradient, we can't determine text color from it - use fallback
+  if (isGradient(background)) {
+    return fallback;
   }
   
-  const rgb = hexToRgb(background.trim());
-  if (!rgb) return fallback;
-  const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
-  return luminance > 0.5 ? '#0f172a' : '#f8fafc';
+  try {
+    // Use colorizr's luminance function which handles any color format
+    const lum = luminance(background);
+    // luminance returns 0-1, use 0.5 as threshold
+    return lum > 0.5 ? '#0f172a' : '#f8fafc';
+  } catch {
+    // Fallback: try to extract lightness from OKLCH format
+    if (background.startsWith('oklch(')) {
+      const match = background.match(/oklch\(([\d.]+)/);
+      if (match) {
+        const lightness = parseFloat(match[1]);
+        return lightness > 0.5 ? '#0f172a' : '#f8fafc';
+      }
+    }
+    
+    // Final fallback: try converting to hex and using manual calculation
+    try {
+      const hex = convert(background, 'hex');
+      const rgb = hexToRgb(hex);
+      if (rgb) {
+        // Manual luminance calculation as last resort
+        const srgb = [rgb[0], rgb[1], rgb[2]].map((value) => {
+          const channel = value / 255;
+          return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+        });
+        const manualLum = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+        return manualLum > 0.5 ? '#0f172a' : '#f8fafc';
+      }
+    } catch {
+      // If all else fails, return fallback
+    }
+    
+    return fallback;
+  }
 };
 
 const rgba = (color: string, alpha: number): string => {
@@ -143,27 +253,31 @@ const rgba = (color: string, alpha: number): string => {
 };
 
 const computeSidebarAccentColor = (sidebarColor: string): string => {
+  // If it's a gradient, we can't compute accent from it - return a neutral fallback
+  if (isGradient(sidebarColor)) {
+    return '#F1F3F5';
+  }
+  
   try {
-    // Convert to hex to check luminance, then use colorizr to lighten/darken
-    const hexColor = convert(sidebarColor, 'hex');
-    const rgb = hexToRgb(hexColor);
-    if (!rgb) return '#F1F3F5';
-    
-    const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
+    // Use colorizr's luminance function to check brightness
+    const lum = luminance(sidebarColor);
     // For dark sidebars, lighten; for light sidebars, darken
-    if (luminance < 0.45) {
+    if (lum < 0.45) {
       return lighten(sidebarColor, 8); // lighten by 8%
     }
     return darken(sidebarColor, 5); // darken by 5%
   } catch {
-    // Fallback to original hex-based logic
-    const rgb = hexToRgb(sidebarColor);
-    if (!rgb) return '#F1F3F5';
-    const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
-    if (luminance < 0.45) {
-      return mixColors(sidebarColor, '#ffffff', 0.15);
+    // Fallback: use mixColors with white/black
+    try {
+      const lum = luminance(sidebarColor);
+      if (lum < 0.45) {
+        return mixColors(sidebarColor, '#ffffff', 0.15);
+      }
+      return mixColors(sidebarColor, '#000000', 0.08);
+    } catch {
+      // Final fallback
+      return '#F1F3F5';
     }
-    return mixColors(sidebarColor, '#000000', 0.08);
   }
 };
 
@@ -323,42 +437,81 @@ const formatVariableBlock = (tokens: Record<string, string>) => {
     .join('\n');
 };
 
+// Helper to convert any color format to CSS-compatible format (preserve gradients)
+const convertToCssColor = (color: string, fallback: string): string => {
+  // If it's a gradient, return as-is (gradients are already CSS-compatible)
+  if (isGradient(color)) {
+    return color;
+  }
+  
+  // Use colorizr to convert to hex for CSS compatibility
+  try {
+    const hex = convert(color, 'hex');
+    return hex.startsWith('#') ? hex : `#${hex}`;
+  } catch {
+    // Fallback to ensureHexColor which also uses colorizr internally
+    return ensureHexColor(color, fallback, false);
+  }
+};
+
 const applyBrandingToCSS = (config: BrandingConfig) => {
   if (typeof document === 'undefined') return;
 
   const root = document.documentElement;
-  const gradient = config.gradientAccent || `linear-gradient(135deg, ${config.primaryColor}, ${config.accentColor})`;
+  
+  // Determine gradient from header background or create from primary/accent
+  let gradient: string;
+  if (config.headerBackgroundGradient) {
+    gradient = config.headerBackgroundGradient;
+  } else {
+    // Fallback: create gradient from solid colors (convert to hex for CSS)
+    const primaryCss = convertToCssColor(config.primaryColor, DEFAULT_BRANDING_CONFIG.primaryColor);
+    const accentCss = convertToCssColor(config.accentColor, DEFAULT_BRANDING_CONFIG.accentColor);
+    gradient = `linear-gradient(135deg, ${primaryCss}, ${accentCss})`;
+  }
 
-  const defaultPrimaryHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.primaryColor, DEFAULT_BRANDING_CONFIG.primaryColor);
-  const defaultAccentHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.accentColor, DEFAULT_BRANDING_CONFIG.accentColor);
-  const defaultBackgroundHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.backgroundColor, DEFAULT_BRANDING_CONFIG.backgroundColor);
-  const defaultSidebarHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.sidebarColor, DEFAULT_BRANDING_CONFIG.sidebarColor);
-  const defaultTextHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.textColor, DEFAULT_BRANDING_CONFIG.textColor);
-  const defaultNeutralHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.neutralColor, DEFAULT_BRANDING_CONFIG.neutralColor);
+  const defaultPrimaryHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.primaryColor, DEFAULT_BRANDING_CONFIG.primaryColor, false);
+  const defaultAccentHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.accentColor, DEFAULT_BRANDING_CONFIG.accentColor, false);
+  const defaultBackgroundHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.backgroundColor, DEFAULT_BRANDING_CONFIG.backgroundColor, true);
+  const defaultSidebarHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.sidebarColor, DEFAULT_BRANDING_CONFIG.sidebarColor, true);
+  const defaultNavbarHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.navbarColor || '#ffffff', '#ffffff', true);
+  const defaultTextHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.textColor, DEFAULT_BRANDING_CONFIG.textColor, false);
+  const defaultNeutralHex = ensureHexColor(DEFAULT_BRANDING_CONFIG.neutralColor, DEFAULT_BRANDING_CONFIG.neutralColor, false);
   const surfacePattern = validatePattern(config.surfacePattern);
   const sidebarPattern = validatePattern(config.sidebarPattern);
   const surfacePatternSize = validatePatternSize(config.surfacePatternSize, DEFAULT_BRANDING_CONFIG.surfacePatternSize);
   const sidebarPatternSize = validatePatternSize(config.sidebarPatternSize, DEFAULT_BRANDING_CONFIG.sidebarPatternSize);
 
-  const primaryHex = ensureHexColor(config.primaryColor, defaultPrimaryHex);
-  const accentHex = ensureHexColor(config.accentColor, defaultAccentHex);
-  const backgroundHex = ensureHexColor(config.backgroundColor, defaultBackgroundHex);
-  const sidebarHex = ensureHexColor(config.sidebarColor, defaultSidebarHex);
-  const textHex = ensureHexColor(config.textColor, defaultTextHex);
-  const neutralHex = ensureHexColor(config.neutralColor, defaultNeutralHex);
+  // Convert colors to CSS-compatible format
+  // Primary/accent colors: always solid (no gradients allowed)
+  const primaryHex = ensureHexColor(config.primaryColor, defaultPrimaryHex, false);
+  const accentHex = ensureHexColor(config.accentColor, defaultAccentHex, false);
+  // Background colors: allow gradients
+  const backgroundHex = ensureHexColor(config.backgroundColor, defaultBackgroundHex, true);
+  const sidebarHex = ensureHexColor(config.sidebarColor, defaultSidebarHex, true);
+  const navbarColor = config.navbarColor || defaultNavbarHex;
+  const navbarHex = ensureHexColor(navbarColor, defaultNavbarHex, true);
+  const textHex = ensureHexColor(config.textColor, defaultTextHex, false);
+  const neutralHex = ensureHexColor(config.neutralColor, defaultNeutralHex, false);
+  
+  // Header background: use gradient if set, otherwise use navbar color
+  // If gradient is set, use it for both navbar and header-background
+  const headerBackground = config.headerBackgroundGradient || navbarHex;
+  const navbarForCSS = config.headerBackgroundGradient || navbarHex;
 
   const isDefaultTheme =
     primaryHex === defaultPrimaryHex &&
     accentHex === defaultAccentHex &&
     backgroundHex === defaultBackgroundHex &&
     sidebarHex === defaultSidebarHex &&
+    navbarHex === defaultNavbarHex &&
     textHex === defaultTextHex &&
     neutralHex === defaultNeutralHex &&
     surfacePattern === DEFAULT_BRANDING_CONFIG.surfacePattern &&
     sidebarPattern === DEFAULT_BRANDING_CONFIG.sidebarPattern &&
     surfacePatternSize === DEFAULT_BRANDING_CONFIG.surfacePatternSize &&
     sidebarPatternSize === DEFAULT_BRANDING_CONFIG.sidebarPatternSize &&
-    (config.gradientAccent || '') === (DEFAULT_BRANDING_CONFIG.gradientAccent || '');
+    !config.headerBackgroundGradient;
   const sidebarTextColor = getAccessibleTextColor(config.sidebarColor, config.textColor);
   const sidebarTextSecondary = rgba(sidebarTextColor, 0.75);
   const sidebarTextTertiary = rgba(sidebarTextColor, 0.55);
@@ -366,23 +519,32 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
   const sidebarAccentForeground = getAccessibleTextColor(sidebarAccent, sidebarTextColor);
 
   // Determine if sidebar is dark (for Night Ops theme which uses dark sidebar in light mode)
+  // If sidebar is a gradient, default to light sidebar
   let isDarkSidebar = false;
-  if (sidebarHex.startsWith('oklch(')) {
-    const match = sidebarHex.match(/oklch\(([\d.]+)/);
-    if (match) {
-      const lightness = parseFloat(match[1]);
-      isDarkSidebar = lightness < 0.3; // Lightness below 0.3 is considered dark
-    }
-  } else {
-    const rgb = hexToRgb(sidebarHex);
-    if (rgb) {
-      const luminance = getLuminance(rgb[0], rgb[1], rgb[2]);
-      isDarkSidebar = luminance < 0.3;
+  if (!isGradient(sidebarHex)) {
+    try {
+      // Use colorizr's luminance function
+      const lum = luminance(sidebarHex);
+      isDarkSidebar = lum < 0.3; // Luminance below 0.3 is considered dark
+    } catch {
+      // Fallback: try extracting lightness from OKLCH format
+      if (sidebarHex.startsWith('oklch(')) {
+        const match = sidebarHex.match(/oklch\(([\d.]+)/);
+        if (match) {
+          const lightness = parseFloat(match[1]);
+          isDarkSidebar = lightness < 0.3;
+        }
+      }
     }
   }
   
-  const sidebarHeaderColor = isDarkSidebar ? sidebarHex : '#ffffff';
-  const sidebarBorderColor = isDarkSidebar ? 'rgba(255, 255, 255, 0.12)' : neutralHex;
+  // For gradients, use a solid color for header (extract first color or use white)
+  const sidebarHeaderColor = isGradient(sidebarHex) 
+    ? '#ffffff' 
+    : (isDarkSidebar ? sidebarHex : '#ffffff');
+  const sidebarBorderColor = isGradient(sidebarHex)
+    ? neutralHex
+    : (isDarkSidebar ? 'rgba(255, 255, 255, 0.12)' : neutralHex);
   
   const lightThemeVariables: Record<string, string> = {
     '--primary': primaryHex,
@@ -399,6 +561,8 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--card-foreground': textHex,
     '--popover-foreground': textHex,
     '--sidebar': sidebarHex,
+    '--navbar': navbarForCSS,
+    '--header-background': headerBackground,
     '--sidebar-header': sidebarHeaderColor,
     '--sidebar-foreground': sidebarTextColor,
     '--sidebar-text-primary': sidebarTextColor,
@@ -420,13 +584,32 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
   };
 
   // Use explicit dark mode colors if provided, otherwise generate
-  const darkPrimaryHex = config.darkPrimaryColor ? ensureHexColor(config.darkPrimaryColor, primaryHex) : mixColors(primaryHex, '#ffffff', 0.08);
-  const darkAccentHex = config.darkAccentColor ? ensureHexColor(config.darkAccentColor, accentHex) : mixColors(accentHex, '#ffffff', 0.06);
-  const darkBackgroundHex = config.darkBackgroundColor ? ensureHexColor(config.darkBackgroundColor, '#0F0F0F') : mixColors('#0F0F0F', backgroundHex, 0.18);
-  const darkSidebarHex = config.darkSidebarColor ? ensureHexColor(config.darkSidebarColor, sidebarHex) : mixColors('#0a0a0a', sidebarHex, 0.2);
-  const darkTextHex = config.darkTextColor ? ensureHexColor(config.darkTextColor, '#f8fafc') : '#f8fafc';
-  const darkNeutralHex = config.darkNeutralColor ? ensureHexColor(config.darkNeutralColor, neutralHex) : mixColors('#1F1F1F', neutralHex, 0.25);
-  const darkGradient = config.darkGradientAccent || gradient;
+  // Primary/accent: always solid (no gradients)
+  const darkPrimaryHex = config.darkPrimaryColor 
+    ? ensureHexColor(config.darkPrimaryColor, primaryHex, false) 
+    : mixColors(primaryHex, '#ffffff', 0.08);
+  const darkAccentHex = config.darkAccentColor 
+    ? ensureHexColor(config.darkAccentColor, accentHex, false) 
+    : mixColors(accentHex, '#ffffff', 0.06);
+  // Backgrounds: allow gradients
+  const darkBackgroundHex = config.darkBackgroundColor 
+    ? ensureHexColor(config.darkBackgroundColor, '#0F0F0F', true) 
+    : (isGradient(backgroundHex) ? backgroundHex : mixColors('#0F0F0F', backgroundHex, 0.18));
+  const darkSidebarHex = config.darkSidebarColor 
+    ? ensureHexColor(config.darkSidebarColor, sidebarHex, true) 
+    : (isGradient(sidebarHex) ? sidebarHex : mixColors('#0a0a0a', sidebarHex, 0.2));
+  // Dark mode navbar: use gradient if set, otherwise use darkNavbarColor or fallback to light navbar, NOT sidebar
+  const darkNavbarColor = config.darkNavbarColor || navbarColor;
+  const darkNavbarHex = ensureHexColor(darkNavbarColor, '#0F0F0F', true);
+  const darkTextHex = config.darkTextColor ? ensureHexColor(config.darkTextColor, '#f8fafc', false) : '#f8fafc';
+  const darkNeutralHex = config.darkNeutralColor 
+    ? ensureHexColor(config.darkNeutralColor, neutralHex, false) 
+    : mixColors('#1F1F1F', neutralHex, 0.25);
+  
+  // Dark mode header background: use gradient if set, otherwise use navbar color
+  // If gradient is set, use it for both navbar and header-background
+  const darkHeaderBackground = config.darkHeaderBackgroundGradient || darkNavbarHex;
+  const darkNavbarForCSS = config.darkHeaderBackgroundGradient || darkNavbarHex;
   
   const darkBgSecondary = mixColors('#1A1A1A', darkBackgroundHex, 0.22);
   const darkBgHover = mixColors('#222222', darkBackgroundHex, 0.25);
@@ -461,6 +644,8 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--border': darkBorder,
     '--sidebar-border': darkBorderMedium,
     '--sidebar': darkSidebarHex,
+    '--navbar': darkNavbarForCSS,
+    '--header-background': darkHeaderBackground,
     '--sidebar-header': darkSidebarHex,
     '--sidebar-foreground': darkSidebarText,
     '--sidebar-text-primary': darkSidebarText,
@@ -469,9 +654,9 @@ const applyBrandingToCSS = (config: BrandingConfig) => {
     '--sidebar-accent': darkSidebarAccent,
     '--sidebar-accent-foreground': darkSidebarAccentForeground,
     '--sidebar-selected-bg': mixColors(darkSidebarHex, '#ffffff', 0.04),
-    '--gradient-primary': darkGradient,
-    '--gradient-secondary': darkGradient,
-    '--gradient-accent': darkGradient,
+    '--gradient-primary': darkHeaderBackground,
+    '--gradient-secondary': darkHeaderBackground,
+    '--gradient-accent': darkHeaderBackground,
     '--ring': mixColors(darkPrimaryHex, '#ffffff', 0.25),
     '--surface-pattern': surfacePattern,
     '--surface-pattern-size': surfacePatternSize,
