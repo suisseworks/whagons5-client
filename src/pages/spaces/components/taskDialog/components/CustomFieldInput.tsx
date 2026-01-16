@@ -3,6 +3,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { normalizeFieldType, coerceBoolean, parseFieldOptions, parseMultiValue } from '../utils/fieldHelpers';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface CustomFieldInputProps {
   field: any;
@@ -11,6 +12,7 @@ interface CustomFieldInputProps {
 }
 
 export function CustomFieldInput({ field, value, onChange }: CustomFieldInputProps) {
+  const { t } = useLanguage();
   const type = normalizeFieldType(field);
   const options = parseFieldOptions(field);
 
@@ -19,7 +21,7 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
       <Textarea
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Ingresa un valor..."
+        placeholder={t('workspace.customFields.enterValue', 'Enter a value...')}
         className="min-h-[100px] px-4 py-3 rounded-[10px] text-sm focus:border-primary focus:ring-[3px] focus:ring-ring transition-all duration-150"
       />
     );
@@ -31,7 +33,7 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
         type="number"
         value={value === undefined || value === null ? '' : String(value)}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Ingresa un número"
+        placeholder={t('workspace.customFields.enterNumber', 'Enter a number')}
         className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
       />
     );
@@ -46,7 +48,7 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
           onChange={(e) => onChange(e.target.checked)}
           className="h-4 w-4 rounded border border-border"
         />
-        <span>Marcar</span>
+        <span>{t('workspace.customFields.checkbox', 'Check')}</span>
       </label>
     );
   }
@@ -60,13 +62,13 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
         <SelectTrigger 
           className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
         >
-          <SelectValue placeholder="Selecciona una opción" />
+          <SelectValue placeholder={t('workspace.customFields.selectOption', 'Select an option')} />
         </SelectTrigger>
         <SelectContent>
           {options.length ? options.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
           )) : (
-            <div className="px-2 py-1.5 text-sm text-muted-foreground">Sin opciones</div>
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">{t('workspace.customFields.noOptions', 'No options')}</div>
           )}
         </SelectContent>
       </Select>
@@ -81,9 +83,9 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
           options={options}
           value={values}
           onValueChange={(vals) => onChange(vals)}
-          placeholder="Selecciona opciones"
-          searchPlaceholder="Buscar..."
-          emptyText="Sin opciones"
+          placeholder={t('workspace.customFields.selectOptions', 'Select options')}
+          searchPlaceholder={t('workspace.customFields.search', 'Search...')}
+          emptyText={t('workspace.customFields.noOptions', 'No options')}
           className="w-full"
         />
       </div>
@@ -128,7 +130,7 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
     <Input
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="Ingresa un valor..."
+      placeholder={t('workspace.customFields.enterValue', 'Enter a value...')}
       className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
     />
   );

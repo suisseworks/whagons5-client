@@ -227,29 +227,22 @@ const SignIn: React.FC = () => {
                           </div>
                         </div>
                         
-                        {/* App screenshot - Person using task management app */}
-                        <img
-                          src="https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=300&h=600&fit=crop&q=80"
-                          alt="Person using Whagons mobile app for task management"
+                        {/* App video - Sticky notes productivity */}
+                        <video
+                          src="https://cdn.pixabay.com/video/2016/02/29/2335-157269903_large.mp4"
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
                           className="w-full h-auto object-cover"
                           style={{ 
                             display: 'block',
                             aspectRatio: '9/16',
                             objectFit: 'cover'
                           }}
-                          onError={(e) => {
-                            // Fallback if image fails to load - try alternative
-                            const target = e.target as HTMLImageElement;
-                            target.src = 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=300&h=600&fit=crop&q=80';
-                            target.onerror = () => {
-                              target.style.display = 'none';
-                              const fallback = target.nextElementSibling as HTMLElement;
-                              if (fallback) fallback.style.display = 'flex';
-                            };
-                          }}
                         />
                         
-                        {/* Fallback placeholder if image doesn't load */}
+                        {/* Fallback placeholder if video doesn't load */}
                         <div 
                           className="hidden bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center"
                           style={{ 
@@ -268,12 +261,16 @@ const SignIn: React.FC = () => {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                               />
                             </svg>
-                            <p className="text-xs">Mobile app screenshot</p>
-                            <p className="text-[10px] mt-1">Place image at:</p>
-                            <p className="text-[10px] font-mono">/public/images/app-mobile-screenshot.png</p>
+                            <p className="text-xs">Video preview</p>
                           </div>
                         </div>
                       </div>

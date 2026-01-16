@@ -184,7 +184,7 @@ function PluginCardDisplay({
 	// Get border color for each plugin (for hover effects)
 	const getPluginBorderColor = (pluginId: string) => {
 		const borderColors: Record<string, string> = {
-			broadcasts: 'hover:border-amber-500/40 hover:shadow-amber-500/20',
+			broadcasts: 'hover:border-red-500/40 hover:shadow-red-500/20',
 			cleaning: 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
 			assets: 'hover:border-sky-500/40 hover:shadow-sky-500/20',
 			boards: 'hover:border-violet-500/40 hover:shadow-violet-500/20',
@@ -491,7 +491,7 @@ function CustomPluginDialog({
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!formData.title.trim() || !formData.route.trim()) {
-			toast.error('Please fill in all required fields');
+			toast.error(t('errors.fillRequiredFields', 'Please fill in all required fields'));
 			return;
 		}
 		onSave(formData);
@@ -901,7 +901,7 @@ function Plugins() {
 				title: t('plugins.broadcasts.title', 'Broadcasts'),
 				description: t('plugins.broadcasts.description', 'Send messages and track acknowledgments'),
 				icon: faBell,
-				color: 'text-amber-500',
+				color: 'text-red-500',
 				configurable: true,
 			},
 			{

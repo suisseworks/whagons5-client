@@ -19,9 +19,11 @@ import {
 } from '@/components/ui/table';
 import { CheckCircle2, Clock, X, Send } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuthUser } from '@/providers/AuthProvider';
 import { Broadcast } from '@/types/broadcast';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
+import AcknowledgeDialog from './AcknowledgeDialog';
 
 interface BroadcastDetailViewProps {
   broadcast: Broadcast;
@@ -39,11 +41,36 @@ function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
   const { value: users } = useSelector(
     (state: RootState) => (state as any).users || { value: [] }
   );
+  const currentUser = useAuthUser();
+
+  // Local state
+  const [showAcknowledgeDialog, setShowAcknowledgeDialog] = useState(false);
 
   // Filter acknowledgments for this broadcast
   const broadcastAcks = acknowledgments.filter(
-    (ack: any) => ack.broadcast_id === broadcast.id
+    (ack: any) => Number(ack.broadcast_id) === Number(broadcast.id)
   );
+
+  // Check if current user has a pending acknowledgment
+  const currentUserAck = broadcastAcks.find(
+    (ack: any) => Number(ack.user_id) === Number(currentUser?.id)
+  );
+  const canAcknowledge = currentUserAck && currentUserAck.status === 'pending';
+
+  // Debug logging
+  useEffect(() => {
+    if (broadcast.id) {
+      console.log('🔍 [BroadcastDetailView] Debug:', {
+        broadcastId: broadcast.id,
+        currentUserId: currentUser?.id,
+        broadcastAcksCount: broadcastAcks.length,
+        broadcastAcks: broadcastAcks,
+        currentUserAck,
+        canAcknowledge,
+        acknowledgmentsCount: acknowledgments.length,
+      });
+    }
+  }, [broadcast.id, currentUser?.id, broadcastAcks.length, currentUserAck, canAcknowledge]);
 
   // Group by status
   const acknowledged = broadcastAcks.filter((ack: any) => ack.status === 'acknowledged');
@@ -105,10 +132,19 @@ function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+    <>
+    <Dialog open={!showAcknowledgeDialog} onOpenChange={onClose}>
+      <DialogContent className="!max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{broadcast.title}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-2xl">{broadcast.title}</DialogTitle>
+            {canAcknowledge && (
+              <Button onClick={() => setShowAcknowledgeDialog(true)}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {t('broadcasts.acknowledge', 'Acknowledge')}
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -240,6 +276,23 @@ function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Acknowledge Dialog - Render outside the main dialog to avoid nesting issues */}
+    {showAcknowledgeDialog && (
+      <AcknowledgeDialog
+        broadcast={broadcast}
+        onClose={() => {
+          setShowAcknowledgeDialog(false);
+          // Refresh acknowledgments after acknowledgment
+          dispatch(genericActions.broadcastAcknowledgments.fetchFromAPI());
+          dispatch(genericActions.broadcasts.fetchFromAPI());
+          // Also refresh the detail view
+          dispatch(genericActions.broadcastAcknowledgments.getFromIndexedDB());
+          dispatch(genericActions.broadcasts.getFromIndexedDB());
+        }}
+      />
+    )}
+  </>
   );
 }
 

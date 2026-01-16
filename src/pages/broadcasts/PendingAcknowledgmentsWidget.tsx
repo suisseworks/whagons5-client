@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuthUser } from '@/providers/AuthProvider';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
 import { Broadcast } from '@/types/broadcast';
@@ -23,7 +24,7 @@ function PendingAcknowledgmentsWidget() {
   const { value: acknowledgments } = useSelector(
     (state: RootState) => (state as any).broadcastAcknowledgments || { value: [] }
   );
-  const currentUser = useSelector((state: RootState) => (state as any).currentUser);
+  const currentUser = useAuthUser();
 
   // Local state
   const [selectedBroadcast, setSelectedBroadcast] = useState<Broadcast | null>(null);

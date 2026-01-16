@@ -29,7 +29,7 @@ import Global from '@/pages/settings/sub_pages/Global';
 import BoardsSettings from '@/pages/settings/sub_pages/Boards';
 import Home from '@/pages/home/Home';
 // Messages removed
-import Boards from '@/pages/boards/Boards';
+// Boards listing page removed - boards are now created via sidebar popup
 import BoardDetail from '@/pages/boards/BoardDetail';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
@@ -81,7 +81,6 @@ export const HomeRoutes = () => {
           <Route path="/plugins" element={<Plugins />} />
           <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
           <Route path="/admin/plugins" element={<PluginManagement />} />
-          <Route path="/boards" element={<Boards />} />
           <Route path="/boards/:boardId" element={<BoardDetail />} />
           <Route path="/broadcasts" element={<BroadcastsPage />} />
           <Route path="/settings/categories" element={<Categories />} />

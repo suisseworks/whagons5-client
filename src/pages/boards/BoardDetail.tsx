@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pin, Trash2, User, Users, Globe, Lock, Calendar } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { ArrowLeft, Settings, Users, Globe, Lock, Plus, User, Trash2, Pencil, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { useTheme } from '@/providers/ThemeProvider';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
 import { Board, BoardMessage } from '@/store/types';
@@ -21,7 +19,25 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { PostItem } from './components/PostItem';
+import { PostComposer } from './components/PostComposer';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -29,7 +45,6 @@ dayjs.extend(relativeTime);
 
 function BoardDetail() {
   const { t } = useLanguage();
-  const { theme } = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { boardId } = useParams<{ boardId: string }>();
@@ -40,16 +55,9 @@ function BoardDetail() {
   const { value: members } = useSelector((state: RootState) => (state as any).boardMembers || { value: [] });
   const { value: users } = useSelector((state: RootState) => state.users || { value: [] });
   const { value: teams } = useSelector((state: RootState) => (state as any).teams || { value: [] });
+  const currentUser = useSelector((state: RootState) => (state as any).user?.value ?? null);
 
   // Local state
-  const [isCreateMessageOpen, setIsCreateMessageOpen] = useState(false);
-  const [messageFormData, setMessageFormData] = useState({
-    title: '',
-    content: '',
-    is_pinned: false,
-    starts_at: '',
-    ends_at: '',
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [memberFormData, setMemberFormData] = useState({
@@ -58,19 +66,43 @@ function BoardDetail() {
     role: 'member' as 'admin' | 'member',
   });
   const [showMembers, setShowMembers] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [settingsFormData, setSettingsFormData] = useState({
+    name: '',
+    description: '',
+    visibility: 'private' as 'public' | 'private',
+  });
 
   // Find current board
   const board = boards.find((b: Board) => b.id === parseInt(boardId || '0'));
 
-  // Filter messages for this board
-  const boardMessages = messages
-    .filter((m: BoardMessage) => m.board_id === parseInt(boardId || '0'))
-    .sort((a: BoardMessage, b: BoardMessage) => {
-      // Pinned first, then by created_at descending
-      if (a.is_pinned && !b.is_pinned) return -1;
-      if (!a.is_pinned && b.is_pinned) return 1;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  // Create a map of users for quick lookup
+  const usersMap = useMemo(() => {
+    const map = new Map<number, { id: number; name: string; email?: string; avatar_url?: string }>();
+    users.forEach((user: any) => {
+      map.set(user.id, {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar_url: user.avatar_url || user.photo_url,
+      });
     });
+    return map;
+  }, [users]);
+
+  // Filter messages for this board
+  const boardMessages = useMemo(() => {
+    return messages
+      .filter((m: BoardMessage) => m.board_id === parseInt(boardId || '0') && !m.deleted_at)
+      .sort((a: BoardMessage, b: BoardMessage) => {
+        // Pinned first, then by created_at descending
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+  }, [messages, boardId]);
 
   // Filter members for this board
   const boardMembers = members.filter((m: any) => m.board_id === parseInt(boardId || '0'));
@@ -80,51 +112,73 @@ function BoardDetail() {
     dispatch(genericActions.boards.getFromIndexedDB());
     dispatch(genericActions.boardMessages.getFromIndexedDB());
     dispatch(genericActions.boardMembers.getFromIndexedDB());
+    dispatch(genericActions.boardAttachments.getFromIndexedDB());
     dispatch(genericActions.users.getFromIndexedDB());
   }, [dispatch, boardId]);
 
-  const handleCreateMessage = async () => {
-    if (!messageFormData.content.trim()) return;
+  const handleCreateMessage = async (data: { content: string; title?: string; is_pinned?: boolean }) => {
+    // Normalize content - ensure it's a string (can be empty or whitespace for image-only posts)
+    if (data.content === null || data.content === undefined) {
+      data.content = '';
+    }
 
     // Validate boardId is available
     const currentBoardId = boardId ? parseInt(boardId) : null;
     if (!currentBoardId || currentBoardId <= 0) {
       console.error('Invalid board ID:', boardId);
       alert(t('boards.error.invalidBoard', 'Invalid board ID. Please refresh the page.'));
-      return;
+      throw new Error('Invalid board ID');
     }
 
     setIsSubmitting(true);
     try {
       const messageData: any = {
-        ...messageFormData,
+        content: data.content || '', // Allow empty content
+        title: data.title || null,
+        is_pinned: data.is_pinned || false,
         board_id: currentBoardId,
-        // Convert empty strings to null for optional date fields
-        starts_at: messageFormData.starts_at || null,
-        ends_at: messageFormData.ends_at || null,
-        title: messageFormData.title || null,
+        starts_at: null,
+        ends_at: null,
       };
       
-      await dispatch(genericActions.boardMessages.addAsync(messageData) as any);
-      
-      setIsCreateMessageOpen(false);
-      setMessageFormData({
-        title: '',
-        content: '',
-        is_pinned: false,
-        starts_at: '',
-        ends_at: '',
-      });
+      console.log('Creating board message with data:', messageData);
+      const result = await dispatch(genericActions.boardMessages.addAsync(messageData) as any).unwrap();
+      console.log('Board message created successfully:', result);
+      return result;
     } catch (error: any) {
       console.error('Failed to create message:', error);
-      // Extract error message from various possible error formats
+      console.error('Error details:', {
+        message: error?.message,
+        payload: error?.payload,
+        response: error?.response?.data,
+        stack: error?.stack
+      });
       const errorMessage = error?.payload || 
                           error?.response?.data?.message || 
                           error?.message || 
                           t('boards.error.postMessage', 'Failed to post message');
       alert(errorMessage);
+      throw error; // Re-throw so PostComposer can handle it
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!confirm(t('boards.messages.confirmDelete', 'Are you sure you want to delete this post?'))) return;
+    
+    try {
+      await dispatch(genericActions.boardMessages.removeAsync(messageId) as any);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+    }
+  };
+
+  const handlePinMessage = async (messageId: number, isPinned: boolean) => {
+    try {
+      await dispatch(genericActions.boardMessages.updateAsync({ id: messageId, updates: { is_pinned: isPinned } }) as any);
+    } catch (error) {
+      console.error('Failed to pin message:', error);
     }
   };
 
@@ -162,11 +216,6 @@ function BoardDetail() {
     }
   };
 
-  const getUserName = (userId: number) => {
-    const user = users.find((u: any) => u.id === userId);
-    return user?.name || t('common.unknown', 'Unknown');
-  };
-
   const getMemberName = (member: any) => {
     if (member.member_type === 'user') {
       const user = users.find((u: any) => u.id === member.member_id);
@@ -177,298 +226,299 @@ function BoardDetail() {
     }
   };
 
+  const handleOpenSettingsDialog = () => {
+    if (board) {
+      setSettingsFormData({
+        name: board.name || '',
+        description: board.description || '',
+        visibility: board.visibility || 'private',
+      });
+    }
+    setIsSettingsDialogOpen(true);
+  };
+
+  const handleUpdateBoard = async () => {
+    if (!settingsFormData.name.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await dispatch(genericActions.boards.updateAsync({
+        id: parseInt(boardId || '0'),
+        updates: {
+          name: settingsFormData.name,
+          description: settingsFormData.description,
+          visibility: settingsFormData.visibility,
+        },
+      }) as any);
+      setIsSettingsDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to update board:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteBoard = async () => {
+    setIsSubmitting(true);
+    try {
+      await dispatch(genericActions.boards.removeAsync(parseInt(boardId || '0')) as any);
+      setIsDeleteDialogOpen(false);
+      navigate('/welcome');
+    } catch (error) {
+      console.error('Failed to delete board:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!board) {
     return (
-      <div className="p-6 bg-background text-foreground">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/teamconnect')}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t('teamconnect.actions.back', 'Back to Boards')}
-        </Button>
-        <Card>
-          <CardContent className="pt-6 text-center py-12">
-            <h3 className="text-lg font-semibold mb-2">
+      <div className="min-h-screen bg-background">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/teamconnect')}
+                className="size-9"
+              >
+                <ArrowLeft className="size-5" />
+              </Button>
+              <h1 className="text-lg font-semibold">
+                {t('boards.error.notFound', 'Board Not Found')}
+              </h1>
+            </div>
+          </header>
+          <div className="p-8 text-center">
+            <p className="text-muted-foreground">
               {t('teamconnect.error.noAccess', "You don't have access to this board")}
-            </h3>
-          </CardContent>
-        </Card>
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 bg-background text-foreground">
-      {/* Header */}
-      <div className="space-y-4">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/teamconnect')}
-          className="mb-2"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t('teamconnect.actions.back', 'Back to Boards')}
-        </Button>
-        
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-2xl mx-auto">
+        {/* Header - Threads Style */}
+        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold" style={{ color: 'var(--brand-primary)' }}>
-                {board.name}
-              </h1>
-              {board.visibility === 'public' ? (
-                <Badge variant="secondary" className="gap-1">
-                  <Globe className="w-3 h-3" />
-                  {t('teamconnect.boards.visibility.public', 'Public')}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="gap-1">
-                  <Lock className="w-3 h-3" />
-                  {t('teamconnect.boards.visibility.private', 'Private')}
-                </Badge>
-              )}
-            </div>
-            {board.description && (
-              <p className="text-muted-foreground mt-2">{board.description}</p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowMembers(!showMembers)}
-            >
-              <Users className="w-4 h-4" />
-              {t('teamconnect.members.title', 'Members')} ({boardMembers.length})
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setIsCreateMessageOpen(true)}
-              size="lg"
-            >
-              <Plus className="w-4 h-4" />
-              📝 {t('teamconnect.messages.create', 'Post Message')}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Members Section */}
-      {showMembers && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{t('teamconnect.members.title', 'Members')}</CardTitle>
               <Button
-                variant="destructive"
-                onClick={() => setIsAddMemberOpen(true)}
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/teamconnect')}
+                className="size-9"
               >
-                <Plus className="w-4 h-4" />
-                👥 {t('teamconnect.members.add', 'Add Members')}
+                <ArrowLeft className="size-5" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-semibold">{board.name}</h1>
+                  {board.visibility === 'public' ? (
+                    <Globe className="size-4 text-muted-foreground" />
+                  ) : (
+                    <Lock className="size-4 text-muted-foreground" />
+                  )}
+                </div>
+                {board.description && (
+                  <p className="text-sm text-muted-foreground truncate max-w-[300px]">
+                    {board.description}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowMembers(!showMembers)}
+                className="size-9"
+              >
+                <Users className="size-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings(!showSettings)}
+                className="size-9"
+              >
+                <Settings className="size-5" />
               </Button>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+        </header>
+
+        {/* Members Panel - Slide Down */}
+        {showMembers && (
+          <div className="border-b border-border bg-muted/30 p-4 animate-in slide-in-from-top-2">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold">{t('teamconnect.members.title', 'Members')} ({boardMembers.length})</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddMemberOpen(true)}
+              >
+                <Plus className="size-4 mr-1" />
+                {t('teamconnect.members.add', 'Add')}
+              </Button>
+            </div>
             {boardMembers.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
+              <p className="text-sm text-muted-foreground">
                 {t('teamconnect.members.empty', 'No members yet')}
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
                 {boardMembers.map((member: any) => (
-                  <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {member.member_type === 'user' ? (
-                        <User className="w-5 h-5 text-muted-foreground" />
-                      ) : (
-                        <Users className="w-5 h-5 text-muted-foreground" />
-                      )}
-                      <div>
-                        <div className="font-medium">{getMemberName(member)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {member.member_type === 'user' 
-                            ? t('teamconnect.members.type.user', 'User')
-                            : t('teamconnect.members.type.team', 'Team')
-                          }
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
-                        {member.role === 'admin' 
-                          ? t('teamconnect.members.admin', 'Admin')
-                          : t('teamconnect.members.member', 'Member')
-                        }
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveMember(member.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
+                  <Badge
+                    key={member.id}
+                    variant={member.role === 'admin' ? 'default' : 'secondary'}
+                    className="gap-1.5 pl-1.5 pr-2 py-1"
+                  >
+                    {member.member_type === 'user' ? (
+                      <User className="size-3" />
+                    ) : (
+                      <Users className="size-3" />
+                    )}
+                    {getMemberName(member)}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveMember(member.id);
+                      }}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </Badge>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Messages Feed */}
-      <div className="space-y-4">
-        {messagesLoading && boardMessages.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            {t('common.loading', 'Loading...')}
           </div>
-        ) : boardMessages.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center py-12">
-              <h3 className="text-lg font-semibold mb-2">
-                {t('teamconnect.messages.empty', 'No messages yet')}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {t('teamconnect.messages.emptyDescription', 'Be the first to post a message')}
-              </p>
-              <Button
-                variant="destructive"
-                onClick={() => setIsCreateMessageOpen(true)}
-                size="lg"
-                className="mx-auto"
-              >
-                <Plus className="w-4 h-4" />
-                📝 {t('teamconnect.messages.create', 'Post Message')}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          boardMessages.map((message: BoardMessage) => (
-            <Card key={message.id} className={message.is_pinned ? 'border-2' : ''} style={message.is_pinned ? { borderColor: 'var(--brand-accent)' } : {}}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      {message.is_pinned && (
-                        <Badge variant="secondary" className="gap-1">
-                          <Pin className="w-3 h-3" />
-                          {t('teamconnect.messages.pinned', 'Pinned')}
-                        </Badge>
-                      )}
-                      {message.title && (
-                        <CardTitle className="text-xl">{message.title}</CardTitle>
-                      )}
-                    </div>
-                    <CardDescription className="flex items-center gap-2">
-                      <span>{t('teamconnect.messages.postedBy', 'Posted by')} {getUserName(message.created_by)}</span>
-                      <span>•</span>
-                      <span>{dayjs(message.created_at).fromNow()}</span>
-                      {message.starts_at && (
-                        <>
-                          <span>•</span>
-                          <Calendar className="w-3 h-3" />
-                          <span>{dayjs(message.starts_at).format('MMM D, YYYY')}</span>
-                        </>
-                      )}
-                    </CardDescription>
+        )}
+
+        {/* Settings Panel - Slide Down */}
+        {showSettings && (
+          <div className="border-b border-border bg-muted/30 p-4 animate-in slide-in-from-top-2">
+            <h2 className="font-semibold mb-4">{t('boards.settings.title', 'Board Settings')}</h2>
+            
+            <div className="space-y-3">
+              {/* Board Info */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
+                <div className="flex-1">
+                  <p className="font-medium">{t('boards.settings.editBoard', 'Edit Board')}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('boards.settings.editBoardDescription', 'Change name, description, and visibility')}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenSettingsDialog}
+                >
+                  <Pencil className="size-4 mr-1" />
+                  {t('common.edit', 'Edit')}
+                </Button>
+              </div>
+
+              {/* Visibility Info */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
+                <div className="flex items-center gap-3">
+                  {board.visibility === 'public' ? (
+                    <Globe className="size-5 text-muted-foreground" />
+                  ) : (
+                    <Lock className="size-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="font-medium">
+                      {board.visibility === 'public' 
+                        ? t('boards.settings.publicBoard', 'Public Board')
+                        : t('boards.settings.privateBoard', 'Private Board')
+                      }
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {board.visibility === 'public'
+                        ? t('boards.settings.publicDescription', 'Anyone can view this board')
+                        : t('boards.settings.privateDescription', 'Only members can view this board')
+                      }
+                    </p>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+              </div>
 
-      {/* Create Message Dialog */}
-      <Dialog open={isCreateMessageOpen} onOpenChange={setIsCreateMessageOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t('teamconnect.messages.create', 'Post Message')}</DialogTitle>
-            <DialogDescription>
-              {t('teamconnect.messages.adminOnly', 'Only admins can post messages')}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">{t('teamconnect.messages.title.label', 'Title (optional)')}</Label>
-              <Input
-                id="title"
-                placeholder={t('teamconnect.messages.title.placeholder', 'Message title')}
-                value={messageFormData.title}
-                onChange={(e) => setMessageFormData({ ...messageFormData, title: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="content">{t('teamconnect.messages.content', 'Content')}</Label>
-              <Textarea
-                id="content"
-                placeholder={t('teamconnect.messages.contentPlaceholder', 'Write your message here...')}
-                value={messageFormData.content}
-                onChange={(e) => setMessageFormData({ ...messageFormData, content: e.target.value })}
-                rows={6}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="starts_at">{t('teamconnect.messages.startsAt', 'Start Date (optional)')}</Label>
-                <Input
-                  id="starts_at"
-                  type="date"
-                  value={messageFormData.starts_at}
-                  onChange={(e) => setMessageFormData({ ...messageFormData, starts_at: e.target.value })}
-                />
+              {/* Danger Zone */}
+              <div className="mt-6 pt-4 border-t border-border">
+                <h3 className="text-sm font-semibold text-destructive mb-3 flex items-center gap-2">
+                  <AlertTriangle className="size-4" />
+                  {t('boards.settings.dangerZone', 'Danger Zone')}
+                </h3>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <div>
+                    <p className="font-medium text-destructive">{t('boards.settings.deleteBoard', 'Delete Board')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('boards.settings.deleteBoardDescription', 'Permanently delete this board and all its posts')}
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="size-4 mr-1" />
+                    {t('common.delete', 'Delete')}
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="ends_at">{t('teamconnect.messages.endsAt', 'End Date (optional)')}</Label>
-                <Input
-                  id="ends_at"
-                  type="date"
-                  value={messageFormData.ends_at}
-                  onChange={(e) => setMessageFormData({ ...messageFormData, ends_at: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="is_pinned"
-                checked={messageFormData.is_pinned}
-                onChange={(e) => setMessageFormData({ ...messageFormData, is_pinned: e.target.checked })}
-                className="rounded"
-              />
-              <Label htmlFor="is_pinned" className="cursor-pointer">
-                {t('teamconnect.messages.pin', 'Pin Message')}
-              </Label>
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsCreateMessageOpen(false)}
-              disabled={isSubmitting}
-            >
-              {t('teamconnect.actions.cancel', 'Cancel')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleCreateMessage}
-              disabled={!messageFormData.content.trim() || isSubmitting}
-            >
-              {isSubmitting ? t('teamconnect.messages.posting', 'POSTING...') : t('teamconnect.messages.postMessage', 'POST MESSAGE')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+
+        {/* Post Composer */}
+        <PostComposer
+          user={currentUser ? {
+            id: currentUser.id,
+            name: currentUser.name,
+            email: currentUser.email,
+            avatar_url: currentUser.avatar_url || currentUser.photo_url,
+          } : null}
+          boardId={parseInt(boardId || '0')}
+          onPost={handleCreateMessage}
+          placeholder={t('boards.composer.placeholder', "What's on your mind?")}
+          isLoading={isSubmitting}
+        />
+
+        {/* Messages Feed - Threads Style */}
+        <div className="divide-y divide-border">
+          {messagesLoading && boardMessages.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              {t('common.loading', 'Loading...')}
+            </div>
+          ) : boardMessages.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-muted-foreground mb-2">
+                {t('teamconnect.messages.empty', 'No posts yet')}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t('teamconnect.messages.emptyDescription', 'Be the first to share something')}
+              </p>
+            </div>
+          ) : (
+            boardMessages.map((message: BoardMessage) => (
+              <PostItem
+                key={message.id}
+                message={message}
+                user={usersMap.get(message.created_by) || null}
+                onDelete={handleDeleteMessage}
+                onPin={handlePinMessage}
+              />
+            ))
+          )}
+        </div>
+      </div>
 
       {/* Add Member Dialog */}
       <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
@@ -561,15 +611,116 @@ function BoardDetail() {
             </Button>
             <Button
               type="button"
-              variant="destructive"
               onClick={handleAddMember}
               disabled={!memberFormData.member_id || isSubmitting}
             >
-              {isSubmitting ? t('teamconnect.members.adding', 'Adding...') : t('teamconnect.members.addMember', 'ADD MEMBER')}
+              {isSubmitting ? t('teamconnect.members.adding', 'Adding...') : t('teamconnect.members.addMember', 'Add Member')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Board Settings Dialog */}
+      <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('boards.settings.editBoard', 'Edit Board')}</DialogTitle>
+            <DialogDescription>
+              {t('boards.settings.editBoardDialogDescription', 'Update your board settings')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="settings-name">{t('boards.settings.name', 'Board Name')}</Label>
+              <Input
+                id="settings-name"
+                placeholder={t('boards.settings.namePlaceholder', 'e.g., Company Updates')}
+                value={settingsFormData.name}
+                onChange={(e) => setSettingsFormData({ ...settingsFormData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="settings-description">{t('boards.settings.description', 'Description')}</Label>
+              <Textarea
+                id="settings-description"
+                placeholder={t('boards.settings.descriptionPlaceholder', 'What is this board for?')}
+                value={settingsFormData.description}
+                onChange={(e) => setSettingsFormData({ ...settingsFormData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="settings-visibility">{t('boards.settings.visibility', 'Visibility')}</Label>
+              <Select
+                value={settingsFormData.visibility}
+                onValueChange={(value: 'public' | 'private') => setSettingsFormData({ ...settingsFormData, visibility: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4" />
+                      {t('boards.settings.visibility.public', 'Public - All users can view')}
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="private">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4" />
+                      {t('boards.settings.visibility.private', 'Private - Members only')}
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsSettingsDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUpdateBoard}
+              disabled={!settingsFormData.name.trim() || isSubmitting}
+            >
+              {isSubmitting ? t('common.saving', 'Saving...') : t('common.save', 'Save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Board Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="size-5" />
+              {t('boards.settings.deleteConfirmTitle', 'Delete Board')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('boards.settings.deleteConfirmDescription', 'Are you sure you want to delete this board? This action cannot be undone. All posts in this board will be permanently deleted.')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>
+              {t('common.cancel', 'Cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBoard}
+              disabled={isSubmitting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSubmitting ? t('common.deleting', 'Deleting...') : t('common.delete', 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

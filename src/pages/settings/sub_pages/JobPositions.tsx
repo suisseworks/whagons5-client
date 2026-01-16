@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBriefcase, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { faBriefcase, faPlus, faChartBar, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UrlTabs } from "@/components/ui/url-tabs";
@@ -80,6 +81,7 @@ const createDefaultFormState = (): JobPositionFormState => ({
 
 function JobPositions() {
 	const dispatch = useDispatch<AppDispatch>();
+	const { t } = useLanguage();
 
 	useEffect(() => {
 		dispatch((genericActions as any).jobPositions.getFromIndexedDB());
@@ -141,32 +143,32 @@ function JobPositions() {
 	const columns = useMemo<ColDef<JobPosition>[]>(() => [
 		{
 			field: "code",
-			headerName: "Code",
+			headerName: t("settings.jobPositions.grid.columns.code", "Code"),
 			minWidth: 140,
 			flex: 1
 		},
 		{
 			field: "title",
-			headerName: "Title",
+			headerName: t("settings.jobPositions.grid.columns.title", "Title"),
 			minWidth: 220,
 			flex: 2
 		},
 		{
 			field: "level",
-			headerName: "Level",
+			headerName: t("settings.jobPositions.grid.columns.level", "Level"),
 			minWidth: 160,
 			flex: 1,
 			cellRenderer: (params: ICellRendererParams<JobPosition>) => <LevelBadge level={params.value} />
 		},
 		{
 			field: "is_leadership",
-			headerName: "Leadership",
+			headerName: t("settings.jobPositions.grid.columns.leadership", "Leadership"),
 			minWidth: 150,
 			cellRenderer: (params: ICellRendererParams<JobPosition>) => (
 				<BooleanBadgeCellRenderer
 					value={!!params.value}
-					trueText="Leadership"
-					falseText="Individual"
+					trueText={t("settings.jobPositions.grid.values.leadership", "Leadership")}
+					falseText={t("settings.jobPositions.grid.values.individual", "Individual")}
 					trueVariant="default"
 					falseVariant="secondary"
 				/>
@@ -174,13 +176,13 @@ function JobPositions() {
 		},
 		{
 			field: "is_active",
-			headerName: "Status",
+			headerName: t("settings.jobPositions.grid.columns.status", "Status"),
 			minWidth: 130,
 			cellRenderer: (params: ICellRendererParams<JobPosition>) => (
 				<BooleanBadgeCellRenderer
 					value={!!params.value}
-					trueText="Active"
-					falseText="Inactive"
+					trueText={t("settings.jobPositions.grid.values.active", "Active")}
+					falseText={t("settings.jobPositions.grid.values.inactive", "Inactive")}
 					trueVariant="default"
 					falseVariant="secondary"
 				/>
@@ -188,7 +190,7 @@ function JobPositions() {
 		},
 		{
 			field: "description",
-			headerName: "Description",
+			headerName: t("settings.jobPositions.grid.columns.description", "Description"),
 			flex: 3,
 			minWidth: 260,
 			valueGetter: (params) => params.data?.description || "—",
@@ -200,18 +202,17 @@ function JobPositions() {
 		},
 		{
 			field: "actions",
-			headerName: "Actions",
+			headerName: t("settings.jobPositions.grid.columns.actions", "Actions"),
 			width: 110,
 			pinned: "right",
 			cellRenderer: createActionsCellRenderer({
-				onEdit: handleEdit,
-				onDelete: handleDelete
+				onEdit: handleEdit
 			}),
 			sortable: false,
 			filter: false,
 			resizable: false
 		}
-	], [handleDelete, handleEdit]);
+	], [t]);
 
 	const stats = useMemo(() => {
 		const total = items.length;
@@ -286,17 +287,17 @@ function JobPositions() {
 
 	return (
 		<SettingsLayout
-			title="Job Positions"
-			description="Standardize role titles for reporting, permissions, and analytics."
+			title={t("settings.jobPositions.title", "Job Positions")}
+			description={t("settings.jobPositions.description", "Standardize role titles for reporting, permissions, and analytics.")}
 			icon={faBriefcase}
 			iconColor="#2563eb"
 			backPath="/settings"
-			loading={{ isLoading: loading, message: "Loading job positions..." }}
+			loading={{ isLoading: loading, message: t("settings.jobPositions.loading", "Loading job positions...") }}
 			error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
 			headerActions={(
 				<Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
 					<FontAwesomeIcon icon={faPlus} className="mr-2" />
-					Add Job Position
+					{t("settings.jobPositions.header.addJobPosition", "Add Job Position")}
 				</Button>
 			)}
 		>
@@ -307,7 +308,7 @@ function JobPositions() {
 						label: (
 							<div className="flex items-center gap-2">
 								<FontAwesomeIcon icon={faBriefcase} className="w-4 h-4" />
-								<span>Positions</span>
+								<span>{t("settings.jobPositions.tabs.positions", "Positions")}</span>
 							</div>
 						),
 						content: (
@@ -315,7 +316,7 @@ function JobPositions() {
 								<div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
 									<input
 										type="text"
-										placeholder="Search by code or title..."
+										placeholder={t("settings.jobPositions.search.placeholder", "Search by code or title...")}
 										value={searchQuery}
 										onChange={(e) => {
 											setSearchQuery(e.target.value);
@@ -324,7 +325,9 @@ function JobPositions() {
 										className="w-full md:w-80 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
 									/>
 									<p className="text-xs text-muted-foreground">
-										Showing {filteredItems.length} of {items.length} positions
+										{t("settings.jobPositions.grid.showing", "Showing {count} of {total} positions")
+											.replace("{count}", String(filteredItems.length))
+											.replace("{total}", String(items.length))}
 									</p>
 								</div>
 								<div className="flex-1 min-h-0">
@@ -332,7 +335,7 @@ function JobPositions() {
 										rowData={filteredItems}
 										columnDefs={columns}
 										onRowClicked={handleEdit}
-										noRowsMessage="No job positions found"
+										noRowsMessage={t("settings.jobPositions.grid.noRows", "No job positions found")}
 									/>
 								</div>
 							</div>
@@ -343,7 +346,7 @@ function JobPositions() {
 						label: (
 							<div className="flex items-center gap-2">
 								<FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-								<span>Statistics</span>
+								<span>{t("settings.jobPositions.tabs.statistics", "Statistics")}</span>
 							</div>
 						),
 						content: (
@@ -351,33 +354,33 @@ function JobPositions() {
 								<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 									<Card>
 										<CardHeader className="py-2">
-											<CardTitle className="text-sm">Overview</CardTitle>
-											<CardDescription className="text-xs">Snapshot of your catalog</CardDescription>
+											<CardTitle className="text-sm">{t("settings.jobPositions.stats.overview.title", "Overview")}</CardTitle>
+											<CardDescription className="text-xs">{t("settings.jobPositions.stats.overview.description", "Snapshot of your catalog")}</CardDescription>
 										</CardHeader>
 										<CardContent className="py-2">
 											<div className="grid grid-cols-2 gap-3 text-center">
 												<div>
 													<div className="text-lg font-semibold">{stats.total}</div>
-													<div className="text-[11px] text-muted-foreground">Total</div>
+													<div className="text-[11px] text-muted-foreground">{t("settings.jobPositions.stats.total", "Total")}</div>
 												</div>
 												<div>
 													<div className="text-lg font-semibold">{stats.active}</div>
-													<div className="text-[11px] text-muted-foreground">Active</div>
+													<div className="text-[11px] text-muted-foreground">{t("settings.jobPositions.stats.active", "Active")}</div>
 												</div>
 												<div>
 													<div className="text-lg font-semibold">{stats.leadership}</div>
-													<div className="text-[11px] text-muted-foreground">Leadership</div>
+													<div className="text-[11px] text-muted-foreground">{t("settings.jobPositions.stats.leadership", "Leadership")}</div>
 												</div>
 												<div>
 													<div className="text-lg font-semibold">{stats.individual}</div>
-													<div className="text-[11px] text-muted-foreground">Individual</div>
+													<div className="text-[11px] text-muted-foreground">{t("settings.jobPositions.stats.individual", "Individual")}</div>
 												</div>
 											</div>
 										</CardContent>
 									</Card>
 									<Card className="md:col-span-1 lg:col-span-2">
 										<CardHeader className="py-2">
-											<CardTitle className="text-sm">Level Distribution</CardTitle>
+											<CardTitle className="text-sm">{t("settings.jobPositions.stats.levelDistribution.title", "Level Distribution")}</CardTitle>
 										</CardHeader>
 										<CardContent className="py-2">
 											<div className="space-y-3">
@@ -393,7 +396,7 @@ function JobPositions() {
 												))}
 												{stats.inactive > 0 && (
 													<div className="flex items-center justify-between text-sm pt-1 border-t border-border">
-														<span className="text-muted-foreground text-xs">Inactive roles</span>
+														<span className="text-muted-foreground text-xs">{t("settings.jobPositions.stats.inactive", "Inactive roles")}</span>
 														<span className="font-semibold text-xs">{stats.inactive}</span>
 													</div>
 												)}
@@ -414,8 +417,8 @@ function JobPositions() {
 				open={isCreateDialogOpen}
 				onOpenChange={setIsCreateDialogOpen}
 				type="create"
-				title="Add Job Position"
-				description="Define a reusable job position for assignments and reporting."
+				title={t("settings.jobPositions.dialogs.create.title", "Add Job Position")}
+				description={t("settings.jobPositions.dialogs.create.description", "Define a reusable job position for assignments and reporting.")}
 				onSubmit={handleCreateSubmit}
 				isSubmitting={isSubmitting}
 				error={formError}
@@ -424,23 +427,23 @@ function JobPositions() {
 				<div className="grid gap-4">
 					<TextField
 						id="create-code"
-						label="Code"
+						label={t("settings.jobPositions.dialogs.create.fields.code", "Code")}
 						value={createFormData.code}
 						onChange={(value) => setCreateFormData((prev) => ({ ...prev, code: value }))}
-						placeholder="e.g., OPS-MGR"
+						placeholder={t("settings.jobPositions.dialogs.create.fields.codePlaceholder", "e.g., OPS-MGR")}
 						required
 					/>
 					<TextField
 						id="create-title"
-						label="Title"
+						label={t("settings.jobPositions.dialogs.create.fields.title", "Title")}
 						value={createFormData.title}
 						onChange={(value) => setCreateFormData((prev) => ({ ...prev, title: value }))}
-						placeholder="Operations Manager"
+						placeholder={t("settings.jobPositions.dialogs.create.fields.titlePlaceholder", "Operations Manager")}
 						required
 					/>
 					<SelectField
 						id="create-level"
-						label="Level"
+						label={t("settings.jobPositions.dialogs.create.fields.level", "Level")}
 						value={createFormData.level}
 						onChange={(value) => setCreateFormData((prev) => ({ ...prev, level: value as JobPositionLevel }))}
 						options={LEVEL_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
@@ -449,25 +452,25 @@ function JobPositions() {
 					<div className="grid gap-2 sm:grid-cols-2">
 						<CheckboxField
 							id="create-is-leadership"
-							label="Leadership Role"
+							label={t("settings.jobPositions.dialogs.create.fields.leadership", "Leadership Role")}
 							checked={createFormData.is_leadership}
 							onChange={(checked) => setCreateFormData((prev) => ({ ...prev, is_leadership: !!checked }))}
-							description="Marks the position as part of management."
+							description={t("settings.jobPositions.dialogs.create.fields.leadershipDescription", "Marks the position as part of management.")}
 						/>
 						<CheckboxField
 							id="create-is-active"
-							label="Active"
+							label={t("settings.jobPositions.dialogs.create.fields.active", "Active")}
 							checked={createFormData.is_active}
 							onChange={(checked) => setCreateFormData((prev) => ({ ...prev, is_active: !!checked }))}
-							description="Inactive roles remain in history but can't be assigned."
+							description={t("settings.jobPositions.dialogs.create.fields.activeDescription", "Inactive roles remain in history but can't be assigned.")}
 						/>
 					</div>
 					<TextAreaField
 						id="create-description"
-						label="Description"
+						label={t("settings.jobPositions.dialogs.create.fields.description", "Description")}
 						value={createFormData.description}
 						onChange={(value) => setCreateFormData((prev) => ({ ...prev, description: value }))}
-						placeholder="Optional summary of responsibilities and scope."
+						placeholder={t("settings.jobPositions.dialogs.create.fields.descriptionPlaceholder", "Optional summary of responsibilities and scope.")}
 						rows={3}
 					/>
 				</div>
@@ -477,32 +480,48 @@ function JobPositions() {
 				open={isEditDialogOpen}
 				onOpenChange={setIsEditDialogOpen}
 				type="edit"
-				title="Edit Job Position"
-				description="Update the selected job position."
+				title={t("settings.jobPositions.dialogs.edit.title", "Edit Job Position")}
+				description={t("settings.jobPositions.dialogs.edit.description", "Update the selected job position.")}
 				onSubmit={handleEditSubmit}
 				isSubmitting={isSubmitting}
 				error={formError}
 				submitDisabled={isSubmitting || !editingItem}
+				footerActions={
+					editingItem ? (
+						<Button
+							type="button"
+							variant="destructive"
+							onClick={() => {
+								setIsEditDialogOpen(false);
+								handleDelete(editingItem);
+							}}
+							disabled={isSubmitting}
+						>
+							<FontAwesomeIcon icon={faTrash} className="mr-2" />
+							{t("settings.jobPositions.dialogs.edit.delete", "Delete")}
+						</Button>
+					) : null
+				}
 			>
 				{editingItem && (
 					<div className="grid gap-4">
 						<TextField
 							id="edit-code"
-							label="Code"
+							label={t("settings.jobPositions.dialogs.edit.fields.code", "Code")}
 							value={editFormData.code}
 							onChange={(value) => setEditFormData((prev) => ({ ...prev, code: value }))}
 							required
 						/>
 						<TextField
 							id="edit-title"
-							label="Title"
+							label={t("settings.jobPositions.dialogs.edit.fields.title", "Title")}
 							value={editFormData.title}
 							onChange={(value) => setEditFormData((prev) => ({ ...prev, title: value }))}
 							required
 						/>
 						<SelectField
 							id="edit-level"
-							label="Level"
+							label={t("settings.jobPositions.dialogs.edit.fields.level", "Level")}
 							value={editFormData.level}
 							onChange={(value) => setEditFormData((prev) => ({ ...prev, level: value as JobPositionLevel }))}
 							options={LEVEL_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
@@ -511,20 +530,20 @@ function JobPositions() {
 						<div className="grid gap-2 sm:grid-cols-2">
 							<CheckboxField
 								id="edit-is-leadership"
-								label="Leadership Role"
+								label={t("settings.jobPositions.dialogs.edit.fields.leadership", "Leadership Role")}
 								checked={editFormData.is_leadership}
 								onChange={(checked) => setEditFormData((prev) => ({ ...prev, is_leadership: !!checked }))}
 							/>
 							<CheckboxField
 								id="edit-is-active"
-								label="Active"
+								label={t("settings.jobPositions.dialogs.edit.fields.active", "Active")}
 								checked={editFormData.is_active}
 								onChange={(checked) => setEditFormData((prev) => ({ ...prev, is_active: !!checked }))}
 							/>
 						</div>
 						<TextAreaField
 							id="edit-description"
-							label="Description"
+							label={t("settings.jobPositions.dialogs.edit.fields.description", "Description")}
 							value={editFormData.description}
 							onChange={(value) => setEditFormData((prev) => ({ ...prev, description: value }))}
 							rows={3}
@@ -537,13 +556,13 @@ function JobPositions() {
 				open={isDeleteDialogOpen}
 				onOpenChange={handleCloseDeleteDialog}
 				type="delete"
-				title="Delete Job Position"
-				description={deletingItem ? `Are you sure you want to delete "${deletingItem.title}"? This action cannot be undone.` : undefined}
+				title={t("settings.jobPositions.dialogs.delete.title", "Delete Job Position")}
+				description={deletingItem ? t("settings.jobPositions.dialogs.delete.description", "Are you sure you want to delete \"{title}\"? This action cannot be undone.").replace("{title}", deletingItem.title) : undefined}
 				onConfirm={handleDeleteConfirm}
 				isSubmitting={isSubmitting}
 				error={formError}
 				submitDisabled={!deletingItem}
-				entityName="job position"
+				entityName={t("settings.jobPositions.dialogs.delete.entityName", "job position")}
 				entityData={deletingItem as any}
 				renderEntityPreview={(position: JobPosition) => (
 					<div className="space-y-1">

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 import type { TaskDialogProps } from './taskDialog/types';
 
@@ -27,6 +28,7 @@ function isPerfEnabled() {
 // Lightweight shell that renders immediately.
 // Heavy logic mounts lazily so the Sheet animation can start within a frame.
 export default function TaskDialog({ open, onOpenChange, mode, workspaceId, task }: TaskDialogProps) {
+  const { t } = useLanguage();
   const perfEnabled = isPerfEnabled();
   const [contentMounted, setContentMounted] = useState(false);
   const sheetContentRef = useRef<HTMLDivElement>(null);
@@ -137,7 +139,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId, task
             fallback={
               <>
                 <SheetHeader className="sr-only">
-                  <SheetTitle>{mode === 'edit' ? 'Edit Task' : 'Create New Task'}</SheetTitle>
+                  <SheetTitle>{mode === 'edit' ? t('task.editTask', 'Edit Task') : t('task.createNewTask', 'Create New Task')}</SheetTitle>
                   <SheetDescription>Loading task dialog</SheetDescription>
                 </SheetHeader>
                 <div className="flex-1 flex items-center justify-center">

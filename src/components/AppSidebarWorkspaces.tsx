@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import { useAuth } from '@/providers/AuthProvider';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -293,6 +294,16 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const isCollapsedState = state === 'collapsed';
   const collapsed = isCollapsedState && !isMobile;
   const { t } = useLanguage();
+  const { user } = useAuth();
+  
+  // Filter out hidden workspaces
+  const visibleWorkspaces = useMemo(() => {
+    if (!user?.settings?.hiddenWorkspaces) {
+      return workspaces;
+    }
+    const hiddenIds = new Set((user.settings.hiddenWorkspaces || []) as number[]);
+    return workspaces.filter((workspace) => !hiddenIds.has(Number(workspace.id)));
+  }, [workspaces, user?.settings?.hiddenWorkspaces]);
   
   // Track task counts for each workspace
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
@@ -310,7 +321,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       }
       
       // Map workspaces to promises for parallel execution
-      const promises = workspaces.map(async (workspace) => {
+      const promises = visibleWorkspaces.map(async (workspace) => {
         try {
           const result = await TasksCache.queryTasks({ 
             workspace_id: Number(workspace.id), 
@@ -368,7 +379,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       unsubscribeUpdated();
       unsubscribeDeleted();
     };
-  }, [workspaces]);
+  }, [visibleWorkspaces]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
@@ -383,7 +394,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const localWorkspaces = useMemo(() => {
     // If workspaces prop is empty but we have stable workspaces, use stable workspaces
     // This prevents workspaces from disappearing during animation transitions
-    const sourceWorkspaces = workspaces.length > 0 ? workspaces : stableWorkspacesRef.current;
+    const sourceWorkspaces = visibleWorkspaces.length > 0 ? visibleWorkspaces : stableWorkspacesRef.current;
     
     const normalized = sourceWorkspaces.map((w) => ({ ...w, id: String(w.id) }));
     const savedOrder = loadWorkspaceOrder();
@@ -403,7 +414,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     }
     
     return ordered;
-  }, [workspaces, orderKey]);
+  }, [visibleWorkspaces, orderKey]);
 
   const workspaceIds = useMemo(() => localWorkspaces.map((w) => String(w.id)), [localWorkspaces]);
 

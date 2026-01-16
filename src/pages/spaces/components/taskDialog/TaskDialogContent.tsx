@@ -14,6 +14,7 @@ import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { genericActions } from '@/store/genericSlices';
 import { AppDispatch } from '@/store/store';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 import { useTaskDialogData } from './hooks/useTaskDialogData';
 import { useTaskFormState } from './hooks/useTaskFormState';
@@ -49,6 +50,7 @@ export default function TaskDialogContent({
   clickTime,
   perfEnabled = false,
 }: Props) {
+  const { t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
 
   const perfRef = useRef<{ marks: Record<string, number> }>({ marks: {} });
@@ -354,7 +356,7 @@ export default function TaskDialogContent({
       const status = e?.response?.status;
       const toast = (await import('react-hot-toast')).default;
       if (status === 403 || errorMessage.includes('permission')) {
-        toast.error('You do not have permission to create tasks in this category.', { duration: 5000 });
+        toast.error(t('errors.noPermissionCreateTask', 'You do not have permission to create tasks in this category.'), { duration: 5000 });
       } else {
         toast.error(errorMessage, { duration: 5000 });
       }
@@ -468,7 +470,7 @@ export default function TaskDialogContent({
       <SheetHeader className="relative px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-border/40 overflow-hidden bg-gradient-to-br from-primary/5 via-transparent to-transparent flex-shrink-0">
         <div className={`flex items-center gap-3 flex-1 min-w-0 ${mode === 'edit' ? 'mb-2' : ''}`}>
           <SheetTitle className="text-xl sm:text-2xl font-semibold font-[600] text-foreground flex-shrink-0">
-            {mode === 'edit' ? 'Edit Task' : 'Create New Task'}
+            {mode === 'edit' ? t('task.editTask', 'Edit Task') : t('task.createNewTask', 'Create New Task')}
           </SheetTitle>
           {categoryId && categoryIconDef && (
             <FontAwesomeIcon
@@ -498,14 +500,14 @@ export default function TaskDialogContent({
                 value="basic"
                 className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
               >
-                Basic Details
+                {t('taskDialog.basicDetails', 'Basic Details')}
               </TabsTrigger>
               {categoryFields.length > 0 && (
                 <TabsTrigger
                   value="customFields"
                   className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
                 >
-                  Fields
+                  {t('taskDialog.fields', 'Fields')}
                   {customFieldRequirementMissing && (
                     <span className="ml-2 text-[11px] text-red-500 font-semibold align-middle">●</span>
                   )}
@@ -515,14 +517,14 @@ export default function TaskDialogContent({
                 value="additional"
                 className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
               >
-                Additional Info
+                {t('taskDialog.additionalInfo', 'Additional Info')}
               </TabsTrigger>
               {mode === 'edit' && (
                 <TabsTrigger
                   value="share"
                   className="px-0 py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
                 >
-                  Share
+                  {t('taskDialog.share', 'Share')}
                 </TabsTrigger>
               )}
             </TabsList>
@@ -640,11 +642,11 @@ export default function TaskDialogContent({
           >
             {formState.isSubmitting
               ? mode === 'edit'
-                ? 'Saving...'
-                : 'Creating...'
+                ? t('task.saving', 'Saving...')
+                : t('task.creating', 'Creating...')
               : mode === 'edit'
-                ? 'Save Changes'
-                : 'Create Task'}
+                ? t('task.saveChanges', 'Save Changes')
+                : t('task.createTask', 'Create Task')}
           </Button>
         </div>
       </div>

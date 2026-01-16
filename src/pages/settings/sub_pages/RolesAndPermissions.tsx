@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faShieldAlt, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faShieldAlt, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { ColDef } from "ag-grid-community";
 import type { Role, Permission, RolePermission } from "@/store/types";
 import { AppDispatch, RootState } from "@/store/store";
@@ -269,7 +269,6 @@ function RolesAndPermissions() {
       suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
-        onDelete: handleDelete,
         customActions: [
           {
             icon: faShieldAlt,
@@ -285,7 +284,7 @@ function RolesAndPermissions() {
       resizable: false,
       pinned: "right"
     }
-  ], [handleEdit, handleDelete, handleOpenPermissions, tu]);
+  ], [handleEdit, handleOpenPermissions, tu]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -409,6 +408,22 @@ function RolesAndPermissions() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingItem || !editFormData.name.trim()}
+        footerActions={
+          editingItem ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingItem);
+              }}
+              disabled={isSubmitting}
+            >
+              <FontAwesomeIcon icon={faTrash} className="mr-2" />
+              {tu('editDialog.delete', 'Delete')}
+            </Button>
+          ) : null
+        }
       >
         {editingItem && (
           <div className="grid gap-4">
@@ -439,7 +454,7 @@ function RolesAndPermissions() {
         type="custom"
         contentClassName="max-w-6xl"
         title={tu('permissionsDialog.title', 'Assign permissions')}
-        description={selectedRoleName ? tu('permissionsDialog.description', `Configure permissions for "${selectedRoleName}"`) : tu('permissionsDialog.description', 'Configure permissions')}
+        description={selectedRoleName ? tu('permissionsDialog.description', 'Configure permissions for "{roleName}"').replace('{roleName}', selectedRoleName) : tu('permissionsDialog.description', 'Configure permissions')}
         onSubmit={(e) => { e.preventDefault(); handleSavePermissions(); }}
         isSubmitting={isSavingPerms}
         submitDisabled={isSavingPerms || !selectedRoleId}
@@ -541,12 +556,12 @@ function RolesAndPermissions() {
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
         title={tu('deleteDialog.title', 'Delete Role')}
-        description={deletingItem ? tu('deleteDialog.description', `Are you sure you want to delete the role "${deletingItem.name}"? This action cannot be undone.`) : undefined}
+        description={deletingItem ? tu('deleteDialog.description', 'Are you sure you want to delete the role "{name}"? This action cannot be undone.').replace('{name}', deletingItem.name || '') : undefined}
         onConfirm={() => deletingItem ? deleteItem(deletingItem.id) : undefined}
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={!deletingItem}
-        entityName="role"
+        entityName={tu('deleteDialog.entityName', 'role')}
         entityData={deletingItem as any}
         renderEntityPreview={(role: Role) => renderRolePreview(role)}
       />

@@ -468,7 +468,6 @@ function Users() {
         width: 220,
         cellRenderer: createActionsCellRenderer({
           onEdit: handleEdit,
-          onDelete: handleDelete,
           customActions: [
             {
               icon: faUsers,
@@ -1200,7 +1199,7 @@ function Users() {
         submitText={tu('dialogs.manageTeams.save', 'Save')}
         submitDisabled={!teamsDialogUser || isSavingTeams}
         cancelText={tu('dialogs.manageTeams.close', 'Close')}
-        contentClassName="max-w-3xl"
+        contentClassName="max-w-4xl"
       >
         {!teamsDialogUser ? (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
@@ -1514,6 +1513,22 @@ function Users() {
         error={formError}
         submitDisabled={isSubmitting || !editingUser}
         contentClassName="max-w-[80vw] sm:max-w-4xl"
+        footerActions={
+          editingUser ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingUser);
+              }}
+              disabled={isSubmitting}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              {tu('dialogs.deleteUser.title', 'Delete User')}
+            </Button>
+          ) : null
+        }
       >
         {editingUser && (
           <Tabs defaultValue="basic" className="w-full">

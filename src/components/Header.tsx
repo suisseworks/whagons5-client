@@ -91,6 +91,7 @@ function Header() {
             workspace: 'Workspace',
             settings: 'Settings',
             categories: 'Categories',
+            'custom-fields': 'Custom fields',
             templates: 'Templates',
             teams: 'Teams',
             spots: 'Spots',
@@ -442,11 +443,11 @@ function Header() {
         if (hydrationState === "custom") return null;
         const label =
             hydrationState === "processing"
-                ? "Syncing"
+                ? t("sync.syncing", "Syncing")
                 : hydrationState === "success"
-                ? "Synced"
+                ? t("sync.synced", "Synced")
                 : hydrationState === "error"
-                ? "Sync failed"
+                ? t("sync.failed", "Sync failed")
                 : undefined;
         const badge = (
             <MultiStateBadge
@@ -463,7 +464,7 @@ function Header() {
             );
         }
         return badge;
-    }, [hydrationError, hydrationState]);
+    }, [hydrationError, hydrationState, t]);
 
 
 
@@ -745,10 +746,10 @@ function Header() {
                         <button
                             className="group inline-flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97]"
                             onClick={() => setOpenCreateTask(true)}
-                            title="Create Task"
+                            title={t('task.createTask', 'Create Task')}
                         >
                             <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" strokeWidth={2.5} />
-                            <span>New Task</span>
+                            <span>{t('task.newTask', 'New Task')}</span>
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
@@ -853,7 +854,7 @@ function Header() {
                             variant="outline" 
                             size="sm" 
                             className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-                            title="All tasks"
+                            title={t('workspace.filters.allTasks', 'All tasks')}
                             onClick={() => {
                                 dispatch(setFilterModel(null));
                                 dispatch(setSearchText(''));
@@ -863,7 +864,7 @@ function Header() {
                                 }));
                             }}
                         >
-                            All
+                            {t('workspace.filters.all', 'All')}
                         </Button>
                         {quickPresets.map((p: any, idx: number) => (
                             <Button
@@ -888,12 +889,12 @@ function Header() {
                             variant="outline" 
                             size="sm" 
                             className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-                            title="Custom filters"
+                            title={t('workspace.filters.customFilters', 'Custom filters')}
                             onClick={() => {
                                 window.dispatchEvent(new CustomEvent('workspace-filter-dialog-open', { detail: {} }));
                             }}
                         >
-                            Filters…
+                            {t('workspace.filters.filters', 'Filters…')}
                         </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -901,15 +902,15 @@ function Header() {
                                     variant="outline" 
                                     size="sm" 
                                     className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" 
-                                    title="More presets"
+                                    title={t('workspace.filters.morePresets', 'More presets')}
                                 >
-                                    More…
+                                    {t('workspace.filters.more', 'More…')}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="min-w-[240px]">
-                                <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
+                                <DropdownMenuLabel>{t('workspace.filters.applyPreset', 'Apply preset')}</DropdownMenuLabel>
                                 {allPresets.length === 0 ? (
-                                    <DropdownMenuItem disabled>No presets yet</DropdownMenuItem>
+                                    <DropdownMenuItem disabled>{t('workspace.filters.noPresets', 'No presets yet')}</DropdownMenuItem>
                                 ) : (
                                     allPresets.map((p: any) => (
                                         <DropdownMenuItem 
@@ -930,22 +931,22 @@ function Header() {
 
                         {/* Group by control */}
                         <div className="flex items-center gap-2 ml-auto">
-                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('workspace.group.group', 'Group')}</Label>
                             <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
                                 <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
-                                    <SelectValue placeholder="Group" />
+                                    <SelectValue placeholder={t('workspace.group.group', 'Group')} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    <SelectItem value="spot_id">Location</SelectItem>
-                                    <SelectItem value="status_id">Status</SelectItem>
-                                    <SelectItem value="priority_id">Priority</SelectItem>
+                                    <SelectItem value="none">{t('workspace.group.none', 'None')}</SelectItem>
+                                    <SelectItem value="spot_id">{t('workspace.group.location', 'Location')}</SelectItem>
+                                    <SelectItem value="status_id">{t('workspace.group.status', 'Status')}</SelectItem>
+                                    <SelectItem value="priority_id">{t('workspace.group.priority', 'Priority')}</SelectItem>
                                 </SelectContent>
                             </Select>
                             {groupBy !== 'none' && (
                                 <div className="flex items-center gap-2">
                                     <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
-                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
+                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('workspace.group.collapse', 'Collapse')}</Label>
                                 </div>
                             )}
                         </div>

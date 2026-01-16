@@ -33,6 +33,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSepar
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 const WORKSPACE_TAB_PATHS = {
   grid: '',
@@ -48,6 +49,7 @@ type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
 const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'statistics', 'settings'];
 
 export const Workspace = () => {
+  const { t } = useLanguage();
   const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
@@ -769,7 +771,7 @@ export const Workspace = () => {
   const kpiCards: KpiCard[] = [
     {
       key: 'total',
-      label: 'Total',
+      label: t('workspace.stats.total', 'Total'),
       value: formatStatValue(stats.total),
       icon: <BarChart3 className="h-4 w-4" />,
       badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-200',
@@ -777,7 +779,7 @@ export const Workspace = () => {
     },
     {
       key: 'inProgress',
-      label: 'In progress',
+      label: t('workspace.stats.inProgress', 'In progress'),
       value: formatStatValue(stats.inProgress),
       icon: <Activity className="h-4 w-4" />,
       badgeClass: 'bg-sky-100 text-sky-900 border-sky-200',
@@ -785,17 +787,17 @@ export const Workspace = () => {
     },
     {
       key: 'completedToday',
-      label: 'Completed today',
+      label: t('workspace.stats.completedToday', 'Completed today'),
       value: formatStatValue(stats.completedToday),
       icon: <Sparkles className="h-4 w-4" />,
       badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-200',
       barClass: 'from-emerald-50 to-emerald-100',
-      helperText: stats.completedToday === 0 && !statsArePending ? 'Start completing tasks to see progress!' : undefined
+      helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
     },
     {
       key: 'trend',
-      label: '7-day trend',
-      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} done`,
+      label: t('workspace.stats.sevenDayTrend', '7-day trend'),
+      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
       icon: <TrendingUp className="h-4 w-4" />,
       badgeClass: 'bg-purple-100 text-purple-900 border-purple-200',
       barClass: 'from-purple-50 to-purple-100',
@@ -803,8 +805,8 @@ export const Workspace = () => {
       helperText: statsArePending 
         ? '' 
         : completedLast7Days === 0 
-          ? 'Complete your first task to begin tracking progress!'
-          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} vs yesterday`
+          ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
+          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`
     }
   ];
 
@@ -859,11 +861,11 @@ export const Workspace = () => {
                 aria-label="Collaboration menu"
               >
                 <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
-                <span className="hidden sm:inline">Collab</span>
+                <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>Collaboration</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('workspace.collab.collaboration', 'Collaboration')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={rightPanel === 'chat'}
@@ -871,7 +873,7 @@ export const Workspace = () => {
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
-                  <span>Chat</span>
+                  <span>{t('workspace.collab.chat', 'Chat')}</span>
                 </div>
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
@@ -880,7 +882,7 @@ export const Workspace = () => {
               >
                 <div className="flex items-center gap-2">
                   <FolderPlus className="w-4 h-4" />
-                  <span>Resources</span>
+                  <span>{t('workspace.collab.resources', 'Resources')}</span>
                 </div>
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
@@ -942,7 +944,7 @@ export const Workspace = () => {
             />
             <div className="border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
             <div className="flex items-center justify-between px-3 py-2 border-b">
-              <div className="text-sm font-medium">{rightPanel === 'chat' ? 'Chat' : 'Resources'}</div>
+              <div className="text-sm font-medium">{rightPanel === 'chat' ? t('workspace.collab.chat', 'Chat') : t('workspace.collab.resources', 'Resources')}</div>
               <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
                 <X className="w-4 h-4" />
               </Button>

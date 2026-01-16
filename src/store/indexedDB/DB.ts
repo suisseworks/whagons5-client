@@ -323,6 +323,9 @@ export class DB {
           if (!db.objectStoreNames.contains('board_messages')) {
             db.createObjectStore('board_messages', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('board_attachments')) {
+            db.createObjectStore('board_attachments', { keyPath: 'id' });
+          }
 
           // Workflows
           if (!db.objectStoreNames.contains('workflows')) {
@@ -568,6 +571,7 @@ export class DB {
       | 'task_recurrences'
       | 'workspace_chat'
       | 'exceptions'
+      | 'board_attachments'
       | 'avatars',
     mode: IDBTransactionMode = 'readonly'
   ) {
@@ -631,6 +635,7 @@ export class DB {
       | 'task_recurrences'
       | 'workspace_chat'
       | 'exceptions'
+      | 'board_attachments'
       | 'avatars',
     mode: IDBTransactionMode = 'readwrite'
   ) {

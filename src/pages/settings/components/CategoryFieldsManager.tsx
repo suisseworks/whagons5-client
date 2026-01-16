@@ -9,6 +9,7 @@ import { RootState, AppDispatch } from "@/store/store";
 import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Category } from "@/store/types";
 import api from "@/api/whagonsApi";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 type CategoryFieldAssignment = { 
   id: number; 
@@ -37,6 +38,8 @@ export interface CategoryFieldsManagerProps {
 
 export function CategoryFieldsManager({ open, onOpenChange, category }: CategoryFieldsManagerProps) {
   const dispatch = useDispatch<AppDispatch>();
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.categories.fieldsManager.${key}`, fallback);
   const { value: customFields } = useSelector((state: RootState) => state.customFields) as { value: CustomField[] };
   const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: CategoryFieldAssignment[] };
   
@@ -158,7 +161,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const addAssignment = async () => {
     if (!category || !newFieldId) return;
     if (assignedFieldIds.has(Number(newFieldId))) {
-      setInlineError('Field already assigned to this category.');
+      setInlineError(tc('errors.alreadyAssigned', 'Field already assigned to this category.'));
       return;
     }
     setInlineError(null);
@@ -215,7 +218,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
       console.error('Error adding assignment', e?.response?.data || e);
       // If server add fails, remove our optimistic row
       setLocalAssignments(prev => prev.filter(r => r.id >= 0));
-      const msg = e?.response?.data?.message || e?.response?.data?.error || (Array.isArray(e?.response?.data?.errors) ? e.response.data.errors.join(', ') : '') || e?.message || 'Failed to add field';
+      const msg = e?.response?.data?.message || e?.response?.data?.error || (Array.isArray(e?.response?.data?.errors) ? e.response.data.errors.join(', ') : '') || e?.message || tc('errors.failedToAdd', 'Failed to add field');
       setInlineError(String(msg));
     } finally {
       setAssignSubmitting(false);
@@ -408,9 +411,9 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     <Dialog open={open} onOpenChange={closeDialog}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Manage Fields{category ? ` • ${category.name}` : ''}</DialogTitle>
+          <DialogTitle>{tc('title', 'Manage Fields')}{category ? ` • ${category.name}` : ''}</DialogTitle>
           <DialogDescription>
-            Assign custom fields to this category and configure their requirements, defaults, and order.
+            {tc('description', 'Assign custom fields to this category and configure their requirements, defaults, and order.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -421,30 +424,30 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
               onChange={(e) => setNewFieldId(e.target.value)}
               className="px-3 py-2 border border-input bg-background rounded-md text-sm"
             >
-              <option value="">Select field to add</option>
+              <option value="">{tc('selectPlaceholder', 'Select field to add')}</option>
               {availableFields.map((f: any) => (
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
             <Button onClick={addAssignment} disabled={!newFieldId || assignSubmitting} size="sm">
               {assignSubmitting ? <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" /> : <FontAwesomeIcon icon={faPlus} className="mr-2" />}
-              Add Field
+              {tc('addButton', 'Add Field')}
             </Button>
             {inlineError && <span className="text-sm text-red-600 ml-2">{inlineError}</span>}
           </div>
 
           {currentAssignments.length === 0 ? (
             <div className="rounded-md border border-dashed p-8 text-center">
-              <div className="text-sm text-muted-foreground">No fields assigned yet.</div>
-              <div className="text-xs text-muted-foreground mt-1">Select a field above and click Add Field.</div>
+              <div className="text-sm text-muted-foreground">{tc('empty.noFields', 'No fields assigned yet.')}</div>
+              <div className="text-xs text-muted-foreground mt-1">{tc('empty.selectField', 'Select a field above and click Add Field.')}</div>
             </div>
           ) : (
             <div className="border rounded-md">
               <div className="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-t-md">
-                <div className="col-span-6">Field</div>
-                <div className="col-span-2">Required</div>
-                <div className="col-span-3">Default</div>
-                <div className="col-span-1 text-right">Actions</div>
+                <div className="col-span-6">{tc('columns.field', 'Field')}</div>
+                <div className="col-span-2">{tc('columns.required', 'Required')}</div>
+                <div className="col-span-3">{tc('columns.default', 'Default')}</div>
+                <div className="col-span-1 text-right">{tc('columns.actions', 'Actions')}</div>
               </div>
               <div className="divide-y">
                 {currentAssignments.map((a, idx) => {
@@ -480,7 +483,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
                         {renderDefaultValueEditor(a, f)}
                       </div>
                       <div className="col-span-1 flex items-center justify-end gap-1">
-                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(a)} title="Remove field" aria-label="Remove field">
+                        <Button variant="destructive" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteTarget(a)} title={tc('removeButton', 'Remove field')} aria-label={tc('removeButton', 'Remove field')}>
                           <FontAwesomeIcon icon={faTrash} className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -493,7 +496,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={closeDialog}>Close</Button>
+          <Button variant="outline" onClick={closeDialog}>{tc('closeButton', 'Close')}</Button>
         </DialogFooter>
       </DialogContent>
 
@@ -501,19 +504,21 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Remove field from category</DialogTitle>
+            <DialogTitle>{tc('deleteDialog.title', 'Remove field from category')}</DialogTitle>
             <DialogDescription>
               {(() => {
                 const fid = deleteTarget ? getFieldId(deleteTarget) : null;
                 const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
-                const name = f?.name || (fid != null ? `Field #${fid}` : 'this field');
-                return `Are you sure you want to remove "${name}" from ${category?.name ?? 'this category'}? This does not delete the custom field itself.`;
+                const name = f?.name || (fid != null ? tc('deleteDialog.fieldNumber', 'Field #{id}').replace('{id}', String(fid)) : tc('deleteDialog.thisField', 'this field'));
+                return tc('deleteDialog.confirm', 'Are you sure you want to remove "{name}" from {category}? This does not delete the custom field itself.')
+                  .replace('{name}', name)
+                  .replace('{category}', category?.name ?? tc('deleteDialog.thisCategory', 'this category'));
               })()}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={async () => { if (deleteTarget) { await removeAssignment(deleteTarget); setDeleteTarget(null); } }}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{tc('deleteDialog.cancel', 'Cancel')}</Button>
+            <Button variant="destructive" onClick={async () => { if (deleteTarget) { await removeAssignment(deleteTarget); setDeleteTarget(null); } }}>{tc('deleteDialog.delete', 'Delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -27,6 +27,7 @@ import {
 import { MultiSelect } from "@/components/ui/multi-select";
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
+import { useLanguage } from "@/providers/LanguageProvider";
 
 // Custom component for async icon loading in Templates
 const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
@@ -75,7 +76,7 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
             <FontAwesomeIcon
               icon={faLock}
               className="w-3 h-3 text-muted-foreground"
-              title="Private template"
+              title={tt('grid.values.privateTemplate', 'Private template')}
             />
           )}
         </div>
@@ -89,6 +90,8 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
 
 function Templates() {
   const dispatch = useDispatch();
+  const { t } = useLanguage();
+  const tt = (key: string, fallback: string) => t(`settings.templates.${key}`, fallback);
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
@@ -545,12 +548,12 @@ function Templates() {
       <div className="bg-muted/30 rounded-md p-3 text-sm space-y-2 border">
         <div className="font-medium flex items-center gap-2 text-primary">
           <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
-          <span>SLA Configuration</span>
+          <span>{tt('dialogs.create.fields.slaConfig', 'SLA Configuration')}</span>
         </div>
         {sla.description && <div className="text-muted-foreground text-xs">{sla.description}</div>}
         <div className="flex flex-wrap gap-2 mt-2">
-           <Badge variant="secondary" className="text-xs">Response: {secondsToHHMM((sla as any).response_time)}</Badge>
-           <Badge variant="secondary" className="text-xs">Resolution: {secondsToHHMM((sla as any).resolution_time)}</Badge>
+           <Badge variant="secondary" className="text-xs">{tt('dialogs.create.fields.slaResponse', 'Response')}: {secondsToHHMM((sla as any).response_time)}</Badge>
+           <Badge variant="secondary" className="text-xs">{tt('dialogs.create.fields.slaResolution', 'Resolution')}: {secondsToHHMM((sla as any).resolution_time)}</Badge>
         </div>
       </div>
     );
@@ -566,13 +569,13 @@ function Templates() {
       <div className="bg-muted/30 rounded-md p-3 text-sm space-y-2 border">
         <div className="font-medium flex items-center gap-2 text-primary">
           <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3" />
-          <span>Approval Process</span>
+          <span>{tt('dialogs.create.fields.approvalProcess', 'Approval Process')}</span>
         </div>
         {approval.description && <div className="text-muted-foreground text-xs">{approval.description}</div>}
         <div className="flex flex-wrap gap-2 mt-2">
-           <Badge variant="secondary" className="text-xs">{approval.approval_type === 'SEQUENTIAL' ? 'Sequential' : 'Parallel'}</Badge>
-           <Badge variant="secondary" className="text-xs">Trigger: {approval.trigger_type?.replace(/_/g, ' ').toLowerCase()}</Badge>
-           {approval.require_all && <Badge variant="outline" className="text-xs">Requires All</Badge>}
+           <Badge variant="secondary" className="text-xs">{approval.approval_type === 'SEQUENTIAL' ? tt('dialogs.create.fields.approvalSequential', 'Sequential') : tt('dialogs.create.fields.approvalParallel', 'Parallel')}</Badge>
+           <Badge variant="secondary" className="text-xs">{tt('dialogs.create.fields.approvalTrigger', 'Trigger')}: {approval.trigger_type?.replace(/_/g, ' ').toLowerCase()}</Badge>
+           {approval.require_all && <Badge variant="outline" className="text-xs">{tt('dialogs.create.fields.approvalRequiresAll', 'Requires All')}</Badge>}
         </div>
       </div>
     );
@@ -584,7 +587,7 @@ function Templates() {
   const colDefs = useMemo<ColDef[]>(() => [
     {
       field: 'name',
-      headerName: 'Template Name',
+      headerName: tt('grid.columns.name', 'Template Name'),
       flex: 2,
       minWidth: 250,
       cellRenderer: TemplateNameCellRenderer
@@ -600,8 +603,8 @@ function Templates() {
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => openSummary(params.data as Template)}
-          title="Summary"
-          aria-label="Summary"
+          title={tt('grid.columns.summary', 'Summary')}
+          aria-label={tt('grid.columns.summary', 'Summary')}
         >
           <FontAwesomeIcon icon={faInfoCircle} className="w-4 h-4 text-muted-foreground" />
         </Button>
@@ -610,7 +613,7 @@ function Templates() {
     // Description removed per migration
     {
       field: 'category_id',
-      headerName: 'Category',
+      headerName: tt('grid.columns.category', 'Category'),
       flex: 1,
       minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
@@ -654,7 +657,7 @@ function Templates() {
     },
     {
       field: 'priority_id',
-      headerName: 'Priority',
+      headerName: tt('grid.columns.priority', 'Priority'),
       flex: 0.8,
       minWidth: 140,
       cellRenderer: (params: ICellRendererParams) => {
@@ -675,7 +678,7 @@ function Templates() {
     },
     {
       field: 'sla_id',
-      headerName: 'SLA',
+      headerName: tt('grid.columns.sla', 'SLA'),
       flex: 1,
       minWidth: 160,
       editable: true,
@@ -706,7 +709,7 @@ function Templates() {
     },
     {
       field: 'approval_id',
-      headerName: 'Approval',
+      headerName: tt('grid.columns.approval', 'Approval'),
       flex: 1,
       minWidth: 160,
       cellRenderer: (params: ICellRendererParams) => {
@@ -720,7 +723,7 @@ function Templates() {
     },
     {
       field: 'expected_duration',
-      headerName: 'Expected Duration',
+      headerName: tt('grid.columns.expectedDuration', 'Expected Duration'),
       flex: 0.8,
       minWidth: 170,
       valueFormatter: (params: any) => {
@@ -734,35 +737,8 @@ function Templates() {
       filter: true
     },
     {
-      field: 'default_spot_id',
-      headerName: 'Spot',
-      flex: 1,
-      minWidth: 170,
-      cellRenderer: (params: ICellRendererParams) => {
-        const sid = Number(params.value);
-        if (!sid) return <span className="text-muted-foreground">—</span>;
-        const spot = spotById.get(sid);
-        return <span>{spot?.name || `Spot ${sid}`}</span>;
-      },
-      sortable: true,
-      filter: true
-    },
-    {
-      field: 'default_user_ids',
-      headerName: 'User',
-      flex: 0.8,
-      minWidth: 160,
-      cellRenderer: (params: ICellRendererParams) => {
-        const arr = (params.value as any[]) || [];
-        if (!Array.isArray(arr) || arr.length === 0) return <span className="text-muted-foreground">—</span>;
-        return <Badge variant="secondary">{arr.length} user{arr.length !== 1 ? 's' : ''}</Badge>;
-      },
-      sortable: false,
-      filter: false
-    },
-    {
       field: 'actions',
-      headerName: 'Actions',
+      headerName: tt('grid.columns.actions', 'Actions'),
       width: 100,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit
@@ -788,10 +764,10 @@ function Templates() {
 
     // Validate required fields
     if (!name?.trim()) {
-      throw new Error('Template name is required');
+      throw new Error(tt('validation.nameRequired', 'Template name is required'));
     }
     if (!createFormData.category_id) {
-      throw new Error('Please select a category');
+      throw new Error(tt('validation.categoryRequired', 'Please select a category'));
     }
 
     const templateData: any = {
@@ -849,10 +825,10 @@ function Templates() {
 
     // Validate required fields
     if (!name?.toString()?.trim()) {
-      throw new Error('Template name is required');
+      throw new Error(tt('validation.nameRequired', 'Template name is required'));
     }
     if (!editFormData.category_id) {
-      throw new Error('Please select a category');
+      throw new Error(tt('validation.categoryRequired', 'Please select a category'));
     }
 
     const updates: any = {
@@ -958,12 +934,12 @@ function Templates() {
 
   return (
     <SettingsLayout
-      title="Templates"
-      description="Manage task templates for faster task creation and standardized workflows"
+      title={tt('title', 'Templates')}
+      description={tt('description', 'Manage task templates for faster task creation and standardized workflows')}
       icon={faClipboardList}
       iconColor="#3b82f6"
       search={{
-        placeholder: "Search templates...",
+        placeholder: tt('search.placeholder', 'Search templates...'),
         value: searchQuery,
         onChange: (value: string) => {
           setSearchQuery(value);
@@ -972,7 +948,7 @@ function Templates() {
       }}
       loading={{
         isLoading: loading,
-        message: "Loading templates..."
+        message: tt('loading', 'Loading templates...')
       }}
       error={error ? {
         message: error,
@@ -981,7 +957,7 @@ function Templates() {
       headerActions={
         <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          Add Template
+          {tt('header.addTemplate', 'Add Template')}
         </Button>
       }
     >
@@ -992,7 +968,7 @@ function Templates() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faClipboardList} className="w-4 h-4" />
-                <span>Templates</span>
+                <span>{tt('tabs.templates', 'Templates')}</span>
               </div>
             ),
             content: (
@@ -1001,7 +977,7 @@ function Templates() {
                   <SettingsGrid
                     rowData={filteredItems}
                     columnDefs={colDefs}
-                    noRowsMessage="No templates found"
+                    noRowsMessage={tt('grid.noRows', 'No templates found')}
                     onRowDoubleClicked={handleEdit}
                     onCellValueChanged={handleCellValueChanged}
                   />
@@ -1014,7 +990,7 @@ function Templates() {
             label: (
               <div className="flex items-center gap-2">
                 <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-                <span>Statistics</span>
+                <span>{tt('tabs.statistics', 'Statistics')}</span>
               </div>
             ),
             content: (
@@ -1022,7 +998,7 @@ function Templates() {
                 {statsLoading ? (
                   <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
                     <FontAwesomeIcon icon={faSpinner} className="w-8 h-8 text-muted-foreground animate-spin mb-4" />
-                    <p className="text-sm text-muted-foreground">Calculating statistics...</p>
+                    <p className="text-sm text-muted-foreground">{tt('stats.calculating', 'Calculating statistics...')}</p>
                   </div>
                 ) : statistics ? (
                   <div className="space-y-4">
@@ -1032,7 +1008,7 @@ function Templates() {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-2xl font-bold">{statistics.totalTemplates}</div>
-                            <div className="text-xs text-muted-foreground mt-1">Total Templates</div>
+                            <div className="text-xs text-muted-foreground mt-1">{tt('stats.totalTemplates', 'Total Templates')}</div>
                           </div>
                         </CardContent>
                       </Card>
@@ -1042,7 +1018,7 @@ function Templates() {
                             <div className="text-2xl font-bold text-orange-600">{statistics.urgentTasksCount}</div>
                             <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                               <FontAwesomeIcon icon={faExclamationTriangle} className="w-3 h-3" />
-                              Urgent Tasks
+                              {tt('stats.urgentTasks', 'Urgent Tasks')}
                             </div>
                           </div>
                         </CardContent>
@@ -1053,7 +1029,7 @@ function Templates() {
                             <div className="text-2xl font-bold text-blue-600">{statistics.tasksWithApprovalsCount}</div>
                             <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                               <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3" />
-                              With Approvals
+                              {tt('stats.withApprovals', 'With Approvals')}
                             </div>
                           </div>
                         </CardContent>
@@ -1064,7 +1040,7 @@ function Templates() {
                             <div className="text-2xl font-bold text-green-600">{statistics.latestTasks.length}</div>
                             <div className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
                               <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
-                              Recent Tasks
+                              {tt('stats.recentTasks', 'Recent Tasks')}
                             </div>
                           </div>
                         </CardContent>
@@ -1076,8 +1052,8 @@ function Templates() {
                       {/* Most Used Templates Chart */}
                       <Card>
                         <CardHeader>
-                          <CardTitle className="text-sm">Most Used Templates</CardTitle>
-                          <CardDescription className="text-xs">Top templates by task count</CardDescription>
+                          <CardTitle className="text-sm">{tt('stats.mostUsed.title', 'Most Used Templates')}</CardTitle>
+                          <CardDescription className="text-xs">{tt('stats.mostUsed.description', 'Top templates by task count')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                           {statistics.mostUsedTemplates.length > 0 ? (
@@ -1090,7 +1066,7 @@ function Templates() {
                                 grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
                                 xAxis: {
                                   type: 'value',
-                                  name: 'Tasks'
+                                  name: tt('stats.mostUsed.tasks', 'Tasks')
                                 },
                                 yAxis: {
                                   type: 'category',
@@ -1100,7 +1076,7 @@ function Templates() {
                                   }
                                 },
                                 series: [{
-                                  name: 'Tasks Created',
+                                  name: tt('stats.mostUsed.tasksCreated', 'Tasks Created'),
                                   type: 'bar',
                                   data: statistics.mostUsedTemplates.map(item => item.count).reverse(),
                                   itemStyle: {
@@ -1112,7 +1088,7 @@ function Templates() {
                             />
                           ) : (
                             <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                              No template usage data available
+                              {tt('stats.mostUsed.empty', 'No template usage data available')}
                             </div>
                           )}
                         </CardContent>
@@ -1121,8 +1097,8 @@ function Templates() {
                       {/* Templates by Category Chart */}
                       <Card>
                         <CardHeader>
-                          <CardTitle className="text-sm">Templates by Category</CardTitle>
-                          <CardDescription className="text-xs">Distribution across categories</CardDescription>
+                          <CardTitle className="text-sm">{tt('stats.byCategory.title', 'Templates by Category')}</CardTitle>
+                          <CardDescription className="text-xs">{tt('stats.byCategory.description', 'Distribution across categories')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                           {statistics.templatesByCategory.length > 0 ? (
@@ -1138,7 +1114,7 @@ function Templates() {
                                   textStyle: { fontSize: 11 }
                                 },
                                 series: [{
-                                  name: 'Templates',
+                                  name: tt('stats.byCategory.templates', 'Templates'),
                                   type: 'pie',
                                   radius: ['40%', '70%'],
                                   avoidLabelOverlap: false,
@@ -1168,7 +1144,7 @@ function Templates() {
                             />
                           ) : (
                             <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                              No category data available
+                              {tt('stats.byCategory.empty', 'No category data available')}
                             </div>
                           )}
                         </CardContent>
@@ -1179,8 +1155,8 @@ function Templates() {
                     {statistics.tasksOverTime.length > 0 && (
                       <Card>
                         <CardHeader>
-                          <CardTitle className="text-sm">Tasks Created Over Time</CardTitle>
-                          <CardDescription className="text-xs">Last 30 days of template-based task creation</CardDescription>
+                          <CardTitle className="text-sm">{tt('stats.overTime.title', 'Tasks Created Over Time')}</CardTitle>
+                          <CardDescription className="text-xs">{tt('stats.overTime.description', 'Last 30 days of template-based task creation')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                           <ReactECharts
@@ -1203,10 +1179,10 @@ function Templates() {
                               },
                               yAxis: {
                                 type: 'value',
-                                name: 'Tasks'
+                                name: tt('stats.overTime.tasks', 'Tasks')
                               },
                               series: [{
-                                name: 'Tasks Created',
+                                name: tt('stats.overTime.tasksCreated', 'Tasks Created'),
                                 type: 'line',
                                 smooth: true,
                                 data: statistics.tasksOverTime.map(item => item.count),
@@ -1242,8 +1218,8 @@ function Templates() {
                     {statistics.latestTasks.length > 0 && (
                       <Card>
                         <CardHeader>
-                          <CardTitle className="text-sm">Latest Tasks from Templates</CardTitle>
-                          <CardDescription className="text-xs">Most recently created tasks using templates</CardDescription>
+                          <CardTitle className="text-sm">{tt('stats.latest.title', 'Latest Tasks from Templates')}</CardTitle>
+                          <CardDescription className="text-xs">{tt('stats.latest.description', 'Most recently created tasks using templates')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
@@ -1254,11 +1230,11 @@ function Templates() {
                                   <div className="flex-1">
                                     <div className="text-sm font-medium">{task.name}</div>
                                     <div className="text-xs text-muted-foreground">
-                                      Template: {template?.name || 'Unknown'} • {dayjs(task.created_at).format('MMM DD, YYYY HH:mm')}
+                                      {tt('stats.latest.template', 'Template')}: {template?.name || 'Unknown'} • {dayjs(task.created_at).format('MMM DD, YYYY HH:mm')}
                                     </div>
                                   </div>
                                   <Badge variant="outline" className="ml-2">
-                                    {getTemplateTaskCount(task.template_id || 0)} total
+                                    {getTemplateTaskCount(task.template_id || 0)} {tt('stats.latest.total', 'total')}
                                   </Badge>
                                 </div>
                               );
@@ -1274,7 +1250,7 @@ function Templates() {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-xl font-semibold">{statistics.withDefaultSpot}</div>
-                            <div className="text-xs text-muted-foreground mt-1">With Default Spot</div>
+                            <div className="text-xs text-muted-foreground mt-1">{tt('stats.withDefaultSpot', 'With Default Spot')}</div>
                           </div>
                         </CardContent>
                       </Card>
@@ -1282,7 +1258,7 @@ function Templates() {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-xl font-semibold">{statistics.withDefaultUsers}</div>
-                            <div className="text-xs text-muted-foreground mt-1">With Default Users</div>
+                            <div className="text-xs text-muted-foreground mt-1">{tt('stats.withDefaultUsers', 'With Default Users')}</div>
                           </div>
                         </CardContent>
                       </Card>
@@ -1290,7 +1266,7 @@ function Templates() {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-xl font-semibold">{statistics.withExpectedDuration}</div>
-                            <div className="text-xs text-muted-foreground mt-1">With Expected Duration</div>
+                            <div className="text-xs text-muted-foreground mt-1">{tt('stats.withExpectedDuration', 'With Expected Duration')}</div>
                           </div>
                         </CardContent>
                       </Card>
@@ -1298,7 +1274,7 @@ function Templates() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-                    <p className="text-sm text-muted-foreground">Click the Statistics tab to load statistics</p>
+                    <p className="text-sm text-muted-foreground">{tt('stats.clickToLoad', 'Click the Statistics tab to load statistics')}</p>
                   </div>
                 )}
               </div>
@@ -1317,16 +1293,16 @@ function Templates() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FontAwesomeIcon icon={faInfoCircle} className="text-sky-600 w-4 h-4" />
-              {summaryTemplate?.name || 'Template summary'}
+              {summaryTemplate?.name || tt('summary.title', 'Template summary')}
             </DialogTitle>
             <DialogDescription>
-              {summaryTemplate?.description || 'Overview of template configuration'}
+              {summaryTemplate?.description || tt('summary.description', 'Overview of template configuration')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Category</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.category', 'Category')}</div>
               <div className="font-medium">
                 {(() => {
                   const c = (categories as any[]).find((cat: any) => Number(cat.id) === Number((summaryTemplate as any)?.category_id));
@@ -1335,13 +1311,13 @@ function Templates() {
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Priority</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.priority', 'Priority')}</div>
               <div className="font-medium">
                 {priorityById.get(Number((summaryTemplate as any)?.priority_id))?.name || '—'}
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">SLA</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.sla', 'SLA')}</div>
               <div className="font-medium">
                 {(() => {
                   const s = slaById.get(Number((summaryTemplate as any)?.sla_id));
@@ -1351,7 +1327,7 @@ function Templates() {
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Approval</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.approval', 'Approval')}</div>
               <div className="font-medium">
                 {(() => {
                   const a = approvalById.get(Number((summaryTemplate as any)?.approval_id));
@@ -1360,7 +1336,7 @@ function Templates() {
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Default Spot</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.defaultSpot', 'Default Spot')}</div>
               <div className="font-medium">
                 {(() => {
                   const s = spotById.get(Number((summaryTemplate as any)?.default_spot_id));
@@ -1369,7 +1345,7 @@ function Templates() {
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Default Users</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.defaultUsers', 'Default Users')}</div>
               <div className="font-medium">
                 {summaryDefaultUsers.length > 0
                   ? summaryDefaultUsers.map((u: any) => u.name || `User #${u.id}`).join(', ')
@@ -1377,20 +1353,20 @@ function Templates() {
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Expected Duration</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.expectedDuration', 'Expected Duration')}</div>
               <div className="font-medium">
                 {summaryTemplate?.expected_duration ? `${summaryTemplate.expected_duration} min (${minutesToHHMM(summaryTemplate.expected_duration)})` : '—'}
               </div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Usage</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.usage', 'Usage')}</div>
               <div className="font-medium">{usageCount}</div>
             </div>
             <div className="p-3 border rounded-lg space-y-1">
-              <div className="text-xs text-muted-foreground">Status</div>
+              <div className="text-xs text-muted-foreground">{tt('summary.status', 'Status')}</div>
               <div className="font-medium">
                 <Badge variant={(summaryTemplate as any)?.enabled ? 'default' : 'outline'}>
-                  {(summaryTemplate as any)?.enabled ? 'Enabled' : 'Disabled'}
+                  {(summaryTemplate as any)?.enabled ? tt('summary.enabled', 'Enabled') : tt('summary.disabled', 'Disabled')}
                 </Badge>
               </div>
             </div>
@@ -1423,8 +1399,8 @@ function Templates() {
           }
         }}
         type="create"
-        title="Add New Template"
-        description="Create a new task template to standardize your workflows."
+        title={tt('dialogs.create.title', 'Add New Template')}
+        description={tt('dialogs.create.description', 'Create a new task template to standardize your workflows.')}
         onSubmit={handleCreateSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -1435,9 +1411,9 @@ function Templates() {
           <FontAwesomeIcon icon={faClipboardList} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">Create a template</p>
+          <p className="text-sm font-semibold text-foreground">{tt('dialogs.create.helper.title', 'Create a template')}</p>
           <p className="text-xs text-muted-foreground">
-            Set the basics, defaults, and rules. You can assign approvals, SLA, default spot and users.
+            {tt('dialogs.create.helper.description', 'Set the basics, defaults, and rules. You can assign approvals, SLA, default spot and users.')}
           </p>
         </div>
       </div>
@@ -1451,11 +1427,11 @@ function Templates() {
           <TabsContent value="general">
         <div className="grid gap-4 min-h-[320px]">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
+            <Label htmlFor="name" className="text-right">{tt('dialogs.create.fields.name', 'Name *')}</Label>
             <Input id="name" name="name" className="col-span-3" required />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="description" className="text-right pt-2">Description</Label>
+            <Label htmlFor="description" className="text-right pt-2">{tt('dialogs.create.fields.description', 'Description')}</Label>
             <textarea 
               id="description" 
               name="description" 
@@ -1506,9 +1482,9 @@ function Templates() {
             label="Priority"
             value={createFormData.priority_id || 'none'}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, priority_id: value === 'none' ? '' : value }))}
-            placeholder="None"
+            placeholder={tt('dialogs.create.fields.priorityNone', 'None')}
             options={[
-              { value: 'none', label: 'None' },
+              { value: 'none', label: tt('dialogs.create.fields.priorityNone', 'None') },
               ...createCategoryPriorities.map((priority: any) => ({
                 value: priority.id.toString(),
                 label: priority.name,
@@ -1522,12 +1498,12 @@ function Templates() {
             <div className="grid gap-4 min-h-[320px]">
               <SelectField
                 id="sla"
-                label="SLA"
+                label={tt('dialogs.create.fields.sla', 'SLA')}
                 value={createFormData.sla_id}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-                placeholder="None"
+                placeholder={tt('dialogs.create.fields.slaNone', 'None')}
                 options={[
-                  { value: 'none', label: 'None' },
+                  { value: 'none', label: tt('dialogs.create.fields.slaNone', 'None') },
                   ...Array.from(slaById.entries()).map(([id, sla]) => ({
                     value: String(id),
                     label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min`
@@ -1537,12 +1513,12 @@ function Templates() {
               {renderSlaSummary(createFormData.sla_id)}
               <SelectField
                 id="approval"
-                label="Approval"
+                label={tt('dialogs.create.fields.approval', 'Approval')}
                 value={createFormData.approval_id}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-                placeholder="None"
+                placeholder={tt('dialogs.create.fields.approvalNone', 'None')}
                 options={[
-                  { value: 'none', label: 'None' },
+                  { value: 'none', label: tt('dialogs.create.fields.approvalNone', 'None') },
                   ...((approvals as any[]) || []).map((a: any) => ({
                     value: String(a.id),
                     label: a.name
@@ -1556,7 +1532,7 @@ function Templates() {
             <div className="grid gap-4 min-h-[320px]">
               <CheckboxField 
                 id="spots_not_applicable" 
-                label="Spots Not Applicable" 
+                label={tt('dialogs.create.fields.spotsNotApplicable', 'Spots Not Applicable')}
                 checked={createFormData.spots_not_applicable}
                 onChange={(checked) => {
                   setCreateFormData(prev => ({ 
@@ -1565,46 +1541,46 @@ function Templates() {
                     default_spot_id: checked ? '' : prev.default_spot_id // Clear spot if spots not applicable
                   }));
                 }}
-                description="When enabled, tasks created from this template will not require a location/spot"
+                description={tt('dialogs.create.fields.spotsNotApplicableDesc', 'When enabled, tasks created from this template will not require a location/spot')}
               />
               {!createFormData.spots_not_applicable && (
                 <SelectField
                   id="default_spot_id"
-                  label="Default Spot"
+                  label={tt('dialogs.create.fields.defaultSpot', 'Default Spot')}
                   value={createFormData.default_spot_id}
                   onChange={(value) => setCreateFormData(prev => ({ ...prev, default_spot_id: value }))}
-                  placeholder="None"
+                  placeholder={tt('dialogs.create.fields.defaultSpotNone', 'None')}
                   options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))}
                 />
               )}
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label className="text-right pt-2">Default Users</Label>
+                <Label className="text-right pt-2">{tt('dialogs.create.fields.defaultUsers', 'Default Users')}</Label>
                 <div className="col-span-3">
                   <MultiSelect
                     options={userOptions}
                     onValueChange={setCreateDefaultUserValues}
                     defaultValue={createDefaultUserValues}
-                    placeholder="Select default users..."
+                    placeholder={tt('dialogs.create.fields.defaultUsersPlaceholder', 'Select default users...')}
                     maxCount={5}
                     className="w-full"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="expected_duration" className="text-right">Expected Duration (min)</Label>
-                <Input id="expected_duration" name="expected_duration" type="number" min="0" step="1" placeholder="e.g. 90" className="col-span-3" />
+                <Label htmlFor="expected_duration" className="text-right">{tt('dialogs.create.fields.expectedDuration', 'Expected Duration (min)')}</Label>
+                <Input id="expected_duration" name="expected_duration" type="number" min="0" step="1" placeholder={tt('dialogs.create.fields.expectedDurationPlaceholder', 'e.g. 90')} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="instructions" className="text-right pt-2">Instructions</Label>
-                <textarea id="instructions" name="instructions" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder="Enter detailed instructions..." />
+                <Label htmlFor="instructions" className="text-right pt-2">{tt('dialogs.create.fields.instructions', 'Instructions')}</Label>
+                <textarea id="instructions" name="instructions" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder={tt('dialogs.create.fields.instructionsPlaceholder', 'Enter detailed instructions...')} />
               </div>
-              <CheckboxField id="enabled" name="enabled" label="Status" defaultChecked={true} description="Enabled" />
+              <CheckboxField id="enabled" name="enabled" label={tt('dialogs.create.fields.status', 'Status')} defaultChecked={true} description={tt('dialogs.create.fields.enabled', 'Enabled')} />
               <CheckboxField 
                 id="is_private" 
-                label="Private Template" 
+                label={tt('dialogs.create.fields.privateTemplate', 'Private Template')}
                 checked={createFormData.is_private}
                 onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_private: checked }))}
-                description="Private templates can only be used by the team that owns the category"
+                description={tt('dialogs.create.fields.privateTemplateDesc', 'Private templates can only be used by the team that owns the category')}
               />
             </div>
           </TabsContent>
@@ -1638,12 +1614,12 @@ function Templates() {
           }
         }}
         type="edit"
-        title="Edit Template"
+        title={tt('dialogs.edit.title', 'Edit Template')}
         description={editingTemplate ? (
           <span>
-            Editing: <span className="font-medium text-foreground">{editingTemplate.name}</span>
+            {tt('dialogs.edit.editing', 'Editing')}: <span className="font-medium text-foreground">{editingTemplate.name}</span>
           </span>
-        ) : "Update the template information."}
+        ) : tt('dialogs.edit.description', 'Update the template information.')}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -1656,7 +1632,7 @@ function Templates() {
           disabled={isSubmitting}
         >
           <FontAwesomeIcon icon={faTrash} className="mr-2" />
-          Delete
+          {tt('dialogs.edit.delete', 'Delete')}
         </Button>
       ) : undefined}
       >
@@ -1665,9 +1641,9 @@ function Templates() {
           <FontAwesomeIcon icon={faClipboardList} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">Edit template</p>
+          <p className="text-sm font-semibold text-foreground">{tt('dialogs.edit.helper.title', 'Edit template')}</p>
           <p className="text-xs text-muted-foreground">
-            Update details, defaults, and rules. Approvals, SLA, and defaults can be changed here.
+            {tt('dialogs.edit.helper.description', 'Update details, defaults, and rules. Approvals, SLA, and defaults can be changed here.')}
           </p>
         </div>
       </div>
@@ -1675,15 +1651,15 @@ function Templates() {
           <div className="max-h-[75vh] overflow-y-auto pr-1">
           <Tabs defaultValue="general" className="w-full">
           <TabsList>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="defaults">Defaults</TabsTrigger>
-            <TabsTrigger value="rules">Rules</TabsTrigger>
-            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+            <TabsTrigger value="general">{tt('dialogs.edit.tabs.general', 'General')}</TabsTrigger>
+            <TabsTrigger value="defaults">{tt('dialogs.edit.tabs.defaults', 'Defaults')}</TabsTrigger>
+            <TabsTrigger value="rules">{tt('dialogs.edit.tabs.rules', 'Rules')}</TabsTrigger>
+            <TabsTrigger value="compliance">{tt('dialogs.edit.tabs.compliance', 'Compliance')}</TabsTrigger>
           </TabsList>
             <TabsContent value="general">
           <div className="grid gap-4 min-h-[320px]">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
+              <Label htmlFor="edit-name" className="text-right">{tt('dialogs.edit.fields.name', 'Name *')}</Label>
               <Input
                 id="edit-name"
                 name="name"
@@ -1693,7 +1669,7 @@ function Templates() {
               />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="edit-description" className="text-right pt-2">Description</Label>
+              <Label htmlFor="edit-description" className="text-right pt-2">{tt('dialogs.edit.fields.description', 'Description')}</Label>
               <textarea
                 id="edit-description"
                 name="description"
@@ -1703,7 +1679,7 @@ function Templates() {
             </div>
             <SelectField
               id="edit-category"
-              label="Category"
+              label={tt('dialogs.edit.fields.category', 'Category')}
               value={editFormData.category_id}
               onChange={(value) => {
                 setEditFormData(prev => {
@@ -1734,7 +1710,7 @@ function Templates() {
                   };
                 });
               }}
-              placeholder="Select Category"
+              placeholder={tt('dialogs.edit.fields.categoryPlaceholder', 'Select Category')}
               options={categories.map((category: Category) => ({
                 value: category.id.toString(),
                 label: category.name
@@ -1743,12 +1719,12 @@ function Templates() {
             {/* Team removed per migration */}
             <SelectField
               id="edit-priority"
-              label="Priority"
+              label={tt('dialogs.edit.fields.priority', 'Priority')}
               value={editFormData.priority_id || 'none'}
               onChange={(value) => setEditFormData(prev => ({ ...prev, priority_id: value === 'none' ? '' : value }))}
-              placeholder="None"
+              placeholder={tt('dialogs.edit.fields.priorityNone', 'None')}
               options={[
-                { value: 'none', label: 'None' },
+                { value: 'none', label: tt('dialogs.edit.fields.priorityNone', 'None') },
                 ...editCategoryPriorities.map((priority: any) => ({
                   value: priority.id.toString(),
                   label: priority.name,
@@ -1762,20 +1738,20 @@ function Templates() {
               <div className="grid gap-4 min-h-[320px]">
                 <SelectField
                   id="edit-sla"
-                  label="SLA"
+                  label={tt('dialogs.edit.fields.sla', 'SLA')}
                   value={editFormData.sla_id}
                   onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-                  placeholder="None"
-                  options={[{ value: 'none', label: 'None' }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
+                  placeholder={tt('dialogs.edit.fields.slaNone', 'None')}
+                  options={[{ value: 'none', label: tt('dialogs.edit.fields.slaNone', 'None') }, ...Array.from(slaById.entries()).map(([id, sla]) => ({ value: id.toString(), label: sla.name || `${sla.response_time ?? '?'} / ${sla.resolution_time ?? '?' } min` }))]}
                 />
                 {renderSlaSummary(editFormData.sla_id)}
                 <SelectField
                   id="edit-approval"
-                  label="Approval"
+                  label={tt('dialogs.edit.fields.approval', 'Approval')}
                   value={editFormData.approval_id}
                   onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-                  placeholder="None"
-                  options={[{ value: 'none', label: 'None' }, ...((approvals as Approval[]) || []).map((a: Approval) => ({ value: a.id.toString(), label: a.name }))]}
+                  placeholder={tt('dialogs.edit.fields.approvalNone', 'None')}
+                  options={[{ value: 'none', label: tt('dialogs.edit.fields.approvalNone', 'None') }, ...((approvals as Approval[]) || []).map((a: Approval) => ({ value: a.id.toString(), label: a.name }))]}
                 />
                 {renderApprovalSummary(editFormData.approval_id)}
               </div>
@@ -1785,17 +1761,17 @@ function Templates() {
                 <div className="flex justify-between items-center pb-2 border-b">
                   <div className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faShieldAlt} className="text-blue-600" />
-                    <h3 className="font-medium">Compliance & ISO</h3>
+                    <h3 className="font-medium">{tt('dialogs.edit.compliance.title', 'Compliance & ISO')}</h3>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleDownloadSOP}>
                     <FontAwesomeIcon icon={faFilePdf} className="mr-2 text-red-500" />
-                    Generate SOP
+                    {tt('dialogs.edit.compliance.generateSOP', 'Generate SOP')}
                   </Button>
                 </div>
 
                 <div className="space-y-4">
                   <div className="grid gap-2">
-                    <Label>Link Requirement</Label>
+                    <Label>{tt('dialogs.edit.compliance.linkRequirement', 'Link Requirement')}</Label>
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <SelectField
@@ -1803,7 +1779,7 @@ function Templates() {
                           label="" // No label needed inside flex
                           value={selectedRequirement}
                           onChange={setSelectedRequirement}
-                          placeholder="Select ISO Requirement..."
+                          placeholder={tt('dialogs.edit.compliance.selectRequirement', 'Select ISO Requirement...')}
                           options={requirements.map((r: any) => ({
                             value: String(r.id),
                             label: `${r.clause_number} ${r.title}`
@@ -1811,16 +1787,16 @@ function Templates() {
                         />
                       </div>
                       <Button type="button" onClick={handleAddMapping} disabled={!selectedRequirement}>
-                        Link
+                        {tt('dialogs.edit.compliance.link', 'Link')}
                       </Button>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Linked Requirements</Label>
+                    <Label>{tt('dialogs.edit.compliance.linkedRequirements', 'Linked Requirements')}</Label>
                     {templateMappings.length === 0 ? (
                       <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
-                        No requirements linked to this template.
+                        {tt('dialogs.edit.compliance.noRequirements', 'No requirements linked to this template.')}
                       </div>
                     ) : (
                       <div className="border rounded-md divide-y">
@@ -1858,7 +1834,7 @@ function Templates() {
               <div className="grid gap-4 min-h-[320px]">
                 <CheckboxField 
                   id="edit-spots_not_applicable" 
-                  label="Spots Not Applicable" 
+                  label={tt('dialogs.edit.fields.spotsNotApplicable', 'Spots Not Applicable')}
                   checked={editFormData.spots_not_applicable}
                   onChange={(checked) => {
                     setEditFormData(prev => ({ 
@@ -1867,46 +1843,46 @@ function Templates() {
                       default_spot_id: checked ? '' : prev.default_spot_id // Clear spot if spots not applicable
                     }));
                   }}
-                  description="When enabled, tasks created from this template will not require a location/spot"
+                  description={tt('dialogs.edit.fields.spotsNotApplicableDesc', 'When enabled, tasks created from this template will not require a location/spot')}
                 />
                 {!editFormData.spots_not_applicable && (
                   <SelectField 
                     id="edit-default-spot" 
-                    label="Default Spot" 
+                    label={tt('dialogs.edit.fields.defaultSpot', 'Default Spot')}
                     value={editFormData.default_spot_id} 
                     onChange={(value) => setEditFormData(prev => ({ ...prev, default_spot_id: value }))} 
-                    placeholder="None" 
+                    placeholder={tt('dialogs.edit.fields.defaultSpotNone', 'None')} 
                     options={(spots as any[]).map((s: any) => ({ value: s.id.toString(), label: s.name }))} 
                   />
                 )}
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">Default Users</Label>
+                  <Label className="text-right pt-2">{tt('dialogs.edit.fields.defaultUsers', 'Default Users')}</Label>
                   <div className="col-span-3">
                     <MultiSelect
                       options={userOptions}
                       onValueChange={setEditDefaultUserValues}
                       defaultValue={editDefaultUserValues}
-                      placeholder="Select default users..."
+                      placeholder={tt('dialogs.edit.fields.defaultUsersPlaceholder', 'Select default users...')}
                       maxCount={5}
                       className="w-full"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-expected_duration" className="text-right">Expected Duration (min)</Label>
+                  <Label htmlFor="edit-expected_duration" className="text-right">{tt('dialogs.edit.fields.expectedDuration', 'Expected Duration (min)')}</Label>
                   <Input id="edit-expected_duration" name="expected_duration" type="number" min="0" step="1" defaultValue={(editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : ''} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="edit-instructions" className="text-right pt-2">Instructions</Label>
-                  <textarea id="edit-instructions" name="instructions" defaultValue={(editingTemplate as any).instructions || ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder="Enter detailed instructions..." />
+                  <Label htmlFor="edit-instructions" className="text-right pt-2">{tt('dialogs.edit.fields.instructions', 'Instructions')}</Label>
+                  <textarea id="edit-instructions" name="instructions" defaultValue={(editingTemplate as any).instructions || ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder={tt('dialogs.edit.fields.instructionsPlaceholder', 'Enter detailed instructions...')} />
                 </div>
-                <CheckboxField id="edit-enabled" label="Enabled" checked={editFormData.enabled} onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))} description="Enable this template" />
+                <CheckboxField id="edit-enabled" label={tt('dialogs.edit.fields.enabled', 'Enabled')} checked={editFormData.enabled} onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))} description={tt('dialogs.edit.fields.enabledDesc', 'Enable this template')} />
                 <CheckboxField 
                   id="edit-is_private" 
-                  label="Private Template" 
+                  label={tt('dialogs.edit.fields.privateTemplate', 'Private Template')}
                   checked={editFormData.is_private}
                   onChange={(checked) => setEditFormData(prev => ({ ...prev, is_private: checked }))}
-                  description="Private templates can only be used by the team that owns the category"
+                  description={tt('dialogs.edit.fields.privateTemplateDesc', 'Private templates can only be used by the team that owns the category')}
                 />
               </div>
             </TabsContent>
@@ -1921,15 +1897,18 @@ function Templates() {
         open={isDeleteDialogOpen}
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
-        title="Delete Template"
+        title={tt('dialogs.delete.title', 'Delete Template')}
         description={
           deletingTemplate ? (() => {
             const taskCount = getTemplateTaskCount(deletingTemplate.id);
             
             if (taskCount > 0) {
-              return `This template cannot be deleted because it's used by ${taskCount} task${taskCount !== 1 ? 's' : ''}. Please delete or reassign all tasks using this template first.`;
+              return tt('dialogs.delete.cannotDelete', 'This template cannot be deleted because it\'s used by {count} task{plural}. Please delete or reassign all tasks using this template first.')
+                .replace('{count}', String(taskCount))
+                .replace('{plural}', taskCount !== 1 ? 's' : '');
             } else {
-              return `Are you sure you want to delete the template "${deletingTemplate.name}"? This action cannot be undone.`;
+              return tt('dialogs.delete.confirm', 'Are you sure you want to delete the template "{name}"? This action cannot be undone.')
+                .replace('{name}', deletingTemplate.name);
             }
           })() : undefined
         }

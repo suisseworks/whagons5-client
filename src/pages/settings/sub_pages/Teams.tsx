@@ -407,8 +407,7 @@ function Teams() {
             {tt('grid.actions.manageUsers', 'Users')}
           </Button>
           {createActionsCellRenderer({
-            onEdit: handleQuickEdit,
-            onDelete: handleDeleteTeam
+            onEdit: handleQuickEdit
           })(p)}
         </div>
       ),
@@ -701,6 +700,22 @@ function Teams() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingTeam}
+        footerActions={
+          editingTeam ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDeleteTeam(editingTeam);
+              }}
+              disabled={isSubmitting}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              {tt('dialogs.delete.title', 'Delete Team')}
+            </Button>
+          ) : null
+        }
       >
         {editingTeam && (
           <div className="grid gap-4">

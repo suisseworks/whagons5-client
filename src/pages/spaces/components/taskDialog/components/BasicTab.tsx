@@ -6,8 +6,10 @@ import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export function BasicTab(props: any) {
+  const { t } = useLanguage();
   const {
     mode,
     workspaceTemplates,
@@ -41,7 +43,7 @@ export function BasicTab(props: any) {
       {/* Template Selection */}
       <div className="flex flex-col gap-2">
         <Label htmlFor="template" className="text-sm font-medium font-[500] text-foreground">
-          Template
+          {t('taskDialog.template', 'Template')}
         </Label>
         {mode === 'create-all' ? (
           workspaceTemplates.length === 0 ? (
@@ -50,9 +52,9 @@ export function BasicTab(props: any) {
                 options={[]}
                 value={undefined}
                 onValueChange={() => {}}
-                placeholder="No templates available"
-                searchPlaceholder="Search templates..."
-                emptyText="No templates available"
+                placeholder={t('taskDialog.noTemplatesAvailable', 'No templates available')}
+                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
+                emptyText={t('taskDialog.noTemplatesAvailable', 'No templates available')}
                 className="w-full"
               />
             </div>
@@ -74,9 +76,9 @@ export function BasicTab(props: any) {
                     setTemplateId(newTemplateId);
                   }
                 }}
-                placeholder="Select template"
-                searchPlaceholder="Search templates..."
-                emptyText="No templates found."
+                placeholder={t('taskDialog.selectTemplate', 'Select template')}
+                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
+                emptyText={t('taskDialog.noTemplatesFound', 'No templates found.')}
                 className="w-full"
               />
             </div>
@@ -88,9 +90,9 @@ export function BasicTab(props: any) {
                 options={[]}
                 value={undefined}
                 onValueChange={() => {}}
-                placeholder="Templates only available for default workspaces"
-                searchPlaceholder="Search templates..."
-                emptyText="No templates available"
+                placeholder={t('taskDialog.templatesOnlyDefault', 'Templates only available for default workspaces')}
+                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
+                emptyText={t('taskDialog.noTemplatesAvailable', 'No templates available')}
                 className="w-full"
               />
             </div>
@@ -100,9 +102,9 @@ export function BasicTab(props: any) {
                 options={[]}
                 value={undefined}
                 onValueChange={() => {}}
-                placeholder="No templates available"
-                searchPlaceholder="Search templates..."
-                emptyText="No templates available"
+                placeholder={t('taskDialog.noTemplatesAvailable', 'No templates available')}
+                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
+                emptyText={t('taskDialog.noTemplatesAvailable', 'No templates available')}
                 className="w-full"
               />
             </div>
@@ -123,9 +125,9 @@ export function BasicTab(props: any) {
                     setTemplateId(parseInt(v, 10));
                   }
                 }}
-                placeholder="Select template"
-                searchPlaceholder="Search templates..."
-                emptyText="No templates found."
+                placeholder={t('taskDialog.selectTemplate', 'Select template')}
+                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
+                emptyText={t('taskDialog.noTemplatesFound', 'No templates found.')}
                 className="w-full"
               />
             </div>
@@ -201,13 +203,13 @@ export function BasicTab(props: any) {
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 py-2"
         >
           <Plus className="w-4 h-4" />
-          <span>{description.trim() ? 'Show description' : 'Add description'}</span>
+          <span>{description.trim() ? t('taskDialog.showDescription', 'Show description') : t('taskDialog.addDescription', 'Add description')}</span>
         </button>
       ) : (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="task-desc" className="text-sm font-medium font-[500] text-foreground">
-              Description
+              {t('taskDialog.description', 'Description')}
             </Label>
             <button
               type="button"
@@ -228,7 +230,7 @@ export function BasicTab(props: any) {
               setDescription(e.target.value);
               if (e.target.value.trim() && !showDescription) setShowDescription(true);
             }}
-            placeholder="Add a description for this task..." 
+            placeholder={t('workspace.taskDialog.addDescription', 'Add a description for this task...')} 
             className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y focus:border-primary focus:ring-[3px] focus:ring-ring transition-all duration-150" 
           />
         </div>
@@ -237,7 +239,7 @@ export function BasicTab(props: any) {
       {/* Location */}
       {spotsApplicable && (!selectedTemplate || !(selectedTemplate.spots_not_applicable === true || selectedTemplate.spots_not_applicable === 'true' || selectedTemplate.spots_not_applicable === 1 || selectedTemplate.spots_not_applicable === '1')) && (
         <div className="flex flex-col gap-2">
-          <Label className="text-sm font-medium font-[500] text-foreground">Location</Label>
+          <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.location', 'Location')}</Label>
           <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
             <Combobox
               options={workspaceSpots.map((s: any) => ({
@@ -246,9 +248,9 @@ export function BasicTab(props: any) {
               }))}
               value={spotId ? String(spotId) : undefined}
               onValueChange={(v) => setSpotId(v ? parseInt(v, 10) : null)}
-              placeholder={workspaceSpots.length ? 'Select location' : 'No spots'}
-              searchPlaceholder="Search locations..."
-              emptyText="No locations found."
+              placeholder={workspaceSpots.length ? t('taskDialog.selectLocation', 'Select location') : t('taskDialog.noSpots', 'No spots')}
+              searchPlaceholder={t('taskDialog.searchLocations', 'Search locations...')}
+              emptyText={t('taskDialog.noLocationsFound', 'No locations found.')}
               className="w-full"
             />
           </div>
@@ -257,7 +259,7 @@ export function BasicTab(props: any) {
 
       {/* Responsible */}
       <div className="flex flex-col gap-2">
-        <Label className="text-sm font-medium font-[500] text-foreground">Responsible</Label>
+        <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.responsible', 'Responsible')}</Label>
         <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
           <MultiSelectCombobox
             options={workspaceUsers.map((u: any) => ({
@@ -268,9 +270,9 @@ export function BasicTab(props: any) {
             onValueChange={(values) => {
               setSelectedUserIds(values.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n)));
             }}
-            placeholder="Select users..."
-            searchPlaceholder="Search users..."
-            emptyText="No users found."
+            placeholder={t('taskDialog.selectUsers', 'Select users...')}
+            searchPlaceholder={t('taskDialog.searchUsers', 'Search users...')}
+            emptyText={t('taskDialog.noUsersFound', 'No users found.')}
             className="w-full"
           />
         </div>
@@ -278,10 +280,10 @@ export function BasicTab(props: any) {
 
       {/* Priority */}
       <div className="flex flex-col gap-2">
-        <Label className="text-sm font-medium font-[500] text-foreground">Priority</Label>
+        <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.priority', 'Priority')}</Label>
         <Select value={priorityId ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
           <SelectTrigger className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background">
-            <SelectValue placeholder={categoryPriorities.length ? 'Select priority' : 'No priorities'} />
+            <SelectValue placeholder={categoryPriorities.length ? t('taskDialog.selectPriority', 'Select priority') : t('taskDialog.noPriorities', 'No priorities')} />
           </SelectTrigger>
           <SelectContent>
             {categoryPriorities.map((p: any) => (

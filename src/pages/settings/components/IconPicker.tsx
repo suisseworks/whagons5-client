@@ -270,7 +270,7 @@ export function IconPicker({
       </div>
       
       {showDropdown && (
-        <div className="absolute bottom-full right-0 mb-2 w-80 bg-popover text-popover-foreground border rounded-lg shadow-lg z-50 max-h-[400px] overflow-hidden animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2">
+        <div className="absolute top-full left-0 mt-2 w-80 bg-popover text-popover-foreground border rounded-lg shadow-lg z-[100] overflow-visible animate-in fade-in-0 zoom-in-95">
           <div className="p-3">
             {/* Search input at the top */}
             <Input
@@ -289,10 +289,10 @@ export function IconPicker({
             </div>
             <div 
               ref={scrollContainerRef}
-              className="grid grid-cols-8 gap-1 overflow-y-auto"
+              className="grid grid-cols-8 gap-1 overflow-y-scroll overflow-x-hidden"
               style={{ 
-                maxHeight: '260px',
-                minHeight: '100px'
+                height: '260px',
+                scrollbarWidth: 'thin'
               }}
               onScroll={handleIconScroll}
             >

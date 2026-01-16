@@ -7,8 +7,10 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export function useStatusChange() {
+  const { t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
 
   return useMemo(() => {
@@ -39,10 +41,10 @@ export function useStatusChange() {
         return true;
       } catch (e: any) {
         console.warn('Status change failed', e);
-        const errorMessage = e?.message || e?.response?.data?.message || 'Failed to change task status';
+        const errorMessage = e?.message || e?.response?.data?.message || t('errors.noPermissionChangeStatus', 'Failed to change task status');
         const isPermissionError = e?.response?.status === 403 || errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('unauthorized');
         if (isPermissionError) {
-          toast.error('You do not have permission to change task status.', { duration: 5000 });
+          toast.error(t('errors.noPermissionChangeStatus', 'You do not have permission to change task status.'), { duration: 5000 });
         } else {
           toast.error(errorMessage, { duration: 5000 });
         }

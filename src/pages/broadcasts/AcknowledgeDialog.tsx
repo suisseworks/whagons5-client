@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import {
   Dialog,
   DialogContent,
@@ -14,8 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuthUser } from '@/providers/AuthProvider';
 import { Broadcast } from '@/types/broadcast';
-import { RootState } from '@/store/store';
 import api from '@/api/whagonsApi';
 
 interface AcknowledgeDialogProps {
@@ -26,7 +26,7 @@ interface AcknowledgeDialogProps {
 function AcknowledgeDialog({ broadcast, onClose }: AcknowledgeDialogProps) {
   const { t } = useLanguage();
   const dispatch = useDispatch();
-  const currentUser = useSelector((state: RootState) => (state as any).currentUser);
+  const currentUser = useAuthUser();
 
   // Local state
   const [comment, setComment] = useState('');
@@ -69,7 +69,7 @@ function AcknowledgeDialog({ broadcast, onClose }: AcknowledgeDialogProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" style={{ zIndex: 9999 }}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -135,11 +135,17 @@ function AcknowledgeDialog({ broadcast, onClose }: AcknowledgeDialogProps) {
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             {t('common.cancel', 'Cancel')}
           </Button>
-          <Button onClick={handleAcknowledge} disabled={isSubmitting}>
+          <Button onClick={handleAcknowledge} disabled={isSubmitting} className="min-w-[140px]">
             {isSubmitting ? (
-              t('broadcasts.acknowledge.acknowledging', 'Acknowledging...')
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2 animate-spin" />
+                {t('broadcasts.acknowledge.acknowledging', 'Acknowledging...')}
+              </>
             ) : (
-              t('broadcasts.acknowledge.confirm', 'Confirm Acknowledgment')
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {t('broadcasts.acknowledge.confirm', 'Confirm')}
+              </>
             )}
           </Button>
         </DialogFooter>

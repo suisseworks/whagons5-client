@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 const STATUS_ACTIONS = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
 
@@ -43,6 +44,8 @@ const ACTION_ACCENTS: Record<string, string> = {
 };
 
 function Statuses() {
+  const { t } = useLanguage();
+  const ts = (key: string, fallback: string) => t(`settings.statuses.${key}`, fallback);
   
   const dispatch = useDispatch<AppDispatch>();
 
@@ -205,7 +208,7 @@ function Statuses() {
   // Columns for Statuses grid
 
   const columns = useMemo<ColDef[]>(() => [
-    { headerName: "Name", field: "name", flex: 1, minWidth: 200, cellRenderer: (p: any) => {
+    { headerName: ts("grid.columns.name", "Nombre"), field: "name", flex: 1, minWidth: 200, cellRenderer: (p: any) => {
       const name = p?.value;
       const color = p?.data?.color || '#6B7280';
       const iconStr: string = p?.data?.icon || 'fas fa-circle';
@@ -216,11 +219,11 @@ function Statuses() {
         </div>
       );
     } },
-    { headerName: "Action", field: "action", flex: 1, minWidth: 140 },
+    { headerName: ts("grid.columns.action", "Acción"), field: "action", flex: 1, minWidth: 140 },
     // Icon column removed; icon shown with color inside Name
-    { headerName: "System", field: "system", width: 110 },
+    { headerName: ts("grid.columns.system", "Sistema"), field: "system", width: 110 },
     {
-      headerName: "Initial",
+      headerName: ts("grid.columns.initial", "Inicial"),
       field: "initial",
       width: 110,
       cellRenderer: (p: any) => {
@@ -251,7 +254,7 @@ function Statuses() {
     
     {
       field: 'actions',
-      headerName: 'Actions',
+      headerName: ts("grid.columns.actions", "Acciones"),
       colId: 'actions',
       width: 100,
       suppressSizeToFit: true,
@@ -263,13 +266,6 @@ function Statuses() {
             variant: 'outline',
             onClick: handleEditClick,
             className: 'p-1 h-7 w-7'
-          },
-          {
-            icon: faTrash,
-            variant: 'destructive',
-            onClick: handleDeleteClick,
-            className: 'p-1 h-7 w-7',
-            disabled: (row: any) => !!row?.system
           }
         ]
       }),
@@ -277,7 +273,7 @@ function Statuses() {
       filter: false,
       resizable: false
     }
-  ], [dispatch, statuses]);
+  ], [dispatch, statuses, ts]);
 
   // Derived map for fast lookup of transitions in selected group
   const transitionsByKey = useMemo(() => {
@@ -379,61 +375,61 @@ function Statuses() {
 
   const helpMilestones = [
     {
-      label: "01",
-      title: "Design statuses",
-      subtitle: "Names, icons, actions",
+      label: ts("help.milestones.01.label", "01"),
+      title: ts("help.milestones.01.title", "Diseñar estados"),
+      subtitle: ts("help.milestones.01.subtitle", "Nombres, iconos, acciones"),
       accent: "from-emerald-300 via-emerald-400 to-emerald-500"
     },
     {
-      label: "02",
-      title: "Shape transitions",
-      subtitle: "Matrix or visual builder",
+      label: ts("help.milestones.02.label", "02"),
+      title: ts("help.milestones.02.title", "Formar transiciones"),
+      subtitle: ts("help.milestones.02.subtitle", "Matriz o constructor visual"),
       accent: "from-sky-300 via-sky-400 to-indigo-500"
     },
     {
-      label: "03",
-      title: "Link to categories",
-      subtitle: "Assign per workflow",
+      label: ts("help.milestones.03.label", "03"),
+      title: ts("help.milestones.03.title", "Vincular a categorías"),
+      subtitle: ts("help.milestones.03.subtitle", "Asignar por flujo de trabajo"),
       accent: "from-amber-300 via-orange-400 to-orange-500"
     }
   ];
 
   const helpHeroStatuses = [
-    { name: "Backlog", action: "NONE", color: "#94a3b8" },
-    { name: "In Progress", action: "WORKING", color: "#34d399" },
-    { name: "Blocked", action: "PAUSED", color: "#fb923c" },
-    { name: "Completed", action: "FINISHED", color: "#6366f1" }
+    { name: ts("help.sampleWorkflow.statuses.backlog", "Backlog"), action: "NONE", color: "#94a3b8" },
+    { name: ts("help.sampleWorkflow.statuses.inProgress", "En Progreso"), action: "WORKING", color: "#34d399" },
+    { name: ts("help.sampleWorkflow.statuses.blocked", "Bloqueado"), action: "PAUSED", color: "#fb923c" },
+    { name: ts("help.sampleWorkflow.statuses.completed", "Completado"), action: "FINISHED", color: "#6366f1" }
   ];
 
   const helpInfoCards = [
     {
       icon: faCircleNodes,
-      title: "Global status library",
-      description: "One palette powers every workspace. Update once and all teams stay consistent.",
+      title: ts("help.infoCards.global.title", "Biblioteca global de estados"),
+      description: ts("help.infoCards.global.description", "Una paleta potencia cada workspace. Actualiza una vez y todos los equipos se mantienen consistentes."),
       accent: "text-sky-500",
       iconWrapper: "bg-sky-500/10 border-sky-500/30",
       cardBorder: "border-sky-500/20"
     },
     {
       icon: faLayerGroup,
-      title: "Transition groups",
-      description: "Use multiple groups to reflect different lifecycle rules (standard, approvals, field ops, etc.).",
+      title: ts("help.infoCards.groups.title", "Grupos de transición"),
+      description: ts("help.infoCards.groups.description", "Usa múltiples grupos para reflejar diferentes reglas de ciclo de vida (estándar, aprobaciones, operaciones de campo, etc.)."),
       accent: "text-indigo-500",
       iconWrapper: "bg-indigo-500/10 border-indigo-500/30",
       cardBorder: "border-indigo-500/20"
     },
     {
       icon: faLink,
-      title: "Category linking",
-      description: "Each category picks a transition group. Tasks inherit the graph automatically.",
+      title: ts("help.infoCards.linking.title", "Vinculación de categorías"),
+      description: ts("help.infoCards.linking.description", "Cada categoría elige un grupo de transición. Las tareas heredan el gráfico automáticamente."),
       accent: "text-amber-500",
       iconWrapper: "bg-amber-500/10 border-amber-500/30",
       cardBorder: "border-amber-500/20"
     },
     {
       icon: faLifeRing,
-      title: "Resilience & support",
-      description: "Clone groups to experiment safely. System statuses prevent accidental deletes.",
+      title: ts("help.infoCards.resilience.title", "Resiliencia y soporte"),
+      description: ts("help.infoCards.resilience.description", "Clona grupos para experimentar de forma segura. Los estados del sistema previenen eliminaciones accidentales."),
       accent: "text-rose-500",
       iconWrapper: "bg-rose-500/10 border-rose-500/30",
       cardBorder: "border-rose-500/20"
@@ -442,21 +438,21 @@ function Statuses() {
 
   const helpTimeline = [
     {
-      step: "01",
-      title: "Plan & align",
-      description: "Audit existing task states, decide on action codes, confirm naming with stakeholders.",
+      step: ts("help.timeline.01.step", "01"),
+      title: ts("help.timeline.01.title", "Planificar y alinear"),
+      description: ts("help.timeline.01.description", "Audita estados de tareas existentes, decide códigos de acción, confirma nombres con las partes interesadas."),
       gradient: "from-emerald-400 to-emerald-600"
     },
     {
-      step: "02",
-      title: "Model transitions",
-      description: "Build the graph per group. Use the visual tab to validate bidirectional steps and blockers.",
+      step: ts("help.timeline.02.step", "02"),
+      title: ts("help.timeline.02.title", "Modelar transiciones"),
+      description: ts("help.timeline.02.description", "Construye el gráfico por grupo. Usa la pestaña visual para validar pasos bidireccionales y bloqueadores."),
       gradient: "from-indigo-400 to-indigo-600"
     },
     {
-      step: "03",
-      title: "Rollout & monitor",
-      description: "Attach groups to categories, monitor adoption, and iterate using analytics + config logs.",
+      step: ts("help.timeline.03.step", "03"),
+      title: ts("help.timeline.03.title", "Desplegar y monitorear"),
+      description: ts("help.timeline.03.description", "Adjunta grupos a categorías, monitorea la adopción e itera usando análisis y registros de configuración."),
       gradient: "from-amber-400 to-orange-500"
     }
   ];
@@ -464,14 +460,14 @@ function Statuses() {
   const statusesTabs = [
     {
       value: 'statuses',
-      label: 'Statuses',
+      label: ts("tabs.statuses", "Estados"),
       content: (
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0">
             <SettingsGrid
               rowData={filteredStatuses}
               columnDefs={columns}
-              noRowsMessage="No statuses found"
+              noRowsMessage={ts("grid.noRows", "No se encontraron estados")}
               rowSelection="single"
               onSelectionChanged={(rows) => setSelectedStatus(rows?.[0] || null)}
               onRowDoubleClicked={(row) => {
@@ -492,13 +488,13 @@ function Statuses() {
     },
     {
       value: 'transitions',
-      label: 'Transitions',
+      label: ts("tabs.transitions", "Transiciones"),
       content: (
         <div className="space-y-4 flex-1 min-h-0 flex flex-col">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-xl font-semibold mr-2">Transitions</h2>
+            <h2 className="text-xl font-semibold mr-2">{ts("transitions.title", "Transiciones")}</h2>
             <Select value={selectedGroupId ? String(selectedGroupId) : ''} onValueChange={(v) => setSelectedGroupId(v ? Number(v) : null)}>
-              <SelectTrigger size="sm" className="min-w-[180px]"><SelectValue placeholder="Select group…" /></SelectTrigger>
+              <SelectTrigger size="sm" className="min-w-[180px]"><SelectValue placeholder={ts("transitions.selectGroup", "Seleccionar grupo...")} /></SelectTrigger>
               <SelectContent position="popper">
                 {statusTransitionGroups.map((g: any) => (
                   <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
@@ -508,22 +504,22 @@ function Statuses() {
 
             <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen} modal={false}>
               <DialogTrigger asChild>
-                <Button size="sm" variant="secondary" onClick={() => { setGroupDialogMode('create'); setGroupDialogName(''); }}>New Group</Button>
+                <Button size="sm" variant="secondary" onClick={() => { setGroupDialogMode('create'); setGroupDialogName(''); }}>{ts("transitions.newGroup", "Nuevo Grupo")}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{groupDialogMode === 'create' ? 'New Group' : 'Rename Group'}</DialogTitle>
+                  <DialogTitle>{groupDialogMode === 'create' ? ts("transitions.groupDialog.create.title", "Nuevo Grupo") : ts("transitions.groupDialog.rename.title", "Renombrar Grupo")}</DialogTitle>
                 </DialogHeader>
                 <DialogDescription>
-                  {groupDialogMode === 'create' ? 'Create a new status transition group.' : 'Rename the selected status transition group.'}
+                  {groupDialogMode === 'create' ? ts("transitions.groupDialog.create.description", "Crea un nuevo grupo de transición de estados.") : ts("transitions.groupDialog.rename.description", "Renombra el grupo de transición de estados seleccionado.")}
                 </DialogDescription>
-                <Input placeholder="Group name" value={groupDialogName} onChange={(e) => setGroupDialogName(e.target.value)} />
+                <Input placeholder={ts("transitions.groupDialog.namePlaceholder", "Nombre del grupo")} value={groupDialogName} onChange={(e) => setGroupDialogName(e.target.value)} />
                 <DialogFooter>
-                  <Button onClick={() => setGroupDialogOpen(false)} variant="outline" size="sm">Cancel</Button>
+                  <Button onClick={() => setGroupDialogOpen(false)} variant="outline" size="sm">{t("common.cancel", "Cancelar")}</Button>
                   <Button size="sm" onClick={() => {
                     if (groupDialogMode === 'create') handleCreateGroup(groupDialogName); else handleRenameGroup(groupDialogName);
                     setGroupDialogOpen(false);
-                  }}>Save</Button>
+                  }}>{t("common.save", "Guardar")}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -533,24 +529,24 @@ function Statuses() {
               setGroupDialogMode('rename');
               setGroupDialogName(current?.name || '');
               setGroupDialogOpen(true);
-            }}>Rename</Button>
-            <Button size="sm" variant="destructive" onClick={() => setDeleteGroupOpen(true)} disabled={!selectedGroupId}>Delete</Button>
+            }}>{ts("transitions.rename", "Renombrar")}</Button>
+            <Button size="sm" variant="destructive" onClick={() => setDeleteGroupOpen(true)} disabled={!selectedGroupId}>{ts("transitions.delete", "Eliminar")}</Button>
 
             <Dialog open={deleteGroupOpen} onOpenChange={setDeleteGroupOpen} modal={false}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Delete Group</DialogTitle>
+                  <DialogTitle>{ts("transitions.groupDialog.delete.title", "Eliminar Grupo")}</DialogTitle>
                 </DialogHeader>
                 <DialogDescription>
-                  Deleting a group removes all transitions in it. This cannot be undone.
+                  {ts("transitions.groupDialog.delete.description", "Eliminar un grupo elimina todas las transiciones en él. Esto no se puede deshacer.")}
                 </DialogDescription>
                 <div className="space-y-2">
-                  <p>Are you sure you want to delete "{selectedGroup?.name}"?</p>
-                  <p className="text-sm text-muted-foreground">This will remove all transitions in this group. This action cannot be undone.</p>
+                  <p>{ts("transitions.groupDialog.delete.confirm", "¿Estás seguro de que deseas eliminar \"{name}\"?").replace("{name}", selectedGroup?.name || "")}</p>
+                  <p className="text-sm text-muted-foreground">{ts("transitions.groupDialog.delete.warning", "Esto eliminará todas las transiciones en este grupo. Esta acción no se puede deshacer.")}</p>
                 </div>
                 <DialogFooter>
-                  <Button onClick={() => setDeleteGroupOpen(false)} variant="outline" size="sm">Cancel</Button>
-                  <Button size="sm" variant="destructive" onClick={() => { handleDeleteGroup(); setDeleteGroupOpen(false); }}>Delete</Button>
+                  <Button onClick={() => setDeleteGroupOpen(false)} variant="outline" size="sm">{t("common.cancel", "Cancelar")}</Button>
+                  <Button size="sm" variant="destructive" onClick={() => { handleDeleteGroup(); setDeleteGroupOpen(false); }}>{ts("transitions.delete", "Eliminar")}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -559,8 +555,8 @@ function Statuses() {
             <div className="ml-auto">
               <Tabs value={transitionsView} onValueChange={(v: any) => setTransitionsView(v)}>
                 <TabsList>
-                  <TabsTrigger value="visual">Visual</TabsTrigger>
-                  <TabsTrigger value="matrix">Matrix</TabsTrigger>
+                  <TabsTrigger value="visual">{ts("transitions.view.visual", "Visual")}</TabsTrigger>
+                  <TabsTrigger value="matrix">{ts("transitions.view.matrix", "Matriz")}</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -572,7 +568,7 @@ function Statuses() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-b-2 bg-muted/50">
-                      <TableHead className="sticky left-0 z-10 bg-muted/50 border-r-2 font-semibold text-foreground min-w-[120px]">From \\ To</TableHead>
+                      <TableHead className="sticky left-0 z-10 bg-muted/50 border-r-2 font-semibold text-foreground min-w-[120px]">{ts("transitions.matrix.fromTo", "De \\ A")}</TableHead>
                       {matrixStatuses.map((to: any) => (
                         <TableHead key={`to-${to.id}`} className="whitespace-nowrap min-w-[100px] text-center font-semibold border-r last:border-r-0">
                           <div className="flex flex-col items-center space-y-1">
@@ -634,7 +630,7 @@ function Statuses() {
     },
     {
       value: 'stats',
-      label: 'Statistics',
+      label: ts("tabs.stats", "Estadísticas"),
       content: (
         <div className="flex-1 min-h-0 overflow-auto space-y-6">
           <div className="rounded-3xl border bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white p-6 shadow-xl relative overflow-hidden">
@@ -646,11 +642,11 @@ function Statuses() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <Badge variant="outline" className="bg-white/10 text-white border-white/20 uppercase tracking-[0.35em] text-[10px]">
-                    status pulse
+                    {ts("stats.hero.badge", "pulso de estado")}
                   </Badge>
-                  <h3 className="mt-3 text-3xl font-semibold leading-tight">Lifecycle health overview</h3>
+                  <h3 className="mt-3 text-3xl font-semibold leading-tight">{ts("stats.hero.title", "Resumen de salud del ciclo de vida")}</h3>
                   <p className="text-sm text-white/70">
-                    {statusStats.total} statuses wired into {statusStats.transitionGroups} transition groups.
+                    {ts("stats.hero.description", "{total} estados conectados en {groups} grupos de transición.").replace("{total}", String(statusStats.total)).replace("{groups}", String(statusStats.transitionGroups))}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -684,9 +680,9 @@ function Statuses() {
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="text-xs uppercase text-muted-foreground tracking-wide">System statuses</p>
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">{ts("stats.cards.system.title", "Estados del sistema")}</p>
               <p className="text-3xl font-semibold mt-2">{statusStats.system}</p>
-              <p className="text-xs text-muted-foreground">Protected defaults</p>
+              <p className="text-xs text-muted-foreground">{ts("stats.cards.system.value", "Protegidos por defecto")}</p>
               <div className="mt-3 h-2 rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-500"
@@ -694,13 +690,13 @@ function Statuses() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground mt-1">
-                {percentOf(statusStats.system, statusStats.total || 1)}% of the library.
+                {percentOf(statusStats.system, statusStats.total || 1)}{ts("stats.cards.system.percentage", "% de la biblioteca.")}
               </p>
             </div>
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="text-xs uppercase text-muted-foreground tracking-wide">Initial statuses</p>
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">{ts("stats.cards.initial.title", "Estados iniciales")}</p>
               <p className="text-3xl font-semibold mt-2">{statusStats.initial}</p>
-              <p className="text-xs text-muted-foreground">Entry points</p>
+              <p className="text-xs text-muted-foreground">{ts("stats.cards.initial.value", "Puntos de entrada")}</p>
               <div className="mt-3 h-2 rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500"
@@ -708,28 +704,28 @@ function Statuses() {
                 />
               </div>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Usually one per workflow; add more for branching templates.
+                {ts("stats.cards.initial.description", "Generalmente uno por flujo de trabajo; agrega más para plantillas de ramificación.")}
               </p>
             </div>
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="text-xs uppercase text-muted-foreground tracking-wide">Transition groups</p>
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">{ts("stats.cards.transitionGroups.title", "Grupos de transición")}</p>
               <p className="text-3xl font-semibold mt-2">{statusStats.transitionGroups}</p>
               <p className="text-xs text-muted-foreground">
-                Avg transitions/group: <span className="text-foreground font-semibold">{avgTransitionsPerGroup}</span>
+                {ts("stats.cards.transitionGroups.avgTransitions", "Promedio transiciones/grupo:")} <span className="text-foreground font-semibold">{avgTransitionsPerGroup}</span>
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <div className="rounded-xl border bg-muted/40 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wide">All transitions</p>
+                  <p className="text-[10px] uppercase tracking-wide">{ts("stats.cards.transitionGroups.allTransitions", "Todas las transiciones")}</p>
                   <p className="text-sm font-semibold text-foreground">{statusStats.transitionsTotal}</p>
                 </div>
                 <div className="rounded-xl border bg-muted/40 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wide">Selected group</p>
+                  <p className="text-[10px] uppercase tracking-wide">{ts("stats.cards.transitionGroups.selectedGroup", "Grupo seleccionado")}</p>
                   <p className="text-sm font-semibold text-foreground">{statusStats.selectedGroupTransitions ?? '—'}</p>
                 </div>
               </div>
             </div>
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <p className="text-xs uppercase text-muted-foreground tracking-wide">Group coverage</p>
+              <p className="text-xs uppercase text-muted-foreground tracking-wide">{ts("stats.cards.coverage.title", "Cobertura del grupo")}</p>
               <div className="mt-3 flex items-center gap-4">
                 <div className="relative h-20 w-20">
                   <div className="absolute inset-0 rounded-full bg-muted" />
@@ -746,11 +742,11 @@ function Statuses() {
                 <div className="flex-1 text-sm text-muted-foreground">
                   {selectedGroupId ? (
                     <>
-                      <p className="font-semibold text-foreground">{selectedGroupCoverage}% of possible paths covered</p>
-                      <p>{activeStatusesCount || 0} active statuses with {statusStats.selectedGroupTransitions ?? 0} edges in this group.</p>
+                      <p className="font-semibold text-foreground">{ts("stats.cards.coverage.covered", "{coverage}% de rutas posibles cubiertas").replace("{coverage}", String(selectedGroupCoverage))}</p>
+                      <p>{ts("stats.cards.coverage.description", "{active} estados activos con {transitions} aristas en este grupo.").replace("{active}", String(activeStatusesCount || 0)).replace("{transitions}", String(statusStats.selectedGroupTransitions ?? 0))}</p>
                     </>
                   ) : (
-                    <p>Select a transition group in the Transitions tab to visualize coverage.</p>
+                    <p>{ts("stats.cards.coverage.selectGroup", "Selecciona un grupo de transición en la pestaña Transiciones para visualizar la cobertura.")}</p>
                   )}
                 </div>
               </div>
@@ -760,10 +756,10 @@ function Statuses() {
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase text-muted-foreground tracking-wide">Action mix</p>
-                <h3 className="text-lg font-semibold">Where statuses land</h3>
+                <p className="text-xs uppercase text-muted-foreground tracking-wide">{ts("stats.actionMix.title", "Mezcla de acciones")}</p>
+                <h3 className="text-lg font-semibold">{ts("stats.actionMix.subtitle", "Dónde aterrizan los estados")}</h3>
               </div>
-              <Badge variant="outline">{statusStats.total ? '100% scaled' : 'No data'}</Badge>
+              <Badge variant="outline">{statusStats.total ? ts("stats.actionMix.scaled", "100% escalado") : ts("stats.actionMix.noData", "Sin datos")}</Badge>
             </div>
             <div className="mt-4 space-y-4">
               {statusStats.actions.map(({ action, count }) => {
@@ -773,7 +769,7 @@ function Statuses() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{action}</span>
-                        <span className="text-muted-foreground">{count} statuses</span>
+                        <span className="text-muted-foreground">{count} {ts("stats.actionMix.statuses", "estados")}</span>
                       </div>
                       <span className="font-mono text-xs">{percent}%</span>
                     </div>
@@ -793,7 +789,7 @@ function Statuses() {
     },
     {
       value: 'help',
-      label: 'Help',
+      label: ts("tabs.help", "Ayuda"),
       content: (
         <div className="flex-1 min-h-0 overflow-auto space-y-6">
           <div className="rounded-3xl border bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 text-white p-6 shadow-xl relative overflow-hidden">
@@ -804,11 +800,11 @@ function Statuses() {
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
               <div className="flex-1 space-y-4">
                 <Badge variant="outline" className="bg-white/10 text-white border-white/20 uppercase tracking-[0.35em] text-[10px]">
-                  workflow map
+                  {ts("help.hero.badge", "mapa de flujo de trabajo")}
                 </Badge>
-                <h3 className="text-3xl font-semibold leading-tight">Statuses keep every lifecycle synchronized</h3>
+                <h3 className="text-3xl font-semibold leading-tight">{ts("help.hero.title", "Los estados mantienen cada ciclo de vida sincronizado")}</h3>
                 <p className="text-sm text-white/80 max-w-2xl">
-                  Define a single library of statuses, connect them with transition groups, then assign those groups to categories. Tasks instantly inherit the right path without extra automation.
+                  {ts("help.hero.description", "Define una única biblioteca de estados, conéctalos con grupos de transición, luego asigna esos grupos a categorías. Las tareas heredan instantáneamente el camino correcto sin automatización adicional.")}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {helpMilestones.map((item) => (
@@ -822,7 +818,7 @@ function Statuses() {
                 </div>
               </div>
               <div className="w-full max-w-sm rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur p-4 shadow-lg">
-                <p className="text-xs uppercase tracking-wide text-white/70">Sample workflow</p>
+                <p className="text-xs uppercase tracking-wide text-white/70">{ts("help.sampleWorkflow.title", "Flujo de trabajo de ejemplo")}</p>
                 <div className="mt-3 space-y-3">
                   {helpHeroStatuses.map((status, index) => (
                     <div key={status.name}>
@@ -839,7 +835,7 @@ function Statuses() {
                       {index < helpHeroStatuses.length - 1 && (
                         <div className="ml-5 mt-1 flex items-center gap-2 text-[10px] text-white/60">
                           <div className="h-px flex-1 bg-white/25" />
-                          Next step
+                          {ts("help.sampleWorkflow.nextStep", "Siguiente paso")}
                           <div className="h-px flex-1 bg-white/25" />
                         </div>
                       )}
@@ -847,7 +843,7 @@ function Statuses() {
                   ))}
                 </div>
                 <p className="mt-3 text-[11px] text-white/70">
-                  Tip: duplicate a transition group when teams need a custom journey—categories inherit whichever group you attach.
+                  {ts("help.sampleWorkflow.tip", "Consejo: duplica un grupo de transición cuando los equipos necesiten un viaje personalizado—las categorías heredan el grupo que adjuntes.")}
                 </p>
               </div>
             </div>
@@ -872,11 +868,11 @@ function Statuses() {
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="flex flex-wrap items-center gap-3">
               <div>
-                <p className="text-xs uppercase text-muted-foreground tracking-wide">Rollout guide</p>
-                <h3 className="text-lg font-semibold">3-step adoption path</h3>
+                <p className="text-xs uppercase text-muted-foreground tracking-wide">{ts("help.rollout.title", "Guía de despliegue")}</p>
+                <h3 className="text-lg font-semibold">{ts("help.rollout.subtitle", "Ruta de adopción en 3 pasos")}</h3>
               </div>
               <span className="text-xs text-muted-foreground">
-                Align with ops, publish the graph, then link it to categories for instant enforcement.
+                {ts("help.rollout.description", "Alinea con operaciones, publica el gráfico, luego vincúlalo a categorías para aplicación instantánea.")}
               </span>
             </div>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -899,10 +895,10 @@ function Statuses() {
 
           <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 flex flex-wrap items-center gap-3">
             <div>
-              <p className="text-sm font-semibold text-foreground">Next stop: Categories</p>
-              <p className="text-xs text-muted-foreground">Open Settings → Categories to attach transition groups to each queue and keep tasks compliant.</p>
+              <p className="text-sm font-semibold text-foreground">{ts("help.nextStop.title", "Próxima parada: Categorías")}</p>
+              <p className="text-xs text-muted-foreground">{ts("help.nextStop.description", "Abre Configuración → Categorías para adjuntar grupos de transición a cada cola y mantener las tareas cumpliendo.")}</p>
             </div>
-            <span className="text-xs text-muted-foreground">Need help? Ping the platform team with a screenshot of this flow.</span>
+            <span className="text-xs text-muted-foreground">{ts("help.nextStop.help", "¿Necesitas ayuda? Contacta al equipo de plataforma con una captura de pantalla de este flujo.")}</span>
           </div>
         </div>
       )
@@ -911,14 +907,14 @@ function Statuses() {
 
   return (
     <SettingsLayout
-      title="Statuses"
-      description="Manage global statuses and transition rules"
+      title={ts("title", "Estados")}
+      description={ts("description", "Administra estados globales y reglas de transición")}
       icon={faSitemap}
       iconColor="#f59e0b"
       backPath="/settings"
       wrapChildrenFullHeight={true}
       search={{
-        placeholder: "Search statuses...",
+        placeholder: ts("search.placeholder", "Buscar estados..."),
         value: searchQuery,
         onChange: setSearchQuery
       }}
@@ -935,7 +931,7 @@ function Statuses() {
             setCreateOpen(true);
           }}>
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
-            Add Status
+            {ts("headerActions.add", "Agregar Estado")}
           </Button>
         </div>
       }
@@ -952,11 +948,11 @@ function Statuses() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         type="create"
-        title="Create Status"
+        title={ts("dialogs.create.title", "Crear Estado")}
         isSubmitting={isCreating}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!formName.trim()) { setFormError('Name is required'); return; }
+          if (!formName.trim()) { setFormError(ts("fields.validation.nameRequired", "El nombre es requerido")); return; }
           setFormError(null);
 
           (async () => {
@@ -970,7 +966,7 @@ function Statuses() {
               }
 
               const normalizedAction = (formAction || 'NONE').toUpperCase();
-              if (!allowedActions.includes(normalizedAction as any)) { setFormError('Invalid action'); return; }
+              if (!allowedActions.includes(normalizedAction as any)) { setFormError(ts("fields.validation.invalidAction", "Acción inválida")); return; }
               const payload: any = {
                 name: formName.trim(),
                 action: normalizedAction,
@@ -992,24 +988,24 @@ function Statuses() {
         }}
         error={formError}
       >
-        <TextField label="Name" value={formName} onChange={setFormName} required />
-        <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-        <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
-        <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
-        <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
-        <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
+        <TextField label={ts("fields.name", "Nombre")} value={formName} onChange={setFormName} required />
+        <SelectField label={ts("fields.action", "Acción")} value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+        <TextField label={ts("fields.color", "Color")} value={formColor} onChange={setFormColor} type="color" />
+        <IconPicker label={ts("fields.icon", "Icono")} value={formIcon} onChange={setFormIcon} color={formColor} />
+        <CheckboxField label={ts("fields.initial", "Inicial")} checked={formInitial} onChange={setFormInitial} />
+        <CheckboxField label={ts("fields.system", "Sistema")} checked={formSystem} onChange={setFormSystem} />
       </SettingsDialog>
 
       <SettingsDialog
         open={editOpen}
         onOpenChange={setEditOpen}
         type="edit"
-        title="Edit Status"
+        title={ts("dialogs.edit.title", "Editar Estado")}
         isSubmitting={isUpdating}
         onSubmit={(e) => {
           e.preventDefault();
           if (!selectedStatus) return;
-          if (!formName.trim()) { setFormError('Name is required'); return; }
+          if (!formName.trim()) { setFormError(ts("fields.validation.nameRequired", "El nombre es requerido")); return; }
           setFormError(null);
 
           (async () => {
@@ -1023,7 +1019,7 @@ function Statuses() {
               }
 
               const normalizedAction = (formAction || selectedStatus?.action || 'NONE').toUpperCase();
-              if (!allowedActions.includes(normalizedAction as any)) { setFormError('Invalid action'); return; }
+              if (!allowedActions.includes(normalizedAction as any)) { setFormError(ts("fields.validation.invalidAction", "Acción inválida")); return; }
               const updates: any = {
                 name: formName.trim(),
                 action: normalizedAction,
@@ -1044,20 +1040,37 @@ function Statuses() {
           })();
         }}
         error={formError}
+        footerActions={
+          selectedStatus && !selectedStatus.system ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setEditOpen(false);
+                setDeleteOpen(true);
+              }}
+              disabled={isUpdating}
+            >
+              <FontAwesomeIcon icon={faTrash} className="mr-2" />
+              {ts("dialogs.edit.deleteButton", "Eliminar")}
+            </Button>
+          ) : null
+        }
       >
-        <TextField label="Name" value={formName} onChange={setFormName} required />
-        <SelectField label="Action" value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
-        <TextField label="Color" value={formColor} onChange={setFormColor} type="color" />
-        <IconPicker label="Icon" value={formIcon} onChange={setFormIcon} color={formColor} />
-        <CheckboxField label="Initial" checked={formInitial} onChange={setFormInitial} />
-        <CheckboxField label="System" checked={formSystem} onChange={setFormSystem} />
+        <TextField label={ts("fields.name", "Nombre")} value={formName} onChange={setFormName} required />
+        <SelectField label={ts("fields.action", "Acción")} value={formAction || 'NONE'} onChange={setFormAction} options={allowedActions.map(a => ({ value: a, label: a }))} />
+        <TextField label={ts("fields.color", "Color")} value={formColor} onChange={setFormColor} type="color" />
+        <IconPicker label={ts("fields.icon", "Icono")} value={formIcon} onChange={setFormIcon} color={formColor} />
+        <CheckboxField label={ts("fields.initial", "Inicial")} checked={formInitial} onChange={setFormInitial} />
+        <CheckboxField label={ts("fields.system", "Sistema")} checked={formSystem} onChange={setFormSystem} />
       </SettingsDialog>
 
       <SettingsDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         type="delete"
-        title="Delete Status"
+        title={ts("dialogs.delete.title", "Eliminar Estado")}
         entityName="status"
         entityData={selectedStatus}
         renderEntityPreview={(s: any) => (
@@ -1068,7 +1081,7 @@ function Statuses() {
         )}
         onConfirm={async () => {
           if (!selectedStatus) return;
-          if (selectedStatus.system) { setFormError('System statuses cannot be deleted'); return; }
+          if (selectedStatus.system) { setFormError(ts("dialogs.delete.systemError", "Los estados del sistema no se pueden eliminar")); return; }
           try {
             setIsDeleting(true);
             await dispatch(genericActions.statuses.removeAsync(selectedStatus.id));

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuthUser } from '@/providers/AuthProvider';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
 import { Broadcast } from '@/types/broadcast';
@@ -20,7 +21,10 @@ function BroadcastsPage() {
   const { value: broadcasts, loading } = useSelector(
     (state: RootState) => (state as any).broadcasts || { value: [], loading: false }
   );
-  const currentUser = useSelector((state: RootState) => (state as any).currentUser);
+  const { value: acknowledgments } = useSelector(
+    (state: RootState) => (state as any).broadcastAcknowledgments || { value: [] }
+  );
+  const currentUser = useAuthUser();
 
   // Local state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -39,16 +43,49 @@ function BroadcastsPage() {
   const filteredBroadcasts = broadcasts.filter((broadcast: Broadcast) => {
     switch (activeTab) {
       case 'my-broadcasts':
-        return broadcast.created_by === currentUser?.id;
+        const isMyBroadcast = Number(broadcast.created_by) === Number(currentUser?.id);
+        if (isMyBroadcast) {
+          console.log('🔍 [BroadcastsPage] Found my broadcast:', {
+            broadcastId: broadcast.id,
+            broadcastCreatedBy: broadcast.created_by,
+            currentUserId: currentUser?.id,
+            title: broadcast.title,
+          });
+        }
+        return isMyBroadcast;
       case 'pending':
-        // This would need acknowledgment data to filter properly
-        return broadcast.status === 'active';
+        // Filter broadcasts where user has pending acknowledgment
+        const hasPendingAck = acknowledgments.some(
+          (ack: any) => 
+            Number(ack.broadcast_id) === Number(broadcast.id) &&
+            Number(ack.user_id) === Number(currentUser?.id) &&
+            ack.status === 'pending'
+        );
+        return broadcast.status === 'active' && hasPendingAck;
       case 'completed':
         return broadcast.status === 'completed';
       default:
         return true;
     }
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 [BroadcastsPage] State:', {
+      broadcastsCount: broadcasts.length,
+      broadcasts: broadcasts.map((b: any) => ({
+        id: b.id,
+        title: b.title,
+        created_by: b.created_by,
+        total_recipients: b.total_recipients,
+      })),
+      currentUserId: currentUser?.id,
+      currentUser: currentUser,
+      acknowledgmentsCount: acknowledgments.length,
+      activeTab,
+      filteredCount: filteredBroadcasts.length,
+    });
+  }, [broadcasts.length, currentUser?.id, acknowledgments.length, activeTab, filteredBroadcasts.length]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -71,7 +108,8 @@ function BroadcastsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-background text-foreground">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1">
@@ -126,12 +164,37 @@ function BroadcastsPage() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {filteredBroadcasts.map((broadcast: Broadcast) => (
+              {filteredBroadcasts.map((broadcast: Broadcast) => {
+                // Calculate progress percentage with fallback
+                const calculatedPercentage = broadcast.total_recipients > 0 
+                  ? Math.round((broadcast.total_acknowledged / broadcast.total_recipients) * 100)
+                  : 0;
+                const progressPercentage = broadcast.progress_percentage ?? calculatedPercentage;
+                
+                const isComplete = progressPercentage >= 100 || broadcast.status === 'completed';
+                const isPending = broadcast.status === 'active' && progressPercentage < 100;
+                
+                return (
                 <Card
                   key={broadcast.id}
-                  className="p-6 cursor-pointer hover:shadow-md transition-shadow"
+                  className={`p-6 cursor-pointer hover:shadow-md transition-all relative overflow-hidden ${
+                    isPending ? 'animate-pulse-subtle ring-2 ring-primary/20' : ''
+                  } ${isComplete ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' : ''}`}
                   onClick={() => setSelectedBroadcast(broadcast)}
                 >
+                  {/* Completion Overlay */}
+                  {isComplete && (
+                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-green-500 text-white px-3 py-1.5 rounded-full shadow-lg animate-in zoom-in duration-300">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="text-xs font-semibold">Complete!</span>
+                    </div>
+                  )}
+                  
+                  {/* Active Pending Indicator */}
+                  {isPending && (
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary/50 to-primary animate-shimmer bg-[length:200%_100%]" />
+                  )}
+
                   <div className="space-y-4">
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
@@ -143,14 +206,9 @@ function BroadcastsPage() {
                           {broadcast.message}
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <Badge variant={getPriorityColor(broadcast.priority)}>
-                          {broadcast.priority}
-                        </Badge>
-                        <Badge variant={getStatusColor(broadcast.status)}>
-                          {broadcast.status}
-                        </Badge>
-                      </div>
+                      <Badge variant={getPriorityColor(broadcast.priority)}>
+                        {broadcast.priority}
+                      </Badge>
                     </div>
 
                     {/* Progress Bar */}
@@ -159,15 +217,21 @@ function BroadcastsPage() {
                         <span className="text-muted-foreground">
                           {t('broadcasts.progress', 'Acknowledgments')}
                         </span>
-                        <span className="font-medium">
+                        <span className={`font-medium ${isComplete ? 'text-green-600 dark:text-green-400' : ''}`}>
                           {broadcast.total_acknowledged} / {broadcast.total_recipients}
-                          {' '}({broadcast.progress_percentage}%)
+                          {' '}({progressPercentage}%)
                         </span>
                       </div>
-                      <div className="w-full bg-secondary rounded-full h-2">
+                      <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
                         <div
-                          className="bg-primary h-2 rounded-full transition-all"
-                          style={{ width: `${broadcast.progress_percentage}%` }}
+                          className={`h-2 rounded-full transition-all duration-500 ${
+                            isComplete 
+                              ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                              : isPending 
+                                ? 'bg-gradient-to-r from-primary to-primary/70 animate-pulse' 
+                                : 'bg-primary'
+                          }`}
+                          style={{ width: `${progressPercentage}%` }}
                         />
                       </div>
                     </div>
@@ -185,7 +249,8 @@ function BroadcastsPage() {
                     </div>
                   </div>
                 </Card>
-              ))}
+              )})}
+            
             </div>
           )}
         </TabsContent>
@@ -203,6 +268,7 @@ function BroadcastsPage() {
           onClose={() => setSelectedBroadcast(null)}
         />
       )}
+      </div>
     </div>
   );
 }

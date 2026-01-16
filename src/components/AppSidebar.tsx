@@ -99,7 +99,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     pinned: false,
     name: 'Broadcasts',
     icon: Bell,
-    iconColor: '#8b5cf6',
+    iconColor: '#ef4444', // red-500 to match plugin card
     route: '/broadcasts',
   },
   {
@@ -108,8 +108,8 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     pinned: false,
     name: 'Boards',
     icon: Users2,
-    iconColor: '#3b82f6',
-    route: '/boards',
+    iconColor: '#8b5cf6', // violet-500 to match plugin card
+    route: '', // No route - boards are managed via sidebar collapsible section
   },
   {
     id: 'compliance',
@@ -117,7 +117,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     pinned: false,
     name: 'Compliance',
     icon: FileText,
-    iconColor: '#10b981',
+    iconColor: '#10b981', // emerald-500 to match plugin card
     route: '/compliance/standards',
   },
 ];
@@ -811,13 +811,10 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             
             {/* Boards section - shown below workspaces if boards plugin is enabled */}
             {boardsPluginEnabled && (
-              <>
-                <SidebarSeparator className="my-2 border-[var(--sidebar-border)]" />
-                <AppSidebarBoards
-                  boards={boards}
-                  pathname={pathname}
-                />
-              </>
+              <AppSidebarBoards
+                boards={boards}
+                pathname={pathname}
+              />
             )}
             
             {/* Pinned plugins - shown below workspaces */}

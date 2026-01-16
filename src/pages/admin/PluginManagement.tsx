@@ -16,6 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import toast from 'react-hot-toast';
 import api from '@/api/whagonsApi';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface Plugin {
 	id: number;
@@ -32,6 +33,7 @@ interface Plugin {
 }
 
 export default function PluginManagement() {
+	const { t } = useLanguage();
 	const [plugins, setPlugins] = useState<Plugin[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [toggling, setToggling] = useState<Record<string, boolean>>({});
@@ -45,7 +47,7 @@ export default function PluginManagement() {
 			}
 		} catch (error) {
 			console.error('Error fetching plugins:', error);
-			toast.error('Failed to fetch plugins');
+			toast.error(t('errors.failedToFetchPlugins', 'Failed to fetch plugins'));
 		} finally {
 			setLoading(false);
 		}

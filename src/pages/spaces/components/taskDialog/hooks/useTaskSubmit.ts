@@ -3,8 +3,10 @@ import { AppDispatch } from '@/store/store';
 import { addTaskAsync, updateTaskAsync } from '@/store/reducers/tasksSlice';
 import { genericActions } from '@/store/genericSlices';
 import toast from 'react-hot-toast';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 export function useTaskSubmit(params: any) {
+  const { t } = useLanguage();
   const {
     mode,
     canSubmit,
@@ -144,7 +146,7 @@ export function useTaskSubmit(params: any) {
       const status = e?.response?.status || e?.status;
       
       if (status === 403 || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
-        toast.error('You do not have permission to create tasks in this category.', { duration: 5000 });
+        toast.error(t('errors.noPermissionCreateTask', 'You do not have permission to create tasks in this category.'), { duration: 5000 });
       } else {
         toast.error(errorMessage, { duration: 5000 });
       }

@@ -3,11 +3,13 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
 import { removeTaskAsync, restoreTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 /**
  * Hook for managing task deletion with undo functionality
  */
 export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGrid: () => void) => {
+  const { t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<{ id: number; name?: string } | null>(null);
@@ -96,7 +98,7 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
 
       // Check if it's a permission error (403)
       if (status === 403 || errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
-        toast.error("You do not have permission to delete this task.", { duration: 5000 });
+        toast.error(t('errors.noPermissionDeleteTask', "You do not have permission to delete this task."), { duration: 5000 });
       } else {
         toast.error(errorMessage, { duration: 5000 });
       }

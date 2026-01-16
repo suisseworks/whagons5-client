@@ -25,6 +25,7 @@ import { genericActions } from '@/store/genericSlices';
 import { BroadcastFormData } from '@/types/broadcast';
 import { RootState } from '@/store/store';
 import { MultiSelect } from '@/components/ui/multi-select';
+import toast from 'react-hot-toast';
 
 interface CreateBroadcastDialogProps {
   open: boolean;
@@ -61,16 +62,74 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
     }
   }, [open, dispatch]);
 
+  const validateRecipients = (): boolean => {
+    const { recipient_selection_type, recipient_config } = formData;
+    
+    console.log('🔍 [CreateBroadcastDialog] Validating recipients:', {
+      recipient_selection_type,
+      recipient_config,
+      manual_user_ids: recipient_config.manual_user_ids,
+      manual_user_ids_length: recipient_config.manual_user_ids?.length,
+      roles: recipient_config.roles,
+      teams: recipient_config.teams,
+    });
+    
+    if (recipient_selection_type === 'manual') {
+      const userIds = recipient_config.manual_user_ids;
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        toast.error(t('broadcasts.create.errors.noUsers', 'Please select at least one user'));
+        return false;
+      }
+    } else if (recipient_selection_type === 'role_based') {
+      const roles = recipient_config.roles;
+      if (!roles || !Array.isArray(roles) || roles.length === 0) {
+        toast.error(t('broadcasts.create.errors.noRoles', 'Please select at least one role'));
+        return false;
+      }
+    } else if (recipient_selection_type === 'team_based') {
+      const teams = recipient_config.teams;
+      if (!teams || !Array.isArray(teams) || teams.length === 0) {
+        toast.error(t('broadcasts.create.errors.noTeams', 'Please select at least one team'));
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async () => {
-    if (!formData.title.trim() || !formData.message.trim()) return;
+    if (!formData.title.trim() || !formData.message.trim()) {
+      toast.error(t('broadcasts.create.errors.requiredFields', 'Please fill in all required fields'));
+      return;
+    }
+
+    if (!validateRecipients()) {
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await dispatch(genericActions.broadcasts.addAsync(formData) as any);
+      toast.success(t('broadcasts.create.success', 'Broadcast created successfully'));
       onOpenChange(false);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create broadcast:', error);
+      
+      // Extract validation errors from API response
+      const errorMessage = error?.response?.data?.message || 
+                          error?.response?.data?.error ||
+                          error?.message ||
+                          t('broadcasts.create.errors.generic', 'Failed to create broadcast. Please check your input.');
+      
+      // If there are validation errors, show them
+      if (error?.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const firstError = Object.values(errors)[0] as string[];
+        toast.error(firstError?.[0] || errorMessage);
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -89,13 +148,18 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
   };
 
   const updateRecipientConfig = (key: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      recipient_config: {
-        ...prev.recipient_config,
-        [key]: value,
-      },
-    }));
+    console.log('🔍 [CreateBroadcastDialog] updateRecipientConfig called:', { key, value, valueType: typeof value, isArray: Array.isArray(value) });
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        recipient_config: {
+          ...prev.recipient_config,
+          [key]: value,
+        },
+      };
+      console.log('🔍 [CreateBroadcastDialog] Updated formData:', updated);
+      return updated;
+    });
   };
 
   const handleRecipientTabChange = (tab: string) => {
@@ -175,11 +239,23 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
                 <TabsTrigger value="teams">{t('broadcasts.create.teams', 'Teams')}</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="manual" className="space-y-2">
+              <TabsContent value="manual" className="space-y-2" key={`manual-${recipientTab}`}>
                 <MultiSelect
-                  options={users.map((u: any) => ({ label: u.name, value: u.id }))}
-                  selected={formData.recipient_config.manual_user_ids || []}
-                  onChange={(ids) => updateRecipientConfig('manual_user_ids', ids)}
+                  key={`manual-select-${JSON.stringify(formData.recipient_config.manual_user_ids)}`}
+                  options={users.map((u: any) => ({ label: u.name, value: String(u.id) }))}
+                  defaultValue={(formData.recipient_config.manual_user_ids || []).map(String)}
+                  onValueChange={(ids) => {
+                    console.log('🔍 [CreateBroadcastDialog] MultiSelect onValueChange (manual):', ids);
+                    const numericIds = ids.map(id => {
+                      const num = Number(id);
+                      if (isNaN(num)) {
+                        console.warn('🔍 [CreateBroadcastDialog] Invalid ID:', id);
+                        return null;
+                      }
+                      return num;
+                    }).filter(id => id !== null);
+                    updateRecipientConfig('manual_user_ids', numericIds);
+                  }}
                   placeholder={t('broadcasts.create.selectUsers', 'Select users')}
                 />
               </TabsContent>
@@ -187,17 +263,29 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
               <TabsContent value="roles" className="space-y-2">
                 <MultiSelect
                   options={roles.map((r: any) => ({ label: r.name, value: r.name }))}
-                  selected={formData.recipient_config.roles || []}
-                  onChange={(roleNames) => updateRecipientConfig('roles', roleNames)}
+                  defaultValue={formData.recipient_config.roles || []}
+                  onValueChange={(roleNames) => updateRecipientConfig('roles', roleNames)}
                   placeholder={t('broadcasts.create.selectRoles', 'Select roles')}
                 />
               </TabsContent>
 
-              <TabsContent value="teams" className="space-y-2">
+              <TabsContent value="teams" className="space-y-2" key={`teams-${recipientTab}`}>
                 <MultiSelect
-                  options={teams.map((t: any) => ({ label: t.name, value: t.id }))}
-                  selected={formData.recipient_config.teams || []}
-                  onChange={(teamIds) => updateRecipientConfig('teams', teamIds)}
+                  key={`teams-select-${JSON.stringify(formData.recipient_config.teams)}`}
+                  options={teams.map((t: any) => ({ label: t.name, value: String(t.id) }))}
+                  defaultValue={(formData.recipient_config.teams || []).map(String)}
+                  onValueChange={(teamIds) => {
+                    console.log('🔍 [CreateBroadcastDialog] MultiSelect onValueChange (teams):', teamIds);
+                    const numericIds = teamIds.map(id => {
+                      const num = Number(id);
+                      if (isNaN(num)) {
+                        console.warn('🔍 [CreateBroadcastDialog] Invalid team ID:', id);
+                        return null;
+                      }
+                      return num;
+                    }).filter(id => id !== null);
+                    updateRecipientConfig('teams', numericIds);
+                  }}
                   placeholder={t('broadcasts.create.selectTeams', 'Select teams')}
                 />
               </TabsContent>

@@ -2,6 +2,8 @@
 export const boardsTranslations = {
   // Sidebar
   "sidebar.boards": "Boards",
+  "sidebar.addBoard": "Add Board",
+  "sidebar.noBoards": "No boards yet",
   "sidebar.broadcasts": "Broadcasts",
   
   // Navigation
@@ -116,6 +118,8 @@ export const boardsTranslations = {
 // Spanish translations
 export const boardsTranslationsES = {
   "sidebar.boards": "Tableros",
+  "sidebar.addBoard": "Agregar Tablero",
+  "sidebar.noBoards": "Aún no hay tableros",
   "sidebar.broadcasts": "Difusión",
   
   "boards.nav.title": "Tableros",

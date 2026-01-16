@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLocationDot, faPlus, faLayerGroup, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { faLocationDot, faPlus, faLayerGroup, faChartBar, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { Spot } from "@/store/types";
@@ -23,6 +23,7 @@ import {
 import { UrlTabs } from "@/components/ui/url-tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -45,6 +46,8 @@ const SpotNameCellRenderer = (props: ICellRendererParams) => {
 
 function Spots() {
   const dispatch = useDispatch<AppDispatch>();
+  const { t } = useLanguage();
+  const ts = (key: string, fallback: string) => t(`settings.spots.${key}`, fallback);
   // Redux state for related data
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: spotTypes } = useSelector((state: RootState) => (state as any).spotTypes || { value: [] });
@@ -132,7 +135,7 @@ function Spots() {
   const ROOT_VALUE = '__ROOT__';
   const parentSpotOptions = useMemo(() => {
     return [
-      { value: ROOT_VALUE, label: 'Root' },
+      { value: ROOT_VALUE, label: ts('dialogs.create.fields.parentSpotRoot', 'Root') },
       ...spots.map((s) => ({ value: String(s.id), label: s.name }))
     ];
   }, [spots]);
@@ -242,7 +245,7 @@ function Spots() {
   // Column definitions for AG Grid (tree data)
   const colDefs = useMemo<ColDef[]>(() => [
     {
-      headerName: 'Spot',
+      headerName: ts('grid.columns.spot', 'Spot'),
       field: 'name',
       flex: 2,
       minWidth: 280,
@@ -254,7 +257,7 @@ function Spots() {
       rowDrag: true
     },
     {
-      headerName: 'Spot Type',
+      headerName: ts('grid.columns.spotType', 'Spot Type'),
       field: 'spot_type_name',
       width: 160,
       cellRenderer: ColorIndicatorCellRenderer as any,
@@ -264,11 +267,10 @@ function Spots() {
     // Updated column removed per request
     {
       field: 'actions',
-      headerName: 'Actions',
+      headerName: ts('grid.columns.actions', 'Actions'),
       width: 100,
       cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
-        onDelete: handleDelete
+        onEdit: handleEdit
       }),
       sortable: false,
       filter: false,
@@ -383,6 +385,13 @@ function Spots() {
     await updateItem(editingSpot.id, updates);
   };
 
+  const handleDeleteFromEdit = () => {
+    if (editingSpot) {
+      setIsEditDialogOpen(false);
+      handleDelete(editingSpot);
+    }
+  };
+
   // Render entity preview for delete dialog
   const renderSpotPreview = (spot: Spot) => (
     <div className="flex items-center space-x-3">
@@ -392,11 +401,11 @@ function Spots() {
       <div>
         <div className="font-medium">{spot.name}</div>
         <div className="text-sm text-muted-foreground">
-          {spot.is_branch ? 'Branch' : 'Location'} • {(spotTypes as any[]).find(t => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`}
-          {spot.parent_id && ` • Parent: Spot ${spot.parent_id}`}
+          {spot.is_branch ? ts('dialogs.delete.preview.branch', 'Branch') : ts('dialogs.delete.preview.location', 'Location')} • {ts('dialogs.delete.preview.type', 'Type')}: {(spotTypes as any[]).find(t => t.id === spot.spot_type_id)?.name ?? `Type ${spot.spot_type_id}`}
+          {spot.parent_id && ` • ${ts('dialogs.delete.preview.parent', 'Parent')}: Spot ${spot.parent_id}`}
         </div>
         <div className="flex items-center space-x-2 mt-1">
-          <span className="text-xs text-muted-foreground">{getSpotTaskCount(spot.id)} tasks</span>
+          <span className="text-xs text-muted-foreground">{getSpotTaskCount(spot.id)} {ts('dialogs.delete.preview.tasks', 'tasks')}</span>
         </div>
       </div>
     </div>
@@ -409,7 +418,7 @@ function Spots() {
       label: (
         <div className="flex items-center gap-2">
           <FontAwesomeIcon icon={faLocationDot} className="w-4 h-4" />
-          <span>Spots</span>
+          <span>{ts('tabs.spots', 'Spots')}</span>
         </div>
       ),
       content: (
@@ -419,7 +428,7 @@ function Spots() {
             columnDefs={colDefs}
             gridOptions={gridOptions}
             rowSelection={rowSelection as any}
-            noRowsMessage="No spots found"
+            noRowsMessage={ts('grid.noRows', 'No spots found')}
             onRowDoubleClicked={handleEdit}
             className="flex-1 min-h-0"
             height="100%"
@@ -429,7 +438,7 @@ function Spots() {
     },
     {
       value: 'branches',
-      label: 'Branches',
+      label: ts('tabs.branches', 'Branches'),
       content: (
         <div className="flex-1 min-h-0 flex flex-col space-y-4">
           <SettingsGrid
@@ -437,7 +446,7 @@ function Spots() {
             columnDefs={colDefs}
             gridOptions={gridOptions}
             rowSelection={rowSelection as any}
-            noRowsMessage="No branches found"
+            noRowsMessage={ts('grid.noBranches', 'No branches found')}
             onRowDoubleClicked={handleEdit}
             className="flex-1 min-h-0"
             height="100%"
@@ -450,7 +459,7 @@ function Spots() {
       label: (
         <div className="flex items-center gap-2">
           <FontAwesomeIcon icon={faChartBar} className="w-4 h-4" />
-          <span>Statistics</span>
+          <span>{ts('tabs.statistics', 'Statistics')}</span>
         </div>
       ),
       content: (
@@ -463,7 +472,7 @@ function Spots() {
                   <div className="text-center">
                     <div className="text-2xl font-bold">{totalSpots}</div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Total Spots
+                      {ts('stats.totalSpots', 'Total Spots')}
                     </div>
                   </div>
                 </CardContent>
@@ -475,7 +484,7 @@ function Spots() {
                       {totalTasks}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Total Tasks
+                      {ts('stats.totalTasks', 'Total Tasks')}
                     </div>
                   </div>
                 </CardContent>
@@ -487,7 +496,7 @@ function Spots() {
                       {rootSpotsCount}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Root Spots
+                      {ts('stats.rootSpots', 'Root Spots')}
                     </div>
                   </div>
                 </CardContent>
@@ -499,7 +508,7 @@ function Spots() {
                       {branchSpotsCount}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Branch Spots
+                      {ts('stats.branchSpots', 'Branch Spots')}
                     </div>
                   </div>
                 </CardContent>
@@ -510,9 +519,9 @@ function Spots() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Tasks by Spot</CardTitle>
+                  <CardTitle className="text-sm">{ts('stats.tasksBySpot.title', 'Tasks by Spot')}</CardTitle>
                   <CardDescription className="text-xs">
-                    Distribution of tasks across spots
+                    {ts('stats.tasksBySpot.description', 'Distribution of tasks across spots')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -566,7 +575,7 @@ function Spots() {
                     />
                   ) : (
                     <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                      No spot task data available
+                      {ts('stats.tasksBySpot.empty', 'No spot task data available')}
                     </div>
                   )}
                 </CardContent>
@@ -574,9 +583,9 @@ function Spots() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Tasks by Spot Type</CardTitle>
+                  <CardTitle className="text-sm">{ts('stats.tasksBySpotType.title', 'Tasks by Spot Type')}</CardTitle>
                   <CardDescription className="text-xs">
-                    Workload distribution across spot types
+                    {ts('stats.tasksBySpotType.description', 'Workload distribution across spot types')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -611,7 +620,7 @@ function Spots() {
                         },
                         series: [
                           {
-                            name: "Tasks",
+                            name: ts('stats.tasksBySpotType.tasks', 'Tasks'),
                             type: "bar",
                             data: tasksBySpotType
                               .map((item) => ({
@@ -628,7 +637,7 @@ function Spots() {
                     />
                   ) : (
                     <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                      No spot type data available
+                      {ts('stats.tasksBySpotType.empty', 'No spot type data available')}
                     </div>
                   )}
                 </CardContent>
@@ -639,9 +648,9 @@ function Spots() {
             {tasksOverTime.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Tasks Over Time</CardTitle>
+                  <CardTitle className="text-sm">{ts('stats.overTime.title', 'Tasks Over Time')}</CardTitle>
                   <CardDescription className="text-xs">
-                    Last 30 days of task creation across all spots
+                    {ts('stats.overTime.description', 'Last 30 days of task creation across all spots')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -676,7 +685,7 @@ function Spots() {
                       },
                       series: [
                         {
-                          name: "Tasks Created",
+                          name: ts('stats.overTime.tasksCreated', 'Tasks Created'),
                           type: "line",
                           smooth: true,
                           data: tasksOverTime.map((item) => item.count),
@@ -722,12 +731,12 @@ function Spots() {
 
   return (
     <SettingsLayout
-      title="Spots"
-      description="Set up hierarchical locations and spot management with row grouping"
+      title={ts('title', 'Spots')}
+      description={ts('description', 'Set up hierarchical locations and spot management with row grouping')}
       icon={faLocationDot}
       iconColor="#10b981"
       search={{
-        placeholder: "Search spots...",
+        placeholder: ts('search.placeholder', 'Search spots...'),
         value: searchQuery,
         onChange: (value: string) => {
           setSearchQuery(value);
@@ -736,7 +745,7 @@ function Spots() {
       }}
       loading={{
         isLoading: loading,
-        message: "Loading spots..."
+        message: ts('loading', 'Loading spots...')
       }}
       error={error ? {
         message: error,
@@ -746,12 +755,12 @@ function Spots() {
         <div className="flex items-center gap-2">
           <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
-            Add Spot
+            {ts('header.addSpot', 'Add Spot')}
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link to="/settings/spots/types" className="flex items-center">
               <FontAwesomeIcon icon={faLayerGroup} className="mr-2" />
-              Spot Types
+              {ts('header.spotTypes', 'Spot Types')}
             </Link>
           </Button>
         </div>
@@ -770,8 +779,8 @@ function Spots() {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         type="create"
-        title="Add New Spot"
-        description="Create a new spot to organize your tasks by location."
+        title={ts('dialogs.create.title', 'Add New Spot')}
+        description={ts('dialogs.create.description', 'Create a new spot to organize your tasks by location.')}
         onSubmit={handleCreateSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -787,27 +796,27 @@ function Spots() {
           />
           <SelectField
             id="spot_type_id"
-            label="Spot Type"
+            label={ts('dialogs.create.fields.spotType', 'Spot Type')}
             value={createFormData.spot_type_id}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, spot_type_id: value }))}
             options={(spotTypes as any[]).map((st) => ({ value: st.id, label: st.name }))}
-            placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
+            placeholder={spotTypes?.length ? ts('dialogs.create.fields.spotTypePlaceholder', 'Select spot type') : ts('dialogs.create.fields.spotTypeLoading', 'Loading...')}
             required
           />
             <SelectField
               id="parent_id"
-              label="Parent Spot"
+              label={ts('dialogs.create.fields.parentSpot', 'Parent Spot')}
               value={createFormData.parent_id || ROOT_VALUE}
               onChange={(value) => setCreateFormData(prev => ({ ...prev, parent_id: value === ROOT_VALUE ? '' : value }))}
               options={parentSpotOptions}
-              placeholder="None (Root)"
+              placeholder={ts('dialogs.create.fields.parentSpotNone', 'None (Root)')}
             />
           <CheckboxField
             id="is_branch"
-            label="Is Branch"
+            label={ts('dialogs.create.fields.isBranch', 'Is Branch')}
             checked={createFormData.is_branch}
             onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_branch: checked }))}
-            description="This is a branch location"
+            description={ts('dialogs.create.fields.isBranchDesc', 'This is a branch location')}
           />
         </div>
       </SettingsDialog>
@@ -817,45 +826,58 @@ function Spots() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         type="edit"
-        title="Edit Spot"
-        description="Update the spot information."
+        title={ts('dialogs.edit.title', 'Edit Spot')}
+        description={ts('dialogs.edit.description', 'Update the spot information.')}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingSpot}
+        footerActions={
+          editingSpot ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteFromEdit}
+              disabled={isSubmitting}
+            >
+              <FontAwesomeIcon icon={faTrash} className="mr-2" />
+              {ts('dialogs.delete.title', 'Delete Spot')}
+            </Button>
+          ) : undefined
+        }
       >
         {editingSpot && (
           <div className="grid gap-4">
             <TextField
               id="edit-name"
-              label="Name"
+              label={ts('dialogs.edit.fields.name', 'Name')}
               value={editFormData.name}
               onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
             />
             <SelectField
               id="edit-spot_type_id"
-              label="Spot Type"
+              label={ts('dialogs.edit.fields.spotType', 'Spot Type')}
               value={editFormData.spot_type_id}
               onChange={(value) => setEditFormData(prev => ({ ...prev, spot_type_id: value }))}
               options={(spotTypes as any[]).map((st) => ({ value: st.id, label: st.name }))}
-              placeholder={spotTypes?.length ? 'Select spot type' : 'Loading...'}
+              placeholder={spotTypes?.length ? ts('dialogs.edit.fields.spotTypePlaceholder', 'Select spot type') : ts('dialogs.edit.fields.spotTypeLoading', 'Loading...')}
               required
             />
             <SelectField
               id="edit-parent_id"
-              label="Parent Spot"
+              label={ts('dialogs.edit.fields.parentSpot', 'Parent Spot')}
               value={editFormData.parent_id || ROOT_VALUE}
               onChange={(value) => setEditFormData(prev => ({ ...prev, parent_id: value === ROOT_VALUE ? '' : value }))}
               options={editParentSpotOptions}
-              placeholder="None (Root)"
+              placeholder={ts('dialogs.edit.fields.parentSpotNone', 'None (Root)')}
             />
             <CheckboxField
               id="edit-is_branch"
-              label="Is Branch"
+              label={ts('dialogs.edit.fields.isBranch', 'Is Branch')}
               checked={editFormData.is_branch}
               onChange={(checked) => setEditFormData(prev => ({ ...prev, is_branch: checked }))}
-              description="This is a branch location"
+              description={ts('dialogs.edit.fields.isBranchDesc', 'This is a branch location')}
             />
           </div>
         )}
@@ -866,8 +888,8 @@ function Spots() {
         open={isEditSpotTypeOpen}
         onOpenChange={setIsEditSpotTypeOpen}
         type="edit"
-        title={editingSpotType ? `Edit Spot Type: ${editingSpotType.name}` : 'Edit Spot Type'}
-        description="Update the spot type color."
+        title={editingSpotType ? `${ts('dialogs.editSpotType.title', 'Edit Spot Type')}: ${editingSpotType.name}` : ts('dialogs.editSpotType.title', 'Edit Spot Type')}
+        description={ts('dialogs.editSpotType.description', 'Update the spot type color.')}
         onSubmit={handleUpdateSpotType}
         isSubmitting={isSubmitting}
         error={formError}
@@ -877,14 +899,14 @@ function Spots() {
           <div className="grid gap-4">
             <TextField
               id="edit-spot-type-name"
-              label="Name"
+              label={ts('dialogs.editSpotType.fields.name', 'Name')}
               value={editingSpotType.name}
               onChange={(value) => setEditingSpotType(prev => prev ? { ...prev, name: value } : prev)}
               required
             />
             <TextField
               id="edit-spot-type-color"
-              label="Color"
+              label={ts('dialogs.editSpotType.fields.color', 'Color')}
               type="color"
               value={editingSpotTypeColor}
               onChange={(value) => setEditingSpotTypeColor(value)}
@@ -899,10 +921,10 @@ function Spots() {
         open={isDeleteDialogOpen}
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
-        title="Delete Spot"
+        title={ts('dialogs.delete.title', 'Delete Spot')}
         description={
           deletingSpot 
-            ? `Are you sure you want to delete the spot "${deletingSpot.name}"? This action cannot be undone.`
+            ? ts('dialogs.delete.confirm', 'Are you sure you want to delete the spot "{name}"? This action cannot be undone.').replace('{name}', deletingSpot.name)
             : undefined
         }
         onConfirm={() => deletingSpot ? deleteItem(deletingSpot.id) : undefined}

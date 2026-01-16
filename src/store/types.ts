@@ -177,7 +177,7 @@ export interface Approval {
     approval_type: 'SEQUENTIAL' | 'PARALLEL' | string;
     require_all: boolean;
     minimum_approvals?: number | null;
-    trigger_type: 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | string;
+    trigger_type: 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | 'ON_COMPLETE' | string;
     trigger_conditions?: ApprovalCondition[] | null;
     require_rejection_comment: boolean;
     block_editing_during_approval: boolean;
@@ -212,6 +212,13 @@ export interface User {
     email: string;
     url_picture?: string | null;
     color?: string | null;
+    birthday_month?: number | null; // 1-12
+    birthday_day?: number | null; // 1-31
+    gender?: string | null;
+    zodiac_sign?: string | null;
+    phone?: string | null;
+    bio?: string | null;
+    hobbies?: string[] | null;
     role_id?: number | null;
     workspace_id?: number | null;
     is_active: boolean;
@@ -219,6 +226,7 @@ export interface User {
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;
+    organization_name?: string | null;
 }
 
 export interface Role {

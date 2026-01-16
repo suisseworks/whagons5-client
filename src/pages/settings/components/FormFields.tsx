@@ -93,11 +93,11 @@ export function TextField({
             />
           </PopoverTrigger>
           <PopoverContent
-            className=" w-72 pointer-events-auto select-text"
+            className="w-72 pointer-events-auto select-text z-[200]"
             align="start"
-            side="top"
+            side="bottom"
             sideOffset={8}
-            avoidCollisions={false}
+            avoidCollisions={true}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             {(() => {

@@ -9,6 +9,7 @@ import { motion } from "motion/react";
 import { removeTaskAsync, restoreTaskAsync } from "@/store/reducers/tasksSlice";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 function createStatusMap(statuses: any[]) {
   const m: Record<number, any> = {};
@@ -41,6 +42,7 @@ export default function TaskListTab({
   workspaceId: string | undefined;
   searchText?: string;
 }) {
+  const { t } = useLanguage();
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
@@ -183,7 +185,7 @@ export default function TaskListTab({
       
       // Check if it's a permission error (403)
       if (status === 403 || errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
-        toast.error("You do not have permission to delete this task.", { duration: 5000 });
+        toast.error(t('errors.noPermissionDeleteTask', "You do not have permission to delete this task."), { duration: 5000 });
       } else {
         setActionError(errorMessage);
         toast.error(errorMessage, { duration: 5000 });

@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { faSquareCheck, faUsers, faPlus, faTrash, faCircleQuestion, faBook, faCheckCircle, faClock, faExclamationTriangle, faInfoCircle, faLock, faGripVertical, faBolt } from "@fortawesome/free-solid-svg-icons";
+import { faSquareCheck, faUsers, faPlus, faTrash, faCircleQuestion, faBook, faCheckCircle, faClock, faExclamationTriangle, faInfoCircle, faLock, faBolt } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Approval, ApprovalApprover, ApprovalCondition, CustomField, Status } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -55,7 +55,7 @@ const formatTemplate = (template: string, params: Record<string, string | number
     Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : `{${key}}`
   );
 
-type TriggerType = 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL';
+type TriggerType = 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | 'ON_COMPLETE';
 type ApprovalFlowType = 'SEQUENTIAL' | 'PARALLEL';
 type DeadlineType = 'hours' | 'date';
 type ConditionValueType = 'string' | 'number' | 'boolean' | 'date' | 'option';
@@ -639,6 +639,7 @@ function Approvals() {
       ON_CREATE: ta('options.triggerType.onCreate', 'On Create'),
       MANUAL: ta('options.triggerType.manual', 'Manual'),
       CONDITIONAL: ta('options.triggerType.conditional', 'Conditional'),
+      ON_COMPLETE: ta('options.triggerType.onComplete', 'On Complete'),
     }),
     [ta]
   );
@@ -809,11 +810,6 @@ function Approvals() {
         width: 52,
         suppressMovable: true,
         rowDrag: true,
-        cellRenderer: () => (
-          <div className="flex items-center justify-center text-muted-foreground">
-            <FontAwesomeIcon icon={faGripVertical} className="w-3.5 h-3.5" />
-          </div>
-        ),
       },
       {
         field: 'name',
@@ -1345,6 +1341,21 @@ function Approvals() {
                             field "Amount" is greater than $1000.
                           </div>
                         </div>
+
+                        <div className="p-4 border rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 text-purple-600" />
+                            <span className="font-semibold text-foreground">ON_COMPLETE</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Approval is triggered when a task transitions to a finished/completed status. Useful for QA sign-off, 
+                            deliverable acceptance, or supervisor verification before final completion.
+                          </p>
+                          <div className="text-xs text-muted-foreground bg-background p-2 rounded border">
+                            <strong>Example:</strong> Require manager approval before a task can be marked as Done. The task 
+                            will remain in "pending approval" state until approved.
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1706,6 +1717,7 @@ function Approvals() {
                 { value: 'ON_CREATE', label: ta('options.triggerType.onCreate', 'On Create') },
                 { value: 'MANUAL', label: ta('options.triggerType.manual', 'Manual') },
                 { value: 'CONDITIONAL', label: ta('options.triggerType.conditional', 'Conditional') },
+                { value: 'ON_COMPLETE', label: ta('options.triggerType.onComplete', 'On Complete') },
               ]} />
               {createFormData.trigger_type === 'CONDITIONAL' && (
                 <ConditionBuilder
@@ -1805,6 +1817,7 @@ function Approvals() {
                 { value: 'ON_CREATE', label: ta('options.triggerType.onCreate', 'On Create') },
                 { value: 'MANUAL', label: ta('options.triggerType.manual', 'Manual') },
                 { value: 'CONDITIONAL', label: ta('options.triggerType.conditional', 'Conditional') },
+                { value: 'ON_COMPLETE', label: ta('options.triggerType.onComplete', 'On Complete') },
               ]} />
               {editFormData.trigger_type === 'CONDITIONAL' && (
                 <ConditionBuilder
