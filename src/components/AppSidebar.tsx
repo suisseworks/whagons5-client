@@ -33,7 +33,7 @@ import {
   CollapsibleTrigger,
   useCollapsible,
 } from '@/components/animate-ui/primitives/radix/collapsible';
-import AssistantWidget from './AssistantWidget';
+import AssistantWidget from '@/features/ai-chat/AssistantWidget';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
