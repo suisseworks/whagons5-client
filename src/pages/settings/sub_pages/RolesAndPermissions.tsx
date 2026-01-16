@@ -15,7 +15,8 @@ import {
   useSettingsState,
   createActionsCellRenderer,
   TextField,
-  TextAreaField
+  TextAreaField,
+  SelectField
 } from "../components";
 import { useLanguage } from "@/providers/LanguageProvider";
 
@@ -72,17 +73,21 @@ function RolesAndPermissions() {
   const [createFormData, setCreateFormData] = useState<{
     name: string;
     description: string;
+    scope: 'GLOBAL' | 'TEAM';
   }>({
     name: '',
-    description: ''
+    description: '',
+    scope: 'TEAM'
   });
 
   const [editFormData, setEditFormData] = useState<{
     name: string;
     description: string;
+    scope: 'GLOBAL' | 'TEAM';
   }>({
     name: '',
-    description: ''
+    description: '',
+    scope: 'TEAM'
   });
 
   // Permissions modal state
@@ -99,7 +104,8 @@ function RolesAndPermissions() {
     if (isCreateDialogOpen) {
       setCreateFormData({
         name: '',
-        description: ''
+        description: '',
+        scope: 'TEAM'
       });
     }
   }, [isCreateDialogOpen]);
@@ -109,7 +115,8 @@ function RolesAndPermissions() {
     if (editingItem) {
       setEditFormData({
         name: editingItem.name || '',
-        description: editingItem.description || ''
+        description: editingItem.description || '',
+        scope: (editingItem as any).scope || 'TEAM'
       });
     }
   }, [editingItem]);
@@ -252,6 +259,25 @@ function RolesAndPermissions() {
       }
     },
     {
+      field: "scope",
+      headerName: tu('grid.scope', 'Scope'),
+      flex: 1,
+      minWidth: 120,
+      cellRenderer: (params: any) => {
+        const scope = params?.data?.scope || 'TEAM';
+        const isGlobal = scope === 'GLOBAL';
+        return (
+          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${
+            isGlobal 
+              ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+              : 'bg-purple-100 text-purple-800 border border-purple-200'
+          }`}>
+            {isGlobal ? tu('grid.scopeGlobal', 'Global') : tu('grid.scopeTeam', 'Team')}
+          </span>
+        );
+      }
+    },
+    {
       field: "created_at",
       headerName: tu('grid.createdAt', 'Created At'),
       flex: 1,
@@ -291,7 +317,8 @@ function RolesAndPermissions() {
 
     const data = {
       name: createFormData.name.trim(),
-      description: createFormData.description.trim() || null
+      description: createFormData.description.trim() || null,
+      scope: createFormData.scope
     } as Omit<Role, "id" | "created_at" | "updated_at" | "deleted_at" | "workspace_id">;
 
     await createItem(data as any);
@@ -299,7 +326,8 @@ function RolesAndPermissions() {
     // Reset form after successful creation
     setCreateFormData({
       name: '',
-      description: ''
+      description: '',
+      scope: 'TEAM'
     });
   };
 
@@ -309,7 +337,8 @@ function RolesAndPermissions() {
 
     const updates = {
       name: editFormData.name.trim(),
-      description: editFormData.description.trim() || null
+      description: editFormData.description.trim() || null,
+      scope: editFormData.scope
     } as Partial<Role>;
 
     await updateItem(editingItem.id, updates);
@@ -386,6 +415,18 @@ function RolesAndPermissions() {
             required
             placeholder={tu('form.namePlaceholder', 'Enter role name')}
           />
+          <SelectField
+            id="scope"
+            label={tu('form.scope', 'Scope')}
+            value={createFormData.scope}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, scope: value as 'GLOBAL' | 'TEAM' }))}
+            options={[
+              { value: 'GLOBAL', label: tu('form.scopeGlobal', 'Global') },
+              { value: 'TEAM', label: tu('form.scopeTeam', 'Team') }
+            ]}
+            required
+            placeholder={tu('form.scopePlaceholder', 'Select scope')}
+          />
           <TextAreaField
             id="description"
             label={tu('form.description', 'Description')}
@@ -434,6 +475,18 @@ function RolesAndPermissions() {
               onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
               placeholder={tu('form.namePlaceholder', 'Enter role name')}
+            />
+            <SelectField
+              id="edit-scope"
+              label={tu('form.scope', 'Scope')}
+              value={editFormData.scope}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, scope: value as 'GLOBAL' | 'TEAM' }))}
+              options={[
+                { value: 'GLOBAL', label: tu('form.scopeGlobal', 'Global') },
+                { value: 'TEAM', label: tu('form.scopeTeam', 'Team') }
+              ]}
+              required
+              placeholder={tu('form.scopePlaceholder', 'Select scope')}
             />
             <TextAreaField
               id="edit-description"
