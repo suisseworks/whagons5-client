@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import api from "@/api/whagonsApi";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
