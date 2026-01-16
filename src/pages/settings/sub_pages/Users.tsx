@@ -988,7 +988,8 @@ function Users() {
       organization_name: editFormData.organization_name || null,
       color: editFormData.color || null,
       is_admin: editFormData.is_admin,
-      has_active_subscription: editFormData.has_active_subscription
+      has_active_subscription: editFormData.has_active_subscription,
+      global_roles: selectedGlobalRoles
     };
     
     try {
@@ -1056,26 +1057,14 @@ function Users() {
         }
       }
 
-      // Handle global roles synchronization
-      // Get all current user roles (including non-global ones)
-      const currentUserRolesResponse = await api.get(`/users/${editingUser.id}/roles`);
-      const allCurrentRoles = currentUserRolesResponse.data?.roles || [];
+      // Global roles are synchronized automatically in the backend update method
+      // No separate API call needed
       
-      // Filter out global roles and keep only non-global ones
-      const nonGlobalRoles = allCurrentRoles.filter((roleName: string) => {
-        const role = roles.find((r: Role) => r.name === roleName && r.scope !== 'GLOBAL');
-        return role !== undefined;
-      });
-      
-      // Combine non-global roles with selected global roles
-      const rolesToSync = [...nonGlobalRoles, ...selectedGlobalRoles];
-      
-      await api.put(`/users/${editingUser.id}/roles`, {
-        roles: rolesToSync
-      });
-
       // Refresh userTeams cache to reflect changes
       dispatch((genericActions as any).userTeams.getFromIndexedDB());
+      
+      // Close edit dialog on success
+      setIsEditDialogOpen(false);
     } catch (error: any) {
       const backendErrors = error?.response?.data?.errors;
       const backendMessage = error?.response?.data?.message;
@@ -1598,7 +1587,10 @@ function Users() {
             <TabsContent value="permissions" className="mt-4 min-h-[200px]">
               <div className="grid gap-4">
                 <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">{tu('dialogs.editUser.fields.globalRoles', 'Roles Globales')}</Label>
+                  <Label className="text-right pt-2">
+                    {tu('dialogs.editUser.fields.globalRoles', 'Roles Globales')}
+                    <span className="text-muted-foreground text-xs font-normal ml-1">(Opcional)</span>
+                  </Label>
                   <div className="col-span-3">
                     <MultiSelect
                       options={roles
@@ -1612,11 +1604,14 @@ function Users() {
                       placeholder={
                         roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
                           ? tu('multiSelect.noGlobalRoles', 'No global roles available')
-                          : tu('multiSelect.selectGlobalRoles', 'Select global roles...')
+                          : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
                       }
                       maxCount={10}
                       className="w-full"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {tu('dialogs.editUser.fields.globalRolesHelp', 'Los roles globales son opcionales. Puedes dejar este campo vacío si no necesitas asignar roles globales al usuario.')}
+                    </p>
                   </div>
                 </div>
               </div>
