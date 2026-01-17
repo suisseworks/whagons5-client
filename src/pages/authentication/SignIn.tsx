@@ -208,70 +208,32 @@ const SignIn: React.FC = () => {
               </p>
 
               <div className="mt-6 flex items-center justify-center">
-                <div className="relative w-full max-w-[240px]">
-                  {/* Phone frame effect */}
+                <div className="relative w-full max-w-[300px]">
+                  {/* iPhone 15 mockup using actual device image */}
                   <div className="relative mx-auto">
-                    {/* Shadow/glow effect */}
-                    <div className="absolute inset-0 bg-primary/20 rounded-[2.5rem] blur-xl transform scale-110"></div>
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 bg-primary/20 rounded-[3rem] blur-2xl transform scale-105"></div>
                     
-                    {/* Phone container */}
-                    <div className="relative bg-gray-900 rounded-[2rem] p-1.5 shadow-2xl">
-                      {/* Screen bezel */}
-                      <div className="bg-gray-800 rounded-[1.5rem] overflow-hidden">
-                        {/* Status bar area */}
-                        <div className="h-6 bg-gray-900 flex items-center justify-between px-3 text-white text-[10px]">
-                          <span>7:04</span>
-                          <div className="flex items-center gap-0.5">
-                            <div className="w-3 h-1.5 border border-white rounded-sm"></div>
-                            <div className="w-0.5 h-0.5 bg-white rounded-full"></div>
-                          </div>
-                        </div>
-                        
-                        {/* App video - Sticky notes productivity */}
-                        <video
-                          src="https://cdn.pixabay.com/video/2016/02/29/2335-157269903_large.mp4"
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-auto object-cover"
-                          style={{ 
-                            display: 'block',
-                            aspectRatio: '9/16',
-                            objectFit: 'cover'
-                          }}
+                    {/* iPhone 15 device frame */}
+                    <div className="relative">
+                      {/* The actual iPhone mockup image as background */}
+                      <div className="relative" style={{ aspectRatio: '430/878' }}>
+                        <img 
+                          src="https://mockuphone.com/images/mockup_templates/apple-iphone-15-black-portrait.png"
+                          alt="iPhone 15"
+                          className="w-full h-auto"
                         />
                         
-                        {/* Fallback placeholder if video doesn't load */}
-                        <div 
-                          className="hidden bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center"
-                          style={{ 
-                            aspectRatio: '9/16',
-                            minHeight: '400px'
-                          }}
-                        >
-                          <div className="text-center p-6 text-muted-foreground">
-                            <svg
-                              className="w-16 h-16 mx-auto mb-3 opacity-50"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                              />
-                            </svg>
-                            <p className="text-xs">Video preview</p>
-                          </div>
+                        {/* Video content positioned inside the phone screen */}
+                        <div className="absolute top-[3.5%] left-[5.5%] right-[5.5%] bottom-[3.5%] overflow-hidden rounded-[2.5rem]">
+                          <video
+                            src="https://cdn.pixabay.com/video/2016/02/29/2335-157269903_large.mp4"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                       </div>
                     </div>
