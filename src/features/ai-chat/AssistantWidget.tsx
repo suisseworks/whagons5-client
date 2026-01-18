@@ -16,6 +16,7 @@ import { createWSManager } from "./utils/ws";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { processFrontendTool, isFrontendTool } from "./utils/frontend_tools";
 import { handleFrontendToolPromptMessage } from "./utils/frontend_tool_prompts";
+import { getPreferredModel } from "./config";
 import { 
   getConversations, 
   saveMessages, 
@@ -484,7 +485,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       
       wsManager.close(conversationId);
       
-      const selectedModel = localStorage.getItem("preferred_model") || undefined;
+      const selectedModel = getPreferredModel();
       unsubscribeWSRef.current = wsManager.subscribe(conversationId, handleWebSocketEvent, selectedModel);
     };
 
