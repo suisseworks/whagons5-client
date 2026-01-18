@@ -45,9 +45,11 @@ interface CategoryFormData {
   icon: string;
   enabled: boolean;
   team_id: string;
+  workspace_id: string;
   sla_id: string;
   approval_id: string;
   status_transition_group_id: string;
+  celebration_effect: string;
 }
 
 // Custom cell renderer for category name with icon
@@ -177,6 +179,8 @@ function Categories() {
   const slas: Sla[] = slasState?.value ?? [];
   const approvalsState = useSelector((state: RootState) => (state as any).approvals) as { value?: Approval[] } | undefined;
   const approvals: Approval[] = approvalsState?.value ?? [];
+  const workspacesState = useSelector((state: RootState) => (state as any).workspaces) as { value?: any[] } | undefined;
+  const workspaces: any[] = workspacesState?.value ?? [];
 
   // Ensure local IndexedDB hydration on mount (no network requests)
   useEffect(() => {
@@ -189,6 +193,8 @@ function Categories() {
     dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
     dispatch((genericActions as any).statusTransitionGroups.fetchFromAPI());
     dispatch((genericActions as any).categoryCustomFields.getFromIndexedDB());
+    dispatch((genericActions as any).workspaces.getFromIndexedDB());
+    dispatch((genericActions as any).workspaces.fetchFromAPI());
   }, [dispatch]);
 
   // Use shared state management
@@ -230,9 +236,11 @@ function Categories() {
     icon: 'fas fa-tags',
     enabled: true,
     team_id: '',
+    workspace_id: '',
     sla_id: '',
     approval_id: '',
-    status_transition_group_id: ''
+    status_transition_group_id: '',
+    celebration_effect: ''
   });
 
   // Form state for edit dialog
@@ -243,9 +251,11 @@ function Categories() {
     icon: 'fas fa-tags',
     enabled: true,
     team_id: '',
+    workspace_id: '',
     sla_id: '',
     approval_id: '',
-    status_transition_group_id: ''
+    status_transition_group_id: '',
+    celebration_effect: ''
   });
 
   // Reporting teams state - now comes directly from category's reporting_team_ids
@@ -269,9 +279,11 @@ function Categories() {
         icon: editingCategory.icon || 'fas fa-tags',
         enabled: editingCategory.enabled ?? true,
         team_id: editingCategory.team_id?.toString() || '',
+        workspace_id: (editingCategory as any).workspace_id?.toString() || '',
         sla_id: editingCategory.sla_id?.toString() || '',
         approval_id: (editingCategory as any).approval_id?.toString?.() || '',
-        status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
+        status_transition_group_id: editingCategory.status_transition_group_id?.toString() || '',
+        celebration_effect: editingCategory.celebration_effect || ''
       });
       // Load reporting teams when editing category changes - dispatch Redux action
       loadReportingTeamsForEdit();
@@ -578,10 +590,11 @@ function Categories() {
       icon: createFormData.icon,
       enabled: createFormData.enabled,
       team_id: parseInt(createFormData.team_id),
-      workspace_id: 1,
+      workspace_id: createFormData.workspace_id ? parseInt(createFormData.workspace_id) : 1,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
       approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
       status_transition_group_id: parseInt(createFormData.status_transition_group_id),
+      celebration_effect: createFormData.celebration_effect || null,
       deleted_at: null
     };
     await createItem(categoryData);
@@ -594,9 +607,11 @@ function Categories() {
       icon: 'fas fa-tags',
       enabled: true,
       team_id: '',
+      workspace_id: '',
       sla_id: '',
       approval_id: '',
-      status_transition_group_id: ''
+      status_transition_group_id: '',
+      celebration_effect: ''
     });
   };
 
@@ -611,10 +626,12 @@ function Categories() {
       icon: editFormData.icon,
       enabled: editFormData.enabled,
       team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
-      workspace_id: 1,
+      workspace_id: editFormData.workspace_id ? parseInt(editFormData.workspace_id) : 1,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
       approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
-      status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined
+      status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined,
+      reporting_team_ids: selectedReportingTeamIds,
+      celebration_effect: editFormData.celebration_effect || null
     };
     await updateItem(editingCategory.id, updates);
   };
@@ -712,8 +729,10 @@ function Categories() {
           </Link>
           <Button 
             onClick={() => setIsCreateDialogOpen(true)}
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
           >
-            <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+            <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-2" />
             <span>{tc('header.addCategory', 'Add Category')}</span>
           </Button>
         </div>
@@ -1112,6 +1131,18 @@ function Categories() {
                 }))}
                 required
               />
+              <SelectField
+                id="workspace"
+                label={tc('fields.workspace', 'Workspace')}
+                value={createFormData.workspace_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, workspace_id: value }))}
+                placeholder={tc('fields.placeholders.selectWorkspace', 'Select Workspace')}
+                options={(workspaces as any[]).filter((w: any) => w.type === 'DEFAULT').map((workspace: any) => ({
+                  value: workspace.id.toString(),
+                  label: workspace.name
+                }))}
+                required
+              />
               <CheckboxField
                 id="enabled"
                 label={tc('fields.status', 'Status')}
@@ -1156,6 +1187,23 @@ function Categories() {
                   label: g.name
                 }))}
                 required
+              />
+              <SelectField
+                id="celebration-effect"
+                label={tc('fields.celebrationEffect', 'Task Completion Celebration')}
+                value={createFormData.celebration_effect}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }))}
+                placeholder={tc('fields.placeholders.selectCelebration', 'Select celebration…')}
+                options={[
+                  { value: 'default', label: tc('fields.placeholders.useGlobalDefault', 'Use Global Default') },
+                  { value: 'confetti', label: tc('fields.celebration.confetti', 'Confetti') },
+                  { value: 'fireworks', label: tc('fields.celebration.fireworks', 'Fireworks') },
+                  { value: 'hearts', label: tc('fields.celebration.hearts', 'Hearts') },
+                  { value: 'balloons', label: tc('fields.celebration.balloons', 'Balloons') },
+                  { value: 'sparkles', label: tc('fields.celebration.sparkles', 'Sparkles') },
+                  { value: 'ribbons', label: tc('fields.celebration.ribbons', 'Ribbons') },
+                  { value: 'none', label: tc('fields.celebration.none', 'None') }
+                ]}
               />
             </div>
           </TabsContent>
@@ -1243,6 +1291,18 @@ function Categories() {
                   label: team.name
                 }))}
               />
+              <SelectField
+                id="edit-workspace"
+                label={tc('fields.workspace', 'Workspace')}
+                value={editFormData.workspace_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, workspace_id: value }))}
+                placeholder={tc('fields.placeholders.selectWorkspace', 'Select Workspace')}
+                options={(workspaces as any[]).filter((w: any) => w.type === 'DEFAULT').map((workspace: any) => ({
+                  value: workspace.id.toString(),
+                  label: workspace.name
+                }))}
+                required
+              />
               <CheckboxField
                 id="edit-enabled"
                 label={tc('fields.status', 'Status')}
@@ -1288,6 +1348,23 @@ function Categories() {
                 }))}
                 required
               />
+              <SelectField
+                id="edit-celebration-effect"
+                label={tc('fields.celebrationEffect', 'Task Completion Celebration')}
+                value={editFormData.celebration_effect}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }))}
+                placeholder={tc('fields.placeholders.selectCelebration', 'Select celebration…')}
+                options={[
+                  { value: 'default', label: tc('fields.placeholders.useGlobalDefault', 'Use Global Default') },
+                  { value: 'confetti', label: tc('fields.celebration.confetti', 'Confetti') },
+                  { value: 'fireworks', label: tc('fields.celebration.fireworks', 'Fireworks') },
+                  { value: 'hearts', label: tc('fields.celebration.hearts', 'Hearts') },
+                  { value: 'balloons', label: tc('fields.celebration.balloons', 'Balloons') },
+                  { value: 'sparkles', label: tc('fields.celebration.sparkles', 'Sparkles') },
+                  { value: 'ribbons', label: tc('fields.celebration.ribbons', 'Ribbons') },
+                  { value: 'none', label: tc('fields.celebration.none', 'None') }
+                ]}
+              />
             </div>
           </TabsContent>
           <TabsContent value="reporting-teams">
@@ -1301,6 +1378,7 @@ function Categories() {
               onSave={handleSaveReportingTeams}
               onReset={loadReportingTeamsForEdit}
               teams={teams}
+              hideFooter={true}
             />
           </TabsContent>
         </Tabs>

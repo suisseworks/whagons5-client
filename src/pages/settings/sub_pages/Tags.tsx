@@ -23,7 +23,8 @@ import {
 	createActionsCellRenderer,
 	ColorIndicatorCellRenderer,
 	TextField,
-	SelectField
+	SelectField,
+	IconPicker
 } from "../components";
 import TagAnalyticsBoard from "./tags/TagAnalyticsBoard";
 import { useLanguage } from "@/providers/LanguageProvider";
@@ -331,7 +332,11 @@ function Tags() {
 			loading={{ isLoading: loading, message: tt('loading', 'Loading tags...') }}
 			error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
 			headerActions={
-				<Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+				<Button 
+					onClick={() => setIsCreateDialogOpen(true)} 
+					size="default"
+					className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+				>
 					<FontAwesomeIcon icon={faPlus} className="mr-2" />
 					{tt('header.addTag', 'Add Tag')}
 				</Button>
@@ -359,7 +364,7 @@ function Tags() {
 				<div className="grid gap-4">
 					<TextField id="name" label={tt('dialogs.fields.name', 'Name')} value={createFormData.name} onChange={(v) => setCreateFormData(p => ({ ...p, name: v }))} required />
 					<TextField id="color" label={tt('dialogs.fields.color', 'Color')} type="color" value={createFormData.color} onChange={(v) => setCreateFormData(p => ({ ...p, color: v }))} />
-					<TextField id="icon" label={tt('dialogs.fields.icon', 'Icon (FontAwesome class)')} value={createFormData.icon} onChange={(v) => setCreateFormData(p => ({ ...p, icon: v }))} />
+					<IconPicker id="icon" label={tt('dialogs.fields.icon', 'Icon')} value={createFormData.icon} onChange={(v) => setCreateFormData(p => ({ ...p, icon: v }))} color={createFormData.color} />
 					<SelectField
 						id="category"
 						label={tt('dialogs.fields.category', 'Category')}
@@ -399,7 +404,7 @@ function Tags() {
 					<div className="grid gap-4">
 						<TextField id="edit-name" label={tt('dialogs.fields.name', 'Name')} value={editFormData.name} onChange={(v) => setEditFormData(p => ({ ...p, name: v }))} required />
 						<TextField id="edit-color" label={tt('dialogs.fields.color', 'Color')} type="color" value={editFormData.color} onChange={(v) => setEditFormData(p => ({ ...p, color: v }))} />
-						<TextField id="edit-icon" label={tt('dialogs.fields.icon', 'Icon (FontAwesome class)')} value={editFormData.icon} onChange={(v) => setEditFormData(p => ({ ...p, icon: v }))} />
+						<IconPicker id="edit-icon" label={tt('dialogs.fields.icon', 'Icon')} value={editFormData.icon} onChange={(v) => setEditFormData(p => ({ ...p, icon: v }))} color={editFormData.color} />
 						<SelectField
 							id="edit-category"
 							label={tt('dialogs.fields.category', 'Category')}

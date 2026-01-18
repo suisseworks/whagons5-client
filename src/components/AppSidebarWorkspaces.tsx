@@ -8,6 +8,7 @@ import {
   Briefcase,
   Layers,
   Inbox,
+  Activity,
 } from 'lucide-react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
@@ -129,13 +130,15 @@ const WorkspaceLink = ({
   icon: Icon, 
   label, 
   pathname, 
-  collapsed 
+  collapsed,
+  iconColor,
 }: { 
   to: string; 
   icon: any; 
   label: string; 
   pathname: string; 
   collapsed: boolean;
+  iconColor?: string;
 }) => {
   const isActive = pathname === to;
   const baseClasses = "flex items-center transition-colors rounded-[8px]";
@@ -151,7 +154,7 @@ const WorkspaceLink = ({
         style={{ width: '32px', height: '32px' }}
         title={label}
       >
-        <WorkspaceIconBadge color="var(--sidebar-primary)">
+        <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
           <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
         </WorkspaceIconBadge>
         <span className="sr-only">{label}</span>
@@ -171,7 +174,7 @@ const WorkspaceLink = ({
         fontSize: '15px'
       }}
     >
-      <WorkspaceIconBadge color="var(--sidebar-primary)">
+      <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
         <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
       </WorkspaceIconBadge>
       <span>{label}</span>
@@ -501,6 +504,14 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       {/* Virtual workspaces */}
       {showEverythingButton && (
         <div className={collapsed ? 'px-2 flex flex-col items-center gap-2 mb-2' : 'space-y-2 mb-2'}>
+          <WorkspaceLink 
+            to="/activity" 
+            icon={Activity} 
+            label={t('sidebar.activityMonitor', 'Activity Monitor')} 
+            pathname={pathname} 
+            collapsed={collapsed}
+            iconColor="#8b5cf6"
+          />
           <WorkspaceLink 
             to="/workspace/all" 
             icon={Layers} 

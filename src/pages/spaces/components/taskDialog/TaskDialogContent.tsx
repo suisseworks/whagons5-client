@@ -33,6 +33,8 @@ import {
 } from './utils/customFieldSerialization';
 import { normalizeDefaultUserIds } from './utils/fieldHelpers';
 import type { TaskDialogProps } from './types';
+import { celebrateTaskCompletion } from '@/utils/confetti';
+import { createStatusMap } from '../workspaceTable/utils/mappers';
 
 type Props = TaskDialogProps & {
   clickTime?: number;
@@ -111,6 +113,7 @@ export default function TaskDialogContent({
     approvalId: formState.approvalId,
     selectedTemplate: null,
     statuses: deferredStatuses,
+    statusTransitions: data.statusTransitions,
   });
   const t7 = perfEnabled ? performance.now() : 0;
   markOnce('useTaskDialogComputed', t6, t7);
@@ -303,6 +306,37 @@ export default function TaskDialogContent({
         if (computed.spotsApplicable) updates.spot_id = formState.spotId;
 
         await dispatch((await import('@/store/reducers/tasksSlice')).updateTaskAsync({ id: Number(task.id), updates })).unwrap();
+
+        // Check if the task was marked as completed and trigger confetti
+        if (updates.status_id) {
+          const newStatusMeta = statusMap[Number(updates.status_id)];
+          if (newStatusMeta) {
+            const action = String(newStatusMeta.action || '').toUpperCase();
+            const nameLower = String(newStatusMeta.name || '').toLowerCase();
+            // Check for DONE, FINISHED actions, or name includes done/complete/finished
+            const isDoneStatus = action === 'DONE' || action === 'FINISHED' || 
+                                nameLower.includes('done') || nameLower.includes('complete') || nameLower.includes('finished');
+            
+            // Check if celebration is enabled for this status
+            const celebrationEnabled = (newStatusMeta as any).celebration_enabled !== false; // Default to true if not set
+            
+            console.log('[Confetti Debug] TaskDialog status update:', {
+              statusId: updates.status_id,
+              statusName: newStatusMeta.name,
+              action,
+              isDoneStatus,
+              celebrationEnabled
+            });
+            
+            if (isDoneStatus && celebrationEnabled) {
+              console.log('[Confetti Debug] Triggering confetti animation from TaskDialog');
+              // Get category celebration effect if available
+              const taskCategory = data.categories.find(cat => cat.id === (task?.category_id || categoryId));
+              const categoryCelebrationEffect = taskCategory?.celebration_effect;
+              celebrateTaskCompletion(categoryCelebrationEffect);
+            }
+          }
+        }
 
         const currentTagIds = new Set(taskTagIds);
         const newTagIds = new Set(formState.selectedTagIds);

@@ -787,10 +787,8 @@ function Approvals() {
       requirement: ta('grid.columns.requirement', 'Requirement'),
       approvalType: ta('grid.columns.approvalType', 'Approval Type'),
       trigger: ta('grid.columns.trigger', 'Trigger'),
-      requireComment: ta('grid.columns.requireComment', 'Require Comment'),
-      blockEditing: ta('grid.columns.blockEditing', 'Block Editing'),
       deadline: ta('grid.columns.deadline', 'Deadline'),
-      actions: ta('grid.columns.actions', 'Actions'),
+      actions: ta('grid.columns.actions', 'Manage'),
     };
     const requirementAllLabel = ta('grid.requirement.all', 'All approvers');
     const requirementMinimumTemplate = ta('grid.requirement.minimum', 'Minimum {count}');
@@ -865,18 +863,6 @@ function Approvals() {
         cellRenderer: (p: ICellRendererParams) => getTriggerTypeLabel(p?.data?.trigger_type),
       },
       {
-        field: 'require_rejection_comment',
-        headerName: columnLabels.requireComment,
-        width: 130,
-        cellRenderer: (p: ICellRendererParams) => (p?.data?.require_rejection_comment ? yesLabel : noLabel),
-      },
-      {
-        field: 'block_editing_during_approval',
-        headerName: columnLabels.blockEditing,
-        width: 120,
-        cellRenderer: (p: ICellRendererParams) => (p?.data?.block_editing_during_approval ? yesLabel : noLabel),
-      },
-      {
         field: 'deadline_type',
         headerName: columnLabels.deadline,
         flex: 1,
@@ -904,7 +890,11 @@ function Approvals() {
               label: manageActionsLabel,
               variant: 'outline',
               onClick: (row: any) => openManageActions(row as Approval),
-              className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[90px]'
+              className: (row: any) => {
+                const hasActions = (row?.on_approved_actions && Array.isArray(row.on_approved_actions) && row.on_approved_actions.length > 0) ||
+                                   (row?.on_rejected_actions && Array.isArray(row.on_rejected_actions) && row.on_rejected_actions.length > 0);
+                return `p-1 h-7 relative flex items-center justify-center gap-1 min-w-[90px] ${hasActions ? 'text-green-600 dark:text-green-500' : ''}`;
+              }
             }
           ],
         }),
@@ -1084,7 +1074,11 @@ function Approvals() {
         loading={{ isLoading: loading, message: ta('loading', 'Loading approvals...') }}
         error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
         headerActions={
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+          <Button 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
             {ta('headerActions.add', 'Add Approval')}
           </Button>
@@ -1697,18 +1691,18 @@ function Approvals() {
             <div className="grid gap-4 min-h-[320px]">
               <TextField id="name" label={ta('fields.name', 'Name')} value={createFormData.name} onChange={(v) => setCreateFormData(p => ({ ...p, name: v }))} required />
               <TextAreaField id="description" label={ta('fields.description', 'Description')} value={createFormData.description} onChange={(v) => setCreateFormData(p => ({ ...p, description: v }))} />
-              <CheckboxField id="is_active" label={ta('fields.active', 'Active')} checked={!!createFormData.is_active} onChange={(c) => setCreateFormData(p => ({ ...p, is_active: c }))} hideFieldLabel />
+              <CheckboxField id="is_active" label={ta('fields.active', 'Active')} checked={!!createFormData.is_active} onChange={(c) => setCreateFormData(p => ({ ...p, is_active: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="rules">
             <div className="grid gap-4 min-h-[320px]">
               <SelectField id="approval_type" label={ta('fields.approvalType', 'Approval Type')} value={createFormData.approval_type} onChange={(v) => setCreateFormData(p => ({ ...p, approval_type: v as any }))} options={[{ value: 'SEQUENTIAL', label: ta('options.approvalType.sequential', 'Sequential') }, { value: 'PARALLEL', label: ta('options.approvalType.parallel', 'Parallel') }]} />
-              <CheckboxField id="require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!createFormData.require_all} onChange={(c) => setCreateFormData(p => ({ ...p, require_all: c }))} hideFieldLabel />
+              <CheckboxField id="require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!createFormData.require_all} onChange={(c) => setCreateFormData(p => ({ ...p, require_all: c }))} />
               {!createFormData.require_all && (
                 <TextField id="minimum_approvals" label={ta('fields.minimumApprovals', 'Minimum approvals')} type="number" value={String(createFormData.minimum_approvals)} onChange={(v) => setCreateFormData(p => ({ ...p, minimum_approvals: v }))} />
               )}
-              <CheckboxField id="require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!createFormData.require_rejection_comment} onChange={(c) => setCreateFormData(p => ({ ...p, require_rejection_comment: c }))} hideFieldLabel />
-              <CheckboxField id="block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!createFormData.block_editing_during_approval} onChange={(c) => setCreateFormData(p => ({ ...p, block_editing_during_approval: c }))} hideFieldLabel />
+              <CheckboxField id="require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!createFormData.require_rejection_comment} onChange={(c) => setCreateFormData(p => ({ ...p, require_rejection_comment: c }))} />
+              <CheckboxField id="block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!createFormData.block_editing_during_approval} onChange={(c) => setCreateFormData(p => ({ ...p, block_editing_during_approval: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="trigger">
@@ -1797,18 +1791,18 @@ function Approvals() {
             <div className="grid gap-4 min-h-[320px]">
               <TextField id="edit-name" label={ta('fields.name', 'Name')} value={editFormData.name} onChange={(v) => setEditFormData(p => ({ ...p, name: v }))} required />
               <TextAreaField id="edit-description" label={ta('fields.description', 'Description')} value={editFormData.description} onChange={(v) => setEditFormData(p => ({ ...p, description: v }))} />
-              <CheckboxField id="edit-is_active" label={ta('fields.active', 'Active')} checked={!!editFormData.is_active} onChange={(c) => setEditFormData(p => ({ ...p, is_active: c }))} hideFieldLabel />
+              <CheckboxField id="edit-is_active" label={ta('fields.active', 'Active')} checked={!!editFormData.is_active} onChange={(c) => setEditFormData(p => ({ ...p, is_active: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="rules">
             <div className="grid gap-4 min-h-[320px]">
               <SelectField id="edit-approval_type" label={ta('fields.approvalType', 'Approval Type')} value={editFormData.approval_type} onChange={(v) => setEditFormData(p => ({ ...p, approval_type: v as any }))} options={[{ value: 'SEQUENTIAL', label: ta('options.approvalType.sequential', 'Sequential') }, { value: 'PARALLEL', label: ta('options.approvalType.parallel', 'Parallel') }]} />
-              <CheckboxField id="edit-require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!editFormData.require_all} onChange={(c) => setEditFormData(p => ({ ...p, require_all: c }))} hideFieldLabel />
+              <CheckboxField id="edit-require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!editFormData.require_all} onChange={(c) => setEditFormData(p => ({ ...p, require_all: c }))} />
               {!editFormData.require_all && (
                 <TextField id="edit-minimum_approvals" label={ta('fields.minimumApprovals', 'Minimum approvals')} type="number" value={String(editFormData.minimum_approvals)} onChange={(v) => setEditFormData(p => ({ ...p, minimum_approvals: v }))} />
               )}
-              <CheckboxField id="edit-require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!editFormData.require_rejection_comment} onChange={(c) => setEditFormData(p => ({ ...p, require_rejection_comment: c }))} hideFieldLabel />
-              <CheckboxField id="edit-block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!editFormData.block_editing_during_approval} onChange={(c) => setEditFormData(p => ({ ...p, block_editing_during_approval: c }))} hideFieldLabel />
+              <CheckboxField id="edit-require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!editFormData.require_rejection_comment} onChange={(c) => setEditFormData(p => ({ ...p, require_rejection_comment: c }))} />
+              <CheckboxField id="edit-block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!editFormData.block_editing_during_approval} onChange={(c) => setEditFormData(p => ({ ...p, block_editing_during_approval: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="trigger">

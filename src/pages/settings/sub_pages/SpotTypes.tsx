@@ -106,7 +106,11 @@ function SpotTypes() {
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       statistics={{ title: 'Spot Types', description: 'Overview', items: [{ label: 'Total Types', value: items.length }] }}
       headerActions={
-        <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+        <Button 
+          size="default"
+          className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          onClick={() => setIsCreateDialogOpen(true)}
+        >
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
           Add Spot Type
         </Button>

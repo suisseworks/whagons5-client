@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ApprovalAction, ACTION_TYPE_LABELS } from './ApprovalActionTypes';
 import { TagsConfigForm } from './config-forms/TagsConfigForm';
@@ -13,16 +13,25 @@ import { EmailConfigForm } from './config-forms/EmailConfigForm';
 import { BoardMessageConfigForm } from './config-forms/BoardMessageConfigForm';
 import { BroadcastConfigForm } from './config-forms/BroadcastConfigForm';
 import { WebhookConfigForm } from './config-forms/WebhookConfigForm';
+import { RootState } from '@/store/store';
+import { User } from '@/store/types';
 
 interface ActionEditorProps {
   action: ApprovalAction;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (action: ApprovalAction) => void;
+  approvalId?: number | null;
 }
 
-export function ActionEditor({ action, open, onOpenChange, onSave }: ActionEditorProps) {
+export function ActionEditor({ action, open, onOpenChange, onSave, approvalId }: ActionEditorProps) {
   const [editedAction, setEditedAction] = useState<ApprovalAction>(action);
+  const users = useSelector((state: RootState) => (state as any).users?.value ?? []) as User[];
+  const enabledUsers = useMemo(() => {
+    return (users || [])
+      .filter((user) => user?.is_active !== false)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [users]);
 
   useEffect(() => {
     setEditedAction(action);
@@ -45,7 +54,7 @@ export function ActionEditor({ action, open, onOpenChange, onSave }: ActionEdito
         return <TagsConfigForm config={editedAction.config} onChange={handleConfigChange} actionType="remove_tags" />;
       
       case 'change_status':
-        return <StatusConfigForm config={editedAction.config} onChange={handleConfigChange} />;
+        return <StatusConfigForm config={editedAction.config} onChange={handleConfigChange} approvalId={approvalId} />;
       
       case 'create_task':
         return <TaskConfigForm config={editedAction.config} onChange={handleConfigChange} />;
@@ -55,13 +64,33 @@ export function ActionEditor({ action, open, onOpenChange, onSave }: ActionEdito
           <div className="space-y-4">
             <div>
               <Label htmlFor="user_id">User ID</Label>
-              <Input
-                id="user_id"
-                type="number"
-                value={editedAction.config.user_id || ''}
-                onChange={(e) => handleConfigChange({ ...editedAction.config, user_id: parseInt(e.target.value) })}
-                placeholder="Enter user ID"
-              />
+              <Select
+                value={editedAction.config.user_id ? String(editedAction.config.user_id) : ''}
+                onValueChange={(value) => {
+                  if (!value) {
+                    handleConfigChange({ ...editedAction.config, user_id: undefined });
+                    return;
+                  }
+                  handleConfigChange({ ...editedAction.config, user_id: Number(value) });
+                }}
+              >
+                <SelectTrigger id="user_id">
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {enabledUsers.length === 0 ? (
+                    <div className="px-2 py-1 text-sm text-muted-foreground">
+                      No enabled users found
+                    </div>
+                  ) : (
+                    enabledUsers.map((user) => (
+                      <SelectItem key={user.id} value={String(user.id)}>
+                        {user.name}{user.email ? ` (${user.email})` : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         );

@@ -88,7 +88,7 @@ export default function PluginManagement() {
 
 	const getPluginColor = (slug: string) => {
 		const colors: Record<string, string> = {
-			teamconnect: 'bg-violet-500',
+			boards: 'bg-violet-500',
 			automation: 'bg-blue-500',
 			analytics: 'bg-purple-500',
 			compliance: 'bg-emerald-500',

@@ -295,7 +295,11 @@ function JobPositions() {
 			loading={{ isLoading: loading, message: t("settings.jobPositions.loading", "Loading job positions...") }}
 			error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
 			headerActions={(
-				<Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+				<Button 
+					size="default"
+					className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+					onClick={() => setIsCreateDialogOpen(true)}
+				>
 					<FontAwesomeIcon icon={faPlus} className="mr-2" />
 					{t("settings.jobPositions.header.addJobPosition", "Add Job Position")}
 				</Button>
@@ -456,6 +460,7 @@ function JobPositions() {
 							checked={createFormData.is_leadership}
 							onChange={(checked) => setCreateFormData((prev) => ({ ...prev, is_leadership: !!checked }))}
 							description={t("settings.jobPositions.dialogs.create.fields.leadershipDescription", "Marks the position as part of management.")}
+							hideFieldLabel={true}
 						/>
 						<CheckboxField
 							id="create-is-active"
@@ -463,6 +468,7 @@ function JobPositions() {
 							checked={createFormData.is_active}
 							onChange={(checked) => setCreateFormData((prev) => ({ ...prev, is_active: !!checked }))}
 							description={t("settings.jobPositions.dialogs.create.fields.activeDescription", "Inactive roles remain in history but can't be assigned.")}
+							hideFieldLabel={true}
 						/>
 					</div>
 					<TextAreaField
@@ -533,12 +539,14 @@ function JobPositions() {
 								label={t("settings.jobPositions.dialogs.edit.fields.leadership", "Leadership Role")}
 								checked={editFormData.is_leadership}
 								onChange={(checked) => setEditFormData((prev) => ({ ...prev, is_leadership: !!checked }))}
+								hideFieldLabel={true}
 							/>
 							<CheckboxField
 								id="edit-is-active"
 								label={t("settings.jobPositions.dialogs.edit.fields.active", "Active")}
 								checked={editFormData.is_active}
 								onChange={(checked) => setEditFormData((prev) => ({ ...prev, is_active: !!checked }))}
+								hideFieldLabel={true}
 							/>
 						</div>
 						<TextAreaField

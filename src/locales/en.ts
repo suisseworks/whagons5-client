@@ -1,6 +1,6 @@
 // Base English translations
 // This file contains common translations used across the application
-// TeamConnect-specific translations are merged from teamconnect.ts
+// Boards-specific translations are merged from boards.ts
 
 export const enTranslations: Record<string, string> = {
   // Common translations
@@ -72,6 +72,7 @@ export const enTranslations: Record<string, string> = {
   "sidebar.spaces": "Spaces",
   "sidebar.more": "More",
   "sidebar.less": "Less",
+  "sidebar.activity": "Activity Monitor",
   "sidebar.compliance": "Compliance",
   "sidebar.analytics": "Analytics",
   "sidebar.plugins": "Plugins",
@@ -123,8 +124,8 @@ export const enTranslations: Record<string, string> = {
   "plugins.cleaning.description": "Cleaning workflows, schedules and services",
   "plugins.assets.title": "Assets",
   "plugins.assets.description": "Asset tracking, inspections and maintenance",
-  "plugins.teamconnect.title": "TeamConnect",
-  "plugins.teamconnect.description": "Team collaboration and directory integration",
+  "plugins.boards.title": "Boards",
+  "plugins.boards.description": "Team communication boards and announcements",
   "plugins.compliance.title": "Compliance",
   "plugins.compliance.description": "Compliance standards, audits and documentation",
   "plugins.analytics.title": "Analytics",

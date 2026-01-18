@@ -17,6 +17,10 @@ export function useApprovalRefresh(gridRef: React.RefObject<any>, refreshGrid: (
     const handler = () => {
       dispatch(genericActions.taskApprovalInstances.fetchFromAPI());
       dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
+      dispatch(genericActions.taskTags.fetchFromAPI());
+      dispatch(genericActions.taskTags.getFromIndexedDB());
+      dispatch(genericActions.tags.fetchFromAPI());
+      dispatch(genericActions.tags.getFromIndexedDB());
       // Also refresh tasks so approval_status reflects latest decision
       refreshGrid();
       try { gridRef.current?.api?.refreshCells({ force: true }); } catch {}

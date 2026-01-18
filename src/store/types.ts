@@ -40,6 +40,7 @@ export interface Category {
     workspace_id: number;
     status_transition_group_id: number;
     reporting_team_ids: number[];
+    celebration_effect?: string | null;
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -108,6 +109,7 @@ export interface Status {
     icon?: string | null;
     system: boolean;
     initial: boolean;
+    celebration_enabled?: boolean;
     created_at?: string | Date;
     updated_at?: string | Date;
     deleted_at?: string | Date | null;

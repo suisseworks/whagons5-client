@@ -69,6 +69,19 @@ function BoardDetail() {
   const [showSettings, setShowSettings] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteMessageId, setDeleteMessageId] = useState<number | null>(null);
+  const [editMessage, setEditMessage] = useState<BoardMessage | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    content: '',
+  });
+  const canEditMessage = (message: BoardMessage) => {
+    if (!currentUser?.id) return false;
+    return !!currentUser?.is_admin || Number(message.created_by) === Number(currentUser.id);
+  };
+  const canDeleteMessage = (message: BoardMessage) => {
+    return canEditMessage(message);
+  };
   const [settingsFormData, setSettingsFormData] = useState({
     name: '',
     description: '',
@@ -114,6 +127,11 @@ function BoardDetail() {
     dispatch(genericActions.boardMembers.getFromIndexedDB());
     dispatch(genericActions.boardAttachments.getFromIndexedDB());
     dispatch(genericActions.users.getFromIndexedDB());
+
+    const parsedBoardId = boardId ? parseInt(boardId, 10) : 0;
+    if (parsedBoardId > 0) {
+      dispatch(genericActions.boardMessages.fetchFromAPI({ board_id: parsedBoardId }) as any);
+    }
   }, [dispatch, boardId]);
 
   const handleCreateMessage = async (data: { content: string; title?: string; is_pinned?: boolean }) => {
@@ -164,13 +182,48 @@ function BoardDetail() {
     }
   };
 
-  const handleDeleteMessage = async (messageId: number) => {
-    if (!confirm(t('boards.messages.confirmDelete', 'Are you sure you want to delete this post?'))) return;
-    
+  const handleRequestDeleteMessage = (message: BoardMessage) => {
+    if (!canDeleteMessage(message)) return;
+    setDeleteMessageId(message.id);
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!deleteMessageId) return;
+    const messageToDelete = boardMessages.find((msg: BoardMessage) => msg.id === deleteMessageId);
+    if (!messageToDelete || !canDeleteMessage(messageToDelete)) {
+      setDeleteMessageId(null);
+      return;
+    }
     try {
-      await dispatch(genericActions.boardMessages.removeAsync(messageId) as any);
+      await dispatch(genericActions.boardMessages.removeAsync(deleteMessageId) as any);
+      setDeleteMessageId(null);
     } catch (error) {
       console.error('Failed to delete message:', error);
+    }
+  };
+
+  const handleOpenEditMessage = (message: BoardMessage) => {
+    if (!canEditMessage(message)) return;
+    setEditMessage(message);
+    setEditFormData({
+      title: message.title ?? '',
+      content: message.content ?? '',
+    });
+  };
+
+  const handleUpdateMessage = async () => {
+    if (!editMessage || !canEditMessage(editMessage)) return;
+    try {
+      await dispatch(genericActions.boardMessages.updateAsync({
+        id: editMessage.id,
+        updates: {
+          title: editFormData.title.trim() ? editFormData.title.trim() : null,
+          content: editFormData.content ?? '',
+        },
+      }) as any);
+      setEditMessage(null);
+    } catch (error) {
+      console.error('Failed to update message:', error);
     }
   };
 
@@ -207,7 +260,7 @@ function BoardDetail() {
   };
 
   const handleRemoveMember = async (memberId: number) => {
-    if (!confirm(t('teamconnect.members.confirmRemove', 'Are you sure you want to remove this member?'))) return;
+    if (!confirm(t('boards.members.confirmRemove', 'Are you sure you want to remove this member?'))) return;
     
     try {
       await dispatch(genericActions.boardMembers.removeAsync(memberId) as any);
@@ -281,7 +334,7 @@ function BoardDetail() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate('/teamconnect')}
+                onClick={() => navigate('/boards')}
                 className="size-9"
               >
                 <ArrowLeft className="size-5" />
@@ -293,7 +346,7 @@ function BoardDetail() {
           </header>
           <div className="p-8 text-center">
             <p className="text-muted-foreground">
-              {t('teamconnect.error.noAccess', "You don't have access to this board")}
+              {t('boards.error.noAccess', "You don't have access to this board")}
             </p>
           </div>
         </div>
@@ -311,7 +364,7 @@ function BoardDetail() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate('/teamconnect')}
+                onClick={() => navigate('/boards')}
                 className="size-9"
               >
                 <ArrowLeft className="size-5" />
@@ -357,19 +410,19 @@ function BoardDetail() {
         {showMembers && (
           <div className="border-b border-border bg-muted/30 p-4 animate-in slide-in-from-top-2">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">{t('teamconnect.members.title', 'Members')} ({boardMembers.length})</h2>
+              <h2 className="font-semibold">{t('boards.members.title', 'Members')} ({boardMembers.length})</h2>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsAddMemberOpen(true)}
               >
                 <Plus className="size-4 mr-1" />
-                {t('teamconnect.members.add', 'Add')}
+                {t('boards.members.add', 'Add')}
               </Button>
             </div>
             {boardMembers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {t('teamconnect.members.empty', 'No members yet')}
+                {t('boards.members.empty', 'No members yet')}
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -500,10 +553,10 @@ function BoardDetail() {
           ) : boardMessages.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-muted-foreground mb-2">
-                {t('teamconnect.messages.empty', 'No posts yet')}
+                {t('boards.messages.empty', 'No messages yet')}
               </p>
               <p className="text-sm text-muted-foreground">
-                {t('teamconnect.messages.emptyDescription', 'Be the first to share something')}
+                {t('boards.messages.emptyDescription', 'Be the first to post a message')}
               </p>
             </div>
           ) : (
@@ -512,7 +565,8 @@ function BoardDetail() {
                 key={message.id}
                 message={message}
                 user={usersMap.get(message.created_by) || null}
-                onDelete={handleDeleteMessage}
+                onDelete={canDeleteMessage(message) ? handleRequestDeleteMessage : undefined}
+                onEdit={canEditMessage(message) ? handleOpenEditMessage : undefined}
                 onPin={handlePinMessage}
               />
             ))
@@ -520,18 +574,90 @@ function BoardDetail() {
         </div>
       </div>
 
+      {/* Delete Message Confirmation */}
+      <AlertDialog
+        open={deleteMessageId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteMessageId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('boards.messages.delete', 'Delete Message')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('boards.messages.deleteConfirm', 'Are you sure you want to delete this message?')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteMessage}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('common.delete', 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Message Dialog */}
+      <Dialog
+        open={!!editMessage}
+        onOpenChange={(open) => {
+          if (!open) setEditMessage(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('boards.messages.edit', 'Edit Message')}</DialogTitle>
+            <DialogDescription>
+              {t('boards.messages.editDescription', 'Update your post content')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">{t('boards.messages.title.label', 'Title (optional)')}</Label>
+              <Input
+                id="edit-title"
+                value={editFormData.title}
+                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                placeholder={t('boards.messages.title.placeholder', 'Message title')}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-content">{t('boards.messages.content', 'Content')}</Label>
+              <Textarea
+                id="edit-content"
+                value={editFormData.content}
+                onChange={(e) => setEditFormData({ ...editFormData, content: e.target.value })}
+                placeholder={t('boards.messages.contentPlaceholder', 'Write your message here...')}
+                rows={5}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditMessage(null)}>
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button onClick={handleUpdateMessage}>
+              {t('common.save', 'Save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Member Dialog */}
       <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('teamconnect.members.add', 'Add Members')}</DialogTitle>
+            <DialogTitle>{t('boards.members.add', 'Add Members')}</DialogTitle>
             <DialogDescription>
               Add users or teams to this board
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="member_type">{t('teamconnect.members.type', 'Member Type')}</Label>
+              <Label htmlFor="member_type">{t('boards.members.type', 'Member Type')}</Label>
               <select
                 id="member_type"
                 value={memberFormData.member_type}
@@ -547,16 +673,16 @@ function BoardDetail() {
                   borderRadius: '6px',
                 }}
               >
-                <option value="user">{t('teamconnect.members.type.user', 'User')}</option>
-                <option value="team">{t('teamconnect.members.type.team', 'Team')}</option>
+                <option value="user">{t('boards.members.type.user', 'User')}</option>
+                <option value="team">{t('boards.members.type.team', 'Team')}</option>
               </select>
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="member_id">
                 {memberFormData.member_type === 'user' 
-                  ? t('teamconnect.members.selectUser', 'Select User')
-                  : t('teamconnect.members.selectTeam', 'Select Team')
+                  ? t('boards.members.selectUser', 'Select User')
+                  : t('boards.members.selectTeam', 'Select Team')
                 }
               </Label>
               <select
@@ -583,7 +709,7 @@ function BoardDetail() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="role">{t('teamconnect.members.role', 'Role')}</Label>
+              <Label htmlFor="role">{t('boards.members.role', 'Role')}</Label>
               <select
                 id="role"
                 value={memberFormData.role}
@@ -595,8 +721,8 @@ function BoardDetail() {
                   borderRadius: '6px',
                 }}
               >
-                <option value="member">{t('teamconnect.members.member', 'Member')}</option>
-                <option value="admin">{t('teamconnect.members.admin', 'Admin')}</option>
+                <option value="member">{t('boards.members.member', 'Member')}</option>
+                <option value="admin">{t('boards.members.admin', 'Admin')}</option>
               </select>
             </div>
           </div>
@@ -607,14 +733,14 @@ function BoardDetail() {
               onClick={() => setIsAddMemberOpen(false)}
               disabled={isSubmitting}
             >
-              {t('teamconnect.actions.cancel', 'Cancel')}
+              {t('boards.actions.cancel', 'Cancel')}
             </Button>
             <Button
               type="button"
               onClick={handleAddMember}
               disabled={!memberFormData.member_id || isSubmitting}
             >
-              {isSubmitting ? t('teamconnect.members.adding', 'Adding...') : t('teamconnect.members.addMember', 'Add Member')}
+              {isSubmitting ? t('boards.members.adding', 'Adding...') : t('boards.members.addMember', 'Add Member')}
             </Button>
           </DialogFooter>
         </DialogContent>

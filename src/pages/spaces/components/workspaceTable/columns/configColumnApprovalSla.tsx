@@ -3,7 +3,7 @@
  */
 
 import dayjs from 'dayjs';
-import { CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Check, X } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import api from '@/api/whagonsApi';
 import { promptForComment } from '../columnUtils/promptForComment';
@@ -277,18 +277,24 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
     return (
       <Popover>
         <PopoverTrigger asChild>
-          <div className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-700 text-xs font-medium cursor-pointer text-left max-w-[200px]">
+          <div className={`flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer text-left max-w-[200px] border transition-all hover:opacity-90 ${
+            isApproved 
+              ? 'bg-green-100 text-green-700 border-green-200' 
+              : isRejected
+              ? 'bg-red-100 text-red-700 border-red-200'
+              : 'bg-blue-50 text-blue-700 border-blue-200'
+          }`}>
             {isPending ? (
-              <svg className="animate-spin w-3.5 h-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin w-3.5 h-3.5 text-blue-600 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             ) : isApproved ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
             ) : isRejected ? (
-              <XCircle className="w-3.5 h-3.5 text-red-600" />
+              <XCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
             ) : (
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+              <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
             )}
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">{isPending ? 'Approval pending' : approvalStatusLabel}</span>
@@ -296,19 +302,23 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
             </div>
           </div>
         </PopoverTrigger>
-        <PopoverContent side="right" className="max-w-[360px] p-0">
-          <div className="rounded-lg overflow-hidden shadow-sm border border-border/60">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-3 py-2 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-white" />
-              <div className="text-sm font-semibold">Approval required</div>
-            </div>
-            <div className="p-3 space-y-2 text-xs text-muted-foreground bg-card">
-              <div className="text-sm text-foreground font-semibold flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                Awaiting approval details
+        <PopoverContent side="right" className="w-[400px] p-0 shadow-2xl border-0">
+          <div className="rounded-lg overflow-hidden bg-white border border-gray-200">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-4 border-b border-blue-800/20">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                  <Clock className="h-5 w-5 text-white" />
+                </div>
+                <div className="text-sm font-semibold text-white">Approval required</div>
               </div>
-              <div className="text-muted-foreground">This task cannot start until the approval is completed.</div>
-              <div className="text-[11px] text-muted-foreground">No approvers loaded yet.</div>
+            </div>
+            <div className="p-5 bg-white">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-sm font-semibold text-gray-900">Awaiting approval details</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-1">This task cannot start until the approval is completed.</p>
+              <p className="text-xs text-gray-500">No approvers loaded yet.</p>
             </div>
           </div>
         </PopoverContent>
@@ -321,87 +331,151 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
     return (
       <Popover>
         <PopoverTrigger asChild>
-          <div className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-gray-200 bg-card text-xs font-medium max-w-[220px] cursor-pointer">
+          <div className={`flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium max-w-[240px] cursor-pointer transition-all hover:opacity-90 ${
+            approvalStatus === 'approved' 
+              ? 'bg-green-100 text-green-700 border border-green-200' 
+              : approvalStatus === 'rejected'
+              ? 'bg-red-100 text-red-700 border border-red-200'
+              : 'bg-blue-50 text-blue-700 border border-blue-200'
+          }`}>
             {approvalStatus === 'approved' ? (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                <span className="text-green-700 leading-snug whitespace-normal break-words flex-1 min-w-0">Approved</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">Approved</span>
               </>
             ) : approvalStatus === 'rejected' ? (
               <>
-                <XCircle className="w-3.5 h-3.5 text-red-600" />
-                <span className="text-red-700 leading-snug whitespace-normal break-words flex-1 min-w-0">Rejected</span>
+                <XCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">Rejected</span>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <svg className="animate-spin w-3.5 h-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin w-3.5 h-3.5 text-blue-600 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span className="text-blue-700 leading-snug whitespace-normal break-words flex-1 min-w-0">Approval pending</span>
+                  <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">Approval pending</span>
                   {slaPill}
                 </div>
               </>
             )}
           </div>
         </PopoverTrigger>
-        <PopoverContent side="right" className="max-w-[420px] p-0">
-          <div className="rounded-lg overflow-hidden shadow-sm border border-border/60">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-3 py-2 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-white" />
-              <div className="text-sm font-semibold">{approval?.name || 'Approval required'}</div>
-              <span className="ml-auto text-[11px] font-medium capitalize">{approvalStatus || 'pending'}</span>
-            </div>
-            <div className="p-3 bg-card space-y-3 text-xs">
-              <div className="text-sm text-foreground font-semibold flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                Approval progress
-              </div>
-              {approverDetails && approverDetails.length > 0 ? (
-                <div className="space-y-1.5">
-                  {approverDetails.map((detail) => {
-                    const showStep = approverDetails.length > 1;
-                    return (
-                      <div key={detail.id} className="flex items-start justify-between gap-3 rounded border border-muted px-2 py-1.5">
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <span className="text-[12px] font-semibold text-foreground break-words">{detail.name}</span>
-                          <span className="text-[11px] text-muted-foreground block">
-                            {showStep ? `Step ${detail.step} • ` : ''}
-                            {detail.isRequired ? 'Required' : 'Optional'}
-                            {detail.respondedAt && dayjs(detail.respondedAt).isValid()
-                              ? ` • ${dayjs(detail.respondedAt).format('YYYY-MM-DD HH:mm')}`
-                              : ''}
-                          </span>
-                          {detail.comment ? (
-                            <div className="mt-1 text-[11px] text-muted-foreground whitespace-pre-wrap break-words max-h-28 overflow-auto pr-1 border border-muted rounded-md px-2 py-1 bg-muted/20">
-                              <div className="text-[11px] font-semibold text-foreground mb-1">Comment</div>
-                              <div className="italic">{detail.comment}</div>
-                            </div>
-                          ) : null}
-                        </div>
-                        <span className={`text-[11px] font-semibold capitalize flex-shrink-0 ${detail.statusColor || 'text-blue-600'}`}>
-                          {detail.status || 'pending'}
-                        </span>
-                      </div>
-                    );
-                  })}
+        <PopoverContent side="right" className="w-[520px] p-0 shadow-2xl border-0">
+          <div className="rounded-lg overflow-hidden bg-white border border-gray-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-4 border-b border-blue-800/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm mt-0.5">
+                    <Clock className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-base font-semibold text-white truncate leading-tight">
+                      {approval?.name || 'Approval Required'}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${
+                        normalizedApprovalStatus === 'approved' ? 'bg-green-500/20 text-green-100' :
+                        normalizedApprovalStatus === 'rejected' ? 'bg-red-500/20 text-red-100' :
+                        'bg-white/20 text-blue-100'
+                      }`}>
+                        {approvalStatusLabel}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-[11px] text-muted-foreground">No approvers have responded yet.</div>
-              )}
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 bg-white">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                  Approval Progress
+                </h3>
+                
+                {approverDetails && approverDetails.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {approverDetails.map((detail) => {
+                      const showStep = approverDetails.length > 1;
+                      const isPending = !detail.status || detail.status === 'pending' || detail.status === 'not started';
+                      const isApproved = detail.status === 'approved';
+                      const isRejected = detail.status === 'rejected';
+                      
+                      return (
+                        <div 
+                          key={detail.id} 
+                          className="rounded-lg border border-gray-200 bg-gray-50/50 p-3.5 transition-colors hover:bg-gray-50 hover:border-gray-300"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-sm font-medium text-gray-900">{detail.name}</span>
+                                {showStep && (
+                                  <span className="text-xs font-medium text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">
+                                    Step {detail.step}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                <span className={detail.isRequired ? 'font-medium text-blue-600' : 'text-gray-500'}>
+                                  {detail.isRequired ? 'Required' : 'Optional'}
+                                </span>
+                                {detail.respondedAt && dayjs(detail.respondedAt).isValid() && (
+                                  <>
+                                    <span className="text-gray-400">•</span>
+                                    <span>{dayjs(detail.respondedAt).format('MMM D, h:mm A')}</span>
+                                  </>
+                                )}
+                              </div>
+                              {detail.comment && (
+                                <div className="mt-2.5 p-2.5 bg-white border border-gray-200 rounded-md">
+                                  <div className="text-xs font-medium text-gray-700 mb-1">Comment</div>
+                                  <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                                    {detail.comment}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className={`flex items-center justify-center px-3 py-1 rounded-md text-xs font-medium flex-shrink-0 ${
+                              isApproved ? 'bg-green-100 text-green-700' :
+                              isRejected ? 'bg-red-100 text-red-700' :
+                              detail.status === 'skipped' ? 'bg-amber-100 text-amber-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {detail.status === 'not started' ? 'Not Started' : 
+                               detail.status === 'pending' ? 'Pending' :
+                               detail.status ? detail.status.charAt(0).toUpperCase() + detail.status.slice(1) : 'Pending'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-sm text-gray-500">No approvers configured yet</div>
+                  </div>
+                )}
+              </div>
+              
               {canAct && (
-                <div className="pt-2 border-t border-muted flex items-center gap-2">
+                <div className="pt-4 mt-4 border-t border-gray-200 flex items-center gap-2.5">
                   <button
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] transition-all duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                     onClick={(e) => { e.stopPropagation(); submitDecision('approved'); }}
                   >
+                    <Check className="h-4 w-4" />
                     Approve
                   </button>
                   <button
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 active:scale-[0.98] transition-all duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                     onClick={(e) => { e.stopPropagation(); submitDecision('rejected'); }}
                   >
+                    <X className="h-4 w-4" />
                     Reject
                   </button>
                 </div>

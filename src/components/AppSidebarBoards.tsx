@@ -219,33 +219,33 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('teamconnect.board.create.title', 'Create Board')}</DialogTitle>
+            <DialogTitle>{t('boards.board.create.title', 'Create Board')}</DialogTitle>
             <DialogDescription>
-              {t('teamconnect.board.create.description', 'Create a new communication board for your team')}
+              {t('boards.board.create.description', 'Create a new communication board for your team')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="board-name">{t('teamconnect.board.name', 'Board Name')}</Label>
+              <Label htmlFor="board-name">{t('boards.board.name', 'Board Name')}</Label>
               <Input
                 id="board-name"
-                placeholder={t('teamconnect.board.namePlaceholder', 'e.g., Company Updates, Team News')}
+                placeholder={t('boards.board.namePlaceholder', 'e.g., Company Updates, Team News')}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="board-description">{t('teamconnect.board.description', 'Description')}</Label>
+              <Label htmlFor="board-description">{t('boards.board.description', 'Description')}</Label>
               <Textarea
                 id="board-description"
-                placeholder={t('teamconnect.board.descriptionPlaceholder', 'What is this board for?')}
+                placeholder={t('boards.board.descriptionPlaceholder', 'What is this board for?')}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="board-visibility">{t('teamconnect.board.visibility', 'Visibility')}</Label>
+              <Label htmlFor="board-visibility">{t('boards.board.visibility', 'Visibility')}</Label>
               <Select
                 value={formData.visibility}
                 onValueChange={(value: 'public' | 'private') => setFormData({ ...formData, visibility: value })}
@@ -257,13 +257,13 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
                   <SelectItem value="public">
                     <div className="flex items-center gap-2">
                       <Globe className="w-4 h-4" />
-                      {t('teamconnect.board.visibility.publicLabel', 'Public - All users can view')}
+                      {t('boards.board.visibility.publicLabel', 'Public - All users can view')}
                     </div>
                   </SelectItem>
                   <SelectItem value="private">
                     <div className="flex items-center gap-2">
                       <Lock className="w-4 h-4" />
-                      {t('teamconnect.board.visibility.privateLabel', 'Private - Members only')}
+                      {t('boards.board.visibility.privateLabel', 'Private - Members only')}
                     </div>
                   </SelectItem>
                 </SelectContent>

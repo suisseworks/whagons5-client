@@ -41,6 +41,8 @@ import {
 import { LANGUAGE_OPTIONS } from "@/config/languages";
 import { useBranding } from "@/providers/BrandingProvider";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { getCelebrationType, setCelebrationType, type CelebrationType } from "@/utils/confetti";
+import { getFontStyle, setFontStyle, initFontStyle, type FontStyle } from "@/utils/fontStyle";
 
 const SIDEBAR_LIGHT = '#FAFBFC';
 const SIDEBAR_DARK = '#08111f';
@@ -964,6 +966,13 @@ function Global() {
     saveBranding
   } = useBranding();
   const { language, setLanguage, t } = useLanguage();
+  const [celebrationType, setCelebrationTypeState] = useState<CelebrationType>(() => getCelebrationType());
+  const [fontStyle, setFontStyleState] = useState<FontStyle>(() => getFontStyle());
+
+  // Initialize font style on mount
+  useEffect(() => {
+    initFontStyle();
+  }, []);
 
   const [brand, setBrand] = useState<BrandingConfig>(() => ({ ...activeBrand }));
   const [assets, setAssets] = useState<BrandingAssets>(() => ({ ...activeAssets }));
@@ -1226,7 +1235,7 @@ function Global() {
                 </div>
               </div>
             </div>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="preferredLanguage">
                   {t("settings.global.defaults.languageLabel", "Preferred language")}
@@ -1248,6 +1257,121 @@ function Global() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="fontStyle">
+                  {t("settings.global.defaults.fontStyleLabel", "Font Style")}
+                </Label>
+                <Select 
+                  value={fontStyle}
+                  onValueChange={(value: FontStyle) => {
+                    setFontStyle(value);
+                    setFontStyleState(value);
+                  }}
+                >
+                  <SelectTrigger id="fontStyle" className="w-full sm:w-[280px]">
+                    <SelectValue
+                      placeholder={t(
+                        "settings.global.defaults.fontStylePlaceholder",
+                        "Select font style"
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">
+                      {t("settings.global.defaults.fontStyle.system", "System Default")}
+                    </SelectItem>
+                    <SelectItem value="inter">
+                      {t("settings.global.defaults.fontStyle.inter", "Inter")}
+                    </SelectItem>
+                    <SelectItem value="roboto">
+                      {t("settings.global.defaults.fontStyle.roboto", "Roboto")}
+                    </SelectItem>
+                    <SelectItem value="montserrat">
+                      {t("settings.global.defaults.fontStyle.montserrat", "Montserrat")}
+                    </SelectItem>
+                    <SelectItem value="georgia">
+                      {t("settings.global.defaults.fontStyle.georgia", "Georgia")}
+                    </SelectItem>
+                    <SelectItem value="playfair">
+                      {t("settings.global.defaults.fontStyle.playfair", "Playfair Display")}
+                    </SelectItem>
+                    <SelectItem value="poppins">
+                      {t("settings.global.defaults.fontStyle.poppins", "Poppins")}
+                    </SelectItem>
+                    <SelectItem value="raleway">
+                      {t("settings.global.defaults.fontStyle.raleway", "Raleway")}
+                    </SelectItem>
+                    <SelectItem value="bebas">
+                      {t("settings.global.defaults.fontStyle.bebas", "Bebas Neue")}
+                    </SelectItem>
+                    <SelectItem value="oswald">
+                      {t("settings.global.defaults.fontStyle.oswald", "Oswald")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "settings.global.defaults.fontStyleDescription",
+                    "Choose the font style used throughout the application"
+                  )}
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="celebrationType">
+                  {t("settings.global.defaults.celebrationLabel", "Task Completion Celebration")}
+                </Label>
+                <Select 
+                  value={celebrationType}
+                  onValueChange={(value: CelebrationType) => {
+                    setCelebrationType(value);
+                    setCelebrationTypeState(value);
+                  }}
+                >
+                  <SelectTrigger id="celebrationType" className="w-full sm:w-[280px]">
+                    <SelectValue
+                      placeholder={t(
+                        "settings.global.defaults.celebrationPlaceholder",
+                        "Select celebration type"
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="confetti">
+                      {t("settings.global.defaults.celebration.confetti", "Confetti")}
+                    </SelectItem>
+                    <SelectItem value="fireworks">
+                      {t("settings.global.defaults.celebration.fireworks", "Fireworks")}
+                    </SelectItem>
+                    <SelectItem value="hearts">
+                      {t("settings.global.defaults.celebration.hearts", "Hearts")}
+                    </SelectItem>
+                    <SelectItem value="balloons">
+                      {t("settings.global.defaults.celebration.balloons", "Balloons")}
+                    </SelectItem>
+                    <SelectItem value="sparkles">
+                      {t("settings.global.defaults.celebration.sparkles", "Sparkles")}
+                    </SelectItem>
+                    <SelectItem value="ribbons">
+                      {t("settings.global.defaults.celebration.ribbons", "Ribbons")}
+                    </SelectItem>
+                    <SelectItem value="none">
+                      {t("settings.global.defaults.celebration.none", "None")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "settings.global.defaults.celebrationDescription",
+                    "Choose the animation that plays when a task is completed"
+                  )}
+                </p>
               </div>
             </CardContent>
           </Card>

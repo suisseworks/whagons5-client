@@ -267,7 +267,11 @@ function Priorities() {
       loading={{ isLoading: loading, message: "Loading priorities..." }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       headerActions={
-        <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)} 
+          size="default"
+          className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+        >
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
           Add Priority
         </Button>

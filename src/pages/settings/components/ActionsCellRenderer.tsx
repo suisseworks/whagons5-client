@@ -10,7 +10,7 @@ export interface ActionButton {
   label?: string | ((data: any) => string | React.ReactNode);
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   onClick: (data: any) => void;
-  className?: string;
+  className?: string | ((data: any) => string);
   disabled?: (data: any) => boolean;
   renderExtra?: (data: any) => React.ReactNode;
 }
@@ -61,13 +61,14 @@ export function ActionsCellRenderer({
   const renderActionButton = (action: ActionButton, key: React.Key, keyPrefix = '') => {
     const computedLabel = typeof action.label === 'function' ? action.label(data) : action.label;
     const titleText = typeof computedLabel === 'string' ? computedLabel : undefined;
+    const computedClassName = typeof action.className === 'function' ? action.className(data) : action.className;
     return (
       <Button
         key={`${keyPrefix}${key}`}
         size="sm"
         variant={action.variant || "outline"}
         onClick={(e) => handleAction(action, e)}
-        className={action.className}
+        className={computedClassName}
         disabled={action.disabled ? action.disabled(data) : false}
         title={titleText}
       >

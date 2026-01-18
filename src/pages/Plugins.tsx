@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -194,6 +194,7 @@ function PluginCardDisplay({
 			costs: 'hover:border-amber-500/40 hover:shadow-amber-500/20',
 			inventory: 'hover:border-teal-500/40 hover:shadow-teal-500/20',
 			tools: 'hover:border-orange-500/40 hover:shadow-orange-500/20',
+			integrations: 'hover:border-indigo-500/40 hover:shadow-indigo-500/20',
 		};
 		
 		return borderColors[pluginId] || 'hover:border-gray-500/40 hover:shadow-gray-500/20';
@@ -830,6 +831,21 @@ function Plugins() {
 					'Ensure tools are maintained and returned on time'
 				]
 			},
+			integrations: {
+				features: [
+					'Configure webhooks to receive real-time notifications',
+					'Manage API keys for programmatic access',
+					'Connect with external systems and services',
+					'Customize payloads and headers for webhooks',
+					'Test webhooks before going live'
+				],
+				benefits: [
+					'Integrate with your existing tools and workflows',
+					'Automate data synchronization across platforms',
+					'Receive instant notifications for important events',
+					'Build custom integrations with API access'
+				]
+			},
 		};
 
 		return {
@@ -844,6 +860,10 @@ function Plugins() {
 	};
 
 	const handlePluginClick = (pluginId: string, isEnabled: boolean) => {
+		if (pluginId === 'integrations') {
+			navigate('/integrations');
+			return;
+		}
 		if (isEnabled) {
 			navigate(`/plugins/${pluginId}/settings`);
 		} else {
@@ -974,6 +994,14 @@ function Plugins() {
 				description: t('plugins.tools.description', 'Tool lending, equipment borrowing and maintenance tool tracking'),
 				icon: faHammer,
 				color: 'text-orange-500',
+				configurable: true,
+			},
+			{
+				id: 'integrations',
+				title: t('plugins.integrations.title', 'Integrations'),
+				description: t('plugins.integrations.description', 'Manage webhooks, API keys, and external integrations'),
+				icon: faLink,
+				color: 'text-indigo-500',
 				configurable: true,
 			},
 		];

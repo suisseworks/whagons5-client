@@ -4,7 +4,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { motion } from 'motion/react';
+import { Search, Clock } from "lucide-react";
 import { SETTINGS_TAB_ANIMATION, getSettingsTabInitialX } from '@/config/tabAnimation';
 import type { SettingsTabKey } from '@/config/tabAnimation';
 
@@ -125,7 +127,7 @@ function SettingCardDisplay({
 
   return (
     <Card
-      className={`transition-all duration-200 group select-none hover:shadow-lg hover:scale-[1.02] h-[180px] overflow-hidden ${isDragging ? 'shadow-lg scale-[1.02]' : ''}`}
+      className={`transition-all duration-300 group select-none hover:shadow-xl hover:scale-[1.03] hover:-translate-y-1 h-[180px] overflow-hidden border-2 hover:border-primary/20 ${isDragging ? 'shadow-lg scale-[1.02]' : ''}`}
       onClick={(e) => {
         if (isDragging) {
           e.preventDefault();
@@ -158,7 +160,7 @@ function SettingCardDisplay({
               <button
                 type="button"
                 className={`rounded-full p-2 transition text-sm ${
-                  favoriteButtonAlwaysVisible
+                  favoriteButtonAlwaysVisible || isFavorite
                     ? ''
                     : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
                 } ${
@@ -190,7 +192,7 @@ function SettingCardDisplay({
               <FontAwesomeIcon icon={faStarSolid} className="text-sm" />
             </div>
           )}
-          <CardTitle className="text-xl">{setting.title}</CardTitle>
+          <CardTitle className="text-2xl font-bold">{setting.title}</CardTitle>
           <CardDescription>{setting.description}</CardDescription>
         </div>
       </CardHeader>
@@ -254,12 +256,18 @@ function SortableSettingCard({
 
 
 const SETTINGS_TAB_STORAGE_KEY = 'wh_settings_last_tab';
+const RECENTLY_ACCESSED_KEY = 'wh_settings_recently_accessed';
+const MAX_RECENT_ITEMS = 5;
 
 function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
   const { t } = useLanguage();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Load last selected tab from localStorage, or default to 'basics'
   const [activeTab, setActiveTab] = useState<SettingsTabKey>(() => {
@@ -273,6 +281,50 @@ function Settings() {
   });
   
   const [prevActiveTab, setPrevActiveTab] = useState<SettingsTabKey>(activeTab);
+  
+  // Recently accessed settings
+  const [recentlyAccessed, setRecentlyAccessed] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(RECENTLY_ACCESSED_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  
+  // Track setting access
+  const trackSettingAccess = (settingId: string) => {
+    setRecentlyAccessed((prev) => {
+      const filtered = prev.filter(id => id !== settingId);
+      const updated = [settingId, ...filtered].slice(0, MAX_RECENT_ITEMS);
+      try {
+        localStorage.setItem(RECENTLY_ACCESSED_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+  
+  // Keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Press "/" to focus search
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      }
+      // Press Escape to clear search
+      if (e.key === 'Escape' && searchQuery) {
+        setSearchQuery('');
+        searchInputRef.current?.blur();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery]);
 
   // Sync activeTab with URL on initial load (URL takes precedence)
   // If no tab in URL and we're on the main settings page, restore from localStorage and update URL
@@ -757,8 +809,46 @@ function Settings() {
 
 
 
+  // Filter settings based on search query
+  const filterSettings = (settings: SettingCard[]) => {
+    if (!searchQuery.trim()) return settings;
+    const query = searchQuery.toLowerCase().trim();
+    return settings.filter(setting => 
+      setting.title.toLowerCase().includes(query) ||
+      setting.description.toLowerCase().includes(query) ||
+      setting.id.toLowerCase().includes(query)
+    );
+  };
+
+  const filteredBasicSettings = useMemo(() => filterSettings(orderedBasicSettings), [orderedBasicSettings, searchQuery]);
+  const filteredAdvancedSettings = useMemo(() => filterSettings(orderedAdvancedSettings), [orderedAdvancedSettings, searchQuery]);
+  const filteredFavoriteSettings = useMemo(() => filterSettings(favoriteSettings), [favoriteSettings, searchQuery]);
+
+  // Get recently accessed settings
+  const recentSettings = useMemo(() => {
+    return recentlyAccessed
+      .map(id => allSettingsById[id])
+      .filter((setting): setting is SettingCard => Boolean(setting))
+      .slice(0, MAX_RECENT_ITEMS);
+  }, [recentlyAccessed, allSettingsById]);
+
+  // Calculate total stats
+  const totalStats = useMemo(() => {
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    return {
+      total,
+      topCategories: [
+        { name: 'Teams', count: counts.teams },
+        { name: 'Users', count: counts.users },
+        { name: 'Tags', count: counts.tags },
+        { name: 'Categories', count: counts.categories },
+      ].filter(item => item.count > 0).slice(0, 3)
+    };
+  }, [counts]);
+
   const handleSettingClick = (settingId: string) => {
-    // console.log(`Clicked on ${settingId}`);
+    // Track access
+    trackSettingAccess(settingId);
 
     // Navigate to specific setting pages
     switch (settingId) {
@@ -842,15 +932,25 @@ function Settings() {
           transition={SETTINGS_TAB_ANIMATION.transition}
         >
           <div className="space-y-4">
-            {favoriteSettings.length === 0 ? (
+            {filteredFavoriteSettings.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
-                <FontAwesomeIcon icon={faStarSolid} className="mb-3 text-2xl text-yellow-500" />
-                <p className="font-medium">{favoritesEmptyLabel}</p>
-                <p className="text-sm">{favoritesHelperLabel}</p>
+                {searchQuery ? (
+                  <>
+                    <Search className="mb-3 h-8 w-8 text-muted-foreground" />
+                    <p className="font-medium">No favorites match your search</p>
+                    <p className="text-sm">Try a different search term</p>
+                  </>
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faStarSolid} className="mb-3 text-2xl text-yellow-500" />
+                    <p className="font-medium">{favoritesEmptyLabel}</p>
+                    <p className="text-sm">{favoritesHelperLabel}</p>
+                  </>
+                )}
               </div>
             ) : (
               <>
-                <div className="text-sm text-muted-foreground">{dragHint}</div>
+                {!searchQuery && <div className="text-sm text-muted-foreground">{dragHint}</div>}
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -859,7 +959,7 @@ function Settings() {
                 >
                   <SortableContext items={favoriteSortableIds} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                      {favoriteSettings.map((setting) => (
+                      {filteredFavoriteSettings.map((setting) => (
                         <SortableSettingCard
                           key={setting.id}
                           setting={setting}
@@ -895,16 +995,23 @@ function Settings() {
           transition={SETTINGS_TAB_ANIMATION.transition}
         >
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">{dragHint}</div>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleBasicDragEnd}
-            >
-              <SortableContext items={basicIds} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {orderedBasicSettings.map((setting) => (
+            {!searchQuery && <div className="text-sm text-muted-foreground">{dragHint}</div>}
+            {filteredBasicSettings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
+                <Search className="mb-3 h-8 w-8 text-muted-foreground" />
+                <p className="font-medium">No basic settings match your search</p>
+                <p className="text-sm">Try a different search term</p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleBasicDragEnd}
+              >
+                <SortableContext items={basicIds} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredBasicSettings.map((setting) => (
                     <SortableSettingCard
                       key={setting.id}
                       setting={setting}
@@ -915,11 +1022,13 @@ function Settings() {
                       favoriteLabel={favoriteAddLabel}
                       unfavoriteLabel={favoriteRemoveLabel}
                       favoriteBadgeLabel={favoriteBadgeLabel}
+                      showFavoriteBadge={false}
                     />
                   ))}
                 </div>
               </SortableContext>
             </DndContext>
+            )}
           </div>
         </motion.div>
       )
@@ -936,31 +1045,40 @@ function Settings() {
           transition={SETTINGS_TAB_ANIMATION.transition}
         >
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">{dragHint}</div>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleAdvancedDragEnd}
-            >
-              <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {orderedAdvancedSettings.map((setting) => (
-                    <SortableSettingCard
-                      key={setting.id}
-                      setting={setting}
-                      onSettingClick={handleSettingClick}
-                      dragHandleLabel={dragHandleLabel}
-                      isFavorite={favoriteSet.has(setting.id)}
-                      onToggleFavorite={handleToggleFavorite}
-                      favoriteLabel={favoriteAddLabel}
-                      unfavoriteLabel={favoriteRemoveLabel}
-                      favoriteBadgeLabel={favoriteBadgeLabel}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+            {!searchQuery && <div className="text-sm text-muted-foreground">{dragHint}</div>}
+            {filteredAdvancedSettings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
+                <Search className="mb-3 h-8 w-8 text-muted-foreground" />
+                <p className="font-medium">No advanced settings match your search</p>
+                <p className="text-sm">Try a different search term</p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleAdvancedDragEnd}
+              >
+                <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredAdvancedSettings.map((setting) => (
+                      <SortableSettingCard
+                        key={setting.id}
+                        setting={setting}
+                        onSettingClick={handleSettingClick}
+                        dragHandleLabel={dragHandleLabel}
+                        isFavorite={favoriteSet.has(setting.id)}
+                        onToggleFavorite={handleToggleFavorite}
+                        favoriteLabel={favoriteAddLabel}
+                        unfavoriteLabel={favoriteRemoveLabel}
+                        favoriteBadgeLabel={favoriteBadgeLabel}
+                        showFavoriteBadge={false}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
           </div>
         </motion.div>
       )
@@ -969,8 +1087,82 @@ function Settings() {
 
   return (
     <div className="p-4 pt-0 space-y-4">
-      {/* Header (collapsed) */}
-      <div className="space-y-2">
+      {/* Header with Title, Stats, and Search */}
+      <div className="space-y-4 pb-4 border-b border-border/40">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start space-x-4 flex-1">
+            <FontAwesomeIcon
+              icon={faCog}
+              className="text-4xl text-primary flex-shrink-0 mt-1"
+            />
+            <div className="flex flex-col flex-1 min-w-0">
+              <h1 className="text-4xl font-extrabold tracking-tight text-foreground leading-tight">Settings</h1>
+              <p className="text-sm text-muted-foreground/80 leading-relaxed mt-2">
+                Configure and manage your workspace settings
+              </p>
+              {/* Quick Stats */}
+              {totalStats.total > 0 && (
+                <div className="flex items-center gap-3 mt-3 flex-wrap">
+                  <Badge variant="outline" className="text-xs font-semibold">
+                    {totalStats.total.toLocaleString()} Total Items
+                  </Badge>
+                  {totalStats.topCategories.map((item) => (
+                    <Badge key={item.name} variant="secondary" className="text-xs">
+                      {item.name}: {item.count}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="flex-shrink-0">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={searchInputRef}
+                placeholder="Search settings... (Press /)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-9 h-10"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                >
+                  Esc
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <p className="text-xs text-muted-foreground mt-1 text-right">
+                {filteredBasicSettings.length + filteredAdvancedSettings.length + filteredFavoriteSettings.length} results
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Recently Accessed */}
+        {recentSettings.length > 0 && !searchQuery && (
+          <div className="flex items-center gap-2 pt-2 border-t border-border/20">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">Recently accessed:</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {recentSettings.map((setting) => (
+                <button
+                  key={setting.id}
+                  onClick={() => handleSettingClick(setting.id)}
+                  className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-muted/80 text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+                >
+                  <FontAwesomeIcon icon={setting.icon} className={setting.color} />
+                  {setting.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <UrlTabs

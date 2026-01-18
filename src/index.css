@@ -13,8 +13,12 @@
   height: 100%;
 } */
 
+:root {
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+}
+
 *{
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-family);
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -1125,17 +1129,32 @@
 }
 
 /* Modern header polish for settings grids */
+.wh-settings-grid,
+.ag-theme-quartz.wh-settings-grid,
+.ag-theme-quartz-dark.wh-settings-grid {
+  --ag-header-background-color: transparent !important;
+}
+
 .wh-settings-grid .ag-header {
-  background: var(--gradient-secondary);
+  background: transparent !important;
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--color-border);
-  box-shadow: 0 1px 0 var(--color-border), 0 6px 16px oklch(from var(--color-background) l calc(l - 0.08) c h / 0.15);
+  box-shadow: none;
   border-top-left-radius: var(--radius-md);
   border-top-right-radius: var(--radius-md);
 }
 
 .wh-settings-grid .ag-header .ag-header-cell,
 .wh-settings-grid .ag-header .ag-header-group-cell {
-  background: transparent;
+  background: transparent !important;
+}
+
+.wh-settings-grid .ag-header-viewport {
+  background: transparent !important;
+}
+
+.wh-settings-grid .ag-header-row {
+  background: transparent !important;
 }
 
 .wh-settings-grid .ag-header-cell-label {
@@ -1322,6 +1341,7 @@
 /* Modern list-card styling for AG Grid */
 .ag-theme-quartz.wh-modern-grid,
 .ag-theme-quartz-dark.wh-modern-grid {
+  --ag-header-background-color: transparent !important;
   --ag-row-border-color: transparent;
   --ag-border-color: transparent;
   --ag-secondary-border-color: transparent;
@@ -1349,7 +1369,8 @@
 .wh-modern-grid .ag-center-cols-container .ag-row {
   /* Use horizontal margins only to avoid AG Grid row stacking issues */
   border-radius: 0;
-  background-color: #ffffff;
+  background-color: transparent;
+  backdrop-filter: blur(4px);
   border: none;
   border-bottom: 1px solid rgba(0,0,0,0.06);
   /* Remove all inset/left shadows to avoid glow on selection */
@@ -1365,7 +1386,8 @@
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row {
-  background-color: #1a1a1a;
+  background-color: transparent;
+  backdrop-filter: blur(4px);
   border: none;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   box-shadow: none !important;
@@ -1594,14 +1616,17 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 
 /* Hover and selection polish - only transition on hover */
 .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  background-color: #f5f5f5 !important;
-  box-shadow: none;
-  transform: translateZ(0);
-  transition: background-color 0.1s ease;
+  background-color: rgba(245, 245, 245, 0.6) !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  transform: translateY(-1px) translateZ(0);
+  transition: all 0.2s ease;
+  border-left: 3px solid var(--primary);
 }
 
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: #f0f0f0 !important;
+  background-color: rgba(240, 240, 240, 0.6) !important;
+  backdrop-filter: blur(8px);
   border-color: transparent;
   box-shadow: none !important;
 }
@@ -1613,24 +1638,41 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 
 /* Dark mode: use darker, higher-contrast selection and hover */
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
-  background-color: #222222 !important;
-  box-shadow: none;
-  transition: background-color 0.1s ease;
+  background-color: rgba(34, 34, 34, 0.6) !important;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-1px) translateZ(0);
+  transition: all 0.2s ease;
+  border-left: 3px solid var(--primary);
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
-  background-color: #2a2a2a !important;
+  background-color: rgba(42, 42, 42, 0.6) !important;
+  backdrop-filter: blur(8px);
   border-color: transparent;
   box-shadow: none !important;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected .ag-cell {
-  background-color: oklch(0.28 0.03 255) !important;
+  background-color: transparent !important;
 }
 
 /* Reduce gridlines and header chrome */
+.wh-modern-grid,
+.ag-theme-quartz.wh-modern-grid,
+.ag-theme-quartz-dark.wh-modern-grid {
+  --ag-header-background-color: transparent !important;
+}
+
+.dark .wh-modern-grid,
+.dark .ag-theme-quartz.wh-modern-grid,
+.dark .ag-theme-quartz-dark.wh-modern-grid {
+  --ag-header-background-color: transparent !important;
+}
+
 .wh-modern-grid .ag-header {
-  background: #ffffff;
+  background: transparent !important;
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
@@ -1638,19 +1680,33 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 }
 
 .dark .wh-modern-grid .ag-header {
-  background: #1a1a1a;
+  background: transparent !important;
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .wh-modern-grid .ag-header .ag-header-cell,
 .wh-modern-grid .ag-header .ag-header-group-cell {
-  background: transparent;
+  background: transparent !important;
+}
+
+.wh-modern-grid .ag-header-viewport {
+  background: transparent !important;
+}
+
+.wh-modern-grid .ag-header-row {
+  background: transparent !important;
+}
+
+.wh-modern-grid .ag-header-row .ag-header-cell {
+  background: transparent !important;
 }
 
 /* Compact, friendly cell paddings */
 .wh-modern-grid .ag-cell {
   padding-block: 10px;
   padding-inline: 12px;
+  background-color: transparent;
   /* GPU acceleration for smooth scrolling */
   will-change: auto;
   transform: translateZ(0);
@@ -1690,11 +1746,11 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 /* Zebra hover nuance: faint divider on alternating rows only when not selected */
 /* Zebra striping: very subtle alternate row background */
 .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
-  /* White background for light mode */
-  background-color: #ffffff;
+  /* Transparent background for light mode */
+  background-color: transparent;
 }
 .dark .wh-modern-grid .ag-center-cols-container .ag-row:not(.ag-row-selected):nth-child(2n) {
-  background-color: #1a1a1a;
+  background-color: transparent;
 }
 
 /* Star Wars: avoid zebra rules fighting with Star Wars grid styling */
@@ -1760,4 +1816,26 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 
 .wh-modern-grid.wh-density-spacious .ag-cell { padding-block: 16px; }
 
+/* KPI Card gradient animation */
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}
+
+
+
+/* 3D perspective for Activity Monitor carousel */
+.perspective-1000 {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
 

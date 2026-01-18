@@ -195,6 +195,39 @@ function RolesAndPermissions() {
     setSelectedPermIds(new Set());
   };
 
+  const getGroupIds = (perms: Permission[]) =>
+    perms
+      .map((p) => p.id)
+      .filter((id) => id !== undefined && id !== null)
+      .map((id) => String(id));
+
+  const handleSelectGroup = (perms: Permission[]) => {
+    const groupIds = getGroupIds(perms);
+    setSelectedPermIds(prev => {
+      const next = new Set(prev);
+      groupIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const handleClearGroup = (perms: Permission[]) => {
+    const groupIds = new Set(getGroupIds(perms));
+    setSelectedPermIds(prev => {
+      const next = new Set(prev);
+      groupIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const getGroupSelectionState = (perms: Permission[]) => {
+    if (perms.length === 0) return { selectedCount: 0, isAllSelected: false };
+    const selectedCount = perms.reduce(
+      (count, perm) => count + (selectedPermIds.has(String(perm.id)) ? 1 : 0),
+      0
+    );
+    return { selectedCount, isAllSelected: selectedCount === perms.length };
+  };
+
   const handleSavePermissions = useCallback(async () => {
     if (!selectedRoleId) return;
     try {
@@ -505,7 +538,7 @@ function RolesAndPermissions() {
         open={isPermissionsDialogOpen}
         onOpenChange={setIsPermissionsDialogOpen}
         type="custom"
-        contentClassName="max-w-6xl"
+        contentClassName="max-w-4xl"
         title={tu('permissionsDialog.title', 'Assign permissions')}
         description={selectedRoleName ? tu('permissionsDialog.description', 'Configure permissions for "{roleName}"').replace('{roleName}', selectedRoleName) : tu('permissionsDialog.description', 'Configure permissions')}
         onSubmit={(e) => { e.preventDefault(); handleSavePermissions(); }}
@@ -513,11 +546,24 @@ function RolesAndPermissions() {
         submitDisabled={isSavingPerms || !selectedRoleId}
         submitText={tu('permissionsDialog.save', 'Save')}
       >
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div className="text-sm text-muted-foreground">
-            {isLoadingRolePerms
-              ? tu('permissionsDialog.loading', 'Loading permissions...')
-              : tu('permissionsDialog.hint', 'Select the permissions for this role')}
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={activePermTab === 'general' ? 'default' : 'outline'}
+              onClick={() => setActivePermTab('general')}
+            >
+              {tu('permissionsDialog.tabGeneral', 'General')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activePermTab === 'settings' ? 'default' : 'outline'}
+              onClick={() => setActivePermTab('settings')}
+            >
+              {tu('permissionsDialog.tabSettings', 'Settings')}
+            </Button>
           </div>
           <div className="flex gap-2">
             <Button
@@ -540,30 +586,42 @@ function RolesAndPermissions() {
             </Button>
           </div>
         </div>
-        <div className="flex mb-3 gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={activePermTab === 'general' ? 'default' : 'outline'}
-            onClick={() => setActivePermTab('general')}
-          >
-            {tu('permissionsDialog.tabGeneral', 'General')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={activePermTab === 'settings' ? 'default' : 'outline'}
-            onClick={() => setActivePermTab('settings')}
-          >
-            {tu('permissionsDialog.tabSettings', 'Settings')}
-          </Button>
-        </div>
-        <div className="max-h-[70vh] overflow-auto pr-2">
-          <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
-            {(activePermTab === 'general' ? generalGroups : settingsGroups).map(({ group, perms }) => (
-              <div key={group} className="border rounded-lg p-1.5 bg-muted/30">
-                <div className="font-semibold mb-3 capitalize text-center">{group}</div>
-                <div className="grid gap-2">
+        <div className={`max-h-[65vh] overflow-auto pr-2 space-y-4 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
+          {(activePermTab === 'general' ? generalGroups : settingsGroups).map(({ group, perms }) => {
+            const { selectedCount, isAllSelected } = getGroupSelectionState(perms);
+            return (
+              <div key={group} className="border rounded-lg bg-muted/30 overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/60">
+                  <div className="flex items-center gap-3">
+                    <div className="font-semibold text-base capitalize">{group}</div>
+                    <span className="text-xs text-muted-foreground px-2 py-0.5 bg-background/60 rounded border">
+                      {selectedCount}/{perms.length}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isAllSelected ? "default" : "outline"}
+                      onClick={() => handleSelectGroup(perms)}
+                      disabled={perms.length === 0 || isLoadingRolePerms}
+                      className="h-8"
+                    >
+                      {tu('permissionsDialog.selectGroupAll', 'All')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleClearGroup(perms)}
+                      disabled={selectedCount === 0 || isLoadingRolePerms}
+                      className="h-8"
+                    >
+                      {tu('permissionsDialog.selectGroupNone', 'None')}
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-3 grid gap-2 sm:grid-cols-2">
                   {perms.map((perm) => {
                     const raw = (perm as any).key || perm.name || [perm.action, perm.resource].filter(Boolean).join('-');
                     const tokens = (raw || '').replace(/[.:/]/g, '-').split('-').filter(Boolean);
@@ -573,33 +631,31 @@ function RolesAndPermissions() {
                     return (
                       <label
                         key={perm.id}
-                        className="w-full min-w-0 flex items-center gap-2 justify-start rounded border border-border/70 bg-background px-3.5 py-2 cursor-pointer"
+                        className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-all ${
+                          selectedPermIds.has(String(perm.id))
+                            ? 'bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100'
+                            : 'bg-background border-border hover:bg-muted/50'
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedPermIds.has(String(perm.id))}
                           onChange={() => togglePermission(perm.id)}
-                          className="h-4 w-4 accent-primary"
+                          className="h-4 w-4 accent-primary shrink-0"
                         />
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span
-                            className={`inline-flex shrink-0 min-w-[80px] justify-center items-center rounded-md px-2 py-1 text-[11px] font-semibold tracking-wide uppercase border ${
-                              selectedPermIds.has(String(perm.id))
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
-                          >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm uppercase tracking-wide text-foreground">
                             {displayName}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate">{perm.name}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{perm.name}</div>
                         </div>
                       </label>
                     );
                   })}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </SettingsDialog>
 

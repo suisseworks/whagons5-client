@@ -62,6 +62,7 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
   const templateName = props.value;
   const description = (props.data as any)?.description as string | undefined;
   const isPrivate = (props.data as any)?.is_private === true;
+  const isEnabled = (props.data as any)?.enabled !== false; // Default to true if not set
 
   return (
     <div className="flex items-center h-full space-x-2">
@@ -71,7 +72,7 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
       />
       <div className="flex flex-col justify-center flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="leading-tight">{templateName}</span>
+          <span className={`leading-tight ${!isEnabled ? 'line-through opacity-60' : ''}`}>{templateName}</span>
           {isPrivate && (
             <FontAwesomeIcon
               icon={faLock}
@@ -145,6 +146,7 @@ function Templates() {
     deleteItem,
     isSubmitting,
     formError,
+    setFormError,
     isCreateDialogOpen,
     setIsCreateDialogOpen,
     isEditDialogOpen,
@@ -753,111 +755,129 @@ function Templates() {
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
+    setFormError(null); // Clear any previous errors
+    
+    try {
+      const formData = new FormData(e.target as HTMLFormElement);
 
-    // Get form values
-    const name = formData.get('name') as string;
-    const description = (formData.get('description') as string) || null;
-    const instructions = (formData.get('instructions') as string) || null;
-    const enabled = formData.get('enabled') === 'on';
-    const expectedDurationRaw = formData.get('expected_duration') as string;
+      // Get form values
+      const name = formData.get('name') as string;
+      const description = (formData.get('description') as string) || null;
+      const instructions = (formData.get('instructions') as string) || null;
+      const enabled = formData.get('enabled') === 'on';
+      const expectedDurationRaw = formData.get('expected_duration') as string;
 
-    // Validate required fields
-    if (!name?.trim()) {
-      throw new Error(tt('validation.nameRequired', 'Template name is required'));
+      // Validate required fields
+      if (!name?.trim()) {
+        const errorMsg = tt('validation.nameRequired', 'Template name is required');
+        setFormError(errorMsg);
+        return;
+      }
+      if (!createFormData.category_id) {
+        const errorMsg = tt('validation.categoryRequired', 'Please select a category');
+        setFormError(errorMsg);
+        return;
+      }
+
+      const templateData: any = {
+        name: name.trim(),
+        description,
+        category_id: parseInt(createFormData.category_id),
+        priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
+        sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
+        approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
+        default_spot_id: createFormData.spots_not_applicable ? null : (createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null),
+        spots_not_applicable: createFormData.spots_not_applicable,
+        default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
+        instructions,
+        expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+        enabled,
+        is_private: createFormData.is_private
+      };
+
+      await createItem(templateData);
+
+      // Clear any previous error messages after successful creation
+      (window as any).__settings_error = null;
+
+      // approvals logic removed
+
+      // Reset form after successful creation
+      setCreateFormData({
+        category_id: '',
+        priority_id: '',
+        sla_id: '',
+        approval_id: '',
+        default_spot_id: '',
+        spots_not_applicable: false,
+        expected_duration: '',
+        enabled: true,
+        is_private: false
+      });
+      setCreateDefaultUserValues([]);
+      // approvals state removed
+    } catch (err: any) {
+      // Handle any unexpected errors
+      const errorMsg = err?.message || tt('validation.genericError', 'An error occurred while creating the template');
+      setFormError(errorMsg);
     }
-    if (!createFormData.category_id) {
-      throw new Error(tt('validation.categoryRequired', 'Please select a category'));
-    }
-
-    const templateData: any = {
-      name: name.trim(),
-      description,
-      category_id: parseInt(createFormData.category_id),
-      priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
-      sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
-      approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
-      default_spot_id: createFormData.spots_not_applicable ? null : (createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null),
-      spots_not_applicable: createFormData.spots_not_applicable,
-      default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
-      instructions,
-      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-      enabled,
-      is_private: createFormData.is_private
-    };
-
-    await createItem(templateData);
-
-    // Clear any previous error messages after successful creation
-    (window as any).__settings_error = null;
-
-    // approvals logic removed
-
-    // Reset form after successful creation
-    setCreateFormData({
-      category_id: '',
-      priority_id: '',
-      sla_id: '',
-      approval_id: '',
-      default_spot_id: '',
-      spots_not_applicable: false,
-      expected_duration: '',
-      enabled: true,
-      is_private: false
-    });
-    setCreateDefaultUserValues([]);
-    // approvals state removed
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
-    try {
     e.preventDefault();
+    setFormError(null); // Clear any previous errors
+    
     if (!editingTemplate) return;
 
-    const formData = new FormData(e.target as HTMLFormElement);
+    try {
+      const formData = new FormData(e.target as HTMLFormElement);
 
-    // Get form values
-    const name = (formData.get('name') as string) ?? ((editingTemplate as any)?.name ?? '');
-    const description = ((formData.get('description') as string) ?? (editingTemplate as any)?.description ?? null) as any;
-    const instructions = ((formData.get('instructions') as string) ?? (editingTemplate as any)?.instructions ?? null) as any;
-    // enabled state handled via editFormData.enabled
-    const expectedDurationRaw = (formData.get('expected_duration') as string) ?? (((editingTemplate as any)?.expected_duration != null) ? String((editingTemplate as any).expected_duration) : '');
+      // Get form values
+      const name = (formData.get('name') as string) ?? ((editingTemplate as any)?.name ?? '');
+      const description = ((formData.get('description') as string) ?? (editingTemplate as any)?.description ?? null) as any;
+      const instructions = ((formData.get('instructions') as string) ?? (editingTemplate as any)?.instructions ?? null) as any;
+      // enabled state handled via editFormData.enabled
+      const expectedDurationRaw = (formData.get('expected_duration') as string) ?? (((editingTemplate as any)?.expected_duration != null) ? String((editingTemplate as any).expected_duration) : '');
 
-    // Validate required fields
-    if (!name?.toString()?.trim()) {
-      throw new Error(tt('validation.nameRequired', 'Template name is required'));
-    }
-    if (!editFormData.category_id) {
-      throw new Error(tt('validation.categoryRequired', 'Please select a category'));
-    }
+      // Validate required fields
+      if (!name?.toString()?.trim()) {
+        const errorMsg = tt('validation.nameRequired', 'Template name is required');
+        setFormError(errorMsg);
+        return;
+      }
+      if (!editFormData.category_id) {
+        const errorMsg = tt('validation.categoryRequired', 'Please select a category');
+        setFormError(errorMsg);
+        return;
+      }
 
-    const updates: any = {
-      name: name.trim(),
-      description,
-      category_id: parseInt(editFormData.category_id),
-      priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
-      sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
-      approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
-      default_spot_id: editFormData.spots_not_applicable ? null : (editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null),
-      spots_not_applicable: editFormData.spots_not_applicable,
-      default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
-      instructions,
-      expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-      enabled: editFormData.enabled,
-      is_private: editFormData.is_private
-    };
+      const updates: any = {
+        name: name.trim(),
+        description,
+        category_id: parseInt(editFormData.category_id),
+        priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
+        sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
+        approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
+        default_spot_id: editFormData.spots_not_applicable ? null : (editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null),
+        spots_not_applicable: editFormData.spots_not_applicable,
+        default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
+        instructions,
+        expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+        enabled: editFormData.enabled,
+        is_private: editFormData.is_private
+      };
 
-    await updateItem(editingTemplate.id, updates);
+      await updateItem(editingTemplate.id, updates);
 
-    // Clear any previous error messages after successful update
-    (window as any).__settings_error = null;
+      // Clear any previous error messages after successful update
+      (window as any).__settings_error = null;
 
-    // approvals logic removed
+      // approvals logic removed
     } catch (err: any) {
       console.error('Edit template submit failed:', err);
-      // Surface a simple error into the dialog footer
-      const msg = (err?.message || 'Update failed');
-      (window as any).__settings_error = msg;
+      // Handle validation errors and API errors
+      const errorMsg = err?.message || tt('validation.genericError', 'An error occurred while updating the template');
+      setFormError(errorMsg);
     }
   };
 
@@ -955,7 +975,11 @@ function Templates() {
         onRetry: () => window.location.reload()
       } : undefined}
       headerActions={
-        <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)} 
+          size="default"
+          className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+        >
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
           {tt('header.addTemplate', 'Add Template')}
         </Button>

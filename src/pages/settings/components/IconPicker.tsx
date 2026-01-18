@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { iconService } from '@/database/iconService';
 
 // Lazy-loading icon button component
@@ -93,7 +94,6 @@ export function IconPicker({
   const [currentIcon, setCurrentIcon] = useState<any>(null);
   const [isSearching, setIsSearching] = useState(false);
   
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Load default icon and popular icons
@@ -228,111 +228,90 @@ export function IconPicker({
     });
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-        setIconSearch('');
-      }
-    };
-
-    if (showDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showDropdown]);
-
   const iconName = (value || '').replace('fas fa-', '');
 
   const fieldContent = (
-    <div className="relative" ref={dropdownRef}>
-      <div
-        className="flex items-center justify-between w-full px-3 py-2 border border-input bg-background rounded-md cursor-pointer hover:bg-accent transition-colors"
-        onClick={() => setShowDropdown(!showDropdown)}
-      >
-        <div className="flex items-center space-x-2">
-          {currentIcon ? (
-            <FontAwesomeIcon 
-              icon={currentIcon} 
-              className="w-4 h-4" 
-              style={{ color }}
-            />
-          ) : (
-            <span className="inline-block w-4 h-4 rounded-full border" style={{ backgroundColor: color }} />
-          )}
-          <span className="text-sm">{iconName || 'none'}</span>
-        </div>
-        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-      </div>
-      
-      {showDropdown && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-popover text-popover-foreground border rounded-lg shadow-lg z-[100] overflow-visible animate-in fade-in-0 zoom-in-95">
-          <div className="p-3">
-            {/* Search input at the top */}
-            <Input
-              placeholder="Search icons... (e.g., heart, user, star)"
-              value={iconSearch}
-              onChange={(e) => setIconSearch(e.target.value)}
-              className="mb-2"
-              autoFocus
-            />
-            
-            <div className="text-xs text-muted-foreground mb-2">
-              {loadingIcons ? 'Searching icons...' : 
-               isSearching ? 
-                 `${displayedIcons.length} icons found for "${iconSearch}"` :
-                 `${displayedIcons.length} popular icons • ${totalIconsCount} total icons available`}
-            </div>
-            <div 
-              ref={scrollContainerRef}
-              className="grid grid-cols-8 gap-1 overflow-y-scroll overflow-x-hidden"
-              style={{ 
-                height: '260px',
-                scrollbarWidth: 'thin'
-              }}
-              onScroll={handleIconScroll}
-            >
-              {loadingIcons ? (
-                <div className="col-span-8 text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                </div>
-              ) : (
-                <>
-                  {displayedIcons.map((item, index) => (
-                    <IconButton
-                      key={`${item.name}-${index}`}
-                      iconName={item.name}
-                      icon={item.icon}
-                      onClick={() => handleIconSelect(item.name)}
-                      title={item.name}
-                    />
-                  ))}
-                  {loadingMoreIcons && (
-                    <div className="col-span-8 text-center py-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            {!loadingIcons && !isSearching && loadedIconsCount < totalIconsCount && (
-              <div className="text-xs text-muted-foreground mt-2 text-center">
-                Scroll down to load more icons ({loadedIconsCount} of {totalIconsCount} loaded)
-              </div>
+    <Popover open={showDropdown} onOpenChange={setShowDropdown}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center justify-between w-full px-3 py-2 border border-input bg-background rounded-md cursor-pointer hover:bg-accent transition-colors"
+        >
+          <div className="flex items-center space-x-2">
+            {currentIcon ? (
+              <FontAwesomeIcon 
+                icon={currentIcon} 
+                className="w-4 h-4" 
+                style={{ color }}
+              />
+            ) : (
+              <span className="inline-block w-4 h-4 rounded-full border" style={{ backgroundColor: color }} />
             )}
-            {!loadingIcons && displayedIcons.length === 0 && (
-              <div className="text-center text-muted-foreground py-4">
-                {iconSearch.trim() ? 'No icons found. Try different search terms.' : 'No popular icons available.'}
-              </div>
-            )}
+            <span className="text-sm">{iconName || 'none'}</span>
           </div>
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-3" align="start">
+        {/* Search input at the top */}
+        <Input
+          placeholder="Search icons... (e.g., heart, user, star)"
+          value={iconSearch}
+          onChange={(e) => setIconSearch(e.target.value)}
+          className="mb-2"
+          autoFocus
+        />
+        
+        <div className="text-xs text-muted-foreground mb-2">
+          {loadingIcons ? 'Searching icons...' : 
+           isSearching ? 
+             `${displayedIcons.length} icons found for "${iconSearch}"` :
+             `${displayedIcons.length} popular icons • ${totalIconsCount} total icons available`}
         </div>
-      )}
-    </div>
+        <div 
+          ref={scrollContainerRef}
+          className="grid grid-cols-8 gap-1 overflow-y-scroll overflow-x-hidden"
+          style={{ 
+            height: '260px',
+            scrollbarWidth: 'thin'
+          }}
+          onScroll={handleIconScroll}
+        >
+          {loadingIcons ? (
+            <div className="col-span-8 text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+            </div>
+          ) : (
+            <>
+              {displayedIcons.map((item, index) => (
+                <IconButton
+                  key={`${item.name}-${index}`}
+                  iconName={item.name}
+                  icon={item.icon}
+                  onClick={() => handleIconSelect(item.name)}
+                  title={item.name}
+                />
+              ))}
+              {loadingMoreIcons && (
+                <div className="col-span-8 text-center py-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {!loadingIcons && !isSearching && loadedIconsCount < totalIconsCount && (
+          <div className="text-xs text-muted-foreground mt-2 text-center">
+            Scroll down to load more icons ({loadedIconsCount} of {totalIconsCount} loaded)
+          </div>
+        )}
+        {!loadingIcons && displayedIcons.length === 0 && (
+          <div className="text-center text-muted-foreground py-4">
+            {iconSearch.trim() ? 'No icons found. Try different search terms.' : 'No popular icons available.'}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 
   if (label) {

@@ -116,8 +116,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   );
 
   const handleRowClick = useCallback((e: any, onOpenTaskDialogCb?: (task: any) => void) => {
-    // Don't open dialog when clicking ID column, status cell, or notes column
-    if (e?.column?.colId === 'id' || e?.column?.colId === 'status_id' || e?.column?.colId === 'notes') {
+    // Don't open dialog when clicking ID column, status cell, notes column, or config column
+    if (e?.column?.colId === 'id' || e?.column?.colId === 'status_id' || e?.column?.colId === 'notes' || e?.column?.colId === 'config') {
       return;
     }
     
@@ -126,7 +126,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       const statusCell = target.closest('.ag-cell[col-id="status_id"]');
       const idCell = target.closest('.ag-cell[col-id="id"]');
       const notesCell = target.closest('.ag-cell[col-id="notes"]');
-      if (statusCell || idCell || notesCell) return;
+      const configCell = target.closest('.ag-cell[col-id="config"]');
+      if (statusCell || idCell || notesCell || configCell) return;
     }
 
     if (onOpenTaskDialogCb && e?.data) onOpenTaskDialogCb(e.data);
@@ -236,7 +237,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   );
 
   const getDoneStatusId = useDoneStatusId(globalStatusesRef);
-  const handleChangeStatus = useStatusChange();
+  const handleChangeStatus = useStatusChange(statusMap, getDoneStatusId, categories);
 
   const { useClientSide, clientRows, setClientRows } = useWorkspaceTableMode({
     gridApi: gridRef.current?.api,

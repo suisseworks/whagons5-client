@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp, Trash2 } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -34,6 +34,10 @@ import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { removeTaskAsync } from '@/store/reducers/tasksSlice';
+import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
+import toast from 'react-hot-toast';
+import type { AppDispatch } from '@/store/store';
 
 const WORKSPACE_TAB_PATHS = {
   grid: '',
@@ -50,7 +54,7 @@ const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler'
 
 export const Workspace = () => {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -260,6 +264,50 @@ export const Workspace = () => {
 
   // Selected tasks (for bulk actions)
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Handle delete of selected tasks
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    
+    setDeleteDialogOpen(false);
+    const taskCount = selectedIds.length;
+    const taskIds = [...selectedIds];
+    
+    // Clear selection immediately
+    setSelectedIds([]);
+    tableRef.current?.clearSelection?.();
+    
+    // Delete all selected tasks
+    const deletePromises = taskIds.map(taskId => 
+      dispatch(removeTaskAsync(taskId)).unwrap().catch((error: any) => {
+        console.error(`Failed to delete task ${taskId}:`, error);
+        return { error, taskId };
+      })
+    );
+    
+    const results = await Promise.allSettled(deletePromises);
+    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.error));
+    const succeeded = results.filter(r => r.status === 'fulfilled' && !r.value?.error);
+    
+    if (succeeded.length > 0) {
+      toast.success(
+        succeeded.length === taskCount
+          ? `Deleted ${succeeded.length} task${succeeded.length > 1 ? 's' : ''}`
+          : `Deleted ${succeeded.length} of ${taskCount} task${taskCount > 1 ? 's' : ''}`,
+        { duration: 5000 }
+      );
+    }
+    
+    if (failed.length > 0) {
+      toast.error(
+        `Failed to delete ${failed.length} task${failed.length > 1 ? 's' : ''}`,
+        { duration: 5000 }
+      );
+    }
+  };
+  
   // Metadata for filters
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
@@ -773,34 +821,34 @@ export const Workspace = () => {
       key: 'total',
       label: t('workspace.stats.total', 'Total'),
       value: formatStatValue(stats.total),
-      icon: <BarChart3 className="h-4 w-4" />,
-      badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-200',
-      barClass: 'from-indigo-50 to-indigo-100'
+      icon: <BarChart3 className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20',
+      barClass: 'from-indigo-500 via-indigo-400 to-indigo-500'
     },
     {
       key: 'inProgress',
       label: t('workspace.stats.inProgress', 'In progress'),
       value: formatStatValue(stats.inProgress),
-      icon: <Activity className="h-4 w-4" />,
-      badgeClass: 'bg-sky-100 text-sky-900 border-sky-200',
-      barClass: 'from-sky-50 to-sky-100'
+      icon: <Activity className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-amber-500 to-orange-500 text-white border-amber-600 shadow-lg shadow-amber-500/20',
+      barClass: 'from-amber-500 via-amber-400 to-amber-500'
     },
     {
       key: 'completedToday',
       label: t('workspace.stats.completedToday', 'Completed today'),
       value: formatStatValue(stats.completedToday),
-      icon: <Sparkles className="h-4 w-4" />,
-      badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-200',
-      barClass: 'from-emerald-50 to-emerald-100',
+      icon: <Sparkles className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20',
+      barClass: 'from-emerald-500 via-emerald-400 to-emerald-500',
       helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
     },
     {
       key: 'trend',
       label: t('workspace.stats.sevenDayTrend', '7-day trend'),
       value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
-      icon: <TrendingUp className="h-4 w-4" />,
-      badgeClass: 'bg-purple-100 text-purple-900 border-purple-200',
-      barClass: 'from-purple-50 to-purple-100',
+      icon: <TrendingUp className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white border-purple-600 shadow-lg shadow-purple-500/20',
+      barClass: 'from-purple-500 via-purple-400 to-purple-500',
       sparkline: <TrendSparkline data={stats.trend} />,
       helperText: statsArePending 
         ? '' 
@@ -817,35 +865,53 @@ export const Workspace = () => {
           <div className="flex-1 min-w-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {kpiCards.map((card) => (
-                <div
+                <motion.div
                   key={card.key}
-                  className="relative overflow-hidden rounded-xl border bg-card/90 backdrop-blur-sm shadow-sm border-border/60 workspace-kpi-card"
+                  className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-card/95 to-card/80 backdrop-blur-sm shadow-md hover:shadow-lg border-border/60 workspace-kpi-card group transition-all duration-300 hover:-translate-y-0.5 cursor-pointer"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  whileHover={{ scale: 1.02 }}
                 >
-                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass}`} />
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <div className={`flex items-center justify-center flex-shrink-0 rounded-lg p-2 border ${card.badgeClass} workspace-kpi-icon`}>
+                  {/* Animated gradient top bar */}
+                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass} animate-gradient-x`} />
+                  
+                  {/* Subtle background gradient overlay */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${card.barClass} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+                  
+                  <div className="flex items-center gap-3 px-4 py-3 relative z-10">
+                    <motion.div 
+                      className={`flex items-center justify-center flex-shrink-0 rounded-xl p-2.5 border-2 ${card.badgeClass} workspace-kpi-icon group-hover:scale-110 transition-transform duration-300`}
+                      whileHover={{ rotate: [0, -5, 5, -5, 0] }}
+                      transition={{ duration: 0.5 }}
+                    >
                       {card.icon}
-                    </div>
+                    </motion.div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/90 truncate">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
                         {card.label}
                       </div>
-                      <div className="text-xl font-semibold leading-tight text-foreground truncate">
+                      <motion.div 
+                        className="text-2xl font-bold leading-tight text-foreground truncate"
+                        initial={{ scale: 0.9 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                      >
                         {card.value}
-                      </div>
+                      </motion.div>
                       {card.helperText ? (
-                        <div className="text-[11px] text-muted-foreground truncate">
+                        <div className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
                           {card.helperText}
                         </div>
                       ) : null}
                     </div>
                     {card.sparkline ? (
-                      <div className="flex-shrink-0 w-24 sm:w-28">
+                      <div className="flex-shrink-0 w-24 sm:w-28 opacity-80 group-hover:opacity-100 transition-opacity">
                         {card.sparkline}
                       </div>
                     ) : null}
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -904,6 +970,16 @@ export const Workspace = () => {
           </Button>
           <Button variant="ghost" size="sm" title="Reschedule" aria-label="Reschedule" disabled>
             <CalendarDays className="h-4 w-4 mr-1" /> Reschedule
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            title="Delete selected tasks" 
+            aria-label="Delete selected tasks"
+            onClick={() => setDeleteDialogOpen(true)}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Delete
           </Button>
           <div className="ml-auto" />
           <Button
@@ -1020,6 +1096,12 @@ export const Workspace = () => {
         task={selectedTask} 
       />
       <TaskNotesModal />
+      <DeleteTaskDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteSelected}
+        taskName={selectedIds.length === 1 ? undefined : `${selectedIds.length} tasks`}
+      />
     </div>
 
   );

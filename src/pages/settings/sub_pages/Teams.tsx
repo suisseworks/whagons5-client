@@ -526,7 +526,8 @@ function Teams() {
             {tt('header.manageUsers', 'Manage Users')}
           </Button>
           <Button
-            size="sm"
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="mr-2" />

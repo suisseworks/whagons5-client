@@ -1326,6 +1326,7 @@ export const esTranslations: Record<string, string> = {
   "sidebar.spaces": "Espacios",
   "sidebar.more": "Más",
   "sidebar.less": "Menos",
+  "sidebar.activity": "Monitor de Actividad",
   "sidebar.compliance": "Cumplimiento",
   "sidebar.analytics": "Analítica",
   "sidebar.plugins": "Complementos",

@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Workspace, Task, Category, Team } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,8 @@ import {
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useAuth } from "@/providers/AuthProvider";
+import { api } from "@/api/whagonsApi";
 
 // Custom cell renderer for workspace name with color indicator
 const WorkspaceNameCellRenderer = (props: ICellRendererParams) => {
@@ -50,11 +52,175 @@ const WorkspaceNameCellRenderer = (props: ICellRendererParams) => {
 function Workspaces() {
   const { t } = useLanguage();
   const tw = (key: string, fallback: string) => t(`settings.workspaces.${key}`, fallback);
+  const { user, refetchUser, updateUser } = useAuth();
+  
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: teams } = useSelector((state: RootState) => state.teams);
   const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
+  
+  // Get hidden workspace IDs from user settings
+  const hiddenWorkspaceIds = useMemo(() => {
+    return new Set((user?.settings?.hiddenWorkspaces || []) as number[]);
+  }, [user?.settings?.hiddenWorkspaces]);
+  
+  // Local optimistic state for immediate UI updates
+  const [optimisticHiddenIds, setOptimisticHiddenIds] = useState<Set<number> | null>(null);
+  const isTogglingRef = useRef<Set<number>>(new Set());
+  const lastUpdateRef = useRef<Set<number> | null>(null);
+  
+  // Use optimistic state if available, otherwise fall back to user settings
+  const effectiveHiddenIds = optimisticHiddenIds ?? hiddenWorkspaceIds;
+  
+  // Toggle workspace visibility with optimistic updates
+  const handleToggleWorkspaceVisibility = useCallback(async (workspaceId: number, e?: React.MouseEvent) => {
+    console.log('Toggle visibility clicked for workspace:', workspaceId);
+    
+    // Prevent any default behavior or event propagation
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    // Prevent multiple simultaneous toggles for the same workspace
+    if (isTogglingRef.current.has(workspaceId)) {
+      console.log('Already toggling, ignoring');
+      return;
+    }
+    
+    if (!user) {
+      console.warn('Cannot toggle workspace visibility: user not loaded');
+      return;
+    }
+    
+    try {
+      // Mark as toggling
+      isTogglingRef.current.add(workspaceId);
+      
+      // Optimistically update UI immediately
+      const currentHidden = new Set(effectiveHiddenIds);
+      const wasHidden = currentHidden.has(workspaceId);
+      
+      console.log('Current state - isHidden:', wasHidden, 'effectiveHiddenIds:', Array.from(effectiveHiddenIds));
+      
+      if (wasHidden) {
+        currentHidden.delete(workspaceId);
+      } else {
+        currentHidden.add(workspaceId);
+      }
+      
+      const newHiddenSet = new Set(currentHidden);
+      
+      console.log('New state - hiddenWorkspaces:', Array.from(newHiddenSet));
+      
+      // Store the expected state for later comparison
+      lastUpdateRef.current = newHiddenSet;
+      
+      // Update optimistic state immediately
+      setOptimisticHiddenIds(newHiddenSet);
+      console.log('Optimistic state updated');
+      
+      const newSettings = {
+        ...(user.settings || {}),
+        hiddenWorkspaces: Array.from(newHiddenSet),
+      };
+      
+      // Update server
+      console.log('Sending API request with settings:', newSettings);
+      const response = await api.patch('/users/me', { settings: newSettings });
+      console.log('API request successful', response.data);
+      
+      // Verify the response contains the updated settings
+      const updatedUser = response?.data?.data || response?.data;
+      console.log('API response user data:', updatedUser);
+      console.log('API response settings:', updatedUser?.settings);
+      
+      if (updatedUser?.settings?.hiddenWorkspaces) {
+        const serverHiddenSet = new Set((updatedUser.settings.hiddenWorkspaces || []) as number[]);
+        console.log('Server returned hiddenWorkspaces:', Array.from(serverHiddenSet));
+        
+        // Verify it matches what we sent
+        if (serverHiddenSet.size === newHiddenSet.size && 
+            Array.from(serverHiddenSet).every(id => newHiddenSet.has(id))) {
+          console.log('✅ Server response matches our update');
+        } else {
+          console.warn('⚠️ Server response does not match our update!', {
+            sent: Array.from(newHiddenSet),
+            received: Array.from(serverHiddenSet)
+          });
+        }
+      } else {
+        console.warn('⚠️ API response does not include hiddenWorkspaces in settings');
+        console.log('Full response:', JSON.stringify(response?.data, null, 2));
+      }
+      
+      // Update user state directly from API response without full refetch
+      // This avoids the blank screen flash
+      if (updatedUser) {
+        updateUser(updatedUser);
+        console.log('User state updated directly from API response (no refresh)');
+      } else {
+        // Fallback: if response doesn't have user data, do a silent background refetch
+        setTimeout(async () => {
+          try {
+            await refetchUser();
+            console.log('User state updated from background refetch');
+          } catch (refetchError) {
+            console.warn('Failed to refetch user, but API update succeeded:', refetchError);
+          }
+        }, 1000); // Delay to avoid immediate refresh
+      }
+    } catch (error: any) {
+      console.error('Failed to update workspace visibility:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Revert optimistic update on error
+      setOptimisticHiddenIds(null);
+      lastUpdateRef.current = null;
+      
+      // Show error without causing page refresh
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      console.error('Error message:', errorMessage);
+      // Use a non-blocking error notification instead of alert
+      // alert() can sometimes cause issues, so we'll just log it for now
+      // You can replace this with a toast notification if available
+      alert(`Failed to update workspace visibility: ${errorMessage}`);
+    } finally {
+      // Remove from toggling set
+      isTogglingRef.current.delete(workspaceId);
+    }
+  }, [user, effectiveHiddenIds, updateUser]);
+  
+  // Clear optimistic state when user data updates and matches our optimistic state
+  
+  useEffect(() => {
+    if (optimisticHiddenIds && user?.settings?.hiddenWorkspaces && lastUpdateRef.current) {
+      const serverHiddenSet = new Set((user.settings.hiddenWorkspaces || []) as number[]);
+      const expectedSet = lastUpdateRef.current;
+      
+      // Only clear if server state matches our expected state
+      const setsMatch = serverHiddenSet.size === expectedSet.size && 
+          Array.from(serverHiddenSet).every(id => expectedSet.has(id)) &&
+          Array.from(expectedSet).every(id => serverHiddenSet.has(id));
+      
+      if (setsMatch) {
+        console.log('Server state matches optimistic state, clearing optimistic state');
+        setOptimisticHiddenIds(null);
+        lastUpdateRef.current = null;
+      } else {
+        console.log('Server state does not match optimistic state yet', {
+          optimistic: Array.from(optimisticHiddenIds),
+          expected: Array.from(expectedSet),
+          server: Array.from(serverHiddenSet)
+        });
+      }
+    }
+  }, [user?.settings?.hiddenWorkspaces, optimisticHiddenIds]);
 
   // Statistics state
   const [statsLoading, setStatsLoading] = useState(false);
@@ -311,6 +477,51 @@ function Workspaces() {
       }
     },
     {
+      field: 'visibility',
+      headerName: tw('grid.columns.visibility', 'Visibility'),
+      width: 100,
+      cellRenderer: (params: ICellRendererParams) => {
+        const workspace = params.data as Workspace;
+        const workspaceId = Number(workspace.id);
+        const isHidden = effectiveHiddenIds.has(workspaceId);
+        return (
+          <div className="flex items-center justify-center h-full w-full">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-accent transition-colors cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+                console.log('Button clicked for workspace:', workspaceId);
+                handleToggleWorkspaceVisibility(workspaceId, e);
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+              }}
+              disabled={!user}
+              title={isHidden ? tw('grid.actions.show', 'Show workspace') : tw('grid.actions.hide', 'Hide workspace')}
+            >
+              <FontAwesomeIcon 
+                icon={isHidden ? faEyeSlash : faEye} 
+                className={isHidden ? "text-muted-foreground" : "text-primary"}
+              />
+            </Button>
+          </div>
+        );
+      },
+      sortable: false,
+      filter: false,
+      resizable: false,
+      pinned: 'right',
+      suppressMovable: true,
+      cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' }
+    },
+    {
       field: 'actions',
       headerName: tw('grid.columns.actions', 'Actions'),
       width: 100,
@@ -322,7 +533,7 @@ function Workspaces() {
       resizable: false,
       pinned: 'right'
     }
-  ], [categories, handleEdit, handleDeleteWorkspace]);
+  ], [categories, handleEdit, handleDeleteWorkspace, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -426,7 +637,11 @@ function Workspaces() {
         onRetry: () => window.location.reload()
       } : undefined}
       headerActions={
-        <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)} 
+          size="default"
+          className="bg-primary/80 backdrop-blur-sm text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+        >
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
           {tw('header.addWorkspace', 'Add Workspace')}
         </Button>
@@ -450,6 +665,10 @@ function Workspaces() {
                     columnDefs={colDefs}
                     noRowsMessage={tw('grid.noRows', 'No workspaces found')}
                     onRowDoubleClicked={handleEdit}
+                    gridOptions={{
+                      suppressRowClickSelection: true,
+                      suppressCellFocus: true
+                    }}
                   />
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import MistEffect from "./MistEffect";
 
 type RotatingBackgroundProps = {
   images: string[];
@@ -14,6 +15,27 @@ type RotatingBackgroundProps = {
 function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+}
+
+/**
+ * Check if an image URL likely contains clouds/mountains based on known patterns.
+ * This is a heuristic based on the heroBackgrounds.ts image list.
+ */
+function hasCloudsOrMountains(imageUrl: string | undefined): boolean {
+  if (!imageUrl) return false;
+  
+  // Check for known cloud/mountain/nature image IDs from heroBackgrounds.ts
+  // These are the Unsplash photo IDs that contain mountains/clouds/mist/ocean
+  const cloudMountainPatterns = [
+    '1507525428034', // ocean / waves
+    '1441974231531', // forest path
+    '1619973528933', // on a mountain peak
+    '1469474968028', // mountain range / mist
+    '1502126324834', // climbing a mountain
+    '1506905925346', // mountain lake reflection
+  ];
+  
+  return cloudMountainPatterns.some(pattern => imageUrl.includes(pattern));
 }
 
 export default function RotatingBackground({
@@ -100,6 +122,19 @@ export default function RotatingBackground({
 
   const current = usableImages?.[currentIndex];
   const next = usableImages?.[nextIndex];
+  
+  // Debug logging
+  useEffect(() => {
+    if (current) {
+      const shouldShow = hasCloudsOrMountains(current);
+      console.log('[RotatingBackground] Current image:', current);
+      console.log('[RotatingBackground] Should show mist:', shouldShow);
+    }
+  }, [current]);
+  
+  // Determine if we should show mist effect based on current or next image
+  // TEMPORARY: Show mist on ALL images for testing
+  const showMist = true; // hasCloudsOrMountains(current) || hasCloudsOrMountains(next);
 
   return (
     <div className={cn("relative overflow-hidden", className)}>
@@ -118,6 +153,16 @@ export default function RotatingBackground({
         )}
         style={{ backgroundImage: next ? `url(${next})` : undefined, opacity: showNext ? 1 : 0 }}
       />
+
+      {/* Mist effect overlay for cloud/mountain images */}
+      {showMist && (
+        <div className={cn(
+          "absolute inset-0 z-[1]",
+          canAnimate && "transition-opacity duration-1000 ease-in-out"
+        )}>
+          <MistEffect intensity={0.5} startHeight={0.35} />
+        </div>
+      )}
 
       {/* Foreground */}
       {children ? <div className="relative z-10 h-full w-full">{children}</div> : null}

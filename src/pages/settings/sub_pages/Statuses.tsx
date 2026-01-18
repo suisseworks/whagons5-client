@@ -130,6 +130,7 @@ function Statuses() {
   const [formIcon, setFormIcon] = useState("fas fa-circle");
   const [formInitial, setFormInitial] = useState(false);
   const [formSystem, setFormSystem] = useState(false);
+  const [formCelebrationEnabled, setFormCelebrationEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -191,6 +192,7 @@ function Statuses() {
     setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
     setFormInitial(!!row.initial);
     setFormSystem(!!row.system);
+    setFormCelebrationEnabled(row.celebration_enabled !== false); // Default to true
     setFormError(null);
     setEditOpen(true);
   };
@@ -478,6 +480,7 @@ function Statuses() {
                 setFormIcon(row.icon ? (row.icon.startsWith('fas ') ? row.icon : `fas fa-${row.icon}`) : "fas fa-circle");
                 setFormInitial(!!row.initial);
                 setFormSystem(!!row.system);
+                setFormCelebrationEnabled(row.celebration_enabled !== false); // Default to true
                 setFormError(null);
                 setEditOpen(true);
               }}
@@ -920,13 +923,17 @@ function Statuses() {
       }}
       headerActions={
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => {
+          <Button 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+            onClick={() => {
             setFormName("");
             setFormAction("");
             setFormColor("#888888");
             setFormIcon("fas fa-circle");
             setFormInitial(false);
             setFormSystem(false);
+            setFormCelebrationEnabled(true);
             setFormError(null);
             setCreateOpen(true);
           }}>
@@ -973,7 +980,8 @@ function Statuses() {
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
-                initial: !!formInitial
+                initial: !!formInitial,
+                celebration_enabled: !!formCelebrationEnabled
               };
               const result: any = await dispatch(genericActions.statuses.addAsync(payload));
               if (result?.meta?.requestStatus === 'rejected') {
@@ -994,6 +1002,7 @@ function Statuses() {
         <IconPicker label={ts("fields.icon", "Icono")} value={formIcon} onChange={setFormIcon} color={formColor} />
         <CheckboxField label={ts("fields.initial", "Inicial")} checked={formInitial} onChange={setFormInitial} />
         <CheckboxField label={ts("fields.system", "Sistema")} checked={formSystem} onChange={setFormSystem} />
+        <CheckboxField label={ts("fields.celebrationEnabled", "Enable Celebration")} checked={formCelebrationEnabled} onChange={setFormCelebrationEnabled} description={ts("fields.celebrationEnabledDescription", "Trigger celebration animation when tasks reach this status")} />
       </SettingsDialog>
 
       <SettingsDialog
@@ -1026,7 +1035,8 @@ function Statuses() {
                 color: formColor,
                 icon: formIcon,
                 system: !!formSystem,
-                initial: !!formInitial
+                initial: !!formInitial,
+                celebration_enabled: !!formCelebrationEnabled
               };
               const result: any = await dispatch(genericActions.statuses.updateAsync({ id: selectedStatus.id, updates }));
               if (result?.meta?.requestStatus === 'rejected') {

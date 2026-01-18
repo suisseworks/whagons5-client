@@ -206,7 +206,11 @@ function Boards() {
               className="pl-10 w-64"
             />
           </div>
-          <Button onClick={handleCreateButtonClick}>
+          <Button 
+            onClick={handleCreateButtonClick}
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          >
             <Plus className="w-4 h-4 mr-2" />
             {t('settings.boards.create', 'Create Board')}
           </Button>

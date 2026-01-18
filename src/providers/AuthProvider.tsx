@@ -33,6 +33,7 @@ interface AuthContextType {
   hydrating: boolean;
   hydrationError: string | null;
   refetchUser: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 // Create the context
@@ -354,6 +355,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Update user state directly without full refetch (for optimistic updates)
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      setUser({ ...user, ...updates });
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       // console.log('AuthContext: Auth state changed:', currentUser?.uid);
@@ -446,6 +454,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         hydrating,
         hydrationError,
         refetchUser,
+        updateUser,
       }}
     >
       {children}

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Flag, CheckCircle2, Clock, XCircle, MessageSquare } from 'lucide-react';
+import { Flag, CheckCircle2, Clock, XCircle, MessageSquare, Check, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,6 +14,7 @@ import { faTags } from '@fortawesome/free-solid-svg-icons';
 import { getContrastTextColor } from './columnUtils/color';
 import { useIconDefinition } from './columnUtils/icon';
 import { promptForComment } from './columnUtils/promptForComment';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
 
 
 export function buildWorkspaceColumns(opts: any) {
@@ -235,8 +236,11 @@ export function buildWorkspaceColumns(opts: any) {
     const resolutionLabel = formatSlaDuration(sla?.resolution_time);
     const priorityLabel = sla?.priority_id ? `Priority #${sla.priority_id}` : null;
     const pill = (
-      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10 flex-shrink-0 cursor-pointer"
-        style={{ backgroundColor: 'rgba(139, 92, 246, 0.1)' }}>
+      <div 
+        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-opacity-10 flex-shrink-0 cursor-pointer"
+        style={{ backgroundColor: 'rgba(139, 92, 246, 0.1)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <Clock className="w-3.5 h-3.5 text-purple-600" />
         <span className="text-[11px] font-medium text-purple-600">SLA</span>
       </div>
@@ -288,9 +292,22 @@ export function buildWorkspaceColumns(opts: any) {
 
   // Helper function to render approval/SLA badge
   const renderApprovalOrSLA = (p: any) => {
-    const row = p?.data || {};
+    // Prefer node.data over p.data for more up-to-date information
+    // node.data is updated when we call node.setData()
+    const row = p?.node?.data || p?.data || {};
     const approvalId = row?.approval_id;
     const approvalStatus = row?.approval_status;
+    
+    // Debug log to verify cell renderer is getting updated data
+    if (row?.id && (approvalStatus === 'approved' || approvalStatus === 'rejected')) {
+      console.log('[CellRenderer] renderApprovalOrSLA called with:', {
+        taskId: row.id,
+        approvalStatus: approvalStatus,
+        nodeDataApprovalStatus: p?.node?.data?.approval_status,
+        pDataApprovalStatus: p?.data?.approval_status,
+        usingNodeData: !!p?.node?.data
+      });
+    }
     const categoryId = row?.category_id;
     const category = categoryId ? categoryMap[Number(categoryId)] : null;
     const slaId = row?.sla_id ?? category?.sla_id;
@@ -414,7 +431,7 @@ export function buildWorkspaceColumns(opts: any) {
         return;
       }
       try {
-        await api.post('/approvals/decide', {
+        const response = await api.post('/approvals/decide', {
           task_id: p.data?.id,
           approval_id: approvalId,
           approver_user_id: approverUserIdToSend,
@@ -422,12 +439,170 @@ export function buildWorkspaceColumns(opts: any) {
           comment,
           task_status_id: p.data?.status_id,
         });
-        // Update row locally for immediate feedback
-        if (p.data) {
-          p.data.approval_status = decision;
-          p.data.approval_completed_at = new Date().toISOString();
-          try { p.api?.refreshCells({ force: true }); } catch {}
+        
+        console.log('Approval decision response:', response.data);
+        
+        // Update row with response data immediately
+        if (p.data && response.data?.data) {
+          const responseData = response.data.data;
+          const updatedTask = responseData.task;
+          const updatedInstances = responseData.instances;
+          
+          console.log('Response data structure:', {
+            hasTask: !!updatedTask,
+            hasInstances: Array.isArray(updatedInstances),
+            taskApprovalStatus: updatedTask?.approval_status,
+            taskKeys: updatedTask ? Object.keys(updatedTask) : []
+          });
+          
+          // Update all relevant fields from the server response
+          if (updatedTask) {
+            // Always update approval_status if present in response
+            if (updatedTask.approval_status !== undefined && updatedTask.approval_status !== null) {
+              p.data.approval_status = String(updatedTask.approval_status).toLowerCase();
+              console.log('Updated approval_status from task:', p.data.approval_status);
+            }
+            if (updatedTask.approval_completed_at !== undefined) {
+              p.data.approval_completed_at = updatedTask.approval_completed_at;
+            }
+            if (updatedTask.status_id !== undefined) {
+              p.data.status_id = updatedTask.status_id;
+            }
+          }
+          
+          // Fallback: Calculate approval status from instances if not provided or still pending
+          if ((!p.data.approval_status || p.data.approval_status === 'pending') && Array.isArray(updatedInstances) && updatedInstances.length > 0) {
+            const hasReject = updatedInstances.some((inst: any) => 
+              inst.status && String(inst.status).toLowerCase() === 'rejected'
+            );
+            const allApproved = updatedInstances.length > 0 && 
+              updatedInstances.every((inst: any) => 
+                inst.status && String(inst.status).toLowerCase() === 'approved'
+              );
+            
+            if (hasReject) {
+              p.data.approval_status = 'rejected';
+            } else if (allApproved) {
+              p.data.approval_status = 'approved';
+              console.log('Calculated approval_status as approved from instances');
+            } else {
+              p.data.approval_status = 'pending';
+            }
+            
+            console.log('Calculated approval status from instances:', {
+              approval_status: p.data.approval_status,
+              instances: updatedInstances.map((inst: any) => ({ id: inst.id, status: inst.status }))
+            });
+          }
+          
+          console.log('Final updated task data:', {
+            taskId: p.data?.id,
+            approval_status: p.data.approval_status,
+            approval_completed_at: p.data.approval_completed_at,
+            status_id: p.data.status_id
+          });
+          
+          // Immediately update the node data to reflect changes
+          const node = p.node;
+          const taskId = p.data?.id;
+          
+          if (node && p.api && taskId) {
+            try {
+              // Merge server response data with existing node data to ensure we have all fields
+              // Server response may have additional fields (like updated_at) that we want to preserve
+              const updatedData = { 
+                ...p.data,
+                ...(updatedTask || {}), // Merge any additional fields from server response
+                approval_status: p.data.approval_status,
+                approval_completed_at: p.data.approval_completed_at,
+                status_id: p.data.status_id
+              };
+              
+              console.log('Updating node with data:', {
+                taskId,
+                oldApprovalStatus: node.data?.approval_status,
+                newApprovalStatus: updatedData.approval_status
+              });
+              
+              // CRITICAL: Update the node data FIRST
+              // This must happen before any refresh calls
+              node.setData(updatedData);
+              
+              // Also update p.data directly to ensure cell renderer sees the change
+              Object.assign(p.data, updatedData);
+              
+              // Verify the update took
+              console.log('Node data after setData:', {
+                nodeApprovalStatus: node.data?.approval_status,
+                pDataApprovalStatus: p.data?.approval_status,
+                expectedStatus: updatedData.approval_status
+              });
+              
+              // Update IndexedDB cache with the updated task data
+              // This ensures that on page refresh, the correct approval_status is loaded from cache
+              try {
+                console.log('Updating IndexedDB cache with updated task data', {
+                  taskId,
+                  approval_status: updatedData.approval_status,
+                  approval_completed_at: updatedData.approval_completed_at,
+                  status_id: updatedData.status_id
+                });
+                await TasksCache.updateTask(taskId.toString(), updatedData as any);
+                console.log('IndexedDB cache updated successfully');
+              } catch (err) {
+                console.warn('Failed to update IndexedDB cache:', err);
+              }
+              
+              // Force immediate cell refresh
+              // Note: applyTransaction only works with client-side row model, we use infinite row model
+              try {
+                // Refresh cells - re-run renderers for updated fields
+                p.api.refreshCells({ 
+                  rowNodes: [node], 
+                  force: true,
+                });
+                
+                // Also redraw the row to ensure visual update
+                if (p.api.redrawRows) {
+                  p.api.redrawRows({ rowNodes: [node] });
+                }
+              } catch (err) {
+                console.warn('Failed to refresh cells:', err);
+              }
+              
+              // Double-check in next frame
+              requestAnimationFrame(() => {
+                try {
+                  // Verify both node and p.data have correct data
+                  if (node.data?.approval_status !== updatedData.approval_status) {
+                    console.warn('Node data mismatch, re-applying update');
+                    node.setData(updatedData);
+                  }
+                  if (p.data?.approval_status !== updatedData.approval_status) {
+                    console.warn('p.data mismatch, re-applying update');
+                    Object.assign(p.data, updatedData);
+                  }
+                  
+                  // Force re-render again
+                  p.api.refreshCells({ 
+                    rowNodes: [node], 
+                    force: true,
+                  });
+                  
+                  if (p.api.redrawRows) {
+                    p.api.redrawRows({ rowNodes: [node] });
+                  }
+                } catch (err) {
+                  console.warn('Failed to refresh cells in RAF:', err);
+                }
+              });
+            } catch (err) {
+              console.warn('Failed to update node data:', err);
+            }
+          }
         }
+        
+        // Dispatch events and trigger refresh
         try {
           window.dispatchEvent(new CustomEvent('wh:approvalDecision:success', {
             detail: {
@@ -437,11 +612,50 @@ export function buildWorkspaceColumns(opts: any) {
             }
           }));
           window.dispatchEvent(new CustomEvent('wh:notify', {
-            detail: { type: 'success', message: `Decision ${decision} recorded.` }
+            detail: { type: 'success', message: `Decision ${decision} recorded and actions executed.` }
           }));
+          
+          // DON'T refresh cache immediately - it will overwrite our update with stale server data
+          // The local node update should persist. Only refresh after server has had time to process.
+          // The approval action execution might take a moment, so we delay the refresh significantly
+          
+          console.log('Skipping immediate cache refresh to preserve local update');
+          
+          // Mark this task as recently updated to prevent stale data overwrites
+          const taskId = p.data?.id;
+          if (taskId) {
+            (window as any).__recentlyApprovedTasks = (window as any).__recentlyApprovedTasks || new Set();
+            (window as any).__recentlyApprovedTasks.add(taskId);
+            
+            // Remove from set after 10 seconds
+            setTimeout(() => {
+              (window as any).__recentlyApprovedTasks?.delete(taskId);
+            }, 10000);
+          }
+          
+          // Delay cache refresh significantly to give server time to fully process:
+          // 1. Approval decision recording
+          // 2. Approval action execution (status changes, etc.)
+          // 3. Database commits
+          // Increased delay to 5 seconds to ensure server has processed everything
+          setTimeout(() => {
+            if (p.api) {
+              try {
+                console.log('Refreshing cache after delay - server should have updated data now');
+                p.api.refreshInfiniteCache();
+              } catch (err) {
+                console.warn('Failed to refresh infinite cache:', err);
+              }
+            }
+          }, 5000); // Wait 5 seconds for server to fully process
+          
+          // Also trigger full grid refresh event after even longer delay as backup
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('wh:refreshTasks'));
+          }, 7000);
         } catch {}
       } catch (e) {
-        console.warn('approval decision failed', e);
+        console.error('Approval decision failed', e);
         try {
           const msg = (e as any)?.response?.data?.message || 'Failed to record approval decision';
           window.dispatchEvent(new CustomEvent('wh:approvalDecision:error', {
@@ -463,7 +677,10 @@ export function buildWorkspaceColumns(opts: any) {
       return (
         <Popover>
           <PopoverTrigger asChild>
-            <div className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-700 text-xs font-medium cursor-pointer text-left max-w-[200px]">
+            <div 
+              className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-700 text-xs font-medium cursor-pointer text-left max-w-[200px]"
+              onClick={(e) => e.stopPropagation()}
+            >
               {isPending ? (
                 <svg className="animate-spin w-3.5 h-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -507,87 +724,154 @@ export function buildWorkspaceColumns(opts: any) {
       return (
         <Popover>
           <PopoverTrigger asChild>
-            <div className="flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-full border border-gray-200 bg-card text-xs font-medium max-w-[220px] cursor-pointer">
+            <div 
+              className={`flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium max-w-[240px] cursor-pointer transition-all hover:opacity-90 ${
+                approvalStatus === 'approved' 
+                  ? 'bg-green-100 text-green-700 border border-green-200' 
+                  : approvalStatus === 'rejected'
+                  ? 'bg-red-100 text-red-700 border border-red-200'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
               {approvalStatus === 'approved' ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                  <span className="text-green-700 leading-snug whitespace-normal break-words flex-1 min-w-0">Approved</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                  <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">Approved</span>
                 </>
               ) : approvalStatus === 'rejected' ? (
                 <>
-                  <XCircle className="w-3.5 h-3.5 text-red-600" />
-                  <span className="text-red-700 leading-snug whitespace-normal break-words flex-1 min-w-0">Rejected</span>
+                  <XCircle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+                  <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">Rejected</span>
                 </>
               ) : (
                 <>
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <svg className="animate-spin w-3.5 h-3.5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin w-3.5 h-3.5 text-blue-600 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span className="text-blue-700 leading-snug whitespace-normal break-words flex-1 min-w-0">Approval pending</span>
+                    <span className="leading-snug whitespace-normal break-words flex-1 min-w-0">Approval pending</span>
                     {slaPill}
                   </div>
                 </>
               )}
             </div>
           </PopoverTrigger>
-          <PopoverContent side="right" className="max-w-[420px] p-0">
-            <div className="rounded-lg overflow-hidden shadow-sm border border-border/60">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-3 py-2 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-white" />
-                <div className="text-sm font-semibold">{approval?.name || 'Approval required'}</div>
-                <span className="ml-auto text-[11px] font-medium capitalize">{approvalStatus || 'pending'}</span>
-              </div>
-              <div className="p-3 bg-card space-y-3 text-xs">
-                <div className="text-sm text-foreground font-semibold flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                  Approval progress
-                </div>
-                {approverDetails && approverDetails.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {approverDetails.map((detail) => {
-                      const showStep = approverDetails.length > 1;
-                      return (
-                      <div key={detail.id} className="flex items-start justify-between gap-3 rounded border border-muted px-2 py-1.5">
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <span className="text-[12px] font-semibold text-foreground break-words">{detail.name}</span>
-                          <span className="text-[11px] text-muted-foreground block">
-                            {showStep ? `Step ${detail.step} • ` : ''}
-                            {detail.isRequired ? 'Required' : 'Optional'}
-                            {detail.respondedAt && dayjs(detail.respondedAt).isValid()
-                              ? ` • ${dayjs(detail.respondedAt).format('YYYY-MM-DD HH:mm')}`
-                              : ''}
-                          </span>
-                          {detail.comment ? (
-                            <div className="mt-1 text-[11px] text-muted-foreground whitespace-pre-wrap break-words max-h-28 overflow-auto pr-1 border border-muted rounded-md px-2 py-1 bg-muted/20">
-                              <div className="text-[11px] font-semibold text-foreground mb-1">Comment</div>
-                              <div className="italic">{detail.comment}</div>
-                            </div>
-                          ) : null}
-                        </div>
-                        <span className={`text-[11px] font-semibold capitalize flex-shrink-0 ${detail.statusColor || 'text-blue-600'}`}>
-                          {detail.status || 'pending'}
+          <PopoverContent side="right" className="w-[520px] p-0 shadow-2xl border-0">
+            <div className="rounded-lg overflow-hidden bg-white border border-gray-200">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-4 border-b border-blue-800/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm mt-0.5">
+                      <Clock className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-base font-semibold text-white truncate leading-tight">
+                        {approval?.name || 'Approval Required'}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${
+                          normalizedApprovalStatus === 'approved' ? 'bg-green-500/20 text-green-100' :
+                          normalizedApprovalStatus === 'rejected' ? 'bg-red-500/20 text-red-100' :
+                          'bg-white/20 text-blue-100'
+                        }`}>
+                          {approvalStatusLabel}
                         </span>
                       </div>
-                    );
-                    })}
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-[11px] text-muted-foreground">No approvers have responded yet.</div>
-                )}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 bg-white">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    Approval Progress
+                  </h3>
+                  
+                  {approverDetails && approverDetails.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {approverDetails.map((detail) => {
+                        const showStep = approverDetails.length > 1;
+                        const isPending = !detail.status || detail.status === 'pending' || detail.status === 'not started';
+                        const isApproved = detail.status === 'approved';
+                        const isRejected = detail.status === 'rejected';
+                        
+                        return (
+                          <div 
+                            key={detail.id} 
+                            className="rounded-lg border border-gray-200 bg-gray-50/50 p-3.5 transition-colors hover:bg-gray-50 hover:border-gray-300"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <span className="text-sm font-medium text-gray-900">{detail.name}</span>
+                                  {showStep && (
+                                    <span className="text-xs font-medium text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">
+                                      Step {detail.step}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <span className={detail.isRequired ? 'font-medium text-blue-600' : 'text-gray-500'}>
+                                    {detail.isRequired ? 'Required' : 'Optional'}
+                                  </span>
+                                  {detail.respondedAt && dayjs(detail.respondedAt).isValid() && (
+                                    <>
+                                      <span className="text-gray-400">•</span>
+                                      <span>{dayjs(detail.respondedAt).format('MMM D, h:mm A')}</span>
+                                    </>
+                                  )}
+                                </div>
+                                {detail.comment && (
+                                  <div className="mt-2.5 p-2.5 bg-white border border-gray-200 rounded-md">
+                                    <div className="text-xs font-medium text-gray-700 mb-1">Comment</div>
+                                    <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                                      {detail.comment}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className={`flex items-center justify-center px-3 py-1 rounded-md text-xs font-medium flex-shrink-0 ${
+                                isApproved ? 'bg-green-100 text-green-700' :
+                                isRejected ? 'bg-red-100 text-red-700' :
+                                detail.status === 'skipped' ? 'bg-amber-100 text-amber-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {detail.status === 'not started' ? 'Not Started' : 
+                                 detail.status === 'pending' ? 'Pending' :
+                                 detail.status ? detail.status.charAt(0).toUpperCase() + detail.status.slice(1) : 'Pending'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="text-sm text-gray-500">No approvers configured yet</div>
+                    </div>
+                  )}
+                </div>
+                
                 {canAct && (
-                  <div className="pt-2 border-t border-muted flex items-center gap-2">
+                  <div className="pt-4 mt-4 border-t border-gray-200 flex items-center gap-2.5">
                     <button
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
-                        onClick={(e) => { e.stopPropagation(); submitDecision('approved'); }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 active:scale-[0.98] transition-all duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                      onClick={(e) => { e.stopPropagation(); submitDecision('approved'); }}
                     >
+                      <Check className="h-4 w-4" />
                       Approve
                     </button>
                     <button
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
-                        onClick={(e) => { e.stopPropagation(); submitDecision('rejected'); }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 active:scale-[0.98] transition-all duration-150 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      onClick={(e) => { e.stopPropagation(); submitDecision('rejected'); }}
                     >
+                      <X className="h-4 w-4" />
                       Reject
                     </button>
                   </div>
@@ -743,7 +1027,7 @@ export function buildWorkspaceColumns(opts: any) {
             {/* Name row with category icon */}
             <div className="flex items-center gap-2.5 min-w-0">
               <CategoryIconSmall iconClass={cat?.icon} color={cat?.color} />
-              <div className="font-medium text-[14px] leading-[1.4] cursor-default text-foreground min-w-0 flex-1 truncate">{name}</div>
+              <div className="font-semibold text-[15px] leading-[1.4] cursor-default text-foreground min-w-0 flex-1 truncate tracking-[0.01em]">{name}</div>
             </div>
             {/* Tags row - separate line below name for better visual separation */}
             {(taskTagsData && taskTagsData.length > 0) && (
@@ -776,7 +1060,7 @@ export function buildWorkspaceColumns(opts: any) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-muted-foreground"
+                      className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-muted-foreground/75"
                       style={{
                         whiteSpace: 'normal',
                         display: '-webkit-box',
@@ -784,6 +1068,7 @@ export function buildWorkspaceColumns(opts: any) {
                         WebkitBoxOrient: 'vertical' as any,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
+                        opacity: 0.7,
                       }}
                     >
                       {description}
@@ -988,9 +1273,9 @@ export function buildWorkspaceColumns(opts: any) {
           params.event.preventDefault();
         }
       },
-      width: 170,
-      minWidth: 160,
-      maxWidth: 220,
+      width: 200,
+      minWidth: 180,
+      maxWidth: 280,
     },
     {
       field: 'priority_id',
@@ -1033,13 +1318,16 @@ export function buildWorkspaceColumns(opts: any) {
         if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
         const name = meta.name;
         const palette = getPriorityPalette(Number(p.value), name, meta?.color);
+        const isHighPriority = name.toLowerCase().includes('high');
         const pill = (
-          <div className="inline-flex items-center h-full py-1.5">
+          <div className="inline-flex items-center h-full py-1.5 group/priority">
             <span
-              className="inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none whitespace-nowrap"
+              className={`inline-flex items-center gap-2 rounded-[12px] px-3 py-1 text-[13px] font-medium leading-none whitespace-nowrap transition-all duration-200 hover:shadow-md ${
+                isHighPriority ? 'animate-pulse-subtle' : ''
+              }`}
               style={{ background: palette.bg, color: palette.text }}
             >
-              <Flag className="h-3.5 w-3.5 flex-shrink-0" style={{ color: palette.text, opacity: 0.9 }} />
+              <Flag className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 group-hover/priority:scale-110`} style={{ color: palette.text, opacity: 0.9 }} />
               <span>{name}</span>
             </span>
           </div>
@@ -1171,53 +1459,6 @@ export function buildWorkspaceColumns(opts: any) {
       width: 120,
       minWidth: 100,
       maxWidth: 140,
-    },
-    {
-      field: 'due_date',
-      headerName: 'Due',
-      filter: false,
-      cellRenderer: (p: any) => {
-        if (!p.data) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
-            </div>
-          );
-        }
-        const dueDate = p.data?.due_date;
-        if (!dueDate) {
-          return (
-            <div className="flex items-center h-full py-2">
-              <span className="text-[12px] text-muted-foreground"></span>
-            </div>
-          );
-        }
-        const d = dayjs(dueDate);
-        const now = dayjs();
-        const isOverdue = d.isBefore(now, 'day');
-        const daysDiff = d.diff(now, 'day');
-        const urgent = !isOverdue && daysDiff <= 2;
-        const colorCls = isOverdue ? 'text-red-600' : urgent ? 'text-amber-600' : 'text-muted-foreground';
-        const inner = (
-          <div className="flex items-center h-full py-2">
-            <span className={`inline-flex items-center ${colorCls}`}>
-              <span className="text-[12px]">{isOverdue ? d.fromNow() : `in ${Math.abs(daysDiff)} day${Math.abs(daysDiff) === 1 ? '' : 's'}`}</span>
-            </span>
-          </div>
-        );
-        const node = (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>{inner}</TooltipTrigger>
-              <TooltipContent side="top">{d.format('MMM D, YYYY')} • {d.fromNow()}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-        return node;
-      },
-      width: 120,
-      minWidth: 100,
-      maxWidth: 160,
     },
     {
       field: 'spot_id',

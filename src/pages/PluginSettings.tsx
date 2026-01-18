@@ -92,21 +92,6 @@ function PluginSettings() {
 					'Foster team engagement and culture'
 				]
 			},
-			teamconnect: {
-				features: [
-					'Team collaboration boards and messaging',
-					'Directory integration with user profiles',
-					'Real-time notifications and updates',
-					'File sharing and document collaboration',
-					'Team activity feeds and engagement tracking'
-				],
-				benefits: [
-					'Improve team communication and collaboration',
-					'Reduce email clutter with centralized messaging',
-					'Keep everyone informed with real-time updates',
-					'Foster team engagement and culture'
-				]
-			},
 			analytics: {
 				features: [
 					'Customizable dashboards with real-time data visualization',

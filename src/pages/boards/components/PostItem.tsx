@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Repeat2, Send, MoreHorizontal, Pin } from 'lucide-react';
+import { Heart, MessageCircle, Repeat2, Send, MoreHorizontal, Pin, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,7 @@ interface PostItemProps {
   onRepost?: (messageId: number) => void;
   onShare?: (messageId: number) => void;
   onDelete?: (messageId: number) => void;
+  onEdit?: (message: BoardMessage) => void;
   onPin?: (messageId: number, isPinned: boolean) => void;
 }
 
@@ -43,6 +44,7 @@ export function PostItem({
   onRepost,
   onShare,
   onDelete,
+  onEdit,
   onPin,
 }: PostItemProps) {
   const dispatch = useDispatch();
@@ -141,6 +143,12 @@ export function PostItem({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onEdit && (
+                <DropdownMenuItem onClick={() => onEdit(message)}>
+                  <Pencil className="size-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+              )}
               {onPin && (
                 <DropdownMenuItem onClick={() => onPin(message.id, !message.is_pinned)}>
                   <Pin className="size-4 mr-2" />

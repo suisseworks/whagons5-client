@@ -412,14 +412,16 @@ export function CheckboxField({
   };
 
   return (
-    <FormField id={id} label={label} className={className} hideLabel={hideFieldLabel}>
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id={id}
-          checked={isControlled ? checked : uncontrolledChecked}
-          onCheckedChange={isControlled ? onChange : handleUncontrolledChange}
-          disabled={disabled}
-        />
+    <FormField id={id} label={label} className={className} hideLabel={true}>
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 pt-0.5">
+          <Checkbox
+            id={id}
+            checked={isControlled ? checked : uncontrolledChecked}
+            onCheckedChange={isControlled ? onChange : handleUncontrolledChange}
+            disabled={disabled}
+          />
+        </div>
         {/* Hidden input for form submission */}
         {name && (
           <input
@@ -430,9 +432,18 @@ export function CheckboxField({
             style={{ display: 'none' }}
           />
         )}
-        <Label htmlFor={id} className="text-sm font-normal cursor-pointer">
-          {description || label}
-        </Label>
+        <div className="flex-1 min-w-0">
+          {!hideFieldLabel && (
+            <Label htmlFor={id} className="text-sm font-medium cursor-pointer block mb-1">
+              {label}
+            </Label>
+          )}
+          {description && (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {description}
+            </p>
+          )}
+        </div>
       </div>
     </FormField>
   );

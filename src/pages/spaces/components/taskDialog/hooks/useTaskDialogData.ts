@@ -8,6 +8,7 @@ export function useTaskDialogData() {
   const { value: priorities = [] } = useSelector((s: RootState) => (s as any).priorities || { value: [] });
   const { value: categoryPriorityAssignments = [] } = useSelector((s: RootState) => (s as any).categoryPriorities || { value: [] });
   const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
+  const { value: statusTransitions = [] } = useSelector((s: RootState) => (s as any).statusTransitions || { value: [] });
   const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
   const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
   const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
@@ -58,6 +59,7 @@ export function useTaskDialogData() {
     priorities,
     categoryPriorityAssignments,
     statuses,
+    statusTransitions,
     spots,
     users,
     teams,

@@ -126,14 +126,16 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`overflow-visible ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
         <div className="flex flex-col max-h-[90vh] overflow-hidden">
-          <DialogHeader className="flex-shrink-0 mb-4 space-y-1">
-            <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
+          <DialogHeader className="flex-shrink-0 mb-6 space-y-2 pb-4 border-b border-border/40">
+            <DialogTitle className={`${type === 'delete' ? "flex items-center space-x-2" : ""} text-2xl font-extrabold tracking-tight`}>
               {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
               <span>{getDefaultTitle()}</span>
             </DialogTitle>
-            <DialogDescription>
-              {getDefaultDescription()}
-            </DialogDescription>
+            {description && (
+              <DialogDescription className="text-sm text-muted-foreground/80 leading-relaxed">
+                {getDefaultDescription()}
+              </DialogDescription>
+            )}
           </DialogHeader>
 
           {type === 'delete' && entityData && renderEntityPreview && (
@@ -164,6 +166,7 @@ export function SettingsDialog({
                   onClick={submitNow}
                   variant={getSubmitVariant()}
                   disabled={isSubmitting || submitDisabled}
+                  className={type === 'create' ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]" : type === 'edit' ? "font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-[0.98]" : ""}
                 >
                   {isSubmitting ? (
                     <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />

@@ -1107,10 +1107,20 @@ function Users() {
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/roles-and-permissions')}>
             {tu('header.rolesAndPermissions', 'Roles and Permissions')}
           </Button>
-          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)} 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
             {tu('header.createUser', 'Create User')}
           </Button>
-          <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
+          <Button 
+            onClick={() => setIsInviteDialogOpen(true)} 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
             {tu('header.createInvitation', 'Create Invitation')}
           </Button>
         </div>

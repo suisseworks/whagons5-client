@@ -99,15 +99,15 @@ function Boards() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
         <div className="flex-1">
           <h1 className="text-3xl font-bold" style={{ color: 'var(--brand-primary)' }}>
-            {t('teamconnect.boards.title', 'Communication Boards')}
+            {t('boards.boards.title', 'Communication Boards')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {t('teamconnect.boards.subtitle', 'Team-wide announcements and updates')}
+            {t('boards.boards.subtitle', 'Team-wide announcements and updates')}
           </p>
         </div>
         <Button onClick={handleCreateButtonClick}>
           <Plus className="w-5 h-5" />
-          {t('teamconnect.boards.create', 'Create Board')}
+          {t('boards.boards.create', 'Create Board')}
         </Button>
       </div>
 
@@ -115,7 +115,7 @@ function Boards() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder={t('teamconnect.boards.search', 'Search boards...')}
+          placeholder={t('boards.boards.search', 'Search boards...')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"
@@ -132,14 +132,14 @@ function Boards() {
           <CardContent className="pt-6 text-center py-12">
             <Users2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-xl font-semibold mb-2">
-              {t('teamconnect.boards.empty', 'No boards found')}
+              {t('boards.boards.empty', 'No boards found')}
             </h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              {t('teamconnect.boards.emptyDescription', 'Create your first communication board to share updates with your team')}
+              {t('boards.boards.emptyDescription', 'Create your first communication board to share updates with your team')}
             </p>
             <Button onClick={handleCreateButtonClick} className="mx-auto">
               <Plus className="w-5 h-5" />
-              {t('teamconnect.boards.create', 'Create Board')}
+              {t('boards.boards.create', 'Create Board')}
             </Button>
           </CardContent>
         </Card>
@@ -159,12 +159,12 @@ function Boards() {
                       {board.visibility === 'public' ? (
                         <Badge variant="secondary" className="gap-1">
                           <Globe className="w-3 h-3" />
-                          {t('teamconnect.boards.visibility.public', 'Public')}
+                          {t('boards.boards.visibility.public', 'Public')}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="gap-1">
                           <Lock className="w-3 h-3" />
-                          {t('teamconnect.boards.visibility.private', 'Private')}
+                          {t('boards.boards.visibility.private', 'Private')}
                         </Badge>
                       )}
                     </CardTitle>
@@ -185,33 +185,33 @@ function Boards() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('teamconnect.board.create.title', 'Create Board')}</DialogTitle>
+            <DialogTitle>{t('boards.board.create.title', 'Create Board')}</DialogTitle>
             <DialogDescription>
-              {t('teamconnect.board.create.description', 'Create a new communication board for your team')}
+              {t('boards.board.create.description', 'Create a new communication board for your team')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">{t('teamconnect.board.name', 'Board Name')}</Label>
+              <Label htmlFor="name">{t('boards.board.name', 'Board Name')}</Label>
               <Input
                 id="name"
-                placeholder={t('teamconnect.board.namePlaceholder', 'e.g., Company Updates, Team News')}
+                placeholder={t('boards.board.namePlaceholder', 'e.g., Company Updates, Team News')}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">{t('teamconnect.board.description', 'Description')}</Label>
+              <Label htmlFor="description">{t('boards.board.description', 'Description')}</Label>
               <Textarea
                 id="description"
-                placeholder={t('teamconnect.board.descriptionPlaceholder', 'What is this board for?')}
+                placeholder={t('boards.board.descriptionPlaceholder', 'What is this board for?')}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="visibility">{t('teamconnect.board.visibility', 'Visibility')}</Label>
+              <Label htmlFor="visibility">{t('boards.board.visibility', 'Visibility')}</Label>
               <Select
                 value={formData.visibility}
                 onValueChange={(value: 'public' | 'private') => setFormData({ ...formData, visibility: value })}
@@ -223,13 +223,13 @@ function Boards() {
                   <SelectItem value="public">
                     <div className="flex items-center gap-2">
                       <Globe className="w-4 h-4" />
-                      {t('teamconnect.board.visibility.publicLabel', 'Public - All users can view')}
+                      {t('boards.board.visibility.publicLabel', 'Public - All users can view')}
                     </div>
                   </SelectItem>
                   <SelectItem value="private">
                     <div className="flex items-center gap-2">
                       <Lock className="w-4 h-4" />
-                      {t('teamconnect.board.visibility.privateLabel', 'Private - Members only')}
+                      {t('boards.board.visibility.privateLabel', 'Private - Members only')}
                     </div>
                   </SelectItem>
                 </SelectContent>

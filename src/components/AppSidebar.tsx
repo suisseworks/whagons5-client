@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   Sparkles,
   Bell, // Add Bell icon for broadcasts
+  Activity, // Add Activity icon
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -94,6 +95,15 @@ const pluginConfigCallbacks: ((configs: PluginConfig[]) => void)[] = [];
 
 const getDefaultPluginsConfig = (): PluginConfig[] => [
   {
+    id: 'activity',
+    enabled: true,
+    pinned: true, // Pin it by default so it's easy to find
+    name: 'Activity Monitor',
+    icon: Activity,
+    iconColor: '#6366f1', // indigo-500
+    route: '/activity',
+  },
+  {
     id: 'broadcasts',
     enabled: true,
     pinned: false,
@@ -109,7 +119,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     name: 'Boards',
     icon: Users2,
     iconColor: '#8b5cf6', // violet-500 to match plugin card
-    route: '', // No route - boards are managed via sidebar collapsible section
+    route: '/settings/boards', // Link to boards settings when unpinned
   },
   {
     id: 'compliance',
@@ -678,12 +688,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   }
   */
 
-  // Separate pinned and unpinned plugins (excluding boards since it's now a collapsible section)
+  // Separate pinned and unpinned plugins
   const [pinnedPluginsOrder, setPinnedPluginsOrderState] = useState<string[]>(getPinnedPluginsOrder());
   
-  // Sort pinned plugins by saved order (excluding boards)
+  // Sort pinned plugins by saved order (excluding boards and activity from drag-and-drop ordering)
   const pinnedPlugins = useMemo(() => {
-    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned && p.id !== 'boards');
+    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned && p.id !== 'boards' && p.id !== 'activity');
     const order = pinnedPluginsOrder;
     
     if (order.length === 0) return pinned;
@@ -699,11 +709,18 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     });
   }, [pluginsConfig, pinnedPluginsOrder]);
   
-  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned && p.id !== 'boards');
+  // Include boards in unpinned plugins when it's unpinned (so it appears in "More" menu)
+  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned && p.id !== 'activity');
 
-  // Check if boards plugin is enabled
+  // Check if boards plugin is enabled and pinned
   const boardsPluginEnabled = useMemo(() => {
-    return pluginsConfig.find(p => p.id === 'boards')?.enabled ?? false;
+    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
+    return boardsPlugin?.enabled ?? false;
+  }, [pluginsConfig]);
+  
+  const boardsPluginPinned = useMemo(() => {
+    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
+    return boardsPlugin?.pinned ?? false;
   }, [pluginsConfig]);
 
   // DnD sensors for pinned plugins
@@ -809,8 +826,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               showEverythingButton={true}
             />
             
-            {/* Boards section - shown below workspaces if boards plugin is enabled */}
-            {boardsPluginEnabled && (
+            {/* Boards section - shown below workspaces if boards plugin is enabled AND pinned */}
+            {boardsPluginEnabled && boardsPluginPinned && (
               <AppSidebarBoards
                 boards={boards}
                 pathname={pathname}
@@ -883,7 +900,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       </SidebarContent>
 
       <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid var(--sidebar-border)', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
-        <Collapsible defaultOpen={false} className="w-full">
+        <Collapsible defaultOpen={localStorage.getItem('sidebarMoreMenuOpen') === 'true'} onOpenChange={(open) => localStorage.setItem('sidebarMoreMenuOpen', String(open))} className="w-full">
           <MoreMenuTriggerContent isCollapsed={isCollapsed} isMobile={isMobile} />
 
           <CollapsibleContent keepRendered={true} className="mt-2 space-y-1">

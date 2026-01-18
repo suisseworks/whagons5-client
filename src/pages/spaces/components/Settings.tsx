@@ -140,45 +140,6 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   // Get current workspace from Redux store (slice only; no fetching)
   const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
   
-  // Get hidden workspace IDs from user settings
-  const hiddenWorkspaceIds = useMemo(() => {
-    return new Set((user?.settings?.hiddenWorkspaces || []) as number[]);
-  }, [user?.settings?.hiddenWorkspaces]);
-  
-  // Toggle workspace visibility
-  const handleToggleWorkspaceVisibility = useCallback(async (workspaceId: number) => {
-    if (!user) {
-      console.warn('Cannot toggle workspace visibility: user not loaded');
-      return;
-    }
-    
-    const currentHidden = new Set(hiddenWorkspaceIds);
-    if (currentHidden.has(workspaceId)) {
-      currentHidden.delete(workspaceId);
-    } else {
-      currentHidden.add(workspaceId);
-    }
-    
-    const newSettings = {
-      ...(user.settings || {}),
-      hiddenWorkspaces: Array.from(currentHidden),
-    };
-    
-    try {
-      console.log('Updating workspace visibility:', { workspaceId, currentHidden: Array.from(currentHidden), newSettings });
-      const response = await api.patch('/users/me', { settings: newSettings });
-      console.log('Settings updated successfully:', response.data);
-      // Refetch user to get updated settings
-      await refetchUser();
-    } catch (error: any) {
-      console.error('Failed to update workspace visibility:', error);
-      if (error.response) {
-        console.error('API Error Response:', error.response.data);
-        console.error('API Error Status:', error.response.status);
-      }
-      alert(`Failed to update workspace visibility: ${error.response?.data?.message || error.message || 'Unknown error'}`);
-    }
-  }, [user, hiddenWorkspaceIds, refetchUser]);
 
   // Get categories and custom fields from Redux store
   const { value: categories } = useSelector((state: RootState) => (state as any).categories as { value: any[] });
@@ -706,58 +667,6 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
               ))}
             </div>
           </div>
-          <div className="mb-4 p-3 border rounded-md bg-background">
-            <div className="flex items-start gap-3">
-              <div className="flex-1 space-y-1">
-                <div className="text-sm font-medium flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-muted-foreground" />
-                  <span>Workspace visibility</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Hide workspaces from the left sidebar. Hidden workspaces are still accessible via direct links.
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {!user && (
-                <div className="col-span-2 text-sm text-muted-foreground p-2">
-                  Loading user settings...
-                </div>
-              )}
-              {workspaces.map((workspace: any) => {
-                const isHidden = hiddenWorkspaceIds.has(Number(workspace.id));
-                return (
-                  <div
-                    key={workspace.id}
-                    className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left hover:bg-accent"
-                  >
-                    <Checkbox
-                      checked={!isHidden}
-                      onCheckedChange={(checked) => {
-                        console.log('Checkbox toggled:', { workspaceId: workspace.id, checked, isHidden, user: !!user });
-                        if (user) {
-                          handleToggleWorkspaceVisibility(Number(workspace.id));
-                        } else {
-                          console.warn('User not loaded, cannot toggle workspace visibility');
-                        }
-                      }}
-                      className="h-3.5 w-3.5"
-                      disabled={!user}
-                    />
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {workspace.color && (
-                        <div
-                          className="w-3 h-3 rounded flex-shrink-0"
-                          style={{ backgroundColor: workspace.color }}
-                        />
-                      )}
-                      <span className="text-xs truncate">{workspace.name}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </motion.div>
       )
     },
@@ -892,25 +801,27 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   }
 
   return (
-    <div className="h-full w-full p-4 pt-0 flex flex-col">
-      <div className="mb-3 flex-shrink-0">
-        <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+    <div className="h-full w-full p-4 pt-0 flex flex-col items-center">
+      <div className="w-full max-w-2xl flex flex-col h-full">
+        <div className="mb-3 flex-shrink-0">
+          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+        </div>
+
+        {/* Table density control moved into Overview tab */}
+
+        <UrlTabs
+          tabs={settingsTabs}
+          defaultValue="display"
+          basePath={`/workspace/${workspaceId}/settings`}
+          pathMap={{ display: '', overview: '/overview', users: '/users', filters: '/creation' }}
+          className="w-full h-full flex flex-col"
+          onValueChange={(value) => {
+            const typed = (value || 'display') as 'overview' | 'users' | 'filters' | 'display';
+            setPrevActiveTab(activeTab);
+            setActiveTab(typed);
+          }}
+        />
       </div>
-
-      {/* Table density control moved into Overview tab */}
-
-      <UrlTabs
-        tabs={settingsTabs}
-        defaultValue="display"
-        basePath={`/workspace/${workspaceId}/settings`}
-        pathMap={{ display: '', overview: '/overview', users: '/users', filters: '/creation' }}
-        className="w-full h-full flex flex-col"
-        onValueChange={(value) => {
-          const typed = (value || 'display') as 'overview' | 'users' | 'filters' | 'display';
-          setPrevActiveTab(activeTab);
-          setActiveTab(typed);
-        }}
-      />
     </div>
   );
 }

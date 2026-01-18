@@ -1043,7 +1043,11 @@ function Workflows() {
       iconColor="#06b6d4"
       backPath="/settings"
       headerActions={
-        <Button onClick={handleNew}>
+        <Button 
+          onClick={handleNew}
+          size="default"
+          className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+        >
           Create workflow
         </Button>
       }

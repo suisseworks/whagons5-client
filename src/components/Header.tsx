@@ -11,7 +11,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
+import { User, LogOut, Plus, Layers, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector, useDispatch } from "react-redux";
@@ -62,10 +62,6 @@ function Header() {
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
 
-    // Get TeamConnect boards for breadcrumb
-    const teamconnectBoardsState = useSelector((s: RootState) => (s as any).teamconnectBoards);
-    const { value: teamconnectBoards = [] } = teamconnectBoardsState || {};
-
     // Get boards for breadcrumb
     const boardsState = useSelector((s: RootState) => (s as any).boards);
     const { value: boards = [] } = boardsState || {};
@@ -111,7 +107,7 @@ function Header() {
             statuses: 'Statuses',
             status: 'Status',
             'spot-types': 'Spot Types',
-            teamconnect: 'TeamConnect',
+            boards: 'Boards',
             plugins: 'Plugins',
         };
         const getLabel = (seg: string, index: number) => {
@@ -119,12 +115,6 @@ function Header() {
             if (parts[0] === 'boards' && index === 1 && !isNaN(Number(seg))) {
                 const boardId = parseInt(seg);
                 const board = boards.find((b: any) => b.id === boardId);
-                return board?.name || seg;
-            }
-            // Special handling for teamconnect board ID
-            if (parts[0] === 'teamconnect' && index === 1 && !isNaN(Number(seg))) {
-                const boardId = parseInt(seg);
-                const board = teamconnectBoards.find((b: any) => b.id === boardId);
                 return board?.name || seg;
             }
             const fallback = labelDefaults[seg] ?? seg.charAt(0).toUpperCase() + seg.slice(1);
@@ -149,6 +139,15 @@ function Header() {
                 const label = getLabel(seg, i);
                 acc.push({ label, to: `/settings${path}` });
             }
+        } else if (parts[0] === 'boards' && parts.length > 1) {
+            // For boards, skip the "boards" segment and show: Board Name (or Board Name > Subpage)
+            // Start from index 1 to skip "boards"
+            for (let i = 1; i < parts.length; i++) {
+                const seg = parts[i];
+                path += `/${seg}`;
+                const label = getLabel(seg, i);
+                acc.push({ label, to: `/boards${path}` });
+            }
         } else {
             // Regular breadcrumbs for non-settings pages
             for (let i = 0; i < parts.length; i++) {
@@ -159,7 +158,7 @@ function Header() {
             }
         }
         return acc;
-    }, [location.pathname, t, teamconnectBoards, boards]);
+    }, [location.pathname, t, boards]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
@@ -744,7 +743,7 @@ function Header() {
                 <div className="flex items-center gap-2">
                     {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === t('sidebar.everything', 'Everything')) && (
                         <button
-                            className="group inline-flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97]"
+                            className="group inline-flex items-center gap-2 pl-4 pr-5 py-2.5 rounded-full border-2 border-primary bg-primary text-primary-foreground font-semibold text-sm transition-all duration-200 hover:bg-primary/90 hover:border-primary/90 hover:shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-[0.98]"
                             onClick={() => setOpenCreateTask(true)}
                             title={t('task.createTask', 'Create Task')}
                         >
@@ -753,39 +752,45 @@ function Header() {
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
-
-                    {/* Notifications */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent/50 text-foreground relative transition-colors">
-                                <Bell className="h-5 w-5" />
-                                <span className="absolute bottom-0.5 left-0.5 bg-red-500 rounded-full w-2 h-2 ring-2 ring-background"></span>
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64 p-2">
-                            <div className="text-sm text-muted-foreground">No notifications</div>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
                     
+                    {/* Profile with notification badge */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
-                                <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
-                                    {!imageError && imageUrl && (
-                                        <AvatarImage 
-                                            src={imageUrl} 
-                                            onError={handleImageError}
-                                            alt={getDisplayName()}
-                                        />
-                                    )}
-                                    <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
-                                        {getInitials()}
-                                    </AvatarFallback>
-                                </Avatar>
-                            </button>
+                            <div className="relative inline-block">
+                                <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
+                                    <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
+                                        {!imageError && imageUrl && (
+                                            <AvatarImage 
+                                                src={imageUrl} 
+                                                onError={handleImageError}
+                                                alt={getDisplayName()}
+                                            />
+                                        )}
+                                        <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
+                                            {getInitials()}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </button>
+                                {/* Notification badge */}
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-extrabold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 ring-2 ring-background shadow-sm z-10" style={{ fontFeatureSettings: '"tnum"', textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                                    4
+                                </span>
+                            </div>
                         </DropdownMenuTrigger>
 
-                        <DropdownMenuContent align="end" className="w-30">
+                        <DropdownMenuContent align="end" className="w-64">
+                            {/* Notifications section */}
+                            <div className="px-2 py-1.5 border-b border-border/50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <DropdownMenuLabel className="px-0 py-0 text-sm font-semibold">Notifications</DropdownMenuLabel>
+                                    <span className="text-xs text-muted-foreground">4 new</span>
+                                </div>
+                                <div className="max-h-[200px] overflow-y-auto space-y-1">
+                                    <div className="text-sm text-muted-foreground px-2 py-1.5 rounded-md hover:bg-accent/50 cursor-pointer">
+                                        No notifications
+                                    </div>
+                                </div>
+                            </div>
                             <DropdownMenuItem onClick={() => {
                                 navigate('/profile');
                             }}>
