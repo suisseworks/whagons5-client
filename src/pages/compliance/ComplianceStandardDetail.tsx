@@ -23,12 +23,6 @@ export const ComplianceStandardDetail = () => {
         state.complianceRequirements.value.filter((r: any) => r.standard_id === standardId)
     );
 
-    useEffect(() => {
-        if (standardId) {
-            dispatch(genericActions.complianceRequirements.fetchFromAPI()); // Should filter by standard_id in real implementation
-            dispatch(genericActions.complianceRequirements.getFromIndexedDB());
-        }
-    }, [dispatch, standardId]);
 
     if (!standard) return <div>Loading...</div>;
 

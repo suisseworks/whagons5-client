@@ -45,9 +45,11 @@ interface CategoryFormData {
   icon: string;
   enabled: boolean;
   team_id: string;
+  workspace_id: string;
   sla_id: string;
   approval_id: string;
   status_transition_group_id: string;
+  celebration_effect: string;
 }
 
 // Custom cell renderer for category name with icon
@@ -99,15 +101,17 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 // Simple badge renderer to show whether a category is enabled
-const EnabledCellRenderer = ({ value }: ICellRendererParams) => {
+const EnabledCellRenderer = ({ value }: ICellRendererParams & { t: (key: string, fallback: string) => string }) => {
   const isEnabled = Boolean(value);
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
 
   return (
     <Badge
       variant={isEnabled ? "default" : "secondary"}
       className={`text-xs ${isEnabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
     >
-      {isEnabled ? "Enabled" : "Disabled"}
+      {isEnabled ? tc('grid.values.enabled', 'Enabled') : tc('grid.values.disabled', 'Disabled')}
     </Badge>
   );
 };
@@ -115,19 +119,20 @@ const EnabledCellRenderer = ({ value }: ICellRendererParams) => {
 type CategoryActionsRendererParams = {
   onManageFields: (category: Category) => void;
   onEdit: (category: Category) => void;
-  onDelete: (category: Category) => void;
   getFieldCount: (categoryId: number) => number;
 };
 
 const CategoryActionsCellRenderer = (
   props: ICellRendererParams & CategoryActionsRendererParams
 ) => {
-  const { data, onManageFields, onEdit, onDelete, getFieldCount } = props;
+  const { data, onManageFields, onEdit, getFieldCount } = props;
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
   if (!data) return null;
   const category = data as Category;
   const id = Number(category.id);
   const count = getFieldCount(id);
-  const label = count > 0 ? `Fields (${count})` : 'Fields';
+  const label = count > 0 ? tc('grid.actions.fieldsWithCount', `Fields (${count})`).replace('{count}', String(count)) : tc('grid.actions.fields', 'Fields');
 
   const handleClick = (
     handler: (category: Category) => void,
@@ -151,19 +156,11 @@ const CategoryActionsCellRenderer = (
 
         <button
           type="button"
-          aria-label="Edit category"
+          aria-label={tc('grid.actions.edit', 'Edit category')}
           onClick={(event) => handleClick(onEdit, event)}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.12)] transition hover:bg-slate-50"
         >
           <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
-        </button>
-        <button
-          type="button"
-          aria-label="Delete category"
-          onClick={(event) => handleClick(onDelete, event)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff4d4f] text-white shadow-[0_1px_3px_rgba(244,67,54,0.35)] transition hover:bg-[#ea3b3d]"
-        >
-          <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
         </button>
       </div>
     </div>
@@ -182,18 +179,8 @@ function Categories() {
   const slas: Sla[] = slasState?.value ?? [];
   const approvalsState = useSelector((state: RootState) => (state as any).approvals) as { value?: Approval[] } | undefined;
   const approvals: Approval[] = approvalsState?.value ?? [];
-
-  // Ensure local IndexedDB hydration on mount (no network requests)
-  useEffect(() => {
-    dispatch((genericActions as any).categories.getFromIndexedDB());
-    dispatch((genericActions as any).categories.fetchFromAPI());
-    dispatch((genericActions as any).teams.getFromIndexedDB());
-    dispatch((genericActions as any).slas.getFromIndexedDB());
-    dispatch((genericActions as any).approvals.getFromIndexedDB());
-    dispatch((genericActions as any).approvals.fetchFromAPI());
-    dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
-    dispatch((genericActions as any).categoryCustomFields.getFromIndexedDB());
-  }, [dispatch]);
+  const workspacesState = useSelector((state: RootState) => (state as any).workspaces) as { value?: any[] } | undefined;
+  const workspaces: any[] = workspacesState?.value ?? [];
 
   // Use shared state management
   const {
@@ -234,9 +221,11 @@ function Categories() {
     icon: 'fas fa-tags',
     enabled: true,
     team_id: '',
+    workspace_id: '',
     sla_id: '',
     approval_id: '',
-    status_transition_group_id: ''
+    status_transition_group_id: '',
+    celebration_effect: ''
   });
 
   // Form state for edit dialog
@@ -247,9 +236,11 @@ function Categories() {
     icon: 'fas fa-tags',
     enabled: true,
     team_id: '',
+    workspace_id: '',
     sla_id: '',
     approval_id: '',
-    status_transition_group_id: ''
+    status_transition_group_id: '',
+    celebration_effect: ''
   });
 
   // Reporting teams state - now comes directly from category's reporting_team_ids
@@ -273,9 +264,11 @@ function Categories() {
         icon: editingCategory.icon || 'fas fa-tags',
         enabled: editingCategory.enabled ?? true,
         team_id: editingCategory.team_id?.toString() || '',
+        workspace_id: (editingCategory as any).workspace_id?.toString() || '',
         sla_id: editingCategory.sla_id?.toString() || '',
         approval_id: (editingCategory as any).approval_id?.toString?.() || '',
-        status_transition_group_id: editingCategory.status_transition_group_id?.toString() || ''
+        status_transition_group_id: editingCategory.status_transition_group_id?.toString() || '',
+        celebration_effect: editingCategory.celebration_effect || ''
       });
       // Load reporting teams when editing category changes - dispatch Redux action
       loadReportingTeamsForEdit();
@@ -450,7 +443,7 @@ function Categories() {
   const colDefs = useMemo<ColDef[]>(() => [
     { 
       field: 'name', 
-      headerName: 'Category Name',
+      headerName: tc('grid.columns.categoryName', 'Category Name'),
       flex: 4,
       minWidth: 350,
       cellRenderer: CategoryNameCellRenderer
@@ -459,14 +452,14 @@ function Categories() {
     // Fields column removed per request
     {
       field: 'team_id',
-      headerName: 'Team',
+      headerName: tc('grid.columns.team', 'Team'),
       flex: 1.5,
       minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
         const teamId = params.value;
 
         if (!teamId) {
-          return <span className="text-muted-foreground">No Team</span>;
+          return <span className="text-muted-foreground">{tc('grid.values.noTeam', 'No Team')}</span>;
         }
 
         const team = teams.find((t: any) => t.id === teamId);
@@ -488,7 +481,7 @@ function Categories() {
     },
     {
       field: 'sla_id',
-      headerName: 'SLA',
+      headerName: tc('grid.columns.sla', 'SLA'),
       flex: 1.2,
       minWidth: 180,
       cellRenderer: (params: ICellRendererParams) => {
@@ -504,7 +497,7 @@ function Categories() {
     },
     {
       field: 'approval_id',
-      headerName: 'Approval',
+      headerName: tc('grid.columns.approval', 'Approval'),
       flex: 1.2,
       minWidth: 180,
       cellRenderer: (params: ICellRendererParams) => {
@@ -520,13 +513,13 @@ function Categories() {
     },
     {
       field: 'status_transition_group_id',
-      headerName: 'Status Transition Group',
+      headerName: tc('grid.columns.statusTransitionGroup', 'Status Transition Group'),
       flex: 1.5,
       minWidth: 200,
       cellRenderer: (params: ICellRendererParams) => {
         const groupId = params.value as number | null | undefined;
         if (!groupId) {
-          return <span className="text-muted-foreground">Unassigned</span>;
+          return <span className="text-muted-foreground">{tc('grid.values.unassigned', 'Unassigned')}</span>;
         }
         const group = statusTransitionGroups.find((g: any) => g.id === Number(groupId));
         return <span>{group?.name || `Group ${groupId}`}</span>;
@@ -536,15 +529,15 @@ function Categories() {
     },
     {
       field: 'enabled',
-      headerName: 'Status',
+      headerName: tc('grid.columns.status', 'Status'),
       flex: 0.8,
       minWidth: 120,
-      cellRenderer: EnabledCellRenderer,
+      cellRenderer: (params: ICellRendererParams) => <EnabledCellRenderer {...params} t={t} />,
       sortable: true,
       filter: true
     },
     {
-      headerName: 'Actions',
+      headerName: tc('grid.columns.actions', 'Actions'),
       colId: 'actions',
       minWidth: 240,
       suppressSizeToFit: true,
@@ -559,17 +552,20 @@ function Categories() {
       resizable: false,
       pinned: 'right'
     }
-  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, assignmentCountByCategory, openManageFields]);
+  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, assignmentCountByCategory, openManageFields, tc, t]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!createFormData.team_id) {
-      throw new Error('Please select a team for this category.');
+      throw new Error(tc('validation.teamRequired', 'Please select a team for this category.'));
     }
     if (!createFormData.status_transition_group_id) {
-      throw new Error('Please select a transition group for this category.');
+      if (statusTransitionGroups.length === 0) {
+        throw new Error(tc('validation.transitionGroupNotAvailable', 'No status transition groups are available. Please create a status transition group first.'));
+      }
+      throw new Error(tc('validation.transitionGroupRequired', 'Please select a transition group for this category.'));
     }
 
     const categoryData = {
@@ -579,10 +575,11 @@ function Categories() {
       icon: createFormData.icon,
       enabled: createFormData.enabled,
       team_id: parseInt(createFormData.team_id),
-      workspace_id: 1,
+      workspace_id: createFormData.workspace_id ? parseInt(createFormData.workspace_id) : 1,
       sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
       approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
       status_transition_group_id: parseInt(createFormData.status_transition_group_id),
+      celebration_effect: createFormData.celebration_effect || null,
       deleted_at: null
     };
     await createItem(categoryData);
@@ -595,9 +592,11 @@ function Categories() {
       icon: 'fas fa-tags',
       enabled: true,
       team_id: '',
+      workspace_id: '',
       sla_id: '',
       approval_id: '',
-      status_transition_group_id: ''
+      status_transition_group_id: '',
+      celebration_effect: ''
     });
   };
 
@@ -612,10 +611,12 @@ function Categories() {
       icon: editFormData.icon,
       enabled: editFormData.enabled,
       team_id: editFormData.team_id ? parseInt(editFormData.team_id) : 0,
-      workspace_id: 1,
+      workspace_id: editFormData.workspace_id ? parseInt(editFormData.workspace_id) : 1,
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
       approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
-      status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined
+      status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined,
+      reporting_team_ids: selectedReportingTeamIds,
+      celebration_effect: editFormData.celebration_effect || null
     };
     await updateItem(editingCategory.id, updates);
   };
@@ -679,10 +680,10 @@ function Categories() {
               variant={category.enabled ? "default" : "secondary"}
               className={`text-xs ${category.enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
             >
-              {category.enabled ? "Enabled" : "Disabled"}
+              {category.enabled ? tc('grid.values.enabled', 'Enabled') : tc('grid.values.disabled', 'Disabled')}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {getCategoryTaskCount(category.id)} task{getCategoryTaskCount(category.id) !== 1 ? 's' : ''}
+              {getCategoryTaskCount(category.id)} {getCategoryTaskCount(category.id) !== 1 ? tc('preview.tasks', 'tasks') : tc('preview.task', 'task')}
             </span>
           </div>
         </div>
@@ -713,8 +714,10 @@ function Categories() {
           </Link>
           <Button 
             onClick={() => setIsCreateDialogOpen(true)}
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
           >
-            <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+            <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-2" />
             <span>{tc('header.addCategory', 'Add Category')}</span>
           </Button>
         </div>
@@ -909,7 +912,7 @@ function Categories() {
                               },
                               series: [
                                 {
-                                  name: "Categories",
+                                  name: tc('stats.charts.categoriesByTeam.axis', 'Categories'),
                                   type: "bar",
                                   data: categoriesByTeam
                                     .map((item) => ({
@@ -1033,7 +1036,7 @@ function Categories() {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Search categories..."
+          placeholder={tc('search.placeholder', 'Search categories...')}
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
@@ -1048,8 +1051,8 @@ function Categories() {
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         type="create"
-        title="Add New Category"
-        description="Add a new category to organize your tasks."
+        title={tc('dialogs.create.title', 'Add New Category')}
+        description={tc('dialogs.create.description', 'Add a new category to organize your tasks.')}
         onSubmit={handleCreateSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -1060,42 +1063,42 @@ function Categories() {
             <FontAwesomeIcon icon={faTags} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">Create category</p>
+            <p className="text-sm font-semibold text-foreground">{tc('dialogs.create.helper.title', 'Create category')}</p>
             <p className="text-xs text-muted-foreground">
-              Set general details and rules (SLA, approval, transitions) across two tabs.
+              {tc('dialogs.create.helper.description', 'Set general details and rules (SLA, approval, transitions) across two tabs.')}
             </p>
           </div>
         </div>
         <Tabs defaultValue="general" className="w-full">
           <TabsList>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="rules">Rules</TabsTrigger>
+            <TabsTrigger value="general">{tc('dialogs.create.tabs.general', 'General')}</TabsTrigger>
+            <TabsTrigger value="rules">{tc('dialogs.create.tabs.rules', 'Rules')}</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <div className="grid gap-4 min-h-[320px]">
               <TextField
                 id="name"
-                label="Name"
+                label={tc('fields.name', 'Name')}
                 value={createFormData.name}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
                 required
               />
               <TextField
                 id="description"
-                label="Description"
+                label={tc('fields.description', 'Description')}
                 value={createFormData.description}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, description: value }))}
               />
               <TextField
                 id="color"
-                label="Color"
+                label={tc('fields.color', 'Color')}
                 type="color"
                 value={createFormData.color}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
               />
               <IconPicker
                 id="icon"
-                label="Icon"
+                label={tc('fields.icon', 'Icon')}
                 value={createFormData.icon}
                 onChange={(iconClass) => setCreateFormData(prev => ({ ...prev, icon: iconClass }))}
                 color={createFormData.color}
@@ -1103,22 +1106,34 @@ function Categories() {
               />
               <SelectField
                 id="team"
-                label="Team"
+                label={tc('fields.team', 'Team')}
                 value={createFormData.team_id}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, team_id: value }))}
-                placeholder="No Team"
+                placeholder={tc('fields.placeholders.noTeam', 'No Team')}
                 options={teams.map((team: Team) => ({
                   value: team.id.toString(),
                   label: team.name
                 }))}
                 required
               />
+              <SelectField
+                id="workspace"
+                label={tc('fields.workspace', 'Workspace')}
+                value={createFormData.workspace_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, workspace_id: value }))}
+                placeholder={tc('fields.placeholders.selectWorkspace', 'Select Workspace')}
+                options={(workspaces as any[]).filter((w: any) => w.type === 'DEFAULT').map((workspace: any) => ({
+                  value: workspace.id.toString(),
+                  label: workspace.name
+                }))}
+                required
+              />
               <CheckboxField
                 id="enabled"
-                label="Status"
+                label={tc('fields.status', 'Status')}
                 checked={createFormData.enabled}
                 onChange={(checked) => setCreateFormData(prev => ({ ...prev, enabled: checked }))}
-                description="Enabled"
+                description={tc('fields.enabled', 'Enabled')}
               />
             </div>
           </TabsContent>
@@ -1126,37 +1141,54 @@ function Categories() {
             <div className="grid gap-4 min-h-[320px]">
               <SelectField
                 id="sla"
-                label="SLA"
+                label={tc('fields.sla', 'SLA')}
                 value={createFormData.sla_id}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-                placeholder="Select SLA…"
-                options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
+                placeholder={tc('fields.placeholders.selectSla', 'Select SLA…')}
+                options={[{ value: 'none', label: tc('fields.placeholders.none', 'None') }, ...(slas as Sla[]).map((s: Sla) => ({
                   value: s.id.toString(),
                   label: s.name
                 }))]}
               />
               <SelectField
                 id="approval"
-                label="Approval"
+                label={tc('fields.approval', 'Approval')}
                 value={createFormData.approval_id}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-                placeholder="Select approval…"
-                options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
+                placeholder={tc('fields.placeholders.selectApproval', 'Select approval…')}
+                options={[{ value: 'none', label: tc('fields.placeholders.none', 'None') }, ...(approvals as Approval[]).map((a: Approval) => ({
                   value: a.id.toString(),
                   label: a.name
                 }))]}
               />
               <SelectField
                 id="status-group"
-                label="Status Transition Group"
+                label={tc('fields.statusTransitionGroup', 'Status Transition Group')}
                 value={createFormData.status_transition_group_id}
                 onChange={(value) => setCreateFormData(prev => ({ ...prev, status_transition_group_id: value }))}
-                placeholder="Select group…"
+                placeholder={tc('fields.placeholders.selectGroup', 'Select group…')}
                 options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
                   value: g.id.toString(),
                   label: g.name
                 }))}
                 required
+              />
+              <SelectField
+                id="celebration-effect"
+                label={tc('fields.celebrationEffect', 'Task Completion Celebration')}
+                value={createFormData.celebration_effect}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }))}
+                placeholder={tc('fields.placeholders.selectCelebration', 'Select celebration…')}
+                options={[
+                  { value: 'default', label: tc('fields.placeholders.useGlobalDefault', 'Use Global Default') },
+                  { value: 'confetti', label: tc('fields.celebration.confetti', 'Confetti') },
+                  { value: 'fireworks', label: tc('fields.celebration.fireworks', 'Fireworks') },
+                  { value: 'hearts', label: tc('fields.celebration.hearts', 'Hearts') },
+                  { value: 'balloons', label: tc('fields.celebration.balloons', 'Balloons') },
+                  { value: 'sparkles', label: tc('fields.celebration.sparkles', 'Sparkles') },
+                  { value: 'ribbons', label: tc('fields.celebration.ribbons', 'Ribbons') },
+                  { value: 'none', label: tc('fields.celebration.none', 'None') }
+                ]}
               />
             </div>
           </TabsContent>
@@ -1168,8 +1200,8 @@ function Categories() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         type="edit"
-        title="Edit Category"
-        description="Update the category information."
+        title={tc('dialogs.edit.title', 'Edit Category')}
+        description={tc('dialogs.edit.description', 'Update the category information.')}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
@@ -1182,7 +1214,7 @@ function Categories() {
             disabled={!editingCategory}
           >
             <FontAwesomeIcon icon={faTrash} className="mr-2" />
-            Delete
+            {tc('dialogs.delete.button', 'Delete')}
           </Button>
         }
       >
@@ -1191,43 +1223,43 @@ function Categories() {
             <FontAwesomeIcon icon={faTags} className="text-sky-600 dark:text-sky-300 w-4 h-4" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">Edit category</p>
+            <p className="text-sm font-semibold text-foreground">{tc('dialogs.edit.helper.title', 'Edit category')}</p>
             <p className="text-xs text-muted-foreground">
-              Update details and rules. SLA, approval, and transitions live in the Rules tab.
+              {tc('dialogs.edit.helper.description', 'Update details and rules. SLA, approval, and transitions live in the Rules tab.')}
             </p>
           </div>
         </div>
         <Tabs defaultValue="general" className="w-full">
           <TabsList>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="rules">Rules</TabsTrigger>
-            <TabsTrigger value="reporting-teams">Reporting Teams</TabsTrigger>
+            <TabsTrigger value="general">{tc('dialogs.edit.tabs.general', 'General')}</TabsTrigger>
+            <TabsTrigger value="rules">{tc('dialogs.edit.tabs.rules', 'Rules')}</TabsTrigger>
+            <TabsTrigger value="reporting-teams">{tc('dialogs.edit.tabs.reportingTeams', 'Reporting Teams')}</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <div className="grid gap-4 min-h-[320px]">
               <TextField
                 id="edit-name"
-                label="Name"
+                label={tc('fields.name', 'Name')}
                 value={editFormData.name}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
                 required
               />
               <TextField
                 id="edit-description"
-                label="Description"
+                label={tc('fields.description', 'Description')}
                 value={editFormData.description}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
               />
               <TextField
                 id="edit-color"
-                label="Color"
+                label={tc('fields.color', 'Color')}
                 type="color"
                 value={editFormData.color}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
               />
               <IconPicker
                 id="edit-icon"
-                label="Icon"
+                label={tc('fields.icon', 'Icon')}
                 value={editFormData.icon}
                 onChange={(iconClass) => setEditFormData(prev => ({ ...prev, icon: iconClass }))}
                 color={editFormData.color}
@@ -1235,21 +1267,33 @@ function Categories() {
               />
               <SelectField
                 id="edit-team"
-                label="Team"
+                label={tc('fields.team', 'Team')}
                 value={editFormData.team_id}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, team_id: value }))}
-                placeholder="No Team"
+                placeholder={tc('fields.placeholders.noTeam', 'No Team')}
                 options={teams.map((team: Team) => ({
                   value: team.id.toString(),
                   label: team.name
                 }))}
               />
+              <SelectField
+                id="edit-workspace"
+                label={tc('fields.workspace', 'Workspace')}
+                value={editFormData.workspace_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, workspace_id: value }))}
+                placeholder={tc('fields.placeholders.selectWorkspace', 'Select Workspace')}
+                options={(workspaces as any[]).filter((w: any) => w.type === 'DEFAULT').map((workspace: any) => ({
+                  value: workspace.id.toString(),
+                  label: workspace.name
+                }))}
+                required
+              />
               <CheckboxField
                 id="edit-enabled"
-                label="Status"
+                label={tc('fields.status', 'Status')}
                 checked={editFormData.enabled}
                 onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
-                description="Enabled"
+                description={tc('fields.enabled', 'Enabled')}
               />
             </div>
           </TabsContent>
@@ -1257,37 +1301,54 @@ function Categories() {
             <div className="grid gap-4 min-h-[320px]">
               <SelectField
                 id="edit-sla"
-                label="SLA"
+                label={tc('fields.sla', 'SLA')}
                 value={editFormData.sla_id}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, sla_id: value === 'none' ? '' : value }))}
-                placeholder="Select SLA…"
-                options={[{ value: 'none', label: 'None' }, ...(slas as Sla[]).map((s: Sla) => ({
+                placeholder={tc('fields.placeholders.selectSla', 'Select SLA…')}
+                options={[{ value: 'none', label: tc('fields.placeholders.none', 'None') }, ...(slas as Sla[]).map((s: Sla) => ({
                   value: s.id.toString(),
                   label: s.name
                 }))]}
               />
               <SelectField
                 id="edit-approval"
-                label="Approval"
+                label={tc('fields.approval', 'Approval')}
                 value={editFormData.approval_id}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, approval_id: value === 'none' ? '' : value }))}
-                placeholder="Select approval…"
-                options={[{ value: 'none', label: 'None' }, ...(approvals as Approval[]).map((a: Approval) => ({
+                placeholder={tc('fields.placeholders.selectApproval', 'Select approval…')}
+                options={[{ value: 'none', label: tc('fields.placeholders.none', 'None') }, ...(approvals as Approval[]).map((a: Approval) => ({
                   value: a.id.toString(),
                   label: a.name
                 }))]}
               />
               <SelectField
                 id="edit-status-group"
-                label="Status Transition Group"
+                label={tc('fields.statusTransitionGroup', 'Status Transition Group')}
                 value={editFormData.status_transition_group_id}
                 onChange={(value) => setEditFormData(prev => ({ ...prev, status_transition_group_id: value }))}
-                placeholder="Select group…"
+                placeholder={tc('fields.placeholders.selectGroup', 'Select group…')}
                 options={statusTransitionGroups.map((g: StatusTransitionGroup) => ({
                   value: g.id.toString(),
                   label: g.name
                 }))}
                 required
+              />
+              <SelectField
+                id="edit-celebration-effect"
+                label={tc('fields.celebrationEffect', 'Task Completion Celebration')}
+                value={editFormData.celebration_effect}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }))}
+                placeholder={tc('fields.placeholders.selectCelebration', 'Select celebration…')}
+                options={[
+                  { value: 'default', label: tc('fields.placeholders.useGlobalDefault', 'Use Global Default') },
+                  { value: 'confetti', label: tc('fields.celebration.confetti', 'Confetti') },
+                  { value: 'fireworks', label: tc('fields.celebration.fireworks', 'Fireworks') },
+                  { value: 'hearts', label: tc('fields.celebration.hearts', 'Hearts') },
+                  { value: 'balloons', label: tc('fields.celebration.balloons', 'Balloons') },
+                  { value: 'sparkles', label: tc('fields.celebration.sparkles', 'Sparkles') },
+                  { value: 'ribbons', label: tc('fields.celebration.ribbons', 'Ribbons') },
+                  { value: 'none', label: tc('fields.celebration.none', 'None') }
+                ]}
               />
             </div>
           </TabsContent>
@@ -1302,6 +1363,7 @@ function Categories() {
               onSave={handleSaveReportingTeams}
               onReset={loadReportingTeamsForEdit}
               teams={teams}
+              hideFooter={true}
             />
           </TabsContent>
         </Tabs>
@@ -1312,15 +1374,18 @@ function Categories() {
         open={isDeleteDialogOpen}
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
-        title="Delete Category"
+        title={tc('dialogs.delete.title', 'Delete Category')}
         description={
           deletingCategory ? (() => {
             const taskCount = getCategoryTaskCount(deletingCategory.id);
             
             if (taskCount > 0) {
-              return `This category cannot be deleted because it contains ${taskCount} task${taskCount !== 1 ? 's' : ''}. Please reassign or delete all tasks in this category first.`;
+              return tc('dialogs.delete.restricted', 'This category cannot be deleted because it contains {count} task{plural}. Please reassign or delete all tasks in this category first.')
+                .replace('{count}', String(taskCount))
+                .replace('{plural}', taskCount !== 1 ? 's' : '');
             } else {
-              return `Are you sure you want to delete the category "${deletingCategory.name}"? This action cannot be undone.`;
+              return tc('dialogs.delete.confirm', 'Are you sure you want to delete the category "{name}"? This action cannot be undone.')
+                .replace('{name}', deletingCategory.name);
             }
           })() : undefined
         }

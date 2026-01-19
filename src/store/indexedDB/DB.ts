@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.9.15';
+const CURRENT_DB_VERSION = '1.13.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -174,7 +174,9 @@ export class DB {
           if (!db.objectStoreNames.contains('role_permissions')) {
             db.createObjectStore('role_permissions', { keyPath: 'id' });
           }
-          // task_users store removed - user assignments are now stored as JSON in tasks.user_ids
+          if (!db.objectStoreNames.contains('task_users')) {
+            db.createObjectStore('task_users', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('status_transitions')) {
             db.createObjectStore('status_transitions', { keyPath: 'id' });
           }
@@ -186,6 +188,9 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('task_tags')) {
             db.createObjectStore('task_tags', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_shares')) {
+            db.createObjectStore('task_shares', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('spot_types')) {
             db.createObjectStore('spot_types', { keyPath: 'id' });
@@ -234,6 +239,28 @@ export class DB {
           // Task approval instances
           if (!db.objectStoreNames.contains('task_approval_instances')) {
             db.createObjectStore('task_approval_instances', { keyPath: 'id' });
+          }
+
+          // Broadcasts & Acknowledgments
+          if (!db.objectStoreNames.contains('broadcasts')) {
+            db.createObjectStore('broadcasts', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('broadcast_acknowledgments')) {
+            const store = db.createObjectStore('broadcast_acknowledgments', { keyPath: 'id' });
+            store.createIndex('broadcast_id', 'broadcast_id', { unique: false });
+            store.createIndex('user_id', 'user_id', { unique: false });
+            store.createIndex('status', 'status', { unique: false });
+          }
+
+          // Plugin System
+          if (!db.objectStoreNames.contains('plugins')) {
+            const store = db.createObjectStore('plugins', { keyPath: 'id' });
+            store.createIndex('slug', 'slug', { unique: true });
+            store.createIndex('is_enabled', 'is_enabled', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('plugin_routes')) {
+            const store = db.createObjectStore('plugin_routes', { keyPath: 'id' });
+            store.createIndex('plugin_id', 'plugin_id', { unique: false });
           }
 
           // Custom Fields & Values
@@ -290,6 +317,51 @@ export class DB {
           if (!db.objectStoreNames.contains('exceptions')) {
             db.createObjectStore('exceptions', { keyPath: 'id' });
           }
+
+          // Boards (Communication Boards)
+          if (!db.objectStoreNames.contains('boards')) {
+            db.createObjectStore('boards', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('board_members')) {
+            db.createObjectStore('board_members', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('board_messages')) {
+            db.createObjectStore('board_messages', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('board_attachments')) {
+            db.createObjectStore('board_attachments', { keyPath: 'id' });
+          }
+
+          // Workflows
+          if (!db.objectStoreNames.contains('workflows')) {
+            db.createObjectStore('workflows', { keyPath: 'id' });
+          }
+
+          // Compliance Module
+          if (!db.objectStoreNames.contains('compliance_standards')) {
+            db.createObjectStore('compliance_standards', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('compliance_requirements')) {
+            db.createObjectStore('compliance_requirements', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('compliance_mappings')) {
+            db.createObjectStore('compliance_mappings', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('compliance_audits')) {
+            db.createObjectStore('compliance_audits', { keyPath: 'id' });
+          }
+
+          // Schedule Management
+          if (!db.objectStoreNames.contains('schedule_templates')) {
+            db.createObjectStore('schedule_templates', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('schedule_template_days')) {
+            db.createObjectStore('schedule_template_days', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('user_schedules')) {
+            db.createObjectStore('user_schedules', { keyPath: 'id' });
+          }
+
           // Avatar image cache (base64 or blob references)
           if (!db.objectStoreNames.contains('avatars')) {
             db.createObjectStore('avatars', { keyPath: 'id' });
@@ -481,7 +553,9 @@ export class DB {
       | 'role_permissions'
 
       | 'status_transitions'
+      | 'task_users'
       | 'task_tags'
+      | 'task_shares'
       | 'spot_types'
       | 'slas'
       | 'sla_policies'
@@ -496,6 +570,13 @@ export class DB {
       | 'status_transition_groups'
       | 'approval_approvers'
       | 'task_approval_instances'
+      | 'broadcasts'
+      | 'broadcast_acknowledgments'
+      | 'plugins'
+      | 'plugin_routes'
+      | 'schedule_templates'
+      | 'schedule_template_days'
+      | 'user_schedules'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -511,6 +592,7 @@ export class DB {
       | 'task_recurrences'
       | 'workspace_chat'
       | 'exceptions'
+      | 'board_attachments'
       | 'avatars',
     mode: IDBTransactionMode = 'readonly'
   ) {
@@ -540,7 +622,9 @@ export class DB {
       | 'role_permissions'
 
       | 'status_transitions'
+      | 'task_users'
       | 'task_tags'
+      | 'task_shares'
       | 'spot_types'
       | 'slas'
       | 'sla_policies'
@@ -555,6 +639,13 @@ export class DB {
       | 'status_transition_groups'
       | 'approval_approvers'
       | 'task_approval_instances'
+      | 'broadcasts'
+      | 'broadcast_acknowledgments'
+      | 'plugins'
+      | 'plugin_routes'
+      | 'schedule_templates'
+      | 'schedule_template_days'
+      | 'user_schedules'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -570,6 +661,7 @@ export class DB {
       | 'task_recurrences'
       | 'workspace_chat'
       | 'exceptions'
+      | 'board_attachments'
       | 'avatars',
     mode: IDBTransactionMode = 'readwrite'
   ) {
@@ -826,10 +918,11 @@ export class DB {
       if (DB.isEncryptionEnabledForStore(storeName)) {
         const env = await DB.encryptEnvelope(storeName, rowCopy);
         if (!env) {
-          console.warn(`[DB] Not storing ${storeName} row due to encryption failure (no envelope)`);
-          return; // Don't store the data
+          console.warn(`[DB] Storing ${storeName} row unencrypted due to encryption failure (CEK may not be ready yet)`);
+          payload = rowCopy; // Store unencrypted as fallback to prevent data loss
+        } else {
+          payload = env;
         }
-        payload = env;
         // Extra debug: post-encrypt envelope check
         try {
           const dbg = localStorage.getItem('wh-debug-cache') === 'true';
@@ -927,17 +1020,19 @@ export class DB {
       let payloads: any[] = rows;
       if (DB.isEncryptionEnabledForStore(storeName)) {
         const envelopes: any[] = [];
+        let encryptionFailed = false;
         for (const r of rows) {
           const env = await DB.encryptEnvelope(storeName, r);
           if (env !== null) {
             envelopes.push(env);
           } else {
-            console.warn(`[DB] Skipping ${storeName} row due to encryption failure`);
+            // Encryption failed - store unencrypted as fallback to prevent data loss
+            envelopes.push(r);
+            encryptionFailed = true;
           }
         }
-        if (envelopes.length === 0) {
-          console.warn(`[DB] No ${storeName} rows stored due to encryption failures`);
-          return;
+        if (encryptionFailed) {
+          console.warn(`[DB] Some ${storeName} rows stored unencrypted due to encryption failures (CEK may not be ready yet)`);
         }
         payloads = envelopes;
       }

@@ -28,7 +28,13 @@ interface UserData {
   id: number;
   name: string;
   email: string;
-  teams?: Array<{ id: number; name: string; description?: string; color?: string; role_id?: number }> | null;
+  teams?: Array<{ 
+    id: number; 
+    name: string; 
+    description?: string; 
+    color?: string; 
+    // role_id comes from wh_user_team pivot table (userTeams slice), not from user response
+  }> | null;
   role_id?: number | null;
   job_position_id?: number | null;
   job_position?: { id: number; title: string } | null;
@@ -37,7 +43,7 @@ interface UserData {
   has_active_subscription?: boolean;
   url_picture?: string | null;
   color?: string | null;
-  global_roles?: string[];
+  global_roles?: Array<{ id: number; name: string }> | string[] | null; // Can be objects (from API) or strings (for update)
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -68,8 +74,6 @@ function Users() {
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
   const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
   const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
-
-  // Note: create dialog open effect moved below after isCreateDialogOpen is defined
   
   // Use shared state management
   const {
@@ -100,27 +104,7 @@ function Users() {
     searchFields: ['name', 'email']
   });
 
-  // Ensure users, teams, and job positions are loaded when users page mounts
-  useEffect(() => {
-    // Load users data
-    dispatch((genericActions as any).users.getFromIndexedDB());
-    
-    // Load teams (needed for team column and dropdown)
-    dispatch((genericActions as any).teams.getFromIndexedDB());
-    
-    // Load job positions (needed for dropdown/labels)
-    dispatch((genericActions as any).jobPositions.getFromIndexedDB());
-    
-    // Load roles (needed for team-role selector and invitation form)
-    dispatch((genericActions as any).roles.getFromIndexedDB());
-    dispatch((genericActions as any).roles.fetchFromAPI?.());
-    
-    // Load user-teams pivot table (needed for team assignments)
-    dispatch((genericActions as any).userTeams.getFromIndexedDB());
-    
-    // Load invitations from IndexedDB only (no automatic API fetch)
-    dispatch((genericActions as any).invitations.getFromIndexedDB());
-  }, [dispatch]);
+  // Roles are loaded by DataManager on login
 
   // Form state for controlled components
   const [editFormData, setEditFormData] = useState<{
@@ -187,8 +171,11 @@ function Users() {
       const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
       setSelectedTeams(existingUserTeams.map((ut: UserTeam) => ut.team_id.toString()));
 
-      // Load existing global roles - already included in editingUser from UserResource
-      setSelectedGlobalRoles(editingUser.global_roles || []);
+      // Load existing global roles - extract role names from role objects
+      const roleNames = Array.isArray(editingUser.global_roles) 
+        ? editingUser.global_roles.map((role: any) => typeof role === 'object' ? role.name : role)
+        : [];
+      setSelectedGlobalRoles(roleNames);
     } else {
       // Reset selected teams and global roles when dialog closes
       setSelectedTeams([]);
@@ -325,7 +312,7 @@ function Users() {
       }
 
       // Refresh local cache
-      dispatch((genericActions as any).userTeams.getFromIndexedDB());
+      // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       handleCloseTeamsDialog();
     } catch (err: any) {
       setFormError(err?.message || 'Error updating teams');
@@ -463,7 +450,6 @@ function Users() {
         width: 220,
         cellRenderer: createActionsCellRenderer({
           onEdit: handleEdit,
-          onDelete: handleDelete,
           customActions: [
             {
               icon: faUsers,
@@ -678,7 +664,7 @@ function Users() {
     try {
       await dispatch((genericActions as any).invitations.removeAsync(deletingInvitation.id)).unwrap();
       // Refresh invitations list from IndexedDB (will be updated by real-time listener or next validation)
-      dispatch((genericActions as any).invitations.getFromIndexedDB());
+      // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       setIsDeleteInvitationDialogOpen(false);
       setDeletingInvitation(null);
     } catch (error: any) {
@@ -686,7 +672,7 @@ function Users() {
       // Refresh from IndexedDB to sync state
       if (error?.response?.status === 404 || error?.response?.status === 500) {
         console.warn('Invitation may already be deleted, refreshing from cache');
-        dispatch((genericActions as any).invitations.getFromIndexedDB());
+        // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       }
       console.error('Failed to delete invitation:', error);
       setIsDeleteInvitationDialogOpen(false);
@@ -881,7 +867,7 @@ function Users() {
           const result = await dispatch((genericActions as any).invitations.addAsync(payload)).unwrap();
           
           // Refresh invitations list from IndexedDB (real-time listener will update cache automatically)
-          dispatch((genericActions as any).invitations.getFromIndexedDB());
+          // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
           
           // Show invitation link if available
           if (result?.invitation_link) {
@@ -933,8 +919,12 @@ function Users() {
       
       if (createdUser && createSelectedTeams.length > 0) {
         // Get default role (first available role, or first role with name "Usuario"/"User" if exists)
-        const defaultRole = roles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || roles[0];
-        if (!defaultRole) {
+        // Note: roles are not in Redux, so we can't assign roles here
+        // Roles should be assigned separately via the roles API if needed
+        const defaultRole = roles.length > 0 
+          ? (roles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || roles[0])
+          : null;
+        if (!defaultRole && roles.length > 0) {
           setFormError(tu('errors.noRoleAvailable', 'No roles available. Please create a role first.'));
           setIsCreating(false);
           return;
@@ -947,7 +937,7 @@ function Users() {
             await dispatch((genericActions as any).userTeams.addAsync({
               user_id: createdUser.id,
               team_id: teamId,
-              role_id: defaultRole.id
+              role_id: defaultRole?.id || null
             })).unwrap();
           } catch (error) {
             console.error(`Failed to add user-team relationship:`, error);
@@ -956,7 +946,7 @@ function Users() {
         }
         
         // Refresh userTeams cache to reflect changes
-        dispatch((genericActions as any).userTeams.getFromIndexedDB());
+        // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       }
       
       // Close dialog
@@ -1007,8 +997,9 @@ function Users() {
       const teamsToRemove = existingTeamIds.filter(teamId => !selectedTeamIds.includes(teamId));
 
       // Get default role (use existing role from userTeams if available, otherwise find default)
+      // Note: roles are not in Redux, so we can't find roles by ID
       let defaultRole: Role | undefined;
-      if (existingUserTeams.length > 0) {
+      if (existingUserTeams.length > 0 && roles.length > 0) {
         // Use the role from the first existing user-team relationship
         const firstRoleId = getUserTeamRoleId(existingUserTeams[0]);
         if (firstRoleId != null) {
@@ -1016,11 +1007,13 @@ function Users() {
         }
       }
       // If no existing role, find a default role
-      if (!defaultRole) {
+      if (!defaultRole && roles.length > 0) {
         defaultRole = roles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || roles[0];
       }
       
-      if (teamsToAdd.length > 0 && !defaultRole) {
+      // Note: If no defaultRole, we'll proceed without role assignment (roles should be managed separately)
+      // Only show error if roles array exists but no default role found
+      if (teamsToAdd.length > 0 && roles.length > 0 && !defaultRole) {
         setFormError(tu('errors.noRoleAvailable', 'No roles available. Please create a role first.'));
         return;
       }
@@ -1060,7 +1053,7 @@ function Users() {
       // No separate API call needed
       
       // Refresh userTeams cache to reflect changes
-      dispatch((genericActions as any).userTeams.getFromIndexedDB());
+      // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       
       // Close edit dialog on success
       setIsEditDialogOpen(false);
@@ -1107,10 +1100,20 @@ function Users() {
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/roles-and-permissions')}>
             {tu('header.rolesAndPermissions', 'Roles and Permissions')}
           </Button>
-          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} size="sm">
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)} 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
             {tu('header.createUser', 'Create User')}
           </Button>
-          <Button onClick={() => setIsInviteDialogOpen(true)} size="sm">
+          <Button 
+            onClick={() => setIsInviteDialogOpen(true)} 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
             {tu('header.createInvitation', 'Create Invitation')}
           </Button>
         </div>
@@ -1202,7 +1205,7 @@ function Users() {
         submitText={tu('dialogs.manageTeams.save', 'Save')}
         submitDisabled={!teamsDialogUser || isSavingTeams}
         cancelText={tu('dialogs.manageTeams.close', 'Close')}
-        contentClassName="max-w-3xl"
+        contentClassName="max-w-4xl"
       >
         {!teamsDialogUser ? (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
@@ -1254,8 +1257,11 @@ function Users() {
                     : [{ value: assignment.teamId, label: tu('dialogs.manageTeams.unknownTeam', `Team ${assignment.teamId}`) }, ...baseTeamOptions];
 
                   // Filter roles to only show TEAM scope roles when associating teams
+                  // Note: roles are not in Redux, so we can't show role options
                   const teamRoles = roles.filter((r) => r.scope === 'TEAM');
-                  const baseRoleOptions = teamRoles.map((r) => ({ value: String(r.id), label: r.name }));
+                  const baseRoleOptions = teamRoles.length > 0 
+                    ? teamRoles.map((r) => ({ value: String(r.id), label: r.name }))
+                    : [];
                   const hasCurrentRole = assignment.roleId && baseRoleOptions.some((opt) => opt.value === assignment.roleId);
                   const roleOptions = hasCurrentRole || !assignment.roleId
                     ? baseRoleOptions
@@ -1518,6 +1524,22 @@ function Users() {
         error={formError}
         submitDisabled={isSubmitting || !editingUser}
         contentClassName="max-w-[80vw] sm:max-w-4xl"
+        footerActions={
+          editingUser ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingUser);
+              }}
+              disabled={isSubmitting}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              {tu('dialogs.deleteUser.title', 'Delete User')}
+            </Button>
+          ) : null
+        }
       >
         {editingUser && (
           <Tabs defaultValue="basic" className="w-full">
@@ -1592,16 +1614,18 @@ function Users() {
                   </Label>
                   <div className="col-span-3">
                     <MultiSelect
-                      options={roles
-                        .filter((role: Role) => role.scope === 'GLOBAL')
-                        .map((role: Role) => ({
-                          value: role.name,
-                          label: role.name
-                        }))}
+                      options={roles.length > 0
+                        ? roles
+                            .filter((role: Role) => role.scope === 'GLOBAL')
+                            .map((role: Role) => ({
+                              value: role.name,
+                              label: role.name
+                            }))
+                        : []}
                       onValueChange={setSelectedGlobalRoles}
                       defaultValue={selectedGlobalRoles}
                       placeholder={
-                        roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
+                        roles.length === 0 || roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
                           ? tu('multiSelect.noGlobalRoles', 'No global roles available')
                           : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
                       }

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithGoogle, signInWithEmail, linkGoogleProvider } from './auth';
-import { api, updateAuthToken } from '@/api/whagonsApi';
-import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
+import { updateAuthToken } from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
+import { AuthError, AuthErrorCodes, GoogleAuthProvider } from 'firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { InitializationStage } from '@/types/user';
 import { useAuth } from '@/providers/AuthProvider';
@@ -19,6 +20,87 @@ const SignIn: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const navigate = useNavigate();
   const { firebaseUser, user, loading, userLoading, refetchUser } = useAuth();
+
+  // Random workspace/productivity images
+  const workspaceImages = [
+    'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?q=80&w=1000&auto=format&fit=crop', // Laptop and notebook
+    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1000&auto=format&fit=crop', // Office desk with documents
+    'https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=1000&auto=format&fit=crop', // Workspace with plant
+    'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?q=80&w=1000&auto=format&fit=crop', // Team collaboration
+    'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=1000&auto=format&fit=crop', // Business meeting
+    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1000&auto=format&fit=crop', // Analytics and planning
+    'https://images.unsplash.com/photo-1553877522-43269d4ea984?q=80&w=1000&auto=format&fit=crop', // Office workspace
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop', // Modern workspace
+    'https://images.unsplash.com/photo-1497366754035-f200368a1e55?q=80&w=1000&auto=format&fit=crop', // Clean desk setup
+    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1000&auto=format&fit=crop', // Team workspace
+    'https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop', // Collaborative workspace
+    'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?q=80&w=1000&auto=format&fit=crop', // Creative workspace
+    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1000&auto=format&fit=crop', // Focused work
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1000&auto=format&fit=crop', // Modern office
+    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1000&auto=format&fit=crop', // Team discussion
+    'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1000&auto=format&fit=crop', // Productive workspace
+    'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1000&auto=format&fit=crop', // Planning session
+    'https://images.unsplash.com/photo-1556761175-b413da4baf72?q=80&w=1000&auto=format&fit=crop', // Strategy meeting
+    'https://images.unsplash.com/photo-1556761175-4b46a572b786?q=80&w=1000&auto=format&fit=crop', // Workspace with technology
+    'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop', // Modern office space
+    'https://images.unsplash.com/photo-1497215842964-222b430dc094?q=80&w=1000&auto=format&fit=crop', // Professional workspace
+    'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1000&auto=format&fit=crop', // Cozy workspace
+    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop', // Productive desk
+    'https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1000&auto=format&fit=crop', // Coding workspace
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop', // Minimalist office
+    'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000&auto=format&fit=crop', // Team brainstorming
+    'https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=1000&auto=format&fit=crop', // Organized workspace
+    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop', // Data visualization workspace
+    'https://images.unsplash.com/photo-1496435873459-7d1c8c244ef0?q=80&w=1000&auto=format&fit=crop', // Remote workspace
+    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1000&auto=format&fit=crop', // Workspace with notes
+    'https://images.unsplash.com/photo-1496435873459-7d1c8c244ef0?q=80&w=1000&auto=format&fit=crop', // Remote workspace
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop', // Modern workspace
+    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1000&auto=format&fit=crop', // Team meeting space
+    'https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop', // Team collaboration space
+    'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?q=80&w=1000&auto=format&fit=crop', // Creative office space
+    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1000&auto=format&fit=crop', // Focused workspace
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1000&auto=format&fit=crop', // Contemporary office
+    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1000&auto=format&fit=crop', // Team workspace meeting
+    'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1000&auto=format&fit=crop', // Efficient workspace
+    'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1000&auto=format&fit=crop', // Business planning
+    'https://images.unsplash.com/photo-1556761175-b413da4baf72?q=80&w=1000&auto=format&fit=crop', // Strategic planning
+    'https://images.unsplash.com/photo-1556761175-4b46a572b786?q=80&w=1000&auto=format&fit=crop', // Tech-focused workspace
+    'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop', // Modern collaborative space
+    'https://images.unsplash.com/photo-1497215842964-222b430dc094?q=80&w=1000&auto=format&fit=crop', // Professional office environment
+    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop', // Productive environment
+    'https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1000&auto=format&fit=crop', // Developer workspace
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop', // Clean office space
+    'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000&auto=format&fit=crop', // Team collaboration session
+    'https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=1000&auto=format&fit=crop', // Well-organized desk
+    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop', // Analytics workspace
+    'https://images.unsplash.com/photo-1497366754035-f200368a1e55?q=80&w=1000&auto=format&fit=crop', // Clean modern desk
+    'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1000&auto=format&fit=crop', // Cozy workspace
+    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1000&auto=format&fit=crop', // Workspace with notes
+    'https://images.unsplash.com/photo-1496435873459-7d1c8c244ef0?q=80&w=1000&auto=format&fit=crop', // Remote workspace
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop', // Modern workspace
+    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1000&auto=format&fit=crop', // Team meeting space
+    'https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop', // Team collaboration space
+    'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?q=80&w=1000&auto=format&fit=crop', // Creative office space
+    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1000&auto=format&fit=crop', // Focused workspace
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1000&auto=format&fit=crop', // Contemporary office
+    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1000&auto=format&fit=crop', // Team workspace meeting
+    'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=1000&auto=format&fit=crop', // Efficient workspace
+    'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=80&w=1000&auto=format&fit=crop', // Business planning
+    'https://images.unsplash.com/photo-1556761175-b413da4baf72?q=80&w=1000&auto=format&fit=crop', // Strategic planning
+    'https://images.unsplash.com/photo-1556761175-4b46a572b786?q=80&w=1000&auto=format&fit=crop', // Tech-focused workspace
+    'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1000&auto=format&fit=crop', // Modern collaborative space
+    'https://images.unsplash.com/photo-1497215842964-222b430dc094?q=80&w=1000&auto=format&fit=crop', // Professional office environment
+    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop', // Productive environment
+    'https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1000&auto=format&fit=crop', // Developer workspace
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000&auto=format&fit=crop', // Clean office space
+    'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000&auto=format&fit=crop', // Team collaboration session
+    'https://images.unsplash.com/photo-1521791136064-7986c2920216?q=80&w=1000&auto=format&fit=crop', // Well-organized desk
+    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop', // Analytics workspace
+    'https://images.unsplash.com/photo-1497366754035-f200368a1e55?q=80&w=1000&auto=format&fit=crop', // Clean modern desk
+    'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1000&auto=format&fit=crop', // Cozy workspace
+  ];
+  
+  const [randomImage] = useState(() => workspaceImages[Math.floor(Math.random() * workspaceImages.length)]);
 
   async function checkPassword() {
     //make sure password meets requirements and confirm password matches
@@ -38,7 +120,7 @@ const SignIn: React.FC = () => {
     try {
       console.log('idToken', idToken);
 
-      const response = await api.post(`/login`,
+      const response = await actionsApi.post(`/login`,
         {
           "token": idToken
         },
@@ -186,7 +268,7 @@ const SignIn: React.FC = () => {
 
   return (
     <div 
-      className="flex items-center justify-center min-h-screen px-4 py-6 sm:px-6 lg:px-8 relative bg-gradient-to-br from-background via-background to-muted/20"
+      className="flex items-center justify-center min-h-screen px-4 py-4 sm:px-6 lg:px-8 relative bg-gradient-to-br from-background via-background to-muted/20"
       style={{
         backgroundImage: `url('/images/onboarding/gradient-waves.svg')`,
         backgroundSize: 'cover',
@@ -195,86 +277,42 @@ const SignIn: React.FC = () => {
       }}
     >
       <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]"></div>
-      <div className="relative z-10 rounded-xl border border-border bg-card shadow-2xl dark:shadow-2xl max-w-6xl w-full overflow-hidden backdrop-blur-sm">
+      <div className="relative z-10 rounded-xl border border-border bg-card shadow-2xl dark:shadow-2xl max-w-5xl w-full overflow-hidden backdrop-blur-sm my-4">
         <div className="flex flex-wrap items-stretch">
           <div className="hidden w-full xl:block xl:w-1/2 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent">
-            <div className="py-16 px-12 text-center h-full flex flex-col justify-center">
-              <Link className="mb-8 inline-block transition-transform hover:scale-105" to="/">
+            <div className="py-12 px-10 text-center h-full flex flex-col justify-center">
+              <Link className="mb-6 inline-block transition-transform hover:scale-105" to="/">
                 <WhagonsTitle />
               </Link>
 
-              <p className="text-muted-foreground text-lg 2xl:px-20 mb-8">
+              <p className="text-muted-foreground text-base mb-6">
                 {t('auth.welcome', 'Welcome to Whagons - Your workspace management platform.')}
               </p>
 
-              <div className="mt-6 flex items-center justify-center">
-                <div className="relative w-full max-w-[240px]">
-                  {/* Phone frame effect */}
+              <div className="mt-4 flex items-center justify-center">
+                <div className="relative w-full max-w-[260px]">
+                  {/* iPhone 15 mockup using actual device image */}
                   <div className="relative mx-auto">
-                    {/* Shadow/glow effect */}
-                    <div className="absolute inset-0 bg-primary/20 rounded-[2.5rem] blur-xl transform scale-110"></div>
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 bg-primary/20 rounded-[3rem] blur-2xl transform scale-105"></div>
                     
-                    {/* Phone container */}
-                    <div className="relative bg-gray-900 rounded-[2rem] p-1.5 shadow-2xl">
-                      {/* Screen bezel */}
-                      <div className="bg-gray-800 rounded-[1.5rem] overflow-hidden">
-                        {/* Status bar area */}
-                        <div className="h-6 bg-gray-900 flex items-center justify-between px-3 text-white text-[10px]">
-                          <span>7:04</span>
-                          <div className="flex items-center gap-0.5">
-                            <div className="w-3 h-1.5 border border-white rounded-sm"></div>
-                            <div className="w-0.5 h-0.5 bg-white rounded-full"></div>
-                          </div>
-                        </div>
-                        
-                        {/* App screenshot - Person using task management app */}
-                        <img
-                          src="https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=300&h=600&fit=crop&q=80"
-                          alt="Person using Whagons mobile app for task management"
-                          className="w-full h-auto object-cover"
-                          style={{ 
-                            display: 'block',
-                            aspectRatio: '9/16',
-                            objectFit: 'cover'
-                          }}
-                          onError={(e) => {
-                            // Fallback if image fails to load - try alternative
-                            const target = e.target as HTMLImageElement;
-                            target.src = 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=300&h=600&fit=crop&q=80';
-                            target.onerror = () => {
-                              target.style.display = 'none';
-                              const fallback = target.nextElementSibling as HTMLElement;
-                              if (fallback) fallback.style.display = 'flex';
-                            };
-                          }}
+                    {/* iPhone 15 device frame */}
+                    <div className="relative">
+                      {/* The actual iPhone mockup image as background */}
+                      <div className="relative" style={{ aspectRatio: '430/878' }}>
+                        <img 
+                          src="https://mockuphone.com/images/mockup_templates/apple-iphone-15-black-portrait.png"
+                          alt="iPhone 15"
+                          className="w-full h-auto"
                         />
                         
-                        {/* Fallback placeholder if image doesn't load */}
-                        <div 
-                          className="hidden bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center"
-                          style={{ 
-                            aspectRatio: '9/16',
-                            minHeight: '400px'
-                          }}
-                        >
-                          <div className="text-center p-6 text-muted-foreground">
-                            <svg
-                              className="w-16 h-16 mx-auto mb-3 opacity-50"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
-                              />
-                            </svg>
-                            <p className="text-xs">Mobile app screenshot</p>
-                            <p className="text-[10px] mt-1">Place image at:</p>
-                            <p className="text-[10px] font-mono">/public/images/app-mobile-screenshot.png</p>
-                          </div>
+                        {/* Video content positioned inside the phone screen */}
+                        <div className="absolute top-[4.5%] left-[7%] right-[7%] bottom-[7%] overflow-hidden rounded-[2.8rem] bg-gradient-to-br from-primary/20 to-primary/5">
+                          <img
+                            src={randomImage}
+                            alt="Task Management"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                       </div>
                     </div>
@@ -285,14 +323,14 @@ const SignIn: React.FC = () => {
           </div>
 
           <div className="w-full border-t xl:border-t-0 xl:border-l border-border xl:w-1/2">
-            <div className="w-full p-8 sm:p-12 xl:p-16">
+            <div className="w-full p-8 sm:p-10 xl:p-12">
               <div className="max-w-md mx-auto">
                 <span className="mb-2 block text-sm font-medium text-muted-foreground">{t('auth.startForFree', 'Start for free')}</span>
-                <h2 className="mb-8 text-3xl font-bold text-foreground sm:text-4xl tracking-tight">
+                <h2 className="mb-6 text-3xl font-bold text-foreground sm:text-3xl tracking-tight">
                   {t('auth.signInToWhagons', 'Sign In to Whagons')}
                 </h2>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium">
                       {t('auth.email', 'Email')}
@@ -304,7 +342,7 @@ const SignIn: React.FC = () => {
                         placeholder={t('auth.enterYourEmail', 'Enter your email')}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="h-11 pl-11 pr-4"
+                        className="h-10 pl-11 pr-4"
                         disabled={isLoading || isGoogleLoading}
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -336,7 +374,7 @@ const SignIn: React.FC = () => {
                         placeholder={t('auth.passwordPlaceholder', 'Enter your password')}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="h-11 pl-11 pr-4"
+                        className="h-10 pl-11 pr-4"
                         disabled={isLoading || isGoogleLoading}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !isLoading && !isGoogleLoading) {
@@ -370,12 +408,11 @@ const SignIn: React.FC = () => {
                     cypress-id="signin-button"
                     onClick={handleEmailSignin}
                     disabled={isLoading || isGoogleLoading}
-                    className="w-full h-11 text-base font-medium"
-                    size="lg"
+                    className="w-full h-10 text-sm font-medium"
                   >
                     {isLoading ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -399,12 +436,11 @@ const SignIn: React.FC = () => {
                     variant="outline"
                     onClick={handleGoogleSignin}
                     disabled={isLoading || isGoogleLoading}
-                    className="w-full h-11 text-base font-medium"
-                    size="lg"
+                    className="w-full h-10 text-sm font-medium"
                   >
                     {isGoogleLoading ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -413,8 +449,8 @@ const SignIn: React.FC = () => {
                     ) : (
                       <>
                         <svg
-                          width="20"
-                          height="20"
+                          width="18"
+                          height="18"
                           viewBox="0 0 20 20"
                           fill="none"
                           xmlns="http://www.w3.org/2000/svg"
@@ -449,7 +485,7 @@ const SignIn: React.FC = () => {
                     )}
                   </Button>
 
-                  <div className="pt-4 text-center">
+                  <div className="pt-3 text-center">
                     <p className="text-sm text-muted-foreground">
                       {t('auth.dontHaveAccount', 'Don\'t have an account?')}{' '}
                       <Link 

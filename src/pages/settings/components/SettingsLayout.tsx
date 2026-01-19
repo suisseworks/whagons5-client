@@ -66,19 +66,21 @@ export function SettingsLayout({
   return (
     <div className="h-full flex flex-col overflow-hidden space-y-3 bg-background">
       {/* Title and Actions Row - No Breadcrumbs Here */}
-      <div className="py-2 flex-shrink-0">
-        <div className="flex items-center justify-between">
+      <div className="py-4 flex-shrink-0 border-b border-border/40">
+        <div className="flex items-start justify-between gap-4">
           {/* Left: Title and Icon */}
-          <div className="flex items-center space-x-3">
-            <FontAwesomeIcon
-              icon={icon}
-              className="text-2xl"
-              style={iconColor ? { color: iconColor } : {}}
-            />
-            <div className="flex flex-col items-start">
-              <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+          <div className="flex items-start space-x-4 min-w-0 flex-1">
+            <div className="flex-shrink-0 mt-1">
+              <FontAwesomeIcon
+                icon={icon}
+                className="text-3xl"
+                style={iconColor ? { color: iconColor } : {}}
+              />
+            </div>
+            <div className="flex flex-col items-start min-w-0 flex-1">
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground leading-tight">{title}</h1>
               {description && (
-                <p className="text-xs text-muted-foreground/70 leading-tight mt-0.5" title={description}>
+                <p className="text-sm text-muted-foreground/80 leading-relaxed mt-2 max-w-2xl" title={description}>
                   {description}
                 </p>
               )}
@@ -86,7 +88,7 @@ export function SettingsLayout({
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             {headerActions && (
               <div>
                 {headerActions}

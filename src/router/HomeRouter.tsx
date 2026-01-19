@@ -26,15 +26,22 @@ import Slas from '@/pages/settings/sub_pages/Slas';
 import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Approvals from '@/pages/settings/sub_pages/Approvals';
 import Global from '@/pages/settings/sub_pages/Global';
-import Analytics from '@/pages/analytics/Analytics';
+import BoardsSettings from '@/pages/settings/sub_pages/Boards';
+import Boards from '@/pages/boards/Boards';
 import Home from '@/pages/home/Home';
 // Messages removed
-import TeamConnect from '@/pages/teamconnect/TeamConnect';
+// Boards list page
+import BoardDetail from '@/pages/boards/BoardDetail';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
+import PluginSettings from '@/pages/PluginSettings';
+import PluginManagement from '@/pages/admin/PluginManagement';
+import Integrations from '@/pages/Integrations';
 import { ComplianceStandards } from '@/pages/compliance/ComplianceStandards';
 import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardDetail';
 import SharedWithMe from '@/pages/shared/SharedWithMe';
+import BroadcastsPage from '@/pages/broadcasts/BroadcastsPage';
+import ActivityMonitor from '@/pages/activity/ActivityMonitor';
 
 
 const pages = [
@@ -74,9 +81,14 @@ export const HomeRoutes = () => {
           <Route path="/stripe" element={<Stripe />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/stuff" element={<Stuff />} />
-          <Route path="/analytics" element={<Analytics />} />
           <Route path="/plugins" element={<Plugins />} />
-          <Route path="/teamconnect" element={<TeamConnect />} />
+          <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
+          <Route path="/admin/plugins" element={<PluginManagement />} />
+          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/boards" element={<Boards />} />
+          <Route path="/boards/:boardId" element={<BoardDetail />} />
+          <Route path="/broadcasts" element={<BroadcastsPage />} />
+          <Route path="/activity" element={<ActivityMonitor />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
@@ -95,6 +107,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/workflows" element={<Workflows />} />
           <Route path="/settings/approvals" element={<Approvals />} />
           <Route path="/settings/global" element={<Global />} />
+          <Route path="/settings/boards" element={<BoardsSettings />} />
           <Route path="/settings/test" element={<TestPage />} />
           
           {/* Compliance Routes */}

@@ -16,7 +16,7 @@ class IconCacheManager {
   private dbName = 'FontAwesomeIconCache';
   private dbVersion = 1;
   private storeName = 'icons';
-  private currentVersion = '1.0.0'; // Update this when icon set changes
+  private currentVersion = '1.4.0'; // Prioritize regular (outline) icons over solid
   private db: IconCacheDB | null = null;
   private initPromise: Promise<void> | null = null;
 

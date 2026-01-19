@@ -8,9 +8,8 @@ import {
   initializeAuth,
 } from '../api/whagonsApi';
 import { User } from '../types/user';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
-import { genericActions } from '@/store/genericSlices';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
 
@@ -23,6 +22,7 @@ import {
 } from '@/crypto/crypto';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
+import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
 
 // Define context types
 interface AuthContextType {
@@ -33,6 +33,7 @@ interface AuthContextType {
   hydrating: boolean;
   hydrationError: string | null;
   refetchUser: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 // Create the context
@@ -163,10 +164,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [hydrating, setHydrating] = useState<boolean>(false);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  
+  // Only access userTeams if user has a tenant (avoid fetching during onboarding)
+  // Must check user state OUTSIDE of useSelector to avoid triggering slice auto-fetch
+  const hasTenant = user?.tenant_domain_prefix;
+  
+  // Memoized selector with shallow equality check to prevent unnecessary rerenders
   const userTeams = useSelector(
-    (state: RootState) => ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>
+    (state: RootState) => {
+      if (!hasTenant) {
+        return [] as Array<{ team_id?: number }>;
+      }
+      return ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>;
+    },
+    shallowEqual // Use shallow equality to compare array contents
   );
   const teamKey = useMemo(() => {
+    if (!hasTenant) return '';
     const ids = Array.from(
       new Set(
         (userTeams || [])
@@ -175,8 +189,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       )
     ).sort((a, b) => a - b);
     return ids.join(',');
-  }, [userTeams]);
+  }, [userTeams, hasTenant]);
   const prevTeamKeyRef = useRef<string | null>(null);
+
+  // Initialize FCM (Firebase Cloud Messaging) for push notifications
+  const initializeFCM = async (userData: User | null, fbUser: FirebaseUser | null) => {
+    try {
+      // Allow FCM in local development if using trusted certificates (mkcert)
+      // Skip only if explicitly set in env or on unsecured localhost
+      const skipFCM = import.meta.env.VITE_SKIP_FCM === 'true';
+      
+      if (skipFCM) {
+        console.log('⏭️  [FCM] Skipping (VITE_SKIP_FCM=true)');
+        return;
+      }
+
+      console.log('🔔 FCM Init Check:', {
+        hasFirebaseUser: !!fbUser,
+        hasUserData: !!userData,
+        hasTenantPrefix: !!userData?.tenant_domain_prefix,
+        tenantPrefix: userData?.tenant_domain_prefix,
+        notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'N/A'
+      });
+
+      // Only initialize FCM if user is authenticated (Firebase user exists)
+      if (!fbUser || !userData) {
+        console.log('⏭️  Skipping FCM initialization - user not authenticated');
+        return;
+      }
+
+      console.log('🚀 Initializing FCM for authenticated user...');
+      const token = await requestNotificationPermission();
+      
+      if (token) {
+        console.log('✅ Push notifications enabled');
+        // Setup listener for foreground messages
+        setupForegroundMessageHandler();
+      } else {
+        console.log('ℹ️  Push notifications not available or permission denied');
+      }
+    } catch (error) {
+      console.error('❌ FCM initialization error:', error);
+      // Don't crash app if FCM fails
+    }
+  };
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) {
@@ -227,14 +283,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(userData);
           // console.log('AuthContext: User data loaded successfully');
 
+          // Initialize FCM for push notifications BEFORE hydration
+          // This runs for all logged-in users, not just those with tenants
+          (async () => {
+            try {
+              await initializeFCM(userData, firebaseUser);
+            } catch (error) {
+              console.error('FCM initialization failed:', error);
+            }
+          })();
+
           // Kick off background hydration so UI can render immediately
           (async () => {
             try {
               setHydrating(true);
               setHydrationError(null);
               if (!userData?.tenant_domain_prefix) {
+                // Ensure crypto knows we're not in tenant mode
+                CryptoHandler.setTenantMode(false);
                 return;
               }
+              // Enable tenant mode for crypto operations
+              CryptoHandler.setTenantMode(true);
               console.log(firebaseUser.uid);
               const result = await DB.init(firebaseUser.uid);
               console.log('DB.init: result', result);
@@ -267,8 +337,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               } catch (err) {
                 console.warn('AuthProvider: loadCoreFromIndexedDB failed (continuing to network hydration)', err);
               }
-
-              // Background validation
               (async () => {
                 try {
                   await dataManager.validateAndRefresh();
@@ -341,6 +409,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Update user state directly without full refetch (for optimistic updates)
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      setUser({ ...user, ...updates });
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       // console.log('AuthContext: Auth state changed:', currentUser?.uid);
@@ -352,8 +427,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         // User logged out - clear user data, crypto keys, IndexedDB and Redux state
         setUser(null);
+        CryptoHandler.setTenantMode(false);
         setHydrating(false);
         setHydrationError(null);
+        
+        // Unregister FCM token on logout
+        try {
+          await unregisterToken();
+        } catch (err) {
+          console.warn('AuthProvider: failed to unregister FCM token on logout', err);
+        }
+        
         try {
           await zeroizeKeys();
         } catch {}
@@ -384,13 +468,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
 
-  // Always refresh userTeams from API after hydration so membership changes (e.g., leaving a team) propagate to the cache/state
-  useEffect(() => {
-    if (loading || userLoading || hydrating || !firebaseUser) return;
-    dispatch(genericActions.userTeams.fetchFromAPI?.() as any).catch((err: any) => {
-      console.warn('AuthProvider: failed to refresh userTeams from API', err);
-    });
-  }, [loading, userLoading, hydrating, firebaseUser, dispatch]);
+  // Note: userTeams is now validated via DataManager.validateAndRefresh() 
+  // which uses batch integrity checking - no need for separate fetch here
 
   // Refresh tasks when the user's team memberships change so stale team tasks disappear from local cache
   useEffect(() => {
@@ -431,6 +510,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         hydrating,
         hydrationError,
         refetchUser,
+        updateUser,
       }}
     >
       {children}

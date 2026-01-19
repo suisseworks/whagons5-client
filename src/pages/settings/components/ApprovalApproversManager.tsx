@@ -87,17 +87,11 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
 
   const loadData = React.useCallback(async () => {
     if (!approval) return;
-    const aid = Number(approval.id);
-    try {
-      await dispatch(genericActions.approvalApprovers.fetchFromAPI({ approval_id: aid }) as any);
-    } catch {}
     await refreshFromCache(true);
   }, [dispatch, approval, refreshFromCache]);
 
   React.useEffect(() => {
     if (open && approval) {
-      // hydrate from cache and API
-      dispatch(genericActions.approvalApprovers.getFromIndexedDB() as any);
       loadData();
     }
   }, [open, approval, dispatch, loadData]);

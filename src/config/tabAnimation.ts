@@ -1,5 +1,5 @@
 export type WorkspaceTabKey = 'grid' | 'calendar' | 'scheduler' | 'map' | 'board' | 'statistics' | 'settings';
-export type SettingsTabKey = 'favorites' | 'basics' | 'advanced';
+export type SettingsTabKey = 'favorites' | 'basics' | 'advanced' | 'plugins';
 export type WorkspaceSettingsTabKey = 'overview' | 'users' | 'filters' | 'display';
 
 export interface TabAnimationConfig<T extends string = string> {
@@ -25,7 +25,7 @@ export const TAB_ANIMATION: TabAnimationConfig<WorkspaceTabKey> = {
 };
 
 export const SETTINGS_TAB_ANIMATION: TabAnimationConfig<SettingsTabKey> = {
-  order: ['favorites', 'basics', 'advanced'],
+  order: ['favorites', 'basics', 'advanced', 'plugins'],
   distance: '80vw',
   transition: {
     duration: 0.05,

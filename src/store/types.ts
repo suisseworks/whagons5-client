@@ -40,6 +40,7 @@ export interface Category {
     workspace_id: number;
     status_transition_group_id: number;
     reporting_team_ids: number[];
+    celebration_effect?: string | null;
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -108,6 +109,7 @@ export interface Status {
     icon?: string | null;
     system: boolean;
     initial: boolean;
+    celebration_enabled?: boolean;
     created_at?: string | Date;
     updated_at?: string | Date;
     deleted_at?: string | Date | null;
@@ -177,7 +179,7 @@ export interface Approval {
     approval_type: 'SEQUENTIAL' | 'PARALLEL' | string;
     require_all: boolean;
     minimum_approvals?: number | null;
-    trigger_type: 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | string;
+    trigger_type: 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | 'ON_COMPLETE' | string;
     trigger_conditions?: ApprovalCondition[] | null;
     require_rejection_comment: boolean;
     block_editing_during_approval: boolean;
@@ -212,6 +214,13 @@ export interface User {
     email: string;
     url_picture?: string | null;
     color?: string | null;
+    birthday_month?: number | null; // 1-12
+    birthday_day?: number | null; // 1-31
+    gender?: string | null;
+    zodiac_sign?: string | null;
+    phone?: string | null;
+    bio?: string | null;
+    hobbies?: string[] | null;
     role_id?: number | null;
     workspace_id?: number | null;
     is_active: boolean;
@@ -219,6 +228,7 @@ export interface User {
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;
+    organization_name?: string | null;
 }
 
 export interface Role {
@@ -556,3 +566,41 @@ export interface Workflow {
     updated_at: string;
 }
 
+// Boards (Communication Boards)
+export interface Board {
+    id: number;
+    name: string;
+    description?: string | null;
+    visibility: 'public' | 'private';
+    created_by: number;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface BoardMember {
+    id: number;
+    board_id: number;
+    member_type: 'user' | 'team';
+    member_id: number;
+    role: 'admin' | 'member';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface BoardMessage {
+    id: number;
+    board_id: number;
+    created_by: number;
+    title?: string | null;
+    content: string;
+    is_pinned: boolean;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    metadata?: Record<string, any> | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}

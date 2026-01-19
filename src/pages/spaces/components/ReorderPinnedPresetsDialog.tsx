@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { listPinnedPresets, setPinnedOrder, SavedFilterPreset } from './workspaceTable/filterPresets';
+import { listPinnedPresets, setPinnedOrder, SavedFilterPreset } from './workspaceTable/utils/filterPresets';
 
 type Props = {
   open: boolean;

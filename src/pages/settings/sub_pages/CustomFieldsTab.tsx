@@ -12,6 +12,7 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { SettingsLayout } from "../components";
 import { createSwapy } from 'swapy';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 type DraftField = {
   id?: number;
@@ -28,20 +29,22 @@ type DraftField = {
 };
 
 const TYPES = [
-  { id: "text", label: "Text" },
-  { id: "textarea", label: "Textarea" },
-  { id: "number", label: "Number" },
-  { id: "checkbox", label: "Checkbox" },
-  { id: "radio", label: "Radio" },
-  { id: "date", label: "Date" },
-  { id: "time", label: "Time" },
-  { id: "datetime", label: "Date/Time" },
-  { id: "select", label: "List (Single Select)" },
-  { id: "multi_select", label: "Multi‑select" },
+  { id: "text", label: "Text", labelKey: "types.text" },
+  { id: "textarea", label: "Textarea", labelKey: "types.textarea" },
+  { id: "number", label: "Number", labelKey: "types.number" },
+  { id: "checkbox", label: "Checkbox", labelKey: "types.checkbox" },
+  { id: "radio", label: "Radio", labelKey: "types.radio" },
+  { id: "date", label: "Date", labelKey: "types.date" },
+  { id: "time", label: "Time", labelKey: "types.time" },
+  { id: "datetime", label: "Date/Time", labelKey: "types.datetime" },
+  { id: "select", label: "List (Single Select)", labelKey: "types.select" },
+  { id: "multi_select", label: "Multi‑select", labelKey: "types.multiSelect" },
 ];
 
 export default function CustomFieldsTab() {
   const dispatch = useDispatch<AppDispatch>();
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.customFields.${key}`, fallback);
   const { value: fields } = useSelector((s: RootState) => s.customFields);
   const { value: categories } = useSelector((s: RootState) => s.categories || { value: [] });
 
@@ -216,7 +219,7 @@ export default function CustomFieldsTab() {
       setDraft({ name: "", field_type: "text", optionsText: "", isRequired: false, minLength: "", maxLength: "", minNumber: "", maxNumber: "", pattern: "" });
       // toast removed
     } catch (e: any) {
-      setFormError(e?.message || 'Failed to create field.');
+      setFormError(e?.message || tc('errors.failedToCreate', 'Failed to create field.'));
     } finally { setIsSaving(false); }
   };
 
@@ -240,7 +243,7 @@ export default function CustomFieldsTab() {
       setSelectedField(null);
     } catch (e: any) {
       const apiMsg = e?.message || (e?.errors ? JSON.stringify(e.errors) : '');
-      setFormError(apiMsg || 'Failed to update field.');
+      setFormError(apiMsg || tc('errors.failedToUpdate', 'Failed to update field.'));
     } finally { setIsSaving(false); }
   };
 
@@ -316,20 +319,20 @@ export default function CustomFieldsTab() {
 
   return (
     <SettingsLayout
-      title="Custom fields"
-      description="Reusable fields you can assign to any category"
+      title={tc('title', 'Custom fields')}
+      description={tc('description', 'Reusable fields you can assign to any category')}
       icon={faCubes}
       iconColor="#f59e0b"
       backPath="/settings/categories"
       search={{
-        placeholder: "Search fields...",
+        placeholder: tc('search.placeholder', 'Search fields...'),
         value: search,
         onChange: setSearch
       }}
       headerActions={
         <Button onClick={openCreate} size="sm">
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          New field
+          {tc('header.newField', 'New field')}
         </Button>
       }
     >
@@ -343,15 +346,16 @@ export default function CustomFieldsTab() {
               <Card className={`group p-0`} 
                 onDoubleClick={() => openEdit(f)}
               >
-                <div className="flex items-center justify-between px-3 py-2 cursor-pointer" title="Double click to edit">
+                <div className="flex items-center justify-between px-3 py-2 cursor-pointer" title={tc('card.doubleClickToEdit', 'Double click to edit')}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab transition-colors"><FontAwesomeIcon icon={faGripVertical} className="w-3.5 h-3.5" /></span>
-                      <CardTitle className="text-base font-semibold tracking-tight truncate">{f.name || '(Unnamed field)'}</CardTitle>
+                      <CardTitle className="text-base font-semibold tracking-tight truncate">{f.name || tc('card.unnamedField', '(Unnamed field)')}</CardTitle>
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         {(() => {
                           const uiType = DB_TO_UI_TYPE[String(f.field_type || '').toUpperCase()] || String(f.field_type || '').toLowerCase();
-                          const label = (TYPES.find(t => t.id === uiType)?.label) || uiType;
+                          const typeDef = TYPES.find(t => t.id === uiType);
+                          const label = typeDef ? tc(typeDef.labelKey, typeDef.label) : uiType;
                           return label;
                         })()}
                       </span>
@@ -360,11 +364,11 @@ export default function CustomFieldsTab() {
                       <CardDescription className="truncate text-xs mt-0.5 text-muted-foreground/80">{f.description}</CardDescription>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 ml-3 shrink-0">
+                  <div className="flex items-center gap-1 ml-3 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {/* Edit button removed; double-click card to edit */}
-                    <Button size="sm" variant="ghost" className="h-7 px-2 opacity-70 hover:opacity-100 text-muted-foreground" onClick={() => openAssign(f)}>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 opacity-70 hover:opacity-100 text-muted-foreground relative z-10" onClick={(e) => { e.stopPropagation(); openAssign(f); }}>
                       <FontAwesomeIcon icon={faLayerGroup} className="w-3 h-3 mr-1" />
-                      Assign
+                      {tc('card.assign', 'Assign')}
                     </Button>
                     {/* Delete moved into edit dialog */}
                   </div>
@@ -379,12 +383,12 @@ export default function CustomFieldsTab() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{selectedField ? "Edit field" : "New field"}</DialogTitle>
-            <DialogDescription>Define the metadata and default behavior of this field.</DialogDescription>
+            <DialogTitle>{selectedField ? tc('dialog.edit.title', 'Edit field') : tc('dialog.create.title', 'New field')}</DialogTitle>
+            <DialogDescription>{tc('dialog.description', 'Define the metadata and default behavior of this field.')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-4 items-center gap-3">
-              <label className="text-right text-sm">Name</label>
+              <label className="text-right text-sm">{tc('dialog.fields.name', 'Name')}</label>
               <Input 
                 className="col-span-3" 
                 value={draft.name} 
@@ -392,50 +396,50 @@ export default function CustomFieldsTab() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
-              <label className="text-right text-sm">Type</label>
+              <label className="text-right text-sm">{tc('dialog.fields.type', 'Type')}</label>
               <Select value={draft.field_type} onValueChange={(v) => setDraft({ ...draft, field_type: v })}>
-                <SelectTrigger className="col-span-3"><SelectValue placeholder="Select type" /></SelectTrigger>
+                <SelectTrigger className="col-span-3"><SelectValue placeholder={tc('dialog.fields.selectType', 'Select type')} /></SelectTrigger>
                 <SelectContent>
                   {TYPES.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                    <SelectItem key={t.id} value={t.id}>{tc(t.labelKey, t.label)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
-              <label className="text-right text-sm">Options</label>
+              <label className="text-right text-sm">{tc('dialog.fields.options', 'Options')}</label>
               <Input 
                 className="col-span-3 placeholder:text-muted-foreground/60" 
-                placeholder="Low, Medium, High" 
+                placeholder={tc('dialog.fields.optionsPlaceholder', 'Low, Medium, High')} 
                 value={draft.optionsText || ''} 
                 onChange={(e) => setDraft({ ...draft, optionsText: e.target.value })} 
               />
             </div>
             {/* Validation UI */}
             <div className="grid grid-cols-4 items-start gap-3">
-              <label className="text-right text-sm mt-2 sr-only">Validation</label>
+              <label className="text-right text-sm mt-2 sr-only">{tc('dialog.fields.validation', 'Validation')}</label>
               <div className="col-span-3">
                 {(draft.field_type === 'text' || draft.field_type === 'textarea') && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm mr-2"><input type="checkbox" checked={!!draft.isRequired} onChange={(e) => setDraft({ ...draft, isRequired: e.target.checked })} /> Required</label>
-                    <Input placeholder="Regex (optional)" value={draft.pattern || ''} onChange={(e) => setDraft({ ...draft, pattern: e.target.value })} className="min-w-[180px] flex-1 placeholder:text-muted-foreground/60" />
+                    <label className="flex items-center gap-2 text-sm mr-2"><input type="checkbox" checked={!!draft.isRequired} onChange={(e) => setDraft({ ...draft, isRequired: e.target.checked })} /> {tc('dialog.fields.required', 'Required')}</label>
+                    <Input placeholder={tc('dialog.fields.regexPlaceholder', 'Regex (optional)')} value={draft.pattern || ''} onChange={(e) => setDraft({ ...draft, pattern: e.target.value })} className="min-w-[180px] flex-1 placeholder:text-muted-foreground/60" />
                   </div>
                 )}
                 {draft.field_type === 'number' && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm mr-2"><input type="checkbox" checked={!!draft.isRequired} onChange={(e) => setDraft({ ...draft, isRequired: e.target.checked })} /> Required</label>
+                    <label className="flex items-center gap-2 text-sm mr-2"><input type="checkbox" checked={!!draft.isRequired} onChange={(e) => setDraft({ ...draft, isRequired: e.target.checked })} /> {tc('dialog.fields.required', 'Required')}</label>
                     <div className="relative w-24">
                       <FontAwesomeIcon icon={faArrowDown} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 w-3.5 h-3.5" />
-                      <Input placeholder="Min" value={draft.minNumber || ''} onChange={(e) => setDraft({ ...draft, minNumber: e.target.value })} className="pl-6 placeholder:text-muted-foreground/60" />
+                      <Input placeholder={tc('dialog.fields.min', 'Min')} value={draft.minNumber || ''} onChange={(e) => setDraft({ ...draft, minNumber: e.target.value })} className="pl-6 placeholder:text-muted-foreground/60" />
                     </div>
                     <div className="relative w-24">
                       <FontAwesomeIcon icon={faArrowUp} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 w-3.5 h-3.5" />
-                      <Input placeholder="Max" value={draft.maxNumber || ''} onChange={(e) => setDraft({ ...draft, maxNumber: e.target.value })} className="pl-6 placeholder:text-muted-foreground/60" />
+                      <Input placeholder={tc('dialog.fields.max', 'Max')} value={draft.maxNumber || ''} onChange={(e) => setDraft({ ...draft, maxNumber: e.target.value })} className="pl-6 placeholder:text-muted-foreground/60" />
                     </div>
                   </div>
                 )}
                 {!(draft.field_type === 'text' || draft.field_type === 'textarea' || draft.field_type === 'number') && (
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!draft.isRequired} onChange={(e) => setDraft({ ...draft, isRequired: e.target.checked })} /> Required</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!draft.isRequired} onChange={(e) => setDraft({ ...draft, isRequired: e.target.checked })} /> {tc('dialog.fields.required', 'Required')}</label>
                 )}
               </div>
             </div>
@@ -444,12 +448,12 @@ export default function CustomFieldsTab() {
             {formError && <div className="text-sm text-destructive mr-auto">{formError}</div>}
             {selectedField && (
               <Button variant="destructive" className="mr-auto" onClick={() => setDeleteOpen(true)} disabled={isDeleting}>
-                {isDeleting ? 'Deleting…' : 'Delete'}
+                {isDeleting ? tc('dialog.delete.deleting', 'Deleting…') : tc('dialog.delete.button', 'Delete')}
               </Button>
             )}
             <Button onClick={selectedField ? onUpdate : onCreate} disabled={isSaving}>
               <FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />
-              {isSaving ? 'Saving…' : (selectedField ? 'Save changes' : 'Create field')}
+              {isSaving ? tc('dialog.save.saving', 'Saving…') : (selectedField ? tc('dialog.save.saveChanges', 'Save changes') : tc('dialog.save.createField', 'Create field'))}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -459,8 +463,8 @@ export default function CustomFieldsTab() {
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Assign to categories</DialogTitle>
-            <DialogDescription>Select one or more categories to attach this field.</DialogDescription>
+            <DialogTitle>{tc('assignDialog.title', 'Assign to categories')}</DialogTitle>
+            <DialogDescription>{tc('assignDialog.description', 'Select one or more categories to attach this field.')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto p-1 border rounded-md">
@@ -483,7 +487,7 @@ export default function CustomFieldsTab() {
           <DialogFooter>
             <Button onClick={onAssign}>
               <FontAwesomeIcon icon={faCheck} className="w-4 h-4 mr-2" />
-              Assign
+              {tc('assignDialog.assign', 'Assign')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -493,15 +497,15 @@ export default function CustomFieldsTab() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete field</DialogTitle>
+            <DialogTitle>{tc('deleteDialog.title', 'Delete field')}</DialogTitle>
             <DialogDescription>
-              {selectedField ? `Are you sure you want to delete "${selectedField.name}"? This cannot be undone.` : 'Are you sure?'}
+              {selectedField ? tc('deleteDialog.confirm', 'Are you sure you want to delete "{name}"? This cannot be undone.').replace('{name}', selectedField.name) : tc('deleteDialog.areYouSure', 'Are you sure?')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>{tc('deleteDialog.cancel', 'Cancel')}</Button>
             <Button variant="destructive" onClick={() => selectedField && onDelete(selectedField)} disabled={isDeleting}>
-              {isDeleting ? 'Deleting…' : 'Delete'}
+              {isDeleting ? tc('deleteDialog.deleting', 'Deleting…') : tc('deleteDialog.delete', 'Delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

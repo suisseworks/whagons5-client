@@ -8,7 +8,7 @@ import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
 import dayjs from "dayjs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getUserDisplayName, getUserInitials } from "./workspaceTable/userUtils";
+import { getUserDisplayName, getUserInitials } from "./workspaceTable/utils/userUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { uploadFile, getFileUrl } from "@/api/assetApi";
@@ -46,13 +46,6 @@ export default function TaskNotesModal() {
         setTaskId(newTaskId);
         setTaskName(custom.detail.taskName || "Task Notes");
         setIsOpen(true);
-        
-        // Load task notes and attachments for this task
-        dispatch(genericActions.taskNotes.getFromIndexedDB());
-        dispatch(genericActions.taskAttachments.getFromIndexedDB());
-        // Optionally fetch from API to ensure we have latest data
-        dispatch(genericActions.taskNotes.fetchFromAPI({ task_id: newTaskId }));
-        dispatch(genericActions.taskAttachments.fetchFromAPI({ task_id: newTaskId }));
       }
     };
     window.addEventListener('wh:openTaskNotes', handler);
@@ -101,9 +94,6 @@ export default function TaskNotesModal() {
       console.log("Sending note:", note);
       const result = await dispatch(genericActions.taskNotes.addAsync(note)).unwrap();
       console.log("Note sent successfully:", result);
-      
-      // Refresh notes from IndexedDB to ensure UI updates
-      dispatch(genericActions.taskNotes.getFromIndexedDB());
     } catch (error: any) {
       console.error("Failed to send note:", error);
       // Restore input on error
@@ -174,9 +164,6 @@ export default function TaskNotesModal() {
         console.log("Creating task attachment record:", attachment);
         const result_data = await dispatch(genericActions.taskAttachments.addAsync(attachment)).unwrap();
         console.log("Attachment created successfully:", result_data);
-        
-        // Refresh attachments from IndexedDB to ensure UI updates
-        dispatch(genericActions.taskAttachments.getFromIndexedDB());
     } catch (error: any) {
         console.error("Failed to upload attachment:", error);
         console.error("Full error object:", JSON.stringify(error, null, 2));

@@ -78,13 +78,8 @@ function Teams() {
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
-  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
-
-  useEffect(() => {
-    dispatch((genericActions as any).roles.getFromIndexedDB?.());
-    dispatch((genericActions as any).roles.fetchFromAPI?.());
-  }, [dispatch]);
+  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   
   // Use shared state management
   const {
@@ -407,8 +402,7 @@ function Teams() {
             {tt('grid.actions.manageUsers', 'Users')}
           </Button>
           {createActionsCellRenderer({
-            onEdit: handleQuickEdit,
-            onDelete: handleDeleteTeam
+            onEdit: handleQuickEdit
           })(p)}
         </div>
       ),
@@ -527,7 +521,8 @@ function Teams() {
             {tt('header.manageUsers', 'Manage Users')}
           </Button>
           <Button
-            size="sm"
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
@@ -701,6 +696,22 @@ function Teams() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingTeam}
+        footerActions={
+          editingTeam ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDeleteTeam(editingTeam);
+              }}
+              disabled={isSubmitting}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              {tt('dialogs.delete.title', 'Delete Team')}
+            </Button>
+          ) : null
+        }
       >
         {editingTeam && (
           <div className="grid gap-4">

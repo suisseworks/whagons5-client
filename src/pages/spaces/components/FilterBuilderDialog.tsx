@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { listPresets, savePreset, deletePreset, getPresetById, SavedFilterPreset } from './workspaceTable/filterPresets';
+import { listPresets, savePreset, deletePreset, getPresetById, SavedFilterPreset } from './workspaceTable/utils/filterPresets';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 

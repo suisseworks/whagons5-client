@@ -1,8 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentTenant } from "@/api/whagonsApi";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import Xarrow, { Xwrapper } from "react-xarrows";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus, faMinus, faRotateRight } from "@fortawesome/free-solid-svg-icons";
 
 const ACTION_COLUMN_ORDER = ["NONE", "WORKING", "PAUSED", "FINISHED"] as const;
 const ACTION_COLUMN_MAP: Record<string, number> = ACTION_COLUMN_ORDER.reduce((acc, action, index) => {
@@ -21,6 +24,8 @@ const StatusPalette = memo(function StatusPalette({
   onDragStart: (statusId: number) => void;
   onDragEnd: () => void;
 }) {
+  const { t } = useLanguage();
+  const ts = (key: string, fallback: string) => t(`settings.statuses.transitions.visual.${key}`, fallback);
 
   const handleDragStart = (e: React.DragEvent, statusId: number) => {
     e.dataTransfer.setData('statusId', statusId.toString());
@@ -33,30 +38,46 @@ const StatusPalette = memo(function StatusPalette({
   };
 
   return (
-    <div className="w-64 bg-muted/30 rounded-lg p-4 border">
-      <h3 className="font-medium text-sm mb-3 text-muted-foreground">Available Statuses</h3>
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+    <div className="w-72 bg-card rounded-xl p-5 border-2 shadow-lg">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-sm text-foreground">
+          {ts("palette.title", "Estados Disponibles")}
+        </h3>
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+          {availableStatuses.length}
+        </span>
+      </div>
+      <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
         {availableStatuses.map((status) => (
           <div
             key={status.id}
             draggable
             onDragStart={(e) => handleDragStart(e, status.id)}
             onDragEnd={handleDragEnd}
-            className="p-3 bg-background rounded-md border border-border hover:bg-accent hover:border-accent-foreground cursor-grab active:cursor-grabbing transition-colors"
-            style={{ borderColor: status.color || '#e5e7eb' }}
+            className="p-3 bg-background rounded-lg border-2 hover:bg-accent hover:border-primary/50 cursor-grab active:cursor-grabbing transition-all duration-200 hover:shadow-md"
+            style={{ 
+              borderLeftWidth: '4px',
+              borderLeftColor: status.color || '#e5e7eb' 
+            }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div
-                className="w-3 h-3 rounded-full flex-shrink-0"
+                className="w-4 h-4 rounded-full flex-shrink-0 shadow-inner"
                 style={{ backgroundColor: status.color || '#e5e7eb' }}
               />
-              <span className="font-medium text-sm">{status.name}</span>
-              {status.initial && (
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Initial</span>
-              )}
-              {status.system && (
-                <span className="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded">System</span>
-              )}
+              <span className="font-medium text-sm flex-1">{status.name}</span>
+              <div className="flex gap-1">
+                {status.initial && (
+                  <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
+                    {ts("palette.initial", "I")}
+                  </span>
+                )}
+                {status.system && (
+                  <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full font-medium">
+                    {ts("palette.system", "S")}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -84,13 +105,16 @@ export const VisualTransitions = memo(function VisualTransitions({
   selectedGroupId: number | null;
   embedded?: boolean;
 }) {
-  const nodeWidth = 160;
-  const nodeHeight = 70;
-  const hGap = 80;
-  const vGap = 30;
-  const EDGE_OFFSET_STEP = 22;
+  const { t } = useLanguage();
+  const ts = (key: string, fallback: string) => t(`settings.statuses.transitions.visual.${key}`, fallback);
+  const nodeWidth = 180;
+  const nodeHeight = 90;
+  const hGap = 120;
+  const vGap = 50;
+  const EDGE_OFFSET_STEP = 18;
 
   const [posById, setPosById] = useState<Record<number, { x: number; y: number }>>({});
+  const [zoom, setZoom] = useState(1);
 
   const tenant = getCurrentTenant();
   const storageKey = useMemo(() => (
@@ -252,19 +276,15 @@ export const VisualTransitions = memo(function VisualTransitions({
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
 
-  // Use theme detection for proper checkerboard colors
+  // Use theme detection for cleaner background
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-  // Different colors for light and dark modes
+  // Cleaner dot grid background
   const checkerBackgroundStyle = {
-    backgroundColor: isDarkMode ? '#1f2937' : '#fafafa',
-    backgroundImage: `
-      linear-gradient(45deg, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 25%, transparent 25%, transparent 75%, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 75%),
-      linear-gradient(45deg, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 25%, transparent 25%, transparent 75%, ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)'} 75%)
-    `,
-    backgroundPosition: '0 0, 10px 10px',
-    backgroundSize: '20px 20px'
+    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    backgroundImage: `radial-gradient(circle at 1px 1px, ${isDarkMode ? 'rgba(148, 163, 184, 0.15)' : 'rgba(203, 213, 225, 0.3)'} 1px, transparent 0)`,
+    backgroundSize: '40px 40px'
   } as const;
 
   // Calculate available statuses (not in active statuses)
@@ -330,42 +350,106 @@ export const VisualTransitions = memo(function VisualTransitions({
         onDragEnd={handlePaletteDragEnd}
       />
       <div className="flex-1 min-h-0 flex flex-col gap-3">
+        {/* Help Banner */}
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+          <div className="flex items-start gap-2 text-sm">
+            <span className="text-blue-600 dark:text-blue-400">💡</span>
+            <div className="flex-1 space-y-1">
+              <p className="font-medium text-blue-900 dark:text-blue-100">
+                {ts("help.title", "Cómo usar el editor visual:")}
+              </p>
+              <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 ml-4 list-disc">
+                <li>{ts("help.drag", "Arrastra estados desde la paleta")}</li>
+                <li>{ts("help.shift", "Shift + Click y arrastra para crear transiciones")}</li>
+                <li>{ts("help.click", "Click en flechas para eliminarlas")}</li>
+                <li>{ts("help.organize", "Usa 'Auto organizar' para ordenar")}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground">
-            Drag statuses to reposition manually or auto-arrange for a clean baseline.
+            {ts("instructions", "Arrastra estados para reposicionarlos manualmente o usa auto-organizar para una línea base limpia.")}
           </p>
           <Button size="sm" variant="outline" onClick={handleAutoOrganize} disabled={!activeStatuses.length}>
-            Auto arrange
+            {ts("autoArrange", "Auto organizar")}
           </Button>
         </div>
-        <div
-          className="relative"
-          style={embedded ? { width: `max(100%, ${width}px)`, height: `${height}px`, ...checkerBackgroundStyle } : { width, height, ...checkerBackgroundStyle }}
-          ref={containerRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={stopDrag}
-          onMouseUp={stopDrag}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdge && selectedGroupId) {
-              const parts = selectedEdge.split('->');
-              if (parts.length === 2) {
-                const from = Number(parts[0]);
-                const to = Number(parts[1]);
-                if (!Number.isNaN(from) && !Number.isNaN(to)) {
-                  onToggle(from, to);
-                  setSelectedEdge(null);
-                  e.preventDefault();
+        <div className="relative">
+          {/* Zoom Controls */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 bg-background border rounded-lg shadow-lg p-2 z-10">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setZoom(z => Math.min(z + 0.1, 2))}
+              className="h-8 w-8 p-0"
+              title="Zoom in"
+            >
+              <FontAwesomeIcon icon={faPlus} className="text-xs" />
+            </Button>
+            <span className="text-xs text-center text-muted-foreground">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))}
+              className="h-8 w-8 p-0"
+              title="Zoom out"
+            >
+              <FontAwesomeIcon icon={faMinus} className="text-xs" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setZoom(1)}
+              className="h-8 w-8 p-0"
+              title="Reset zoom"
+            >
+              <FontAwesomeIcon icon={faRotateRight} className="text-xs" />
+            </Button>
+          </div>
+
+          <div
+            className="relative overflow-auto rounded-lg border"
+            style={embedded ? { width: '100%', height: `${height}px` } : { width, height }}
+          >
+            <div
+              ref={containerRef}
+              style={{ 
+                ...checkerBackgroundStyle,
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top left',
+                width: `${width}px`,
+                height: `${height}px`,
+                minWidth: `${width}px`,
+                minHeight: `${height}px`
+              }}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={stopDrag}
+              onMouseUp={stopDrag}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdge && selectedGroupId) {
+                  const parts = selectedEdge.split('->');
+                  if (parts.length === 2) {
+                    const from = Number(parts[0]);
+                    const to = Number(parts[1]);
+                    if (!Number.isNaN(from) && !Number.isNaN(to)) {
+                      onToggle(from, to);
+                      setSelectedEdge(null);
+                      e.preventDefault();
+                    }
+                  }
                 }
-              }
-            }
-            if (e.key === 'Escape') {
-              setSelectedEdge(null);
-            }
-          }}
-        >
+                if (e.key === 'Escape') {
+                  setSelectedEdge(null);
+                }
+              }}
+            >
           <Xwrapper>
             {transitions.map((t: any) => {
               const from = idToPos[t.from_status];
@@ -417,9 +501,13 @@ export const VisualTransitions = memo(function VisualTransitions({
                   path="smooth"
                   curveness={0.25}
                   showHead
-                  color={hovered || selected ? "#ef4444" : "#3b82f6"}
-                  strokeWidth={selected ? 4 : (hovered ? 3 : 2)}
-                  headSize={6}
+                  color={
+                    selected ? "#ef4444" : 
+                    hovered ? "#3b82f6" : 
+                    isDarkMode ? "rgba(148, 163, 184, 0.4)" : "rgba(100, 116, 139, 0.3)"
+                  }
+                  strokeWidth={selected ? 3 : (hovered ? 2.5 : 1.5)}
+                  headSize={selected ? 7 : (hovered ? 6 : 5)}
                   passProps={{
                     onMouseEnter: () => setHoverEdge(key),
                     onMouseLeave: () => setHoverEdge(null),
@@ -448,8 +536,24 @@ export const VisualTransitions = memo(function VisualTransitions({
               <div
                 id={`node-${s.id}`}
                 key={s.id}
-                className={`absolute rounded-lg border shadow-sm bg-background select-none ${moving ? 'cursor-move' : (selectedGroupId ? 'cursor-crosshair' : 'cursor-default')} ${dragFrom != null && hoverTarget === s.id ? (transitionsSet.has(`${dragFrom}->${s.id}`) ? 'ring-2 ring-red-400' : 'ring-2 ring-blue-400') : ''}`}
-                style={{ left: s.x, top: s.y, width: nodeWidth, height: nodeHeight, borderColor: s.color || '#e5e7eb' }}
+                className={`absolute rounded-xl border-2 shadow-lg bg-card select-none transition-all duration-200 ${
+                  moving ? 'cursor-move scale-105' : (selectedGroupId ? 'cursor-crosshair hover:scale-105' : 'cursor-default')
+                } ${
+                  dragFrom != null && hoverTarget === s.id 
+                    ? (transitionsSet.has(`${dragFrom}->${s.id}`) 
+                      ? 'ring-4 ring-red-400 shadow-red-400/50' 
+                      : 'ring-4 ring-blue-400 shadow-blue-400/50'
+                    ) 
+                    : 'hover:shadow-xl'
+                }`}
+                style={{ 
+                  left: s.x, 
+                  top: s.y, 
+                  width: nodeWidth, 
+                  height: nodeHeight, 
+                  borderColor: s.color || '#e5e7eb',
+                  boxShadow: moving ? `0 8px 24px ${s.color}40` : undefined
+                }}
                 onMouseDown={(ev) => {
                   if (ev.shiftKey && selectedGroupId) {
                     setDragFrom(s.id);
@@ -472,19 +576,39 @@ export const VisualTransitions = memo(function VisualTransitions({
                 onMouseEnter={() => { if (dragFrom != null) setHoverTarget(s.id); }}
                 onMouseLeave={() => { if (dragFrom != null) setHoverTarget(null); }}
               >
-                <div className="h-full w-full flex items-center justify-center relative">
-                  <div className="text-center p-2">
-                    <div className="font-semibold">{s.name}</div>
-                    <div className="text-xs text-muted-foreground">{s.initial ? 'Initial' : (s.system ? 'System' : '')}</div>
+                <div className="h-full w-full flex flex-col items-center justify-center relative p-3">
+                  {/* Color indicator bar at top */}
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
+                    style={{ backgroundColor: s.color || '#e5e7eb' }}
+                  />
+                  
+                  <div className="text-center flex-1 flex flex-col justify-center">
+                    <div className="font-semibold text-sm mb-1">{s.name}</div>
+                    {(s.initial || s.system) && (
+                      <div className="flex items-center justify-center gap-1">
+                        {s.initial && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+                            {ts("node.initial", "Inicial")}
+                          </span>
+                        )}
+                        {s.system && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-500/10 text-gray-600 dark:text-gray-400 font-medium">
+                            {ts("node.system", "Sistema")}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
+                  
                   {selectedGroupId && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemoveStatus(s.id);
                       }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors"
-                      title="Remove from workflow"
+                      className="absolute -top-3 -right-3 w-7 h-7 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition-all hover:scale-110 shadow-lg"
+                      title={ts("removeFromWorkflow", "Eliminar del flujo de trabajo")}
                     >
                       ×
                     </button>
@@ -492,7 +616,9 @@ export const VisualTransitions = memo(function VisualTransitions({
                 </div>
               </div>
             ))}
-        </Xwrapper>
+            </Xwrapper>
+            </div>
+          </div>
         </div>
       </div>
     </div>

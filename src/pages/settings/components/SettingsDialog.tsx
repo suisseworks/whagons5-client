@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner, faPlus, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 export type DialogType = 'create' | 'edit' | 'delete' | 'custom';
 
@@ -42,7 +43,7 @@ export function SettingsDialog({
   error,
   submitDisabled = false,
   submitText,
-  cancelText = "Cancel",
+  cancelText,
   submitIcon,
   entityName,
   entityData,
@@ -50,6 +51,7 @@ export function SettingsDialog({
   footerActions,
   contentClassName
 }: SettingsDialogProps) {
+  const { t } = useLanguage();
   const formRef = useRef<HTMLFormElement | null>(null);
   const submitNow = () => {
     if (type === 'delete' && onConfirm) {
@@ -86,11 +88,15 @@ export function SettingsDialog({
   const getDefaultSubmitText = () => {
     if (submitText) return submitText;
     switch (type) {
-      case 'create': return isSubmitting ? 'Creating...' : 'Create';
-      case 'edit': return isSubmitting ? 'Updating...' : 'Update';
-      case 'delete': return isSubmitting ? 'Deleting...' : 'Delete';
-      default: return isSubmitting ? 'Processing...' : 'Submit';
+      case 'create': return isSubmitting ? t('common.creating', 'Creating...') : t('common.create', 'Create');
+      case 'edit': return isSubmitting ? t('common.updating', 'Updating...') : t('common.update', 'Update');
+      case 'delete': return isSubmitting ? t('common.deleting', 'Deleting...') : t('common.delete', 'Delete');
+      default: return isSubmitting ? t('common.processing', 'Processing...') : t('common.submit', 'Submit');
     }
+  };
+
+  const getCancelText = () => {
+    return cancelText || t('common.cancel', 'Cancel');
   };
 
   const getDefaultIcon = () => {
@@ -118,16 +124,18 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`overflow-hidden ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
-        <div className="flex flex-col max-h-[90vh]">
-          <DialogHeader className="flex-shrink-0 mb-4 space-y-1">
-            <DialogTitle className={type === 'delete' ? "flex items-center space-x-2" : ""}>
+      <DialogContent className={`overflow-visible ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
+        <div className="flex flex-col max-h-[90vh] overflow-hidden">
+          <DialogHeader className="flex-shrink-0 mb-6 space-y-2 pb-4 border-b border-border/40">
+            <DialogTitle className={`${type === 'delete' ? "flex items-center space-x-2" : ""} text-2xl font-extrabold tracking-tight`}>
               {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
               <span>{getDefaultTitle()}</span>
             </DialogTitle>
-            <DialogDescription>
-              {getDefaultDescription()}
-            </DialogDescription>
+            {description && (
+              <DialogDescription className="text-sm text-muted-foreground/80 leading-relaxed">
+                {getDefaultDescription()}
+              </DialogDescription>
+            )}
           </DialogHeader>
 
           {type === 'delete' && entityData && renderEntityPreview && (
@@ -151,13 +159,14 @@ export function SettingsDialog({
                   {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
                 </div>
                 <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-                  {cancelText}
+                  {getCancelText()}
                 </Button>
                 <Button
                   type="button"
                   onClick={submitNow}
                   variant={getSubmitVariant()}
                   disabled={isSubmitting || submitDisabled}
+                  className={type === 'create' ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]" : type === 'edit' ? "font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-[0.98]" : ""}
                 >
                   {isSubmitting ? (
                     <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
@@ -177,7 +186,7 @@ export function SettingsDialog({
                 </div>
               )}
               <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-                {cancelText}
+                {getCancelText()}
               </Button>
               <Button
                 type="button"

@@ -5,7 +5,7 @@ The Star Wars theme brings the iconic look and feel of the Star Wars universe to
 ## Features
 
 - **Classic Star Wars Color Palette**: Deep space black backgrounds with Rebel Alliance blue (#4A90E2) and iconic yellow (#FFE81F) accents
-- **Orbitron Font**: Futuristic, space-themed typography that matches the Star Wars aesthetic
+- **Audiowide Font**: Bold, futuristic typography inspired by the Star Wars aesthetic
 - **Glow Effects**: Subtle blue and yellow glow effects on interactive elements
 - **Custom Animations**: Star Wars-inspired pulse and scroll animations
 - **Full Component Support**: All UI components styled with Star Wars theming
@@ -75,9 +75,21 @@ All components automatically adapt to the Star Wars theme when active:
 - **Sidebar**: Deep black with yellow text
 - **Scrollbars**: Blue glowing scrollbars
 
-## Font
+## Fonts
 
-The theme uses **Orbitron** font family, a futuristic sans-serif font that complements the Star Wars aesthetic. The font is automatically loaded via Google Fonts when the theme is active.
+The theme uses authentic **Star Wars** fonts throughout the application:
+
+- **Star Jedi**: The iconic Star Wars title font used for all headings (h1-h6)
+- **SF Distant Galaxy**: Alternative Star Wars font for special elements
+- **Orbitron**: Futuristic sans-serif font from Google Fonts used for body text, buttons, inputs, and general UI elements
+
+These fonts are automatically loaded when the theme is active, providing an immersive Star Wars experience across all text elements including:
+- Headings and titles
+- Navigation and sidebar
+- Buttons and form inputs
+- Body text and paragraphs
+- Data grid headers
+- Labels and UI components
 
 ## Browser Support
 

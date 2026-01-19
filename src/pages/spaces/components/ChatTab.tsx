@@ -8,7 +8,7 @@ import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
 import dayjs from "dayjs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getUserDisplayName, getUserInitials } from "./workspaceTable/userUtils";
+import { getUserDisplayName, getUserInitials } from "./workspaceTable/utils/userUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 
@@ -38,16 +38,6 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
   const { user } = useAuth();
   const users = useSelector((state: RootState) => (state.users as any).value);
   const workspaceChat = useSelector((state: RootState) => (state.workspaceChat as any).value);
-
-  // Load messages when workspaceId changes
-  useEffect(() => {
-    if (workspaceId && !isNaN(Number(workspaceId))) {
-      // Load from IndexedDB first
-      dispatch(genericActions.workspaceChat.getFromIndexedDB());
-      // Then fetch from API
-      dispatch(genericActions.workspaceChat.fetchFromAPI({ workspace_id: Number(workspaceId) }));
-    }
-  }, [workspaceId, dispatch]);
 
   // Filter messages by workspace_id and sort by created_at
   const messages = workspaceId && !isNaN(Number(workspaceId))
@@ -87,9 +77,6 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
       };
 
       await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
-
-      // Refresh messages from IndexedDB
-      dispatch(genericActions.workspaceChat.getFromIndexedDB());
     } catch (error: any) {
       console.error("Failed to send message:", error);
       // Restore input on error
