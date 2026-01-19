@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import api from "@/api/whagonsApi";
 import { genericActions } from "@/store/genericSlices";
 import { AppDispatch, RootState } from "@/store/store";
 import { Workflow } from "@/store/types";
@@ -592,10 +591,7 @@ function Workflows() {
     }
   };
 
-  useEffect(() => {
-    dispatch(genericActions.workflows.getFromIndexedDB());
-    dispatch(genericActions.workflows.fetchFromAPI());
-  }, [dispatch]);
+  // Data is hydrated on login; this page should not trigger ad-hoc IndexedDB/API loading.
 
   const handleLoadWorkflow = useCallback((workflow: Workflow) => {
     setDraft(mapWorkflowToDraft(workflow));
@@ -631,23 +627,15 @@ function Workflows() {
   useEffect(() => {
     if (!draft.id) {
       setRunHistory([]);
+      setRunHistoryLoading(false);
       return;
     }
-    let cancelled = false;
-    setRunHistoryLoading(true);
-    api.get(`/workflows/${draft.id}`)
-      .then(resp => {
-        if (cancelled) return;
-        setRunHistory(resp.data?.data?.runs ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setRunHistory([]);
-      })
-      .finally(() => {
-        if (!cancelled) setRunHistoryLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [draft.id]);
+    // Workflow runs are loaded via the workflow detail endpoint
+    // This should be handled by the workflow's relationship data when available
+    // For now, set empty - runs will be loaded when workflow detail is fetched
+    setRunHistory([]);
+    setRunHistoryLoading(false);
+  }, [draft.id, workflows]);
 
   const handleNew = useCallback(() => {
     setDraft(createEmptyDraft());
@@ -660,9 +648,7 @@ function Workflows() {
     setIsEditorOpen(true);
   }, []);
 
-  const refreshWorkflows = useCallback(() => {
-    return dispatch(genericActions.workflows.fetchFromAPI());
-  }, [dispatch]);
+  const refreshWorkflows = useCallback(() => Promise.resolve(), []);
 
   const handleLoadById = useCallback((id: number) => {
     const workflow = workflows.find(w => w.id === id);
@@ -1043,7 +1029,11 @@ function Workflows() {
       iconColor="#06b6d4"
       backPath="/settings"
       headerActions={
-        <Button onClick={handleNew}>
+        <Button 
+          onClick={handleNew}
+          size="default"
+          className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+        >
           Create workflow
         </Button>
       }

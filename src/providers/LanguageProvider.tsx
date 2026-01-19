@@ -10,12 +10,16 @@ import {
 
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "@/config/languages";
 import { esTranslations } from "@/locales/es";
+import { enTranslations } from "@/locales/en";
+import { boardsTranslations, boardsTranslationsES } from "@/locales/boards";
 
 type TranslationDictionary = Record<string, string>;
 
 const TRANSLATION_REGISTRY: Record<string, TranslationDictionary> = {
-  es: esTranslations,
-  "es-ES": esTranslations,
+  "en-US": { ...enTranslations, ...boardsTranslations },
+  "en-GB": { ...enTranslations, ...boardsTranslations },
+  es: { ...esTranslations, ...boardsTranslationsES },
+  "es-ES": { ...esTranslations, ...boardsTranslationsES },
 };
 
 const STORAGE_KEY = "whagons-preferred-language";

@@ -4,7 +4,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -14,16 +13,14 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Settings,
-  Plus,
-  ChevronDown,
-  BarChart3,
-  Layers,
   Plug,
   Users2,
   Globe,
   FileText, // Add FileText icon
   MoreHorizontal,
   Sparkles,
+  Bell, // Add Bell icon for broadcasts
+  Activity, // Add Activity icon
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -44,8 +41,22 @@ import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
+import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useBranding } from '@/providers/BrandingProvider';
 
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
@@ -64,6 +75,137 @@ export const subscribeToPinnedState = (callback: (pinned: boolean) => void) => {
     const index = pinnedStateCallbacks.indexOf(callback);
     if (index > -1) pinnedStateCallbacks.splice(index, 1);
   };
+};
+
+// Plugin configuration management
+export interface PluginConfig {
+  id: string;
+  enabled: boolean;
+  pinned: boolean;
+  name: string;
+  icon: any;
+  iconColor: string;
+  route: string;
+  order?: number;
+}
+
+const PLUGINS_STORAGE_KEY = 'pluginsConfig';
+const PINNED_ORDER_STORAGE_KEY = 'pinnedPluginsOrder';
+const pluginConfigCallbacks: ((configs: PluginConfig[]) => void)[] = [];
+
+const getDefaultPluginsConfig = (): PluginConfig[] => [
+  {
+    id: 'activity',
+    enabled: true,
+    pinned: true, // Pin it by default so it's easy to find
+    name: 'Activity Monitor',
+    icon: Activity,
+    iconColor: '#6366f1', // indigo-500
+    route: '/activity',
+  },
+  {
+    id: 'broadcasts',
+    enabled: true,
+    pinned: false,
+    name: 'Broadcasts',
+    icon: Bell,
+    iconColor: '#ef4444', // red-500 to match plugin card
+    route: '/broadcasts',
+  },
+  {
+    id: 'boards',
+    enabled: true,
+    pinned: false,
+    name: 'Boards',
+    icon: Users2,
+    iconColor: '#8b5cf6', // violet-500 to match plugin card
+    route: '/settings/boards', // Link to boards settings when unpinned
+  },
+  {
+    id: 'compliance',
+    enabled: true,
+    pinned: false,
+    name: 'Compliance',
+    icon: FileText,
+    iconColor: '#10b981', // emerald-500 to match plugin card
+    route: '/compliance/standards',
+  },
+];
+
+const loadPluginsConfig = (): PluginConfig[] => {
+  try {
+    const stored = localStorage.getItem(PLUGINS_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Merge with defaults to handle new plugins
+      const defaults = getDefaultPluginsConfig();
+      return defaults.map(defaultPlugin => {
+        const stored = parsed.find((p: PluginConfig) => p.id === defaultPlugin.id);
+        return stored ? { ...defaultPlugin, ...stored } : defaultPlugin;
+      });
+    }
+  } catch (error) {
+    console.error('Error loading plugins config:', error);
+  }
+  return getDefaultPluginsConfig();
+};
+
+let pluginsConfigGlobal = loadPluginsConfig();
+
+export const setPluginsConfig = (configs: PluginConfig[]) => {
+  pluginsConfigGlobal = configs;
+  try {
+    // Only store id, enabled, and pinned to localStorage
+    const toStore = configs.map(({ id, enabled, pinned }) => ({ id, enabled, pinned }));
+    localStorage.setItem(PLUGINS_STORAGE_KEY, JSON.stringify(toStore));
+  } catch (error) {
+    console.error('Error saving plugins config:', error);
+  }
+  pluginConfigCallbacks.forEach((callback) => callback(configs));
+};
+
+export const getPluginsConfig = () => pluginsConfigGlobal;
+
+export const subscribeToPluginsConfig = (callback: (configs: PluginConfig[]) => void) => {
+  pluginConfigCallbacks.push(callback);
+  return () => {
+    const index = pluginConfigCallbacks.indexOf(callback);
+    if (index > -1) pluginConfigCallbacks.splice(index, 1);
+  };
+};
+
+export const togglePluginEnabled = (pluginId: string) => {
+  const configs = getPluginsConfig();
+  const updated = configs.map(p => 
+    p.id === pluginId ? { ...p, enabled: !p.enabled } : p
+  );
+  setPluginsConfig(updated);
+};
+
+export const togglePluginPinned = (pluginId: string) => {
+  const configs = getPluginsConfig();
+  const updated = configs.map(p => 
+    p.id === pluginId ? { ...p, pinned: !p.pinned } : p
+  );
+  setPluginsConfig(updated);
+};
+
+// Pinned plugins order management
+export const getPinnedPluginsOrder = (): string[] => {
+  try {
+    const stored = localStorage.getItem(PINNED_ORDER_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const setPinnedPluginsOrder = (order: string[]) => {
+  try {
+    localStorage.setItem(PINNED_ORDER_STORAGE_KEY, JSON.stringify(order));
+  } catch (error) {
+    console.error('Error saving pinned plugins order:', error);
+  }
 };
 
 const IconBadge = ({
@@ -88,6 +230,127 @@ const IconBadge = ({
     {children}
   </div>
 );
+
+// Plugin menu item component - moved outside AppSidebar to prevent recreation on every render
+const PluginMenuItem = ({ 
+  plugin, 
+  isCollapsed, 
+  isMobile, 
+  pathname, 
+  t 
+}: { 
+  plugin: PluginConfig; 
+  isCollapsed: boolean; 
+  isMobile: boolean; 
+  pathname: string; 
+  t: (key: string, fallback?: string) => string;
+}) => {
+  const Icon = plugin.icon;
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        tooltip={isCollapsed && !isMobile ? t(`sidebar.${plugin.id}`, plugin.name) : undefined}
+        className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+        style={{
+          height: '30px',
+          padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+          gap: '8px',
+          fontWeight: pathname.startsWith(plugin.route) || pathname === plugin.route ? 600 : 400,
+          fontSize: '12px',
+          boxShadow: pathname.startsWith(plugin.route) || pathname === plugin.route ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+        }}
+      >
+        <Link
+          to={plugin.route}
+          className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+        >
+          <IconBadge color={plugin.iconColor} size={18}>
+            <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+          </IconBadge>
+          {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+};
+
+// Sortable plugin menu item component - moved outside AppSidebar to prevent recreation on every render
+const SortablePluginMenuItem = ({ 
+  plugin, 
+  isCollapsed, 
+  isMobile, 
+  pathname, 
+  t 
+}: { 
+  plugin: PluginConfig; 
+  isCollapsed: boolean; 
+  isMobile: boolean; 
+  pathname: string; 
+  t: (key: string, fallback?: string) => string;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: plugin.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1,
+  };
+
+  const Icon = plugin.icon;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="cursor-grab active:cursor-grabbing"
+    >
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          tooltip={isCollapsed && !isMobile ? t(`sidebar.${plugin.id}`, plugin.name) : undefined}
+          className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+          style={{
+            height: '30px',
+            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+            gap: '8px',
+            fontWeight: pathname.startsWith(plugin.route) || pathname === plugin.route ? 600 : 400,
+            fontSize: '12px',
+            boxShadow: pathname.startsWith(plugin.route) || pathname === plugin.route ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+          }}
+        >
+          <Link
+            to={plugin.route}
+            onClick={(e) => {
+              if (isDragging) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+            style={{
+              pointerEvents: isDragging ? 'none' : 'auto',
+            }}
+          >
+            <IconBadge color={plugin.iconColor} size={18}>
+              <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+            </IconBadge>
+            {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </div>
+  );
+};
 
 const MoreMenuTriggerContent = ({ isCollapsed, isMobile }: { isCollapsed: boolean; isMobile: boolean }) => {
   const { isOpen } = useCollapsible();
@@ -158,13 +421,23 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const pathname = location.pathname;
   const isCollapsed = state === 'collapsed';
   const { t } = useLanguage();
+  const { config } = useBranding();
+  
+  // Check if primary color is a gradient
+  const isPrimaryGradient = useMemo(() => {
+    const primaryColor = config.primaryColor || '';
+    return primaryColor.trim().startsWith('linear-gradient');
+  }, [config.primaryColor]);
 
   // Extract toggleSidebar to suppress unused warning
   // const { toggleSidebar } = useSidebar();
 
   const [, setIsPinned] = useState(getPinnedState());
+  const [pluginsConfig, setPluginsConfigState] = useState<PluginConfig[]>(getPluginsConfig());
   const [workspaceIcons, setWorkspaceIcons] = useState<{ [key: string]: any }>({});
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
+  const [pinnedBoards, setPinnedBoardsState] = useState<number[]>([]);
+  const [pinnedBoardsOrder, setPinnedBoardsOrderState] = useState<number[]>([]);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
   // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
@@ -174,6 +447,31 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     (state: RootState) => state.workspaces
   );
   const { value: workspaces = [] } = workspacesState || {};
+
+  // Boards state
+  const boardsState = useSelector(
+    (state: RootState) => (state as any).boards || { value: [] }
+  );
+  const { value: boards = [] } = boardsState;
+
+  // Load boards on mount if boards plugin is enabled
+  useEffect(() => {
+    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
+    if (boardsPlugin?.enabled && boards.length === 0) {
+      // Try to load boards from IndexedDB
+      const loadBoards = async () => {
+        try {
+          const cache = (genericCaches as any)?.boards;
+          if (cache && typeof cache.getAll === 'function') {
+            await cache.getAll();
+          }
+        } catch (error) {
+          console.error('Error loading boards:', error);
+        }
+      };
+      loadBoards();
+    }
+  }, [pluginsConfig, boards.length]);
 
   // Local-first: read workspaces directly from IndexedDB to render immediately, then let Redux take over
   const [initialWorkspaces, setInitialWorkspaces] = useState<Workspace[] | null>(null);
@@ -222,6 +520,53 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   useEffect(() => {
     const unsubscribe = subscribeToPinnedState(setIsPinned);
     return unsubscribe;
+  }, []);
+
+  // Subscribe to plugins config changes
+  useEffect(() => {
+    const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
+    return unsubscribe;
+  }, []);
+
+  // Load pinned boards from localStorage
+  useEffect(() => {
+    const loadPinnedBoards = () => {
+      try {
+        const stored = localStorage.getItem('pinnedBoards');
+        const storedOrder = localStorage.getItem('pinnedBoardsOrder');
+        if (stored) {
+          setPinnedBoardsState(JSON.parse(stored));
+        }
+        if (storedOrder) {
+          setPinnedBoardsOrderState(JSON.parse(storedOrder));
+        }
+      } catch (error) {
+        console.error('Error loading pinned boards:', error);
+      }
+    };
+    
+    loadPinnedBoards();
+    
+    // Listen for storage changes (when boards are pinned/unpinned from settings)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'pinnedBoards' || e.key === 'pinnedBoardsOrder') {
+        loadPinnedBoards();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events (same-window updates)
+    const handleCustomStorageChange = () => {
+      loadPinnedBoards();
+    };
+    
+    window.addEventListener('pinnedBoardsChanged', handleCustomStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('pinnedBoardsChanged', handleCustomStorageChange);
+    };
   }, []);
 
   // Load default icon
@@ -343,6 +688,76 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   }
   */
 
+  // Separate pinned and unpinned plugins
+  const [pinnedPluginsOrder, setPinnedPluginsOrderState] = useState<string[]>(getPinnedPluginsOrder());
+  
+  // Sort pinned plugins by saved order (excluding boards and activity from drag-and-drop ordering)
+  const pinnedPlugins = useMemo(() => {
+    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned && p.id !== 'boards' && p.id !== 'activity');
+    const order = pinnedPluginsOrder;
+    
+    if (order.length === 0) return pinned;
+    
+    // Sort by saved order, putting unordered items at the end
+    return [...pinned].sort((a, b) => {
+      const aIndex = order.indexOf(a.id);
+      const bIndex = order.indexOf(b.id);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  }, [pluginsConfig, pinnedPluginsOrder]);
+  
+  // Include boards in unpinned plugins when it's unpinned (so it appears in "More" menu)
+  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned && p.id !== 'activity');
+
+  // Check if boards plugin is enabled and pinned
+  const boardsPluginEnabled = useMemo(() => {
+    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
+    return boardsPlugin?.enabled ?? false;
+  }, [pluginsConfig]);
+  
+  const boardsPluginPinned = useMemo(() => {
+    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
+    return boardsPlugin?.pinned ?? false;
+  }, [pluginsConfig]);
+
+  // DnD sensors for pinned plugins
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    })
+  );
+
+  const [activePluginId, setActivePluginId] = useState<string | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActivePluginId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) {
+      setActivePluginId(null);
+      return;
+    }
+
+    const oldIndex = pinnedPlugins.findIndex(p => p.id === active.id);
+    const newIndex = pinnedPlugins.findIndex(p => p.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newOrder = arrayMove(pinnedPlugins, oldIndex, newIndex).map(p => p.id);
+      setPinnedPluginsOrderState(newOrder);
+      setPinnedPluginsOrder(newOrder);
+    }
+    
+    setActivePluginId(null);
+  };
+
   return (
     <Sidebar
       collapsible="icon"
@@ -369,12 +784,26 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <WhagonsCheck
               width={showExpandedContent ? 40 : 28}
               height={showExpandedContent ? 18 : 14}
-              color={'var(--sidebar-primary)'}
+              color={config.primaryColor || 'var(--sidebar-primary)'}
             />
             {showExpandedContent && (
               <div
-                className="pl-2 font-semibold text-[var(--sidebar-primary)]"
-                style={{ fontFamily: 'Montserrat', fontSize: '20px', fontWeight: 600 }}
+                className="pl-2 font-semibold"
+                style={{
+                  fontFamily: 'Montserrat',
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  ...(isPrimaryGradient
+                    ? {
+                        background: 'var(--sidebar-primary)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                      }
+                    : {
+                        color: 'var(--sidebar-primary)',
+                      }),
+                }}
               >
                 Whagons
               </div>
@@ -396,95 +825,99 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               getWorkspaceIcon={getWorkspaceIcon}
               showEverythingButton={true}
             />
+            
+            {/* Boards section - shown below workspaces if boards plugin is enabled AND pinned */}
+            {boardsPluginEnabled && boardsPluginPinned && (
+              <AppSidebarBoards
+                boards={boards}
+                pathname={pathname}
+              />
+            )}
+            
+            {/* Pinned plugins - shown below workspaces */}
+            {pinnedPlugins.length > 0 && (
+              <>
+                <SidebarSeparator className="my-2 border-[var(--sidebar-border)]" />
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragCancel={() => setActivePluginId(null)}
+                >
+                  <SortableContext
+                    items={pinnedPlugins.map(p => p.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <SidebarMenu className="space-y-1">
+                      {pinnedPlugins.map(plugin => (
+                        <SortablePluginMenuItem 
+                          key={plugin.id} 
+                          plugin={plugin}
+                          isCollapsed={isCollapsed}
+                          isMobile={isMobile}
+                          pathname={pathname}
+                          t={t}
+                        />
+                      ))}
+                    </SidebarMenu>
+                  </SortableContext>
+                  <DragOverlay zIndex={10000}>
+                    {activePluginId ? (() => {
+                      const plugin = pinnedPlugins.find(p => p.id === activePluginId);
+                      if (!plugin) return null;
+                      const Icon = plugin.icon;
+                      const isActive = pathname.startsWith(plugin.route) || pathname === plugin.route;
+                      
+                      return (
+                        <div
+                          className="rounded-[8px] shadow-lg flex items-center"
+                          style={{
+                            height: '30px',
+                            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                            gap: '8px',
+                            background: 'var(--sidebar)',
+                            color: 'var(--sidebar-text-primary)',
+                            fontWeight: isActive ? 600 : 400,
+                            fontSize: '12px',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <IconBadge color={plugin.iconColor} size={18}>
+                            <Icon size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                          </IconBadge>
+                          {!isCollapsed && !isMobile && <span className="ml-1.5">{t(`sidebar.${plugin.id}`, plugin.name)}</span>}
+                        </div>
+                      );
+                    })() : null}
+                  </DragOverlay>
+                </DndContext>
+              </>
+            )}
+
           </div>
         </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="bg-sidebar flex flex-col" style={{ borderTop: '1px solid var(--sidebar-border)', paddingLeft: isCollapsed && !isMobile ? '8px' : '20px', paddingRight: isCollapsed && !isMobile ? '8px' : '20px', flexShrink: 0 }}>
-        <Collapsible defaultOpen={false} className="w-full">
+        <Collapsible defaultOpen={localStorage.getItem('sidebarMoreMenuOpen') === 'true'} onOpenChange={(open) => localStorage.setItem('sidebarMoreMenuOpen', String(open))} className="w-full">
           <MoreMenuTriggerContent isCollapsed={isCollapsed} isMobile={isMobile} />
 
           <CollapsibleContent keepRendered={true} className="mt-2 space-y-1">
             <SidebarGroup style={{ flexShrink: 0 }}>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={isCollapsed && !isMobile ? t('sidebar.teamConnect', 'TeamConnect') : undefined}
-                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-                      style={{
-                        height: '30px',
-                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
-                        gap: '8px',
-                        fontWeight: pathname === '/teamconnect' ? 600 : 400,
-                        fontSize: '12px',
-                        boxShadow: pathname === '/teamconnect' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                      }}
-                    >
-                      <Link
-                        to="/teamconnect"
-                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
-                      >
-                        <IconBadge color="#3b82f6" size={18}>
-                          <Users2 size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                        </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.teamConnect', 'TeamConnect')}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={isCollapsed && !isMobile ? t('sidebar.compliance', 'Compliance') : undefined}
-                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-                      style={{
-                        height: '30px',
-                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
-                        gap: '8px',
-                        fontWeight: pathname.startsWith('/compliance') ? 600 : 400,
-                        fontSize: '12px',
-                        boxShadow: pathname.startsWith('/compliance') ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                      }}
-                    >
-                      <Link
-                        to="/compliance/standards"
-                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
-                      >
-                        <IconBadge color="#10b981" size={18}>
-                          <FileText size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                        </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.compliance', 'Compliance')}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={isCollapsed && !isMobile ? t('sidebar.analytics', 'Analytics') : undefined}
-                      className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-                      style={{
-                        height: '30px',
-                        padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
-                        gap: '8px',
-                        fontWeight: pathname === '/analytics' ? 600 : 400,
-                        fontSize: '12px',
-                        boxShadow: pathname === '/analytics' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
-                      }}
-                    >
-                      <Link
-                        to="/analytics"
-                        className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
-                      >
-                        <IconBadge color="#8b5cf6" size={18}>
-                          <BarChart3 size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-                        </IconBadge>
-                        {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.analytics', 'Analytics')}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {/* Unpinned plugins */}
+                  {unpinnedPlugins.map(plugin => (
+                    <PluginMenuItem 
+                      key={plugin.id} 
+                      plugin={plugin}
+                      isCollapsed={isCollapsed}
+                      isMobile={isMobile}
+                      pathname={pathname}
+                      t={t}
+                    />
+                  ))}
 
                   <SidebarMenuItem>
                     <SidebarMenuButton

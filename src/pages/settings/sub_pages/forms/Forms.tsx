@@ -38,7 +38,6 @@ import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
 import { useAuthUser } from "@/providers/AuthProvider";
-import { api } from "@/api/whagonsApi";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -167,17 +166,10 @@ function Forms() {
 
       if (activeVersionId) {
         setCurrentVersionId(activeVersionId);
-        try {
-          const response = await api.get(`/form-versions/${activeVersionId}/usages`);
-          setIsVersionUsed(response.data.task_count > 0);
-        } catch (e) {
-          console.error('Failed to fetch version usages:', e);
-          setIsVersionUsed(false);
-        }
       } else {
         setCurrentVersionId(null);
-        setIsVersionUsed(false);
       }
+      setIsVersionUsed(false);
 
       if ((latest as any)?.fields || (latest as any)?.schema_data) {
         const raw = (latest as any).fields ?? (latest as any).schema_data;

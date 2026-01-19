@@ -53,31 +53,17 @@ const TabsList = React.forwardRef<
     });
   }, []);
 
-  const updateIndicatorContinuously = React.useCallback(() => {
-    // Cancel any existing animation
+  // Schedule a single indicator update on the next frame.
+  // CSS transitions handle the animation; repeatedly measuring layout each frame
+  // can trigger forced reflow warnings (especially during dialog/sheet open).
+  const scheduleIndicatorUpdate = React.useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-
-    const startTime = Date.now();
-    const duration = 300; // Match transition duration
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      
-      // Update indicator position on every frame
+    animationFrameRef.current = requestAnimationFrame(() => {
       updateIndicator();
-
-      if (elapsed < duration) {
-        // Continue animating
-        animationFrameRef.current = requestAnimationFrame(animate);
-      } else {
-        animationFrameRef.current = null;
-      }
-    };
-
-    // Start the animation loop
-    animationFrameRef.current = requestAnimationFrame(animate);
+      animationFrameRef.current = null;
+    });
   }, [updateIndicator]);
 
   useEffect(() => {
@@ -85,8 +71,8 @@ const TabsList = React.forwardRef<
     const timeoutId = setTimeout(updateIndicator, 0);
 
     // Event listeners
-    window.addEventListener("resize", updateIndicatorContinuously);
-    const observer = new MutationObserver(updateIndicatorContinuously);
+    window.addEventListener("resize", scheduleIndicatorUpdate);
+    const observer = new MutationObserver(scheduleIndicatorUpdate);
 
     if (tabsListRef.current) {
       observer.observe(tabsListRef.current, {
@@ -101,10 +87,10 @@ const TabsList = React.forwardRef<
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      window.removeEventListener("resize", updateIndicatorContinuously);
+      window.removeEventListener("resize", scheduleIndicatorUpdate);
       observer.disconnect();
     };
-  }, [updateIndicator, updateIndicatorContinuously]);
+  }, [updateIndicator, scheduleIndicatorUpdate]);
 
   return (
     <div className="relative" ref={tabsListRef}>

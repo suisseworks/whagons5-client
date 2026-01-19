@@ -24,6 +24,7 @@ export interface CategoryReportingTeamsManagerProps {
   onSave?: () => Promise<void>;
   onReset?: () => void;
   teams?: Team[];
+  hideFooter?: boolean; // Hide footer when used inside another dialog
 }
 
 export function CategoryReportingTeamsManager({ 
@@ -38,7 +39,8 @@ export function CategoryReportingTeamsManager({
   error: controlledError,
   onSave: controlledOnSave,
   onReset: controlledOnReset,
-  teams: controlledTeams
+  teams: controlledTeams,
+  hideFooter = false
 }: CategoryReportingTeamsManagerProps) {
   const dispatch = useDispatch<AppDispatch>();
   const teamsFromStore = useSelector((state: RootState) => (state.teams as { value: Team[] }).value);
@@ -217,7 +219,7 @@ export function CategoryReportingTeamsManager({
               </p>
             </div>
             {renderContent()}
-            {renderFooter()}
+            {!hideFooter && renderFooter()}
           </>
         ) : (
           <div className="flex items-center justify-center h-[320px] text-muted-foreground">

@@ -11,7 +11,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Bell, Plus, Layers, Search } from "lucide-react";
+import { User, LogOut, Plus, Layers, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector, useDispatch } from "react-redux";
@@ -62,6 +62,10 @@ function Header() {
     const workspacesState = useSelector((s: RootState) => s.workspaces);
     const { value: workspaces = [] } = workspacesState || {};
 
+    // Get boards for breadcrumb
+    const boardsState = useSelector((s: RootState) => (s as any).boards);
+    const { value: boards = [] } = boardsState || {};
+
     // Redux UI state selectors
     const currentFilterModel = useSelector(selectFilterModel);
     const searchText = useSelector(selectSearchText);
@@ -83,6 +87,7 @@ function Header() {
             workspace: 'Workspace',
             settings: 'Settings',
             categories: 'Categories',
+            'custom-fields': 'Custom fields',
             templates: 'Templates',
             teams: 'Teams',
             spots: 'Spots',
@@ -102,45 +107,69 @@ function Header() {
             statuses: 'Statuses',
             status: 'Status',
             'spot-types': 'Spot Types',
+            boards: 'Boards',
+            plugins: 'Plugins',
         };
-        const getLabel = (seg: string) => {
+        const getLabel = (seg: string, index: number) => {
+            // Special handling for boards board ID
+            if (parts[0] === 'boards' && index === 1 && !isNaN(Number(seg))) {
+                const boardId = parseInt(seg);
+                const board = boards.find((b: any) => b.id === boardId);
+                return board?.name || seg;
+            }
             const fallback = labelDefaults[seg] ?? seg.charAt(0).toUpperCase() + seg.slice(1);
             return t(`breadcrumbs.${seg}`, fallback);
         };
         const acc: Array<{ label: string; to?: string }> = [];
         let path = '';
 
-        // Special handling for settings subpages
-        if (parts[0] === 'settings' && parts.length > 1) {
+        // Special handling for plugin settings pages
+        if (parts[0] === 'plugins' && parts.length === 3 && parts[2] === 'settings') {
+            // For plugin settings, show: Plugins > Plugin Name (skip "settings")
+            const pluginId = parts[1];
+            const pluginName = t(`plugins.${pluginId}.title`, pluginId.charAt(0).toUpperCase() + pluginId.slice(1));
+            acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+            acc.push({ label: pluginName, to: location.pathname });
+        } else if (parts[0] === 'settings' && parts.length > 1) {
             // For settings subpages, create breadcrumbs like: Settings > Subpage
             acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
             for (let i = 1; i < parts.length; i++) {
                 const seg = parts[i];
                 path += `/${seg}`;
-                const label = getLabel(seg);
+                const label = getLabel(seg, i);
                 acc.push({ label, to: `/settings${path}` });
+            }
+        } else if (parts[0] === 'boards' && parts.length > 1) {
+            // For boards, skip the "boards" segment and show: Board Name (or Board Name > Subpage)
+            // Start from index 1 to skip "boards"
+            for (let i = 1; i < parts.length; i++) {
+                const seg = parts[i];
+                path += `/${seg}`;
+                const label = getLabel(seg, i);
+                acc.push({ label, to: `/boards${path}` });
             }
         } else {
             // Regular breadcrumbs for non-settings pages
-            for (const seg of parts) {
+            for (let i = 0; i < parts.length; i++) {
+                const seg = parts[i];
                 path += `/${seg}`;
-                const label = getLabel(seg);
+                const label = getLabel(seg, i);
                 acc.push({ label, to: path });
             }
         }
         return acc;
-    }, [location.pathname, t]);
+    }, [location.pathname, t, boards]);
 
     // Current workspace context (for replacing breadcrumbs with just workspace name)
     const { currentWorkspaceName, currentWorkspaceId, currentWorkspaceIcon, currentWorkspaceColor } = useMemo(() => {
         const numMatch = location.pathname.match(/\/workspace\/(\d+)/);
         const allMatch = /^\/workspace\/all/.test(location.pathname);
         if (!numMatch && !allMatch) return { currentWorkspaceName: null as string | null, currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
-        if (allMatch) return { currentWorkspaceName: 'Everything', currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
+        if (allMatch) return { currentWorkspaceName: t('sidebar.everything', 'Everything'), currentWorkspaceId: null as number | null, currentWorkspaceIcon: null as string | null, currentWorkspaceColor: undefined as string | undefined };
         const wid = parseInt(numMatch![1], 10);
         const ws = workspaces.find((w: any) => w.id === wid);
         return { currentWorkspaceName: ws?.name || `Workspace ${wid}`, currentWorkspaceId: wid, currentWorkspaceIcon: ws?.icon || null, currentWorkspaceColor: ws?.color };
-    }, [location.pathname, workspaces]);
+    }, [location.pathname, workspaces, t]);
     const [openCreateTask, setOpenCreateTask] = useState(false);
 
     const [workspaceIcon, setWorkspaceIcon] = useState<any>(null);
@@ -166,13 +195,13 @@ function Header() {
         const key = `wh_workspace_search_global`;
         try {
             const saved = localStorage.getItem(key);
-            if (saved != null && saved !== searchText) {
+            if (saved != null) {
                 dispatch(setSearchText(saved));
-            } else if (saved === null && searchText !== '') {
+            } else {
                 dispatch(setSearchText(''));
             }
         } catch {}
-    }, [currentWorkspaceName, dispatch, searchText]);
+    }, [currentWorkspaceName, dispatch]);
 
     // Save search text to localStorage when it changes
     useEffect(() => {
@@ -195,14 +224,14 @@ function Header() {
             const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
             const savedGroup = localStorage.getItem(groupKey) as any;
             const savedCollapse = localStorage.getItem(collapseKey);
-            if (savedGroup && savedGroup !== groupBy) {
+            if (savedGroup) {
                 dispatch(setGroupBy(savedGroup));
             }
-            if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+            if (savedCollapse !== null) {
                 dispatch(setCollapseGroups(savedCollapse === 'true'));
             }
         } catch {}
-    }, [currentWorkspaceName, currentWorkspaceId, dispatch, groupBy, collapseGroups]);
+    }, [currentWorkspaceName, currentWorkspaceId, dispatch]);
 
     // Save groupBy to localStorage when changed
     useEffect(() => {
@@ -261,23 +290,28 @@ function Header() {
         };
     }, []);
 
-    // Subtle gradient background for workspace headers
-    const headerSurfaceColor = isDarkTheme ? '#0F0F0F' : 'var(--sidebar-header)';
+    // Use navbar/header background color, not sidebar header
+    // Use CSS variable directly so it updates reactively when branding changes
+    const headerSurfaceColor = 'var(--header-background, var(--navbar, var(--sidebar-header)))';
     
     // Detect if header has dark background for text contrast
     const [isDarkHeader, setIsDarkHeader] = useState(() => {
         if (typeof window === 'undefined') return false;
-        const sidebarHeader = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+        const headerBg = getComputedStyle(document.documentElement).getPropertyValue('--header-background').trim() || 
+                         getComputedStyle(document.documentElement).getPropertyValue('--navbar').trim();
         // Quick check for known dark values
-        return sidebarHeader.includes('#08111f') || sidebarHeader.includes('oklch(0.0') || sidebarHeader.includes('oklch(0.1');
+        return headerBg.includes('#08111f') || headerBg.includes('oklch(0.0') || headerBg.includes('oklch(0.1') || 
+               headerBg.includes('#0F0F0F') || headerBg.includes('#0a0a0a');
     });
     
     useEffect(() => {
         if (typeof window === 'undefined') return;
         
         const checkHeaderBrightness = () => {
-            // Get the actual computed color of --sidebar-header
-            const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-header').trim();
+            // Get the actual computed color of --header-background or --navbar
+            const headerBg = getComputedStyle(document.documentElement).getPropertyValue('--header-background').trim() || 
+                           getComputedStyle(document.documentElement).getPropertyValue('--navbar').trim();
+            const computedColor = headerBg;
             
             // Parse and check brightness
             let isDark = isDarkTheme;
@@ -361,8 +395,12 @@ function Header() {
 
     const headerBackgroundStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (!currentWorkspaceName) return undefined;
-        return { backgroundColor: headerSurfaceColor } as React.CSSProperties;
-    }, [currentWorkspaceName, headerSurfaceColor]);
+        // Use CSS variable directly - browser will handle gradients automatically
+        return { 
+            background: 'var(--header-background, var(--navbar, var(--sidebar-header)))',
+            backgroundSize: 'cover'
+        } as React.CSSProperties;
+    }, [currentWorkspaceName]);
 
     // Track API GET requests for syncing indicator (debounced to prevent flickering)
     useEffect(() => {
@@ -404,11 +442,11 @@ function Header() {
         if (hydrationState === "custom") return null;
         const label =
             hydrationState === "processing"
-                ? "Syncing"
+                ? t("sync.syncing", "Syncing")
                 : hydrationState === "success"
-                ? "Synced"
+                ? t("sync.synced", "Synced")
                 : hydrationState === "error"
-                ? "Sync failed"
+                ? t("sync.failed", "Sync failed")
                 : undefined;
         const badge = (
             <MultiStateBadge
@@ -425,7 +463,7 @@ function Header() {
             );
         }
         return badge;
-    }, [hydrationError, hydrationState]);
+    }, [hydrationError, hydrationState, t]);
 
 
 
@@ -544,10 +582,14 @@ function Header() {
         return user?.name || user?.email || 'User';
     };
 
-    // Loading/error header gradient style
+    // Loading/error header gradient style - use CSS variable directly
     const loadingHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        return { backgroundColor: headerSurfaceColor };
-    }, [headerSurfaceColor]);
+        // Use CSS variable directly - browser will handle gradients automatically
+        return { 
+            background: 'var(--header-background, var(--navbar, var(--sidebar-header)))',
+            backgroundSize: 'cover'
+        };
+    }, []);
 
     if (!firebaseUser || userLoading) {
         return (
@@ -577,10 +619,14 @@ function Header() {
         );
     }
 
-    // Main header gradient style - soft gradient for settings pages
+    // Main header gradient style - use CSS variable directly
     const mainHeaderGradientStyle = useMemo<React.CSSProperties>(() => {
-        return { backgroundColor: headerSurfaceColor };
-    }, [headerSurfaceColor]);
+        // Use CSS variable directly - browser will handle gradients automatically
+        return { 
+            background: 'var(--header-background, var(--navbar, var(--sidebar-header)))',
+            backgroundSize: 'cover'
+        };
+    }, []);
 
     return (
         <>
@@ -611,7 +657,7 @@ function Header() {
                                     />
                                 </div>
                             ) : (
-                                currentWorkspaceName === 'Everything' ? (
+                                currentWorkspaceName === t('sidebar.everything', 'Everything') ? (
                                     <Layers className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
                                 ) : null
                             )}
@@ -695,50 +741,56 @@ function Header() {
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-2">
-                    {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === 'Everything') && (
+                    {(typeof currentWorkspaceId === 'number' || currentWorkspaceName === t('sidebar.everything', 'Everything')) && (
                         <button
-                            className="group inline-flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 text-primary font-medium text-sm transition-all duration-200 hover:bg-primary hover:text-white hover:border-primary hover:shadow-lg hover:shadow-primary/25 active:scale-[0.97]"
+                            className="group inline-flex items-center gap-2 pl-4 pr-5 py-2.5 rounded-full border-2 border-primary bg-primary text-primary-foreground font-semibold text-sm transition-all duration-200 hover:bg-primary/90 hover:border-primary/90 hover:shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-[0.98]"
                             onClick={() => setOpenCreateTask(true)}
-                            title="Create Task"
+                            title={t('task.createTask', 'Create Task')}
                         >
                             <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" strokeWidth={2.5} />
-                            <span>New Task</span>
+                            <span>{t('task.newTask', 'New Task')}</span>
                         </button>
                     )}
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
-
-                    {/* Notifications */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent/50 text-foreground relative transition-colors">
-                                <Bell className="h-5 w-5" />
-                                <span className="absolute bottom-0.5 left-0.5 bg-red-500 rounded-full w-2 h-2 ring-2 ring-background"></span>
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64 p-2">
-                            <div className="text-sm text-muted-foreground">No notifications</div>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
                     
+                    {/* Profile with notification badge */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
-                                <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
-                                    {!imageError && imageUrl && (
-                                        <AvatarImage 
-                                            src={imageUrl} 
-                                            onError={handleImageError}
-                                            alt={getDisplayName()}
-                                        />
-                                    )}
-                                    <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
-                                        {getInitials()}
-                                    </AvatarFallback>
-                                </Avatar>
-                            </button>
+                            <div className="relative inline-block">
+                                <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
+                                    <Avatar className="h-9 w-9 bg-accent text-accent-foreground ring-1 ring-border shadow-sm">
+                                        {!imageError && imageUrl && (
+                                            <AvatarImage 
+                                                src={imageUrl} 
+                                                onError={handleImageError}
+                                                alt={getDisplayName()}
+                                            />
+                                        )}
+                                        <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
+                                            {getInitials()}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </button>
+                                {/* Notification badge */}
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-extrabold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 ring-2 ring-background shadow-sm z-10" style={{ fontFeatureSettings: '"tnum"', textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                                    4
+                                </span>
+                            </div>
                         </DropdownMenuTrigger>
 
-                        <DropdownMenuContent align="end" className="w-30">
+                        <DropdownMenuContent align="end" className="w-64">
+                            {/* Notifications section */}
+                            <div className="px-2 py-1.5 border-b border-border/50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <DropdownMenuLabel className="px-0 py-0 text-sm font-semibold">Notifications</DropdownMenuLabel>
+                                    <span className="text-xs text-muted-foreground">4 new</span>
+                                </div>
+                                <div className="max-h-[200px] overflow-y-auto space-y-1">
+                                    <div className="text-sm text-muted-foreground px-2 py-1.5 rounded-md hover:bg-accent/50 cursor-pointer">
+                                        No notifications
+                                    </div>
+                                </div>
+                            </div>
                             <DropdownMenuItem onClick={() => {
                                 navigate('/profile');
                             }}>
@@ -807,7 +859,7 @@ function Header() {
                             variant="outline" 
                             size="sm" 
                             className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-                            title="All tasks"
+                            title={t('workspace.filters.allTasks', 'All tasks')}
                             onClick={() => {
                                 dispatch(setFilterModel(null));
                                 dispatch(setSearchText(''));
@@ -817,7 +869,7 @@ function Header() {
                                 }));
                             }}
                         >
-                            All
+                            {t('workspace.filters.all', 'All')}
                         </Button>
                         {quickPresets.map((p: any, idx: number) => (
                             <Button
@@ -842,12 +894,12 @@ function Header() {
                             variant="outline" 
                             size="sm" 
                             className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
-                            title="Custom filters"
+                            title={t('workspace.filters.customFilters', 'Custom filters')}
                             onClick={() => {
                                 window.dispatchEvent(new CustomEvent('workspace-filter-dialog-open', { detail: {} }));
                             }}
                         >
-                            Filters…
+                            {t('workspace.filters.filters', 'Filters…')}
                         </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -855,15 +907,15 @@ function Header() {
                                     variant="outline" 
                                     size="sm" 
                                     className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" 
-                                    title="More presets"
+                                    title={t('workspace.filters.morePresets', 'More presets')}
                                 >
-                                    More…
+                                    {t('workspace.filters.more', 'More…')}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="min-w-[240px]">
-                                <DropdownMenuLabel>Apply preset</DropdownMenuLabel>
+                                <DropdownMenuLabel>{t('workspace.filters.applyPreset', 'Apply preset')}</DropdownMenuLabel>
                                 {allPresets.length === 0 ? (
-                                    <DropdownMenuItem disabled>No presets yet</DropdownMenuItem>
+                                    <DropdownMenuItem disabled>{t('workspace.filters.noPresets', 'No presets yet')}</DropdownMenuItem>
                                 ) : (
                                     allPresets.map((p: any) => (
                                         <DropdownMenuItem 
@@ -884,22 +936,22 @@ function Header() {
 
                         {/* Group by control */}
                         <div className="flex items-center gap-2 ml-auto">
-                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('workspace.group.group', 'Group')}</Label>
                             <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
                                 <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
-                                    <SelectValue placeholder="Group" />
+                                    <SelectValue placeholder={t('workspace.group.group', 'Group')} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    <SelectItem value="spot_id">Location</SelectItem>
-                                    <SelectItem value="status_id">Status</SelectItem>
-                                    <SelectItem value="priority_id">Priority</SelectItem>
+                                    <SelectItem value="none">{t('workspace.group.none', 'None')}</SelectItem>
+                                    <SelectItem value="spot_id">{t('workspace.group.location', 'Location')}</SelectItem>
+                                    <SelectItem value="status_id">{t('workspace.group.status', 'Status')}</SelectItem>
+                                    <SelectItem value="priority_id">{t('workspace.group.priority', 'Priority')}</SelectItem>
                                 </SelectContent>
                             </Select>
                             {groupBy !== 'none' && (
                                 <div className="flex items-center gap-2">
                                     <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
-                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Collapse</Label>
+                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('workspace.group.collapse', 'Collapse')}</Label>
                                 </div>
                             )}
                         </div>
@@ -911,7 +963,7 @@ function Header() {
         {typeof currentWorkspaceId === 'number' && (
             <TaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} mode="create" workspaceId={currentWorkspaceId} />
         )}
-        {currentWorkspaceName === 'Everything' && (
+        {currentWorkspaceName === t('sidebar.everything', 'Everything') && (
             <TaskDialog open={openCreateTask} onOpenChange={setOpenCreateTask} mode="create-all" />
         )}
 

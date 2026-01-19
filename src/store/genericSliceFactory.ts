@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, PayloadAction, Slice } from "@reduxjs/toolkit";
-import type { SliceCaseReducers, SliceSelectors } from "@reduxjs/toolkit";
+import type { AsyncThunk, SliceCaseReducers, SliceSelectors } from "@reduxjs/toolkit";
 import { GenericCache } from "./indexedDB/GenericCache";
 
 // Generic event emitter for all tables (replaces TaskEvents for generic slices)
@@ -48,6 +48,27 @@ export interface GenericSliceState<T = any> {
     error: string | null;
 }
 
+type AnyThunk = AsyncThunk<any, any, any>;
+
+export interface GenericSliceActions<T = any> {
+    // Slice reducers
+    setLoading: any;
+    setError: any;
+    clearError: any;
+    updateItem: any;
+    addItem: any;
+    removeItem: any;
+
+    // Internal hydration/network thunks (should not be used directly in UI)
+    getFromIndexedDB: AnyThunk;
+    fetchFromAPI: AnyThunk;
+
+    // Public CRUD thunks
+    updateAsync: AnyThunk;
+    addAsync: AnyThunk;
+    removeAsync: AnyThunk;
+}
+
 // Configuration interface for creating a generic slice
 export interface GenericSliceConfig {
     name: string;
@@ -61,7 +82,7 @@ export interface GenericSliceConfig {
 // Return type interface for createGenericSlice
 export interface GenericSliceResult<T = any> {
     slice: Slice<GenericSliceState<T>>;
-    actions: Record<string, any>;
+    actions: GenericSliceActions<T>;
     cache: GenericCache;
     events: typeof GenericEvents;
     eventNames: {
@@ -206,9 +227,7 @@ let inflightLoad: Promise<T[]> | null = null;
                     await cacheInstance.deleteRemote(id as any);
                 } catch (error: any) {
                     // If 404, item is already deleted on server - treat as success
-                    if (error?.response?.status === 404) {
-                        console.log(`${name}/removeAsync: Item ${id} already deleted on server (404)`);
-                    } else {
+                    if (error?.response?.status !== 404) {
                         throw error; // Re-throw other errors
                     }
                 }
@@ -327,7 +346,7 @@ let inflightLoad: Promise<T[]> | null = null;
             updateAsync,
             addAsync,
             removeAsync,
-        },
+        } as unknown as GenericSliceActions<T>,
         cache: cacheInstance,
         events: GenericEvents,
         eventNames: events,

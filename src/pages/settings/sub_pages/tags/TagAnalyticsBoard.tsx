@@ -3,15 +3,16 @@ import ReactECharts from "echarts-for-react";
 import type { Category, Tag } from "@/store/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface TagAnalyticsBoardProps {
 	tags: Tag[];
 	categories: Category[];
 }
 
-const TIMEFRAMES: Array<{ label: string; value: "30" | "90"; days: number }> = [
-	{ label: "30 days", value: "30", days: 30 },
-	{ label: "90 days", value: "90", days: 90 }
+const getTimeframes = (t: (key: string, fallback: string) => string): Array<{ label: string; value: "30" | "90"; days: number }> => [
+	{ label: t('analytics.timeframes.days30', '30 days'), value: "30", days: 30 },
+	{ label: t('analytics.timeframes.days90', '90 days'), value: "90", days: 90 }
 ];
 
 const getSafeDate = (value?: string | Date) => {
@@ -20,10 +21,13 @@ const getSafeDate = (value?: string | Date) => {
 };
 
 export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoardProps) {
+	const { t } = useLanguage();
+	const ta = (key: string, fallback: string) => t(`settings.tags.analytics.${key}`, fallback);
 	const [timeframe, setTimeframe] = useState<"30" | "90">("30");
+	const timeframes = getTimeframes(ta);
 
 	const timeline = useMemo(() => {
-		const range = TIMEFRAMES.find((frame) => frame.value === timeframe)?.days ?? 30;
+		const range = timeframes.find((frame) => frame.value === timeframe)?.days ?? 30;
 		const today = new Date();
 		const start = new Date(today);
 		start.setDate(start.getDate() - range);
@@ -47,7 +51,7 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 			dates: Object.keys(buckets),
 			values: Object.values(buckets)
 		};
-	}, [tags, timeframe]);
+	}, [tags, timeframe, timeframes]);
 
 	const categoryGrowth = useMemo(() => {
 		const data = categories.map((category) => {
@@ -63,7 +67,7 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 		data.push({
 			category: {
 				id: 0,
-				name: "Global",
+				name: ta('global', 'Global'),
 				color: "#0ea5e9"
 			} as Category,
 			count: globalCount,
@@ -92,33 +96,33 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 		const busiestCategory = categoryGrowth[0];
 		return [
 			{
-				label: "Top category",
+				label: ta('insights.topCategory.label', 'Top category'),
 				value: busiestCategory ? busiestCategory.category.name : "—",
-				sub: `${busiestCategory?.count ?? 0} tags`
+				sub: ta('insights.topCategory.sub', '{count} tags').replace('{count}', String(busiestCategory?.count ?? 0))
 			},
 			{
-				label: "Global coverage",
+				label: ta('insights.globalCoverage.label', 'Global coverage'),
 				value: `${globalRatio}%`,
-				sub: "Org-wide tags"
+				sub: ta('insights.globalCoverage.sub', 'Org-wide tags')
 			},
 			{
-				label: "Freshness",
+				label: ta('insights.freshness.label', 'Freshness'),
 				value: `${topGrowing[0]?.tag.name ?? "—"}`,
-				sub: "Most recently edited"
+				sub: ta('insights.freshness.sub', 'Most recently edited')
 			}
 		];
-	}, [categoryGrowth, tags, topGrowing]);
+	}, [categoryGrowth, tags, topGrowing, ta]);
 
 	return (
 		<div className="space-y-4">
 			<Card>
 				<CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 					<div>
-						<CardTitle className="text-base">Usage Activity</CardTitle>
-						<CardDescription>Replay how tags evolved over the selected timeframe.</CardDescription>
+						<CardTitle className="text-base">{ta('usageActivity.title', 'Usage Activity')}</CardTitle>
+						<CardDescription>{ta('usageActivity.description', 'Replay how tags evolved over the selected timeframe.')}</CardDescription>
 					</div>
 					<ToggleGroup type="single" value={timeframe} onValueChange={(value) => value && setTimeframe(value as "30" | "90")}>
-						{TIMEFRAMES.map((frame) => (
+						{timeframes.map((frame) => (
 							<ToggleGroupItem key={frame.value} value={frame.value} aria-label={frame.label}>
 								{frame.label}
 							</ToggleGroupItem>
@@ -130,10 +134,10 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 						option={{
 							tooltip: { trigger: "axis" },
 							xAxis: { type: "category", data: timeline.dates, boundaryGap: false },
-							yAxis: { type: "value", name: "Updates" },
+							yAxis: { type: "value", name: ta('usageActivity.yAxis', 'Updates') },
 							series: [
 								{
-									name: "Tag touchpoints",
+									name: ta('usageActivity.series', 'Tag touchpoints'),
 									type: "line",
 									areaStyle: { opacity: 0.25 },
 									smooth: true,
@@ -149,8 +153,8 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-sm">Category growth</CardTitle>
-						<CardDescription>Stacked activity by taxonomy.</CardDescription>
+						<CardTitle className="text-sm">{ta('categoryGrowth.title', 'Category growth')}</CardTitle>
+						<CardDescription>{ta('categoryGrowth.description', 'Stacked activity by taxonomy.')}</CardDescription>
 					</CardHeader>
 					<CardContent>
 						<ReactECharts
@@ -165,7 +169,7 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 								},
 								series: [
 									{
-										name: "Tags",
+										name: ta('categoryGrowth.series', 'Tags'),
 										type: "bar",
 										stack: "total",
 										label: { show: true, position: "insideRight" },
@@ -182,8 +186,8 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 				</Card>
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-sm">Top movers</CardTitle>
-						<CardDescription>Recent edits and synthetic sparkline signals.</CardDescription>
+						<CardTitle className="text-sm">{ta('topMovers.title', 'Top movers')}</CardTitle>
+						<CardDescription>{ta('topMovers.description', 'Recent edits and synthetic sparkline signals.')}</CardDescription>
 					</CardHeader>
 					<CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						{topGrowing.map(({ tag, series }) => (
@@ -203,7 +207,7 @@ export default function TagAnalyticsBoard({ tags, categories }: TagAnalyticsBoar
 								/>
 							</div>
 						))}
-						{!topGrowing.length && <p className="text-muted-foreground text-sm">No activity yet.</p>}
+						{!topGrowing.length && <p className="text-muted-foreground text-sm">{ta('topMovers.empty', 'No activity yet.')}</p>}
 					</CardContent>
 				</Card>
 			</div>

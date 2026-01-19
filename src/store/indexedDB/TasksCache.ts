@@ -1,7 +1,7 @@
 import { auth } from "@/firebase/firebaseConfig";
 import { Task } from "../types";
 import { DB } from "./DB";
-import api from "@/api/whagonsApi";
+import { api } from "@/store/api/internalApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import sha256 from "crypto-js/sha256";
 import encHex from "crypto-js/enc-hex";
@@ -696,8 +696,14 @@ export class TasksCache {
             if (sharedWithMe) {
                 if (this._memSharedTasks && (now - this._memSharedTasksStamp) < this.MEM_TTL_MS) {
                     tasks = this._memSharedTasks;
+                    if (localStorage.getItem('wh-debug-shared') === 'true') {
+                        console.log('[TasksCache] Using cached shared tasks from memory:', tasks.length);
+                    }
                 } else {
                     tasks = await this.getSharedTasks();
+                    if (localStorage.getItem('wh-debug-shared') === 'true') {
+                        console.log('[TasksCache] Loaded shared tasks from DB:', tasks.length, 'tasks');
+                    }
                     // Bootstrap fetch if empty - fire and forget to avoid blocking the UI
                     // Only fetch if cache is truly empty AND we're not already fetching
                     if (tasks.length === 0 && !this._fetchingSharedTasks) {
@@ -750,13 +756,23 @@ export class TasksCache {
             const filterModelKeys = hasFilterModel ? new Set(Object.keys(params.filterModel)) : new Set();
             
             // Apply simple parameter filters (skip if column is in filterModel, as filterModel will handle it)
-            if (params.workspace_id) {
+            // Skip workspace_id filter when viewing shared tasks, as shared tasks can come from any workspace
+            if (params.workspace_id && !sharedWithMe) {
                 const wsId = typeof params.workspace_id === 'string' ? parseInt(params.workspace_id, 10) : Number(params.workspace_id);
                 if (Number.isFinite(wsId)) {
+                    const beforeCount = tasks.length;
                     tasks = tasks.filter(task => {
                         const taskWsId = typeof task.workspace_id === 'string' ? parseInt(task.workspace_id, 10) : Number(task.workspace_id);
                         return Number.isFinite(taskWsId) && taskWsId === wsId;
                     });
+                    if (localStorage.getItem('wh-debug-shared') === 'true') {
+                        console.log('[TasksCache] Filtered by workspace_id:', beforeCount, '->', tasks.length);
+                    }
+                }
+            } else if (sharedWithMe && params.workspace_id) {
+                // Log warning if workspace_id is set when viewing shared tasks (shouldn't happen)
+                if (localStorage.getItem('wh-debug-shared') === 'true') {
+                    console.warn('[TasksCache] WARNING: workspace_id filter ignored for shared tasks. workspace_id:', params.workspace_id);
                 }
             }
             if (params.status_id && !filterModelKeys.has('status_id')) {
@@ -901,12 +917,31 @@ export class TasksCache {
                 const endRow = parseInt(params.endRow);
                 // const pageSize = endRow - startRow; // retained for clarity
                 
+                if (localStorage.getItem('wh-debug-shared') === 'true' && sharedWithMe) {
+                    console.log('[TasksCache] Returning shared tasks:', {
+                        total: tasks.length,
+                        startRow,
+                        endRow,
+                        returning: tasks.slice(startRow, endRow).length,
+                        workspace_id_filter: params.workspace_id,
+                        shared_with_me: sharedWithMe
+                    });
+                }
+                
                 return {
                     rows: tasks.slice(startRow, endRow),
                     rowCount: tasks.length
                 };
             } else {
                 // Return all tasks
+                if (localStorage.getItem('wh-debug-shared') === 'true' && sharedWithMe) {
+                    console.log('[TasksCache] Returning all shared tasks:', {
+                        total: tasks.length,
+                        workspace_id_filter: params.workspace_id,
+                        shared_with_me: sharedWithMe
+                    });
+                }
+                
                 return {
                     rows: tasks,
                     rowCount: tasks.length

@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
-import { faSquareCheck, faUsers, faPlus, faTrash, faCircleQuestion, faBook, faCheckCircle, faClock, faExclamationTriangle, faInfoCircle, faLock, faGripVertical } from "@fortawesome/free-solid-svg-icons";
+import { faSquareCheck, faUsers, faPlus, faTrash, faCircleQuestion, faBook, faCheckCircle, faClock, faExclamationTriangle, faInfoCircle, faLock, faBolt } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Approval, ApprovalApprover, ApprovalCondition, CustomField, Status } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
@@ -26,6 +26,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ApprovalActionsDialog } from "./approvals/ApprovalActionsDialog";
 
 // Compact name/description cell similar to Teams with type indicator (S/P)
 const NameCell = (props: ICellRendererParams) => {
@@ -54,7 +55,7 @@ const formatTemplate = (template: string, params: Record<string, string | number
     Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : `{${key}}`
   );
 
-type TriggerType = 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL';
+type TriggerType = 'ON_CREATE' | 'MANUAL' | 'CONDITIONAL' | 'ON_COMPLETE';
 type ApprovalFlowType = 'SEQUENTIAL' | 'PARALLEL';
 type DeadlineType = 'hours' | 'date';
 type ConditionValueType = 'string' | 'number' | 'boolean' | 'date' | 'option';
@@ -85,6 +86,8 @@ type ApprovalFormState = {
   deadline_value: string;
   order_index: number;
   is_active: boolean;
+  on_approved_actions?: any[];
+  on_rejected_actions?: any[];
 };
 
 const CONDITION_OPERATORS_BY_TYPE: Record<ConditionValueType, ConditionOperator[]> = {
@@ -636,6 +639,7 @@ function Approvals() {
       ON_CREATE: ta('options.triggerType.onCreate', 'On Create'),
       MANUAL: ta('options.triggerType.manual', 'Manual'),
       CONDITIONAL: ta('options.triggerType.conditional', 'Conditional'),
+      ON_COMPLETE: ta('options.triggerType.onComplete', 'On Complete'),
     }),
     [ta]
   );
@@ -676,6 +680,8 @@ function Approvals() {
   const [approversApproval, setApproversApproval] = useState<Approval | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [summaryApproval, setSummaryApproval] = useState<Approval | null>(null);
+  const [isActionsDialogOpen, setIsActionsDialogOpen] = useState(false);
+  const [actionsApproval, setActionsApproval] = useState<Approval | null>(null);
   const { value: approvalApprovers } = useSelector((s: RootState) => s.approvalApprovers) as { value: ApprovalApprover[] };
   const { value: statuses } = useSelector((s: RootState) => (s as any).statuses || { value: [] }) as { value: Status[] };
   const { value: customFields } = useSelector((s: RootState) => (s as any).customFields || { value: [] }) as { value: CustomField[] };
@@ -683,7 +689,7 @@ function Approvals() {
   const { value: categories } = useSelector((s: RootState) => (s as any).categories || { value: [] }) as { value: Array<{ id: number; name?: string; approval_id?: number | null }> };
   const { value: slas } = useSelector((s: RootState) => (s as any).slas || { value: [] }) as { value: Array<{ id: number; name?: string }> };
   const { value: users } = useSelector((s: RootState) => (s as any).users || { value: [] }) as { value: any[] };
-  const { value: roles } = useSelector((s: RootState) => (s as any).roles || { value: [] }) as { value: any[] };
+  const { value: roles } = useSelector((s: RootState) => s.roles) as { value: any[] };
   const tasks = useSelector((s: any) => (s?.tasks?.value) || []) as any[];
   const { value: approvalsStateValue } = useSelector((s: RootState) => (s as any).approvals || { value: [] }) as { value: Approval[] };
 
@@ -710,6 +716,11 @@ function Approvals() {
   const openManageApprovers = useCallback((approval: Approval) => {
     setApproversApproval(approval);
     setIsApproversDialogOpen(true);
+  }, []);
+
+  const openManageActions = useCallback((approval: Approval) => {
+    setActionsApproval(approval);
+    setIsActionsDialogOpen(true);
   }, []);
 
   const openSummary = useCallback((approval: Approval) => {
@@ -776,10 +787,8 @@ function Approvals() {
       requirement: ta('grid.columns.requirement', 'Requirement'),
       approvalType: ta('grid.columns.approvalType', 'Approval Type'),
       trigger: ta('grid.columns.trigger', 'Trigger'),
-      requireComment: ta('grid.columns.requireComment', 'Require Comment'),
-      blockEditing: ta('grid.columns.blockEditing', 'Block Editing'),
       deadline: ta('grid.columns.deadline', 'Deadline'),
-      actions: ta('grid.columns.actions', 'Actions'),
+      actions: ta('grid.columns.actions', 'Manage'),
     };
     const requirementAllLabel = ta('grid.requirement.all', 'All approvers');
     const requirementMinimumTemplate = ta('grid.requirement.minimum', 'Minimum {count}');
@@ -790,6 +799,7 @@ function Approvals() {
     const noLabel = ta('grid.values.no', 'No');
     const manageApproversLabel = ta('actions.manageApprovers', 'Approvers');
     const manageApproversWithCount = ta('actions.manageApproversWithCount', 'Approvers ({count})');
+    const manageActionsLabel = ta('actions.manageActions', 'Actions');
 
     return [
       {
@@ -798,11 +808,6 @@ function Approvals() {
         width: 52,
         suppressMovable: true,
         rowDrag: true,
-        cellRenderer: () => (
-          <div className="flex items-center justify-center text-muted-foreground">
-            <FontAwesomeIcon icon={faGripVertical} className="w-3.5 h-3.5" />
-          </div>
-        ),
       },
       {
         field: 'name',
@@ -858,18 +863,6 @@ function Approvals() {
         cellRenderer: (p: ICellRendererParams) => getTriggerTypeLabel(p?.data?.trigger_type),
       },
       {
-        field: 'require_rejection_comment',
-        headerName: columnLabels.requireComment,
-        width: 130,
-        cellRenderer: (p: ICellRendererParams) => (p?.data?.require_rejection_comment ? yesLabel : noLabel),
-      },
-      {
-        field: 'block_editing_during_approval',
-        headerName: columnLabels.blockEditing,
-        width: 120,
-        cellRenderer: (p: ICellRendererParams) => (p?.data?.block_editing_during_approval ? yesLabel : noLabel),
-      },
-      {
         field: 'deadline_type',
         headerName: columnLabels.deadline,
         flex: 1,
@@ -879,19 +872,31 @@ function Approvals() {
       {
         field: 'actions',
         headerName: columnLabels.actions,
-        width: 220,
+        width: 280,
         cellRenderer: createActionsCellRenderer({
-          customActions: [{
-            icon: faUsers,
-            label: (row: any) => {
-              const count = approverCountByApproval.get(Number(row?.id)) || 0;
-              return count > 0 ? formatTemplate(manageApproversWithCount, { count }) : manageApproversLabel;
+          customActions: [
+            {
+              icon: faUsers,
+              label: (row: any) => {
+                const count = approverCountByApproval.get(Number(row?.id)) || 0;
+                return count > 0 ? formatTemplate(manageApproversWithCount, { count }) : manageApproversLabel;
+              },
+              variant: 'outline',
+              onClick: (row: any) => openManageApprovers(row as Approval),
+              className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[120px]'
             },
-            variant: 'outline',
-            onClick: (row: any) => openManageApprovers(row as Approval),
-            className: 'p-1 h-7 relative flex items-center justify-center gap-1 min-w-[150px]'
-          }],
-          onEdit: handleEdit,
+            {
+              icon: faBolt,
+              label: manageActionsLabel,
+              variant: 'outline',
+              onClick: (row: any) => openManageActions(row as Approval),
+              className: (row: any) => {
+                const hasActions = (row?.on_approved_actions && Array.isArray(row.on_approved_actions) && row.on_approved_actions.length > 0) ||
+                                   (row?.on_rejected_actions && Array.isArray(row.on_rejected_actions) && row.on_rejected_actions.length > 0);
+                return `p-1 h-7 relative flex items-center justify-center gap-1 min-w-[90px] ${hasActions ? 'text-green-600 dark:text-green-500' : ''}`;
+              }
+            }
+          ],
         }),
         sortable: false,
         filter: false,
@@ -899,7 +904,7 @@ function Approvals() {
         pinned: 'right',
       },
     ];
-  }, [handleEdit, renderDeadline, approverCountByApproval, openManageApprovers, ta, getTriggerTypeLabel]);
+  }, [handleEdit, renderDeadline, approverCountByApproval, openManageApprovers, openManageActions, ta, getTriggerTypeLabel]);
 
   // Form state
   const [createFormData, setCreateFormData] = useState<ApprovalFormState>(() => createEmptyFormState());
@@ -1033,32 +1038,6 @@ function Approvals() {
     await updateItem((editingItem as any).id, updates);
   };
 
-  // Initial load: hydrate from IndexedDB then refresh from API
-  useEffect(() => {
-    dispatch(genericActions.approvals.getFromIndexedDB());
-    dispatch(genericActions.approvals.fetchFromAPI());
-    // Load approvers for counts and manager
-    dispatch(genericActions.approvalApprovers.getFromIndexedDB());
-    dispatch(genericActions.approvalApprovers.fetchFromAPI());
-    // Load users and roles for approver selection UI
-    dispatch(genericActions.users.getFromIndexedDB());
-    dispatch(genericActions.users.fetchFromAPI());
-    dispatch(genericActions.roles.getFromIndexedDB());
-    dispatch(genericActions.roles.fetchFromAPI());
-    dispatch(genericActions.statuses.getFromIndexedDB());
-    dispatch(genericActions.statuses.fetchFromAPI());
-    dispatch(genericActions.customFields.getFromIndexedDB());
-    dispatch(genericActions.customFields.fetchFromAPI());
-    dispatch(genericActions.priorities.getFromIndexedDB());
-    dispatch(genericActions.priorities.fetchFromAPI());
-    dispatch(genericActions.categories.getFromIndexedDB());
-    dispatch(genericActions.categories.fetchFromAPI());
-    dispatch(genericActions.slas.getFromIndexedDB());
-    dispatch(genericActions.slas.fetchFromAPI());
-    dispatch(genericActions.templates.getFromIndexedDB());
-    dispatch(genericActions.templates.fetchFromAPI());
-  }, [dispatch]);
-
   return (
     <div className="p-4 pt-0 h-full">
       <SettingsLayout
@@ -1069,7 +1048,11 @@ function Approvals() {
         loading={{ isLoading: loading, message: ta('loading', 'Loading approvals...') }}
         error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
         headerActions={
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+          <Button 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
             {ta('headerActions.add', 'Add Approval')}
           </Button>
@@ -1324,6 +1307,21 @@ function Approvals() {
                           <div className="text-xs text-muted-foreground bg-background p-2 rounded border">
                             <strong>Example:</strong> Start approval when task status equals "Pending Review" or when a custom 
                             field "Amount" is greater than $1000.
+                          </div>
+                        </div>
+
+                        <div className="p-4 border rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 text-purple-600" />
+                            <span className="font-semibold text-foreground">ON_COMPLETE</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Approval is triggered when a task transitions to a finished/completed status. Useful for QA sign-off, 
+                            deliverable acceptance, or supervisor verification before final completion.
+                          </p>
+                          <div className="text-xs text-muted-foreground bg-background p-2 rounded border">
+                            <strong>Example:</strong> Require manager approval before a task can be marked as Done. The task 
+                            will remain in "pending approval" state until approved.
                           </div>
                         </div>
                       </div>
@@ -1667,18 +1665,18 @@ function Approvals() {
             <div className="grid gap-4 min-h-[320px]">
               <TextField id="name" label={ta('fields.name', 'Name')} value={createFormData.name} onChange={(v) => setCreateFormData(p => ({ ...p, name: v }))} required />
               <TextAreaField id="description" label={ta('fields.description', 'Description')} value={createFormData.description} onChange={(v) => setCreateFormData(p => ({ ...p, description: v }))} />
-              <CheckboxField id="is_active" label={ta('fields.active', 'Active')} checked={!!createFormData.is_active} onChange={(c) => setCreateFormData(p => ({ ...p, is_active: c }))} hideFieldLabel />
+              <CheckboxField id="is_active" label={ta('fields.active', 'Active')} checked={!!createFormData.is_active} onChange={(c) => setCreateFormData(p => ({ ...p, is_active: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="rules">
             <div className="grid gap-4 min-h-[320px]">
               <SelectField id="approval_type" label={ta('fields.approvalType', 'Approval Type')} value={createFormData.approval_type} onChange={(v) => setCreateFormData(p => ({ ...p, approval_type: v as any }))} options={[{ value: 'SEQUENTIAL', label: ta('options.approvalType.sequential', 'Sequential') }, { value: 'PARALLEL', label: ta('options.approvalType.parallel', 'Parallel') }]} />
-              <CheckboxField id="require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!createFormData.require_all} onChange={(c) => setCreateFormData(p => ({ ...p, require_all: c }))} hideFieldLabel />
+              <CheckboxField id="require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!createFormData.require_all} onChange={(c) => setCreateFormData(p => ({ ...p, require_all: c }))} />
               {!createFormData.require_all && (
                 <TextField id="minimum_approvals" label={ta('fields.minimumApprovals', 'Minimum approvals')} type="number" value={String(createFormData.minimum_approvals)} onChange={(v) => setCreateFormData(p => ({ ...p, minimum_approvals: v }))} />
               )}
-              <CheckboxField id="require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!createFormData.require_rejection_comment} onChange={(c) => setCreateFormData(p => ({ ...p, require_rejection_comment: c }))} hideFieldLabel />
-              <CheckboxField id="block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!createFormData.block_editing_during_approval} onChange={(c) => setCreateFormData(p => ({ ...p, block_editing_during_approval: c }))} hideFieldLabel />
+              <CheckboxField id="require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!createFormData.require_rejection_comment} onChange={(c) => setCreateFormData(p => ({ ...p, require_rejection_comment: c }))} />
+              <CheckboxField id="block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!createFormData.block_editing_during_approval} onChange={(c) => setCreateFormData(p => ({ ...p, block_editing_during_approval: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="trigger">
@@ -1687,6 +1685,7 @@ function Approvals() {
                 { value: 'ON_CREATE', label: ta('options.triggerType.onCreate', 'On Create') },
                 { value: 'MANUAL', label: ta('options.triggerType.manual', 'Manual') },
                 { value: 'CONDITIONAL', label: ta('options.triggerType.conditional', 'Conditional') },
+                { value: 'ON_COMPLETE', label: ta('options.triggerType.onComplete', 'On Complete') },
               ]} />
               {createFormData.trigger_type === 'CONDITIONAL' && (
                 <ConditionBuilder
@@ -1766,18 +1765,18 @@ function Approvals() {
             <div className="grid gap-4 min-h-[320px]">
               <TextField id="edit-name" label={ta('fields.name', 'Name')} value={editFormData.name} onChange={(v) => setEditFormData(p => ({ ...p, name: v }))} required />
               <TextAreaField id="edit-description" label={ta('fields.description', 'Description')} value={editFormData.description} onChange={(v) => setEditFormData(p => ({ ...p, description: v }))} />
-              <CheckboxField id="edit-is_active" label={ta('fields.active', 'Active')} checked={!!editFormData.is_active} onChange={(c) => setEditFormData(p => ({ ...p, is_active: c }))} hideFieldLabel />
+              <CheckboxField id="edit-is_active" label={ta('fields.active', 'Active')} checked={!!editFormData.is_active} onChange={(c) => setEditFormData(p => ({ ...p, is_active: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="rules">
             <div className="grid gap-4 min-h-[320px]">
               <SelectField id="edit-approval_type" label={ta('fields.approvalType', 'Approval Type')} value={editFormData.approval_type} onChange={(v) => setEditFormData(p => ({ ...p, approval_type: v as any }))} options={[{ value: 'SEQUENTIAL', label: ta('options.approvalType.sequential', 'Sequential') }, { value: 'PARALLEL', label: ta('options.approvalType.parallel', 'Parallel') }]} />
-              <CheckboxField id="edit-require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!editFormData.require_all} onChange={(c) => setEditFormData(p => ({ ...p, require_all: c }))} hideFieldLabel />
+              <CheckboxField id="edit-require_all" label={ta('fields.requireAll', 'Require all approvers')} checked={!!editFormData.require_all} onChange={(c) => setEditFormData(p => ({ ...p, require_all: c }))} />
               {!editFormData.require_all && (
                 <TextField id="edit-minimum_approvals" label={ta('fields.minimumApprovals', 'Minimum approvals')} type="number" value={String(editFormData.minimum_approvals)} onChange={(v) => setEditFormData(p => ({ ...p, minimum_approvals: v }))} />
               )}
-              <CheckboxField id="edit-require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!editFormData.require_rejection_comment} onChange={(c) => setEditFormData(p => ({ ...p, require_rejection_comment: c }))} hideFieldLabel />
-              <CheckboxField id="edit-block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!editFormData.block_editing_during_approval} onChange={(c) => setEditFormData(p => ({ ...p, block_editing_during_approval: c }))} hideFieldLabel />
+              <CheckboxField id="edit-require_rejection_comment" label={ta('fields.requireRejectionComment', 'Require rejection comment')} checked={!!editFormData.require_rejection_comment} onChange={(c) => setEditFormData(p => ({ ...p, require_rejection_comment: c }))} />
+              <CheckboxField id="edit-block_editing_during_approval" label={ta('fields.blockEditing', 'Block editing during approval')} checked={!!editFormData.block_editing_during_approval} onChange={(c) => setEditFormData(p => ({ ...p, block_editing_during_approval: c }))} />
             </div>
           </TabsContent>
           <TabsContent value="trigger">
@@ -1786,6 +1785,7 @@ function Approvals() {
                 { value: 'ON_CREATE', label: ta('options.triggerType.onCreate', 'On Create') },
                 { value: 'MANUAL', label: ta('options.triggerType.manual', 'Manual') },
                 { value: 'CONDITIONAL', label: ta('options.triggerType.conditional', 'Conditional') },
+                { value: 'ON_COMPLETE', label: ta('options.triggerType.onComplete', 'On Complete') },
               ]} />
               {editFormData.trigger_type === 'CONDITIONAL' && (
                 <ConditionBuilder
@@ -1851,6 +1851,13 @@ function Approvals() {
         open={isApproversDialogOpen}
         onOpenChange={(open) => { if (!open) { setIsApproversDialogOpen(false); setApproversApproval(null); } else { setIsApproversDialogOpen(true); } }}
         approval={approversApproval}
+      />
+
+      {/* Manage Actions Dialog */}
+      <ApprovalActionsDialog
+        open={isActionsDialogOpen}
+        onOpenChange={(open) => { if (!open) { setIsActionsDialogOpen(false); setActionsApproval(null); } else { setIsActionsDialogOpen(true); } }}
+        approval={actionsApproval}
       />
 
       {/* Summary Dialog */}

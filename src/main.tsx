@@ -19,9 +19,13 @@ import {store } from './store';
 // import * as CryptoAPI from './crypto/crypto';
 // import { genericActions } from './store/genericSlices';
 import { applyEncryptionConfig } from './config/encryptionConfig';
+import { initFontStyle } from './utils/fontStyle';
 
 // Initialize encryption configuration
 applyEncryptionConfig();
+
+// Initialize font style
+initFontStyle();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
@@ -33,6 +37,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
                 <App />
                 <Toaster 
                   position="bottom-right"
+                  containerStyle={{
+                    bottom: '20px',
+                    right: '100px',
+                  }}
                   toastOptions={{
                     duration: 5000,
                     style: {

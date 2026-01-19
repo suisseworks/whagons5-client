@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp, Trash2 } from 'lucide-react';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -28,11 +28,16 @@ import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { motion } from 'motion/react';
 import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
-import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/filterPresets';
+import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/utils/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
+import { useLanguage } from '@/providers/LanguageProvider';
+import { removeTaskAsync } from '@/store/reducers/tasksSlice';
+import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
+import toast from 'react-hot-toast';
+import type { AppDispatch } from '@/store/store';
 
 const WORKSPACE_TAB_PATHS = {
   grid: '',
@@ -48,7 +53,8 @@ type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
 const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'statistics', 'settings'];
 
 export const Workspace = () => {
-  const dispatch = useDispatch();
+  const { t } = useLanguage();
+  const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -258,6 +264,50 @@ export const Workspace = () => {
 
   // Selected tasks (for bulk actions)
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Handle delete of selected tasks
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    
+    setDeleteDialogOpen(false);
+    const taskCount = selectedIds.length;
+    const taskIds = [...selectedIds];
+    
+    // Clear selection immediately
+    setSelectedIds([]);
+    tableRef.current?.clearSelection?.();
+    
+    // Delete all selected tasks
+    const deletePromises = taskIds.map(taskId => 
+      dispatch(removeTaskAsync(taskId)).unwrap().catch((error: any) => {
+        console.error(`Failed to delete task ${taskId}:`, error);
+        return { error, taskId };
+      })
+    );
+    
+    const results = await Promise.allSettled(deletePromises);
+    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.error));
+    const succeeded = results.filter(r => r.status === 'fulfilled' && !r.value?.error);
+    
+    if (succeeded.length > 0) {
+      toast.success(
+        succeeded.length === taskCount
+          ? `Deleted ${succeeded.length} task${succeeded.length > 1 ? 's' : ''}`
+          : `Deleted ${succeeded.length} of ${taskCount} task${taskCount > 1 ? 's' : ''}`,
+        { duration: 5000 }
+      );
+    }
+    
+    if (failed.length > 0) {
+      toast.error(
+        `Failed to delete ${failed.length} task${failed.length > 1 ? 's' : ''}`,
+        { duration: 5000 }
+      );
+    }
+  };
+  
   // Metadata for filters
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
@@ -274,14 +324,14 @@ export const Workspace = () => {
       const collapseKey = `wh_workspace_group_collapse_${workspaceId}`;
       const savedGroup = localStorage.getItem(groupKey) as any;
       const savedCollapse = localStorage.getItem(collapseKey);
-      if (savedGroup && savedGroup !== groupBy) {
+      if (savedGroup) {
         dispatch(setGroupBy(savedGroup));
       }
-      if (savedCollapse !== null && (savedCollapse === 'true') !== collapseGroups) {
+      if (savedCollapse !== null) {
         dispatch(setCollapseGroups(savedCollapse === 'true'));
       }
     } catch {}
-  }, [id, isAllWorkspaces, dispatch, groupBy, collapseGroups]);
+  }, [id, isAllWorkspaces, dispatch]);
 
   // Listen for filter apply events from Header component
   useEffect(() => {
@@ -448,9 +498,6 @@ export const Workspace = () => {
       rowCache.current.clear();
     }
   }, [id, location.pathname]);
-  // Debug logging
-  console.log('Workspace component - id:', id, 'typeof:', typeof id);
-  console.log('Current path:', location.pathname);
 
   
 
@@ -505,11 +552,11 @@ export const Workspace = () => {
     const key = `wh_workspace_search_global`;
     try {
       const saved = localStorage.getItem(key);
-      if (saved != null && saved !== searchText) {
+      if (saved != null) {
         dispatch(setSearchText(saved));
       }
     } catch {}
-  }, [dispatch, searchText]);
+  }, [dispatch]);
 
   // Save search text to localStorage when it changes
   useEffect(() => {
@@ -592,8 +639,10 @@ export const Workspace = () => {
               dispatch(setFilterModel(model || null));
             }}
             onSelectionChanged={setSelectedIds}
-            onRowDoubleClicked={(task) => {
+            onOpenTaskDialog={(task) => {
               setSelectedTask(task);
+              // Perf mark: used by TaskDialog to measure click→animationstart
+              (window as any).__taskDialogClickTime = performance.now();
               setOpenEditTask(true);
             }}
             rowHeight={computedRowHeight}
@@ -770,87 +819,105 @@ export const Workspace = () => {
   const kpiCards: KpiCard[] = [
     {
       key: 'total',
-      label: 'Total',
+      label: t('workspace.stats.total', 'Total'),
       value: formatStatValue(stats.total),
-      icon: <BarChart3 className="h-4 w-4" />,
-      badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-200',
-      barClass: 'from-indigo-50 to-indigo-100'
+      icon: <BarChart3 className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20',
+      barClass: 'from-indigo-500 via-indigo-400 to-indigo-500'
     },
     {
       key: 'inProgress',
-      label: 'In progress',
+      label: t('workspace.stats.inProgress', 'In progress'),
       value: formatStatValue(stats.inProgress),
-      icon: <Activity className="h-4 w-4" />,
-      badgeClass: 'bg-sky-100 text-sky-900 border-sky-200',
-      barClass: 'from-sky-50 to-sky-100'
+      icon: <Activity className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-amber-500 to-orange-500 text-white border-amber-600 shadow-lg shadow-amber-500/20',
+      barClass: 'from-amber-500 via-amber-400 to-amber-500'
     },
     {
       key: 'completedToday',
-      label: 'Completed today',
+      label: t('workspace.stats.completedToday', 'Completed today'),
       value: formatStatValue(stats.completedToday),
-      icon: <Sparkles className="h-4 w-4" />,
-      badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-200',
-      barClass: 'from-emerald-50 to-emerald-100',
-      helperText: stats.completedToday === 0 && !statsArePending ? 'Start completing tasks to see progress!' : undefined
+      icon: <Sparkles className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20',
+      barClass: 'from-emerald-500 via-emerald-400 to-emerald-500',
+      helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
     },
     {
       key: 'trend',
-      label: '7-day trend',
-      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} done`,
-      icon: <TrendingUp className="h-4 w-4" />,
-      badgeClass: 'bg-purple-100 text-purple-900 border-purple-200',
-      barClass: 'from-purple-50 to-purple-100',
+      label: t('workspace.stats.sevenDayTrend', '7-day trend'),
+      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
+      icon: <TrendingUp className="h-5 w-5" />,
+      badgeClass: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white border-purple-600 shadow-lg shadow-purple-500/20',
+      barClass: 'from-purple-500 via-purple-400 to-purple-500',
       sparkline: <TrendSparkline data={stats.trend} />,
       helperText: statsArePending 
         ? '' 
         : completedLast7Days === 0 
-          ? 'Complete your first task to begin tracking progress!'
-          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} vs yesterday`
+          ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
+          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`
     }
   ];
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex flex-wrap items-start gap-3 -mt-1 mb-3">
+      <div className="flex items-start gap-3 -mt-1 mb-3">
         {showHeaderKpis && (
-          <div className="flex-1 min-w-[280px]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {kpiCards.map((card) => (
-                <div
+                <motion.div
                   key={card.key}
-                  className="relative overflow-hidden rounded-xl border bg-card/90 backdrop-blur-sm shadow-sm border-border/60 workspace-kpi-card"
+                  className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-card/95 to-card/80 backdrop-blur-sm shadow-md hover:shadow-lg border-border/60 workspace-kpi-card group transition-all duration-300 hover:-translate-y-0.5 cursor-pointer"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  whileHover={{ scale: 1.02 }}
                 >
-                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass}`} />
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <div className={`flex items-center justify-center rounded-lg p-2 border ${card.badgeClass} workspace-kpi-icon`}>
+                  {/* Animated gradient top bar */}
+                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass} animate-gradient-x`} />
+                  
+                  {/* Subtle background gradient overlay */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${card.barClass} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+                  
+                  <div className="flex items-center gap-3 px-4 py-3 relative z-10">
+                    <motion.div 
+                      className={`flex items-center justify-center flex-shrink-0 rounded-xl p-2.5 border-2 ${card.badgeClass} workspace-kpi-icon group-hover:scale-110 transition-transform duration-300`}
+                      whileHover={{ rotate: [0, -5, 5, -5, 0] }}
+                      transition={{ duration: 0.5 }}
+                    >
                       {card.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/90">
+                    </motion.div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
                         {card.label}
                       </div>
-                      <div className="text-xl font-semibold leading-tight text-foreground">
+                      <motion.div 
+                        className="text-2xl font-bold leading-tight text-foreground truncate"
+                        initial={{ scale: 0.9 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                      >
                         {card.value}
-                      </div>
+                      </motion.div>
                       {card.helperText ? (
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
                           {card.helperText}
                         </div>
                       ) : null}
                     </div>
                     {card.sparkline ? (
-                      <div className="ml-auto w-24 sm:w-28">
+                      <div className="flex-shrink-0 w-24 sm:w-28 opacity-80 group-hover:opacity-100 transition-opacity">
                         {card.sparkline}
                       </div>
                     ) : null}
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-3 pr-2">
+        <div className="flex-shrink-0 flex items-center gap-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -860,11 +927,11 @@ export const Workspace = () => {
                 aria-label="Collaboration menu"
               >
                 <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
-                <span className="hidden sm:inline">Collab</span>
+                <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>Collaboration</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('workspace.collab.collaboration', 'Collaboration')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={rightPanel === 'chat'}
@@ -872,7 +939,7 @@ export const Workspace = () => {
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
-                  <span>Chat</span>
+                  <span>{t('workspace.collab.chat', 'Chat')}</span>
                 </div>
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
@@ -881,7 +948,7 @@ export const Workspace = () => {
               >
                 <div className="flex items-center gap-2">
                   <FolderPlus className="w-4 h-4" />
-                  <span>Resources</span>
+                  <span>{t('workspace.collab.resources', 'Resources')}</span>
                 </div>
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
@@ -904,8 +971,27 @@ export const Workspace = () => {
           <Button variant="ghost" size="sm" title="Reschedule" aria-label="Reschedule" disabled>
             <CalendarDays className="h-4 w-4 mr-1" /> Reschedule
           </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            title="Delete selected tasks" 
+            aria-label="Delete selected tasks"
+            onClick={() => setDeleteDialogOpen(true)}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Delete
+          </Button>
           <div className="ml-auto" />
-          <Button variant="outline" size="sm" onClick={() => setSelectedIds([])}>Clear selection</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              tableRef.current?.clearSelection?.();
+              setSelectedIds([]);
+            }}
+          >
+            Clear selection
+          </Button>
         </div>
       )}
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
@@ -934,7 +1020,7 @@ export const Workspace = () => {
             />
             <div className="border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
             <div className="flex items-center justify-between px-3 py-2 border-b">
-              <div className="text-sm font-medium">{rightPanel === 'chat' ? 'Chat' : 'Resources'}</div>
+              <div className="text-sm font-medium">{rightPanel === 'chat' ? t('workspace.collab.chat', 'Chat') : t('workspace.collab.resources', 'Resources')}</div>
               <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -1010,6 +1096,12 @@ export const Workspace = () => {
         task={selectedTask} 
       />
       <TaskNotesModal />
+      <DeleteTaskDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteSelected}
+        taskName={selectedIds.length === 1 ? undefined : `${selectedIds.length} tasks`}
+      />
     </div>
 
   );

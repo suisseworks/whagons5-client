@@ -1,18 +1,19 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faShieldAlt, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faShieldAlt, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { ColDef } from "ag-grid-community";
-import type { Role, Permission, RolePermission } from "@/store/types";
-import { AppDispatch, RootState } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
+import type { Role, Permission } from "@/store/types";
+import { RootState, AppDispatch } from "@/store/store";
 import { Button } from "@/components/ui/button";
-import api from "@/api/whagonsApi";
+import { actionsApi } from "@/api/whagonsActionsApi";
+import { api } from "@/store/api/internalApi";
+import { addRole, updateRole, removeRole } from "@/store/reducers/rolesSlice";
+
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
-  useSettingsState,
   createActionsCellRenderer,
   TextField,
   TextAreaField,
@@ -25,49 +26,109 @@ function RolesAndPermissions() {
   const tu = (key: string, fallback: string) => t(`settings.rolesAndPermissions.${key}`, fallback);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Load roles and permissions data on mount
+  // Roles from Redux (loaded by DataManager)
+  const { value: roles, loading, error } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean; error: string | null };
+  
+  // Permissions fetched from API (not a wh_* table)
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Role | null>(null);
+  const [deletingItem, setDeletingItem] = useState<Role | null>(null);
+  
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return roles;
+    const query = searchQuery.toLowerCase();
+    return roles.filter(role => 
+      role.name?.toLowerCase().includes(query) || 
+      role.description?.toLowerCase().includes(query)
+    );
+  }, [roles, searchQuery]);
+  
+  const handleEdit = (role: Role) => {
+    setEditingItem(role);
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleDelete = (role: Role) => {
+    setDeletingItem(role);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const handleCloseDeleteDialog = () => {
+    setIsDeleteDialogOpen(false);
+    setDeletingItem(null);
+  };
+  
+  // Fetch permissions on mount (permissions is not a wh_* table)
   useEffect(() => {
-    dispatch((genericActions as any).roles.getFromIndexedDB());
-    dispatch((genericActions as any).roles.fetchFromAPI());
-    dispatch((genericActions as any).permissions.getFromIndexedDB());
-    dispatch((genericActions as any).permissions.fetchFromAPI());
-    dispatch((genericActions as any).rolePermissions.getFromIndexedDB());
-    dispatch((genericActions as any).rolePermissions.fetchFromAPI());
-  }, [dispatch]);
-
-  const { value: permissions = [], loading: permissionsLoading } = useSelector((state: RootState) =>
-    state.permissions as { value: Permission[]; loading: boolean }
-  );
-
-  const { value: rolePermissions = [] } = useSelector((state: RootState) =>
-    state.rolePermissions as { value: RolePermission[] }
-  );
-
-  const {
-    filteredItems,
-    loading,
-    error,
-    searchQuery,
-    setSearchQuery,
-    createItem,
-    updateItem,
-    deleteItem,
-    isSubmitting,
-    formError,
-    isCreateDialogOpen,
-    setIsCreateDialogOpen,
-    isEditDialogOpen,
-    setIsEditDialogOpen,
-    isDeleteDialogOpen,
-    editingItem,
-    deletingItem,
-    handleEdit,
-    handleDelete,
-    handleCloseDeleteDialog
-  } = useSettingsState<Role>({
-    entityName: "roles",
-    searchFields: ["name", "description"]
-  });
+    const fetchPermissions = async () => {
+      try {
+        const response = await api.get('/permissions');
+        if (response.data?.data) {
+          setPermissions(response.data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch permissions:', error);
+      }
+    };
+    
+    fetchPermissions();
+  }, []);
+  
+  // CRUD functions for roles
+  const createItem = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      const response = await actionsApi.post('/roles', data);
+      if (response.data?.data) {
+        dispatch(addRole(response.data.data));
+        setIsCreateDialogOpen(false);
+      }
+    } catch (error: any) {
+      setFormError(error.response?.data?.message || 'Failed to create role');
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const updateItem = async (id: number, updates: any) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      const response = await actionsApi.patch(`/roles/${id}`, updates);
+      if (response.data?.data) {
+        dispatch(updateRole(response.data.data));
+        setIsEditDialogOpen(false);
+      }
+    } catch (error: any) {
+      setFormError(error.response?.data?.message || 'Failed to update role');
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const deleteItem = async (id: number) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      await actionsApi.delete(`/roles/${id}`);
+      dispatch(removeRole(id));
+      setIsDeleteDialogOpen(false);
+    } catch (error: any) {
+      setFormError(error.response?.data?.message || 'Failed to delete role');
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Form state for controlled components
   const [createFormData, setCreateFormData] = useState<{
@@ -122,16 +183,8 @@ function RolesAndPermissions() {
   }, [editingItem]);
 
   // Sync selected permissions when role changes in modal
-  useEffect(() => {
-    if (!selectedRoleId) {
-      setSelectedPermIds(new Set());
-      return;
-    }
-    const current = rolePermissions
-      .filter((rp: RolePermission) => rp.role_id === selectedRoleId)
-      .map((rp: RolePermission) => String(rp.permission_id));
-    setSelectedPermIds(new Set(current));
-  }, [selectedRoleId, rolePermissions]);
+  // Permissions are loaded when opening the permissions dialog via handleOpenPermissions
+  // No need for a separate effect here
 
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, Permission[]> = {};
@@ -195,6 +248,39 @@ function RolesAndPermissions() {
     setSelectedPermIds(new Set());
   };
 
+  const getGroupIds = (perms: Permission[]) =>
+    perms
+      .map((p) => p.id)
+      .filter((id) => id !== undefined && id !== null)
+      .map((id) => String(id));
+
+  const handleSelectGroup = (perms: Permission[]) => {
+    const groupIds = getGroupIds(perms);
+    setSelectedPermIds(prev => {
+      const next = new Set(prev);
+      groupIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const handleClearGroup = (perms: Permission[]) => {
+    const groupIds = new Set(getGroupIds(perms));
+    setSelectedPermIds(prev => {
+      const next = new Set(prev);
+      groupIds.forEach((id) => next.delete(id));
+      return next;
+    });
+  };
+
+  const getGroupSelectionState = (perms: Permission[]) => {
+    if (perms.length === 0) return { selectedCount: 0, isAllSelected: false };
+    const selectedCount = perms.reduce(
+      (count, perm) => count + (selectedPermIds.has(String(perm.id)) ? 1 : 0),
+      0
+    );
+    return { selectedCount, isAllSelected: selectedCount === perms.length };
+  };
+
   const handleSavePermissions = useCallback(async () => {
     if (!selectedRoleId) return;
     try {
@@ -204,7 +290,7 @@ function RolesAndPermissions() {
         .map((idStr) => permissions.find((p) => String(p.id) === idStr)?.name)
         .filter((name): name is string => Boolean(name));
 
-      await api.put(`/roles/${selectedRoleId}/permissions`, {
+      await actionsApi.put(`/roles/${selectedRoleId}/permissions`, {
         permissions: selectedNames,
       });
 
@@ -212,28 +298,33 @@ function RolesAndPermissions() {
     } finally {
       setIsSavingPerms(false);
     }
-  }, [permissions, selectedPermIds, selectedRoleId]);
+  }, [selectedPermIds, selectedRoleId]);
 
-  const handleOpenPermissions = useCallback((role: Role) => {
+  const handleOpenPermissions = useCallback(async (role: Role) => {
     setSelectedRoleId(role.id);
     setSelectedRoleName(role.name || '');
-    // Fetch current permissions from backend for this role
-    (async () => {
-      try {
-        setIsLoadingRolePerms(true);
-        const resp = await api.get(`/roles/${role.id}/permissions`);
-        const names: string[] = resp?.data?.permissions || [];
-        const ids = permissions
-          .filter((p) => names.includes(p.name))
-          .map((p) => String(p.id));
-        setSelectedPermIds(new Set(ids));
-      } catch (error) {
-        console.error('Failed to load role permissions', error);
-        setSelectedPermIds(new Set());
-      } finally {
-        setIsLoadingRolePerms(false);
-      }
-    })();
+    setIsLoadingRolePerms(true);
+    
+    try {
+      // Fetch role permissions from API
+      const response = await api.get(`/roles/${role.id}/permissions`);
+      const permissionNames = response.data?.permissions || [];
+      
+      // Map permission names to IDs
+      const ids = permissionNames
+        .map((name: string) => {
+          const perm = permissions.find((p: Permission) => p.name === name);
+          return perm ? String(perm.id) : null;
+        })
+        .filter((id: string | null): id is string => id !== null);
+      
+      setSelectedPermIds(new Set(ids));
+    } catch (error) {
+      console.error('Failed to load role permissions', error);
+      setSelectedPermIds(new Set());
+    } finally {
+      setIsLoadingRolePerms(false);
+    }
     setIsPermissionsDialogOpen(true);
   }, [permissions]);
 
@@ -295,7 +386,6 @@ function RolesAndPermissions() {
       suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
         onEdit: handleEdit,
-        onDelete: handleDelete,
         customActions: [
           {
             icon: faShieldAlt,
@@ -311,7 +401,7 @@ function RolesAndPermissions() {
       resizable: false,
       pinned: "right"
     }
-  ], [handleEdit, handleDelete, handleOpenPermissions, tu]);
+  ], [handleEdit, handleOpenPermissions, tu]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -364,7 +454,7 @@ function RolesAndPermissions() {
       icon={faShieldAlt}
       iconColor="#6366f1"
       backPath="/settings"
-      loading={{ isLoading: loading || permissionsLoading, message: tu('loading', 'Loading roles...') }}
+      loading={{ isLoading: loading, message: tu('loading', 'Loading roles...') }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       search={{
         placeholder: tu('searchPlaceholder', 'Search roles...'),
@@ -450,6 +540,22 @@ function RolesAndPermissions() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingItem || !editFormData.name.trim()}
+        footerActions={
+          editingItem ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingItem);
+              }}
+              disabled={isSubmitting}
+            >
+              <FontAwesomeIcon icon={faTrash} className="mr-2" />
+              {tu('editDialog.delete', 'Delete')}
+            </Button>
+          ) : null
+        }
       >
         {editingItem && (
           <div className="grid gap-4">
@@ -490,19 +596,32 @@ function RolesAndPermissions() {
         open={isPermissionsDialogOpen}
         onOpenChange={setIsPermissionsDialogOpen}
         type="custom"
-        contentClassName="max-w-6xl"
+        contentClassName="max-w-4xl"
         title={tu('permissionsDialog.title', 'Assign permissions')}
-        description={selectedRoleName ? tu('permissionsDialog.description', `Configure permissions for "${selectedRoleName}"`) : tu('permissionsDialog.description', 'Configure permissions')}
+        description={selectedRoleName ? tu('permissionsDialog.description', 'Configure permissions for "{roleName}"').replace('{roleName}', selectedRoleName) : tu('permissionsDialog.description', 'Configure permissions')}
         onSubmit={(e) => { e.preventDefault(); handleSavePermissions(); }}
         isSubmitting={isSavingPerms}
         submitDisabled={isSavingPerms || !selectedRoleId}
         submitText={tu('permissionsDialog.save', 'Save')}
       >
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div className="text-sm text-muted-foreground">
-            {isLoadingRolePerms
-              ? tu('permissionsDialog.loading', 'Loading permissions...')
-              : tu('permissionsDialog.hint', 'Select the permissions for this role')}
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={activePermTab === 'general' ? 'default' : 'outline'}
+              onClick={() => setActivePermTab('general')}
+            >
+              {tu('permissionsDialog.tabGeneral', 'General')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activePermTab === 'settings' ? 'default' : 'outline'}
+              onClick={() => setActivePermTab('settings')}
+            >
+              {tu('permissionsDialog.tabSettings', 'Settings')}
+            </Button>
           </div>
           <div className="flex gap-2">
             <Button
@@ -525,30 +644,42 @@ function RolesAndPermissions() {
             </Button>
           </div>
         </div>
-        <div className="flex mb-3 gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={activePermTab === 'general' ? 'default' : 'outline'}
-            onClick={() => setActivePermTab('general')}
-          >
-            {tu('permissionsDialog.tabGeneral', 'General')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={activePermTab === 'settings' ? 'default' : 'outline'}
-            onClick={() => setActivePermTab('settings')}
-          >
-            {tu('permissionsDialog.tabSettings', 'Settings')}
-          </Button>
-        </div>
-        <div className="max-h-[70vh] overflow-auto pr-2">
-          <div className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
-            {(activePermTab === 'general' ? generalGroups : settingsGroups).map(({ group, perms }) => (
-              <div key={group} className="border rounded-lg p-1.5 bg-muted/30">
-                <div className="font-semibold mb-3 capitalize text-center">{group}</div>
-                <div className="grid gap-2">
+        <div className={`max-h-[65vh] overflow-auto pr-2 space-y-4 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
+          {(activePermTab === 'general' ? generalGroups : settingsGroups).map(({ group, perms }) => {
+            const { selectedCount, isAllSelected } = getGroupSelectionState(perms);
+            return (
+              <div key={group} className="border rounded-lg bg-muted/30 overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/60">
+                  <div className="flex items-center gap-3">
+                    <div className="font-semibold text-base capitalize">{group}</div>
+                    <span className="text-xs text-muted-foreground px-2 py-0.5 bg-background/60 rounded border">
+                      {selectedCount}/{perms.length}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isAllSelected ? "default" : "outline"}
+                      onClick={() => handleSelectGroup(perms)}
+                      disabled={perms.length === 0 || isLoadingRolePerms}
+                      className="h-8"
+                    >
+                      {tu('permissionsDialog.selectGroupAll', 'All')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleClearGroup(perms)}
+                      disabled={selectedCount === 0 || isLoadingRolePerms}
+                      className="h-8"
+                    >
+                      {tu('permissionsDialog.selectGroupNone', 'None')}
+                    </Button>
+                  </div>
+                </div>
+                <div className="p-3 grid gap-2 sm:grid-cols-2">
                   {perms.map((perm) => {
                     const raw = (perm as any).key || perm.name || [perm.action, perm.resource].filter(Boolean).join('-');
                     const tokens = (raw || '').replace(/[.:/]/g, '-').split('-').filter(Boolean);
@@ -558,33 +689,31 @@ function RolesAndPermissions() {
                     return (
                       <label
                         key={perm.id}
-                        className="w-full min-w-0 flex items-center gap-2 justify-start rounded border border-border/70 bg-background px-3.5 py-2 cursor-pointer"
+                        className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-all ${
+                          selectedPermIds.has(String(perm.id))
+                            ? 'bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100'
+                            : 'bg-background border-border hover:bg-muted/50'
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedPermIds.has(String(perm.id))}
                           onChange={() => togglePermission(perm.id)}
-                          className="h-4 w-4 accent-primary"
+                          className="h-4 w-4 accent-primary shrink-0"
                         />
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span
-                            className={`inline-flex shrink-0 min-w-[80px] justify-center items-center rounded-md px-2 py-1 text-[11px] font-semibold tracking-wide uppercase border ${
-                              selectedPermIds.has(String(perm.id))
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
-                          >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm uppercase tracking-wide text-foreground">
                             {displayName}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate">{perm.name}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{perm.name}</div>
                         </div>
                       </label>
                     );
                   })}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </SettingsDialog>
 
@@ -594,12 +723,12 @@ function RolesAndPermissions() {
         onOpenChange={handleCloseDeleteDialog}
         type="delete"
         title={tu('deleteDialog.title', 'Delete Role')}
-        description={deletingItem ? tu('deleteDialog.description', `Are you sure you want to delete the role "${deletingItem.name}"? This action cannot be undone.`) : undefined}
+        description={deletingItem ? tu('deleteDialog.description', 'Are you sure you want to delete the role "{name}"? This action cannot be undone.').replace('{name}', deletingItem.name || '') : undefined}
         onConfirm={() => deletingItem ? deleteItem(deletingItem.id) : undefined}
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={!deletingItem}
-        entityName="role"
+        entityName={tu('deleteDialog.entityName', 'role')}
         entityData={deletingItem as any}
         renderEntityPreview={(role: Role) => renderRolePreview(role)}
       />

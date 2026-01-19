@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
 import { genericActions } from '@/store/genericSlices';
+import { useAuth } from "@/providers/AuthProvider";
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";
@@ -132,10 +133,12 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
+  const { user, refetchUser } = useAuth();
   // Using async actions for workspace operations
 
   // Get current workspace from Redux store (slice only; no fetching)
   const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
+  
 
   // Get categories and custom fields from Redux store
   const { value: categories } = useSelector((state: RootState) => (state as any).categories as { value: any[] });
@@ -797,25 +800,27 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   }
 
   return (
-    <div className="h-full w-full p-4 pt-0 flex flex-col">
-      <div className="mb-3 flex-shrink-0">
-        <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+    <div className="h-full w-full p-4 pt-0 flex flex-col items-center">
+      <div className="w-full max-w-2xl flex flex-col h-full">
+        <div className="mb-3 flex-shrink-0">
+          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+        </div>
+
+        {/* Table density control moved into Overview tab */}
+
+        <UrlTabs
+          tabs={settingsTabs}
+          defaultValue="display"
+          basePath={`/workspace/${workspaceId}/settings`}
+          pathMap={{ display: '', overview: '/overview', users: '/users', filters: '/creation' }}
+          className="w-full h-full flex flex-col"
+          onValueChange={(value) => {
+            const typed = (value || 'display') as 'overview' | 'users' | 'filters' | 'display';
+            setPrevActiveTab(activeTab);
+            setActiveTab(typed);
+          }}
+        />
       </div>
-
-      {/* Table density control moved into Overview tab */}
-
-      <UrlTabs
-        tabs={settingsTabs}
-        defaultValue="display"
-        basePath={`/workspace/${workspaceId}/settings`}
-        pathMap={{ display: '', overview: '/overview', users: '/users', filters: '/creation' }}
-        className="w-full h-full flex flex-col"
-        onValueChange={(value) => {
-          const typed = (value || 'display') as 'overview' | 'users' | 'filters' | 'display';
-          setPrevActiveTab(activeTab);
-          setActiveTab(typed);
-        }}
-      />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { AppDispatch } from './store';
-import { genericActions, genericCaches } from './genericSlices';
+import { genericInternalActions, genericCaches } from './genericSlices';
 import { getTasksFromIndexedDB } from './reducers/tasksSlice';
+import { fetchRoles } from './reducers/rolesSlice';
 import { TasksCache } from './indexedDB/TasksCache';
 import { GenericCache } from './indexedDB/GenericCache';
 import { DB } from './indexedDB/DB';
-import apiClient from '../api/whagonsApi';
+import { api as apiClient } from './api/internalApi';
 import { verifyManifest } from '../lib/manifestVerify';
 
 const coreKeys = [
@@ -17,18 +18,61 @@ const coreKeys = [
   'statusTransitionGroups',
   'priorities',
   'slas',
+  'slaPolicies',
+  'slaAlerts',
   'approvals',
   'approvalApprovers',
+  'taskApprovalInstances',
   'spots',
+  'spotTypes',
   'users',
   'userTeams',
   'invitations',
   'jobPositions',
   'forms',
+  'formFields',
   'formVersions',
+  'taskForms',
+  'fieldOptions',
   'customFields',
   'categoryCustomFields',
+  'spotCustomFields',
+  'templateCustomFields',
+  'taskCustomFieldValues',
+  'spotCustomFieldValues',
   'tags',
+  'taskTags',
+  'taskUsers',
+  'taskShares',
+  'taskLogs',
+  'statusTransitionLogs',
+  'taskAttachments',
+  'taskNotes',
+  'taskRecurrences',
+  'categoryPriorities',
+  'broadcasts',
+  'broadcastAcknowledgments',
+  'boards',
+  'boardMembers',
+  'boardMessages',
+  'boardAttachments',
+  'workspaceChat',
+  'messages',
+  'workflows',
+  'exceptions',
+  'sessionLogs',
+  'configLogs',
+  // Plugin tables
+  'plugins',
+  'pluginRoutes',
+  'complianceStandards',
+  'complianceRequirements',
+  'complianceMappings',
+  'complianceAudits',
+  // Schedule Management
+  'scheduleTemplates',
+  'scheduleTemplateDays',
+  'userSchedules',
 ] as const;
 
 export class DataManager {
@@ -37,7 +81,7 @@ export class DataManager {
   async loadCoreFromIndexedDB() {
     await Promise.allSettled(
       coreKeys.map(async (key) => {
-        const actions = (genericActions as any)[key];
+        const actions = (genericInternalActions as any)[key];
         if (actions?.getFromIndexedDB) {
           return this.dispatch(actions.getFromIndexedDB());
         } else {
@@ -47,9 +91,12 @@ export class DataManager {
       })
     );
     await this.dispatch(getTasksFromIndexedDB());
+    // Fetch roles (not a wh_* table, no IndexedDB cache)
+    await this.dispatch(fetchRoles());
   }
 
   async validateAndRefresh() {
+    console.log('🔍 [DataManager] validateAndRefresh() CALLED');
     // Batch validate all entities (including tasks) using ONE batch endpoint call
     // Retry logic for transient DB closure errors
     const maxRetries = 2;
@@ -82,8 +129,14 @@ export class DataManager {
         await Promise.all([
           // 1. Generic caches (batched)
           GenericCache.validateMultiple(caches, ['wh_tasks'])
-            .then(res => console.log('[DataManager] Generic validation finished', Object.keys(res.results).length))
-            .catch(e => console.warn('DataManager: generic cache batch failed', e)),
+            .then(res => {
+              console.log('[DataManager] Generic validation finished', Object.keys(res.results).length);
+              return res;
+            })
+            .catch(e => {
+              console.warn('DataManager: generic cache batch failed', e);
+              return null;
+            }),
 
           // 2. Tasks cache (independent)
           (async () => {
@@ -106,7 +159,7 @@ export class DataManager {
         // Refresh all entities from IndexedDB
         await Promise.allSettled(
           coreKeys.map(async (key) => {
-            const actions = (genericActions as any)[key];
+            const actions = (genericInternalActions as any)[key];
             if (actions?.getFromIndexedDB) {
               return this.dispatch(actions.getFromIndexedDB());
             } else {
