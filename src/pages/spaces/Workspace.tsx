@@ -494,7 +494,6 @@ export const Workspace = () => {
   // Clear cache when workspace ID changes
   useEffect(() => {
     if (id) {
-      console.log(`Switching to workspace ${id}, clearing cache`);
       rowCache.current.clear();
     }
   }, [id, location.pathname]);

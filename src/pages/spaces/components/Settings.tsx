@@ -165,15 +165,6 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     ) || null;
   }, [workspaceId, workspaces]);
 
-  // Debug logging
-  console.log('Workspace matching debug:', {
-    workspaceId,
-    workspaceIdType: typeof workspaceId,
-    workspacesLength: workspaces.length,
-    workspaceIds: workspaces.map((w: any) => ({ id: w.id, idType: typeof w.id, name: w.name })),
-    currentWorkspace: currentWorkspace ? { id: currentWorkspace.id, name: currentWorkspace.name } : null,
-    pathname: location.pathname
-  });
 
   // Convert workspace to WorkspaceInfo format
   const workspaceInfo: WorkspaceInfo | null = currentWorkspace ? {

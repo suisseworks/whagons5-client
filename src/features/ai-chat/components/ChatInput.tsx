@@ -2,10 +2,6 @@ import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { ContentItem, ImageData, PdfData } from "../models";
 import WaveIcon from "./WaveIcon";
 import { api } from "@/store/api/internalApi";
-import { getEnvVariables } from "@/lib/getEnvVariables";
-
-const { VITE_API_URL } = getEnvVariables();
-const HOST = VITE_API_URL || window.location.origin;
 
 interface ChatInputProps {
   onSubmit: (content: string | ContentItem[]) => void;
@@ -28,9 +24,6 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
   const [textInput, setTextInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [pendingUploads, setPendingUploads] = useState(0);
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [isModelMenuOpen, setIsModelMenuOpen] = useState<boolean>(false);
-  const [availableModels, setAvailableModels] = useState<Array<{id: string; display_name: string; provider: string; description: string}>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement | null>(null);
   
@@ -42,21 +35,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
       ref(element);
     } else if (ref && 'current' in ref) {
       // Type assertion for mutable ref object - refs from useRef are mutable
-      // @ts-expect-error - refs from useRef are mutable, but TypeScript infers readonly in forwardRef
-      ref.current = element;
+      (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
     }
   };
 
   const loadModelsAndConversation = async () => {
-    try {
-      // For now, skip model loading - can be added later
-      // const modelsResp = await api.get(`${HOST}/api/v1/models`);
-      // if (modelsResp.data?.models) {
-      //   setAvailableModels(modelsResp.data.models);
-      // }
-    } catch (e) {
-      // ignore
-    }
+    // Model loading can be added here later if needed
   };
 
   useEffect(() => {

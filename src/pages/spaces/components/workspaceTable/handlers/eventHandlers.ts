@@ -10,8 +10,6 @@ export interface EventHandlerRefs {
 export const setupTaskEventHandlers = (refs: EventHandlerRefs) => {
   const { refreshGrid, workspaceId } = refs;
 
-  console.log(`Setting up task event handlers for workspace: ${workspaceId}`);
-
   // Debounce refresh calls to prevent rapid-fire refreshes
   let refreshTimeout: NodeJS.Timeout | null = null;
   const debouncedRefresh = () => {
@@ -25,22 +23,18 @@ export const setupTaskEventHandlers = (refs: EventHandlerRefs) => {
   };
 
   const unsubscribeCreated = TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, (data) => {
-    console.log('Task created, refreshing grid:', data);
     debouncedRefresh();
   });
 
   const unsubscribeUpdated = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, (data) => {
-    console.log('Task updated, refreshing grid:', data);
     debouncedRefresh();
   });
 
   const unsubscribeDeleted = TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, (data) => {
-    console.log('Task deleted, refreshing grid:', data);
     debouncedRefresh();
   });
 
   const unsubscribeBulkUpdate = TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, () => {
-    console.log('Bulk task update, refreshing grid');
     // Only refresh if we're viewing shared tasks or all workspaces
     // This prevents unnecessary refreshes when viewing a specific workspace
     if (workspaceId === 'shared' || workspaceId === 'all') {
@@ -49,13 +43,11 @@ export const setupTaskEventHandlers = (refs: EventHandlerRefs) => {
   });
 
   const unsubscribeInvalidate = TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, () => {
-    console.log('Cache invalidated, refreshing grid');
     debouncedRefresh();
   });
 
   // Return cleanup function
   return () => {
-    console.log(`Cleaning up task event handlers for workspace: ${workspaceId}`);
     if (refreshTimeout) {
       clearTimeout(refreshTimeout);
       refreshTimeout = null;

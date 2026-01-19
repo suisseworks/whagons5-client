@@ -43,10 +43,8 @@ export function useGridRefresh(opts: {
 
   const refreshGrid = useCallback(async () => {
     if (!modulesLoaded || !gridRef.current?.api) return;
-    console.log('[WT Filters] refreshGrid: mode =', useClientSide ? 'client' : 'infinite');
 
     if (suppressPersistRef.current) {
-      console.log('[WT Filters] Skipping refresh while restoring filters');
       return;
     }
 
@@ -67,9 +65,6 @@ export function useGridRefresh(opts: {
           taskTagsRef,
           sortModel,
         });
-        if (debugFilters.current) {
-          console.log('[WT Filters] client-side refresh rows=', rows.length, 'totalFiltered=', totalFiltered);
-        }
 
         setClientRows(rows);
         gridRef.current.api.refreshClientSideRowModel?.('everything');

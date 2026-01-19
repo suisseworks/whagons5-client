@@ -44,7 +44,6 @@ export function applyEncryptionConfig(): void {
   import('../store/indexedDB/DB').then(({ DB }) => {
     DISABLED_ENCRYPTION_STORES.forEach(storeName => {
       DB.setEncryptionForStore(storeName, false);
-      console.log(`[EncryptionConfig] Disabled encryption for store: ${storeName}`);
     });
   }).catch(error => {
     console.error('[EncryptionConfig] Failed to apply encryption config:', error);
@@ -79,7 +78,6 @@ export function getEncryptionConfig(): Record<string, boolean> {
 export function disableEncryptionForStore(storeName: string): void {
   import('../store/indexedDB/DB').then(({ DB }) => {
     DB.setEncryptionForStore(storeName, false);
-    console.log(`[EncryptionConfig] Disabled encryption for store: ${storeName}`);
   });
 }
 
@@ -90,6 +88,5 @@ export function disableEncryptionForStore(storeName: string): void {
 export function enableEncryptionForStore(storeName: string): void {
   import('../store/indexedDB/DB').then(({ DB }) => {
     DB.setEncryptionForStore(storeName, true);
-    console.log(`[EncryptionConfig] Enabled encryption for store: ${storeName}`);
   });
 }

@@ -37,17 +37,13 @@ export function useWorkspaceChange(opts: {
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const taskCount = countResp?.rowCount ?? 0;
         
-        console.log(`[WorkspaceTable] Workspace changed to ${workspaceId}, found ${taskCount} tasks in cache`);
-        
         // If no tasks found and we're viewing a specific workspace (not 'all'), 
         // try fetching from API to ensure cache is up to date
         if (taskCount === 0 && workspaceId !== 'all' && workspaceId !== 'shared') {
-          console.log(`[WorkspaceTable] No tasks found for workspace ${workspaceId}, fetching from API...`);
           try {
             await TasksCache.fetchTasks();
-            console.log(`[WorkspaceTable] Fetch completed, refreshing grid...`);
           } catch (fetchError) {
-            console.warn(`[WorkspaceTable] Failed to fetch tasks from API:`, fetchError);
+            // Silently fail - cache will be updated on next validation
           }
         }
         
@@ -56,7 +52,7 @@ export function useWorkspaceChange(opts: {
           refreshGrid();
         }
       } catch (error) {
-        console.error(`[WorkspaceTable] Error checking workspace tasks:`, error);
+        // Silently handle errors - grid will refresh anyway
         // Still try to refresh grid even if check failed
         if (gridRef.current?.api) {
           refreshGrid();

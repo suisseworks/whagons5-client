@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signInWithGoogle, signInWithEmail, linkGoogleProvider } from './auth';
 import { updateAuthToken } from '@/api/whagonsApi';
 import { actionsApi } from '@/api/whagonsActionsApi';
-import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
+import { AuthError, AuthErrorCodes, GoogleAuthProvider } from 'firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { InitializationStage } from '@/types/user';
 import { useAuth } from '@/providers/AuthProvider';
