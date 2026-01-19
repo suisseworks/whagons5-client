@@ -1404,6 +1404,61 @@ export const esTranslations: Record<string, string> = {
   "plugins.contactSalesButton": "Contactar Ventas",
   "plugins.pluginInquirySubject": "Consulta de Complemento: {title}",
   
+  // KPI Cards plugin translations
+  "plugins.kpiCards.title": "Tarjetas KPI Personalizadas",
+  "plugins.kpiCards.description": "Crea tarjetas de métricas personalizadas para espacios de trabajo",
+  
+  // KPI Cards settings translations
+  "kpiCards.title": "Tarjetas KPI Personalizadas",
+  "kpiCards.description": "Crea y gestiona tarjetas de métricas personalizadas para paneles de espacios de trabajo",
+  "kpiCards.addCard": "Agregar Tarjeta",
+  "kpiCards.noCards": "Sin Tarjetas KPI",
+  "kpiCards.noCardsDescription": "Crea tu primera tarjeta KPI personalizada para comenzar",
+  "kpiCards.dragToReorder": "Arrastra las tarjetas para reordenarlas",
+  "kpiCards.confirmDelete": "¿Estás seguro de que deseas eliminar esta tarjeta KPI?",
+  "kpiCards.deleted": "Tarjeta KPI eliminada exitosamente",
+  "kpiCards.enabled": "Tarjeta KPI habilitada",
+  "kpiCards.disabled": "Tarjeta KPI deshabilitada",
+  "kpiCards.updated": "Tarjeta KPI actualizada exitosamente",
+  "kpiCards.created": "Tarjeta KPI creada exitosamente",
+  "kpiCards.reordered": "Tarjetas reordenadas exitosamente",
+  "kpiCards.global": "Global",
+  
+  // KPI Card types
+  "kpiCards.types.taskCount": "Conteo de Tareas",
+  "kpiCards.types.taskPercentage": "Porcentaje",
+  "kpiCards.types.trend": "Tendencia (7 días)",
+  "kpiCards.types.customQuery": "Consulta Personalizada",
+  "kpiCards.types.external": "Externo",
+  
+  // KPI Card Builder translations
+  "kpiCards.builder.createTitle": "Crear Tarjeta KPI",
+  "kpiCards.builder.editTitle": "Editar Tarjeta KPI",
+  "kpiCards.builder.description": "Paso {step} de 3",
+  "kpiCards.builder.name": "Nombre de la Tarjeta",
+  "kpiCards.builder.namePlaceholder": "Mi KPI Personalizado",
+  "kpiCards.builder.type": "Tipo de Tarjeta",
+  "kpiCards.builder.workspace": "Ámbito del Espacio de Trabajo",
+  "kpiCards.builder.allWorkspaces": "Todos los Espacios de Trabajo",
+  "kpiCards.builder.queryConfigDescription": "Configura la consulta de datos para esta tarjeta KPI",
+  "kpiCards.builder.filters": "Filtros",
+  "kpiCards.builder.filtersDescription": "Selecciona qué tareas contar",
+  "kpiCards.builder.statusFilter": "Filtro de Estado",
+  "kpiCards.builder.days": "Número de Días",
+  "kpiCards.builder.customQuery": "Configuración de Consulta (JSON)",
+  "kpiCards.builder.color": "Tema de Color",
+  "kpiCards.builder.helperText": "Texto de Ayuda (Opcional)",
+  "kpiCards.builder.helperTextPlaceholder": "Información adicional...",
+  "kpiCards.builder.preview": "Vista Previa",
+  "kpiCards.builder.untitled": "Tarjeta Sin Título",
+  "kpiCards.builder.noHelperText": "Sin texto de ayuda",
+  
+  // Settings plugins tab
+  "settings.tabs.plugins": "Complementos",
+  "settings.plugins.description": "Configura ajustes para complementos habilitados",
+  "settings.plugins.noPlugins": "Ningún complemento requiere configuración",
+  "settings.plugins.noPluginsDescription": "Habilita complementos en el panel de administración para verlos aquí",
+  
   // Common translations
   "common.back": "Volver",
   "common.cancel": "Cancelar",

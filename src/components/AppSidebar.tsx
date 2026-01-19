@@ -21,6 +21,8 @@ import {
   Sparkles,
   Bell, // Add Bell icon for broadcasts
   Activity, // Add Activity icon
+  BarChart3, // Add BarChart3 icon for KPI Cards
+  Trophy, // Add Trophy icon for gamification
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -129,6 +131,24 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     icon: FileText,
     iconColor: '#10b981', // emerald-500 to match plugin card
     route: '/compliance/standards',
+  },
+  {
+    id: 'kpi-cards',
+    enabled: true,
+    pinned: false,
+    name: 'KPI Cards',
+    icon: BarChart3,
+    iconColor: '#3b82f6', // blue-500
+    route: '/settings/kpi-cards/manage',
+  },
+  {
+    id: 'gamification',
+    enabled: true,
+    pinned: false,
+    name: 'Gamification',
+    icon: Trophy,
+    iconColor: '#a855f7', // purple-500
+    route: '/gamification',
   },
 ];
 
@@ -709,8 +729,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     });
   }, [pluginsConfig, pinnedPluginsOrder]);
   
-  // Include boards in unpinned plugins when it's unpinned (so it appears in "More" menu)
-  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned && p.id !== 'activity');
+  // Plugins that are not visible in sidebar (pinned=false) are not shown anywhere
+  const unpinnedPlugins: PluginConfig[] = [];
 
   // Check if boards plugin is enabled and pinned
   const boardsPluginEnabled = useMemo(() => {
@@ -907,7 +927,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <SidebarGroup style={{ flexShrink: 0 }}>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1">
-                  {/* Unpinned plugins */}
+                  {/* Plugins with "Visible in sidebar" off are not shown here */}
                   {unpinnedPlugins.map(plugin => (
                     <PluginMenuItem 
                       key={plugin.id} 

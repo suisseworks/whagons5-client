@@ -302,10 +302,10 @@ function PluginSettings() {
 							<div className="space-y-0.5">
 								<div className="font-medium flex items-center gap-2">
 									{currentPlugin.pinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
-									{t('plugins.pinned', 'Pinned')}
+									{t('plugins.visibleInSidebar', 'Visible in sidebar')}
 								</div>
 								<div className="text-sm text-muted-foreground">
-									{t('plugins.pinnedDescription', 'Pin this plugin above More/Less in the sidebar')}
+									{t('plugins.visibleInSidebarDescription', 'Show this plugin in the sidebar. When off, it will not appear in the navbar.')}
 								</div>
 							</div>
 							<Switch

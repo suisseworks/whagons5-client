@@ -60,17 +60,6 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
       const users = getUsersFromIds(userIds, userMap) || [];
       if (users.length === 0) return (
         <div className="flex items-center h-full py-1">
-          <button
-            className="text-sm text-muted-foreground hover:text-foreground underline-offset-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              try {
-                window.dispatchEvent(new CustomEvent('wh:assignOwners', { detail: { taskId: p.data?.id } }));
-              } catch {}
-            }}
-          >
-            Assign
-          </button>
         </div>
       );
       const displayUsers = users.slice(0, 3);

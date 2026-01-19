@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.12.0';
+const CURRENT_DB_VERSION = '1.13.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -256,6 +256,15 @@ export class DB {
           if (!db.objectStoreNames.contains('plugin_routes')) {
             const store = db.createObjectStore('plugin_routes', { keyPath: 'id' });
             store.createIndex('plugin_id', 'plugin_id', { unique: false });
+          }
+          
+          // KPI Cards
+          if (!db.objectStoreNames.contains('kpi_cards')) {
+            const store = db.createObjectStore('kpi_cards', { keyPath: 'id' });
+            store.createIndex('workspace_id', 'workspace_id', { unique: false });
+            store.createIndex('user_id', 'user_id', { unique: false });
+            store.createIndex('is_enabled', 'is_enabled', { unique: false });
+            store.createIndex('position', 'position', { unique: false });
           }
 
           // Custom Fields & Values

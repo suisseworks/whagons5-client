@@ -5,8 +5,9 @@ import { useSelector, useDispatch } from "react-redux";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { motion } from 'motion/react';
-import { Search, Clock } from "lucide-react";
+import { Search, Clock, X } from "lucide-react";
 import { SETTINGS_TAB_ANIMATION, getSettingsTabInitialX } from '@/config/tabAnimation';
 import type { SettingsTabKey } from '@/config/tabAnimation';
 
@@ -28,7 +29,10 @@ import {
   faTrophy,
   faSquareCheck,
   faLayerGroup,
-  faStar as faStarSolid
+  faChartBar,
+  faStar as faStarSolid,
+  faBell,
+  faFileAlt
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
 import { RootState } from "@/store/store";
@@ -266,8 +270,9 @@ function Settings() {
   const { t } = useLanguage();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Search state
+  // Unified search state
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   // Load last selected tab from localStorage, or default to 'basics'
   const [activeTab, setActiveTab] = useState<SettingsTabKey>(() => {
@@ -318,6 +323,7 @@ function Settings() {
       // Press Escape to clear search
       if (e.key === 'Escape' && searchQuery) {
         setSearchQuery('');
+        setIsSearchOpen(false);
         searchInputRef.current?.blur();
       }
     };
@@ -375,6 +381,7 @@ function Settings() {
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const tags = useSelector((s: RootState) => s.tags?.value ?? []);
   const workflows = useSelector((s: RootState) => (s as any).workflows?.value ?? []);
+  const plugins = useSelector((s: RootState) => (s as any).plugins?.value ?? []);
 
   const counts = useMemo(() => {
     return {
@@ -522,14 +529,6 @@ function Settings() {
       count: 0,
       description: t('settings.cards.motivation.description', 'Configure motivation and engagement settings'),
       color: 'text-yellow-500'
-    },
-    {
-      id: 'gamification',
-      title: t('settings.cards.gamification.title', 'Gamification'),
-      icon: faTrophy,
-      count: 0,
-      description: t('settings.cards.gamification.description', 'Set up gamification elements and rewards'),
-      color: 'text-purple-500'
     },
   ], [counts.slas, counts.forms, counts.workflows, t]);
 
@@ -820,9 +819,269 @@ function Settings() {
     );
   };
 
-  const filteredBasicSettings = useMemo(() => filterSettings(orderedBasicSettings), [orderedBasicSettings, searchQuery]);
-  const filteredAdvancedSettings = useMemo(() => filterSettings(orderedAdvancedSettings), [orderedAdvancedSettings, searchQuery]);
-  const filteredFavoriteSettings = useMemo(() => filterSettings(favoriteSettings), [favoriteSettings, searchQuery]);
+  // Don't filter settings cards - show all cards regardless of search
+  // Search only shows results in dropdown
+  const filteredBasicSettings = orderedBasicSettings;
+  const filteredAdvancedSettings = orderedAdvancedSettings;
+  const filteredFavoriteSettings = favoriteSettings;
+
+  // Search across all models
+  interface ModelSearchResult {
+    id: number;
+    name: string;
+    description?: string;
+    type: string;
+    typeLabel: string;
+    route: string;
+    icon: any;
+  }
+
+  // Search results - only individual items (users, templates, etc.), not settings cards
+  const unifiedSearchResults = useMemo(() => {
+    if (!searchQuery.trim()) return { models: [] };
+    const query = searchQuery.toLowerCase().trim();
+
+    // Search models only (individual items)
+    const results: ModelSearchResult[] = [];
+
+    // Search templates
+    templates.forEach((template: any) => {
+      if (
+        template.name?.toLowerCase().includes(query) ||
+        template.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          type: 'templates',
+          typeLabel: 'Templates',
+          route: '/settings/templates',
+          icon: faClipboardList
+        });
+      }
+    });
+
+    // Search categories
+    categories.forEach((category: any) => {
+      if (
+        category.name?.toLowerCase().includes(query) ||
+        category.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: category.id,
+          name: category.name,
+          description: category.description,
+          type: 'categories',
+          typeLabel: 'Categories',
+          route: '/settings/categories',
+          icon: faLayerGroup
+        });
+      }
+    });
+
+    // Search tags
+    tags.forEach((tag: any) => {
+      if (tag.name?.toLowerCase().includes(query)) {
+        results.push({
+          id: tag.id,
+          name: tag.name,
+          description: tag.description,
+          type: 'tags',
+          typeLabel: 'Tags',
+          route: '/settings/tags',
+          icon: faTags
+        });
+      }
+    });
+
+    // Search users
+    users.forEach((user: any) => {
+      if (
+        user.name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: user.id,
+          name: user.name || user.email,
+          description: user.email !== user.name ? user.email : undefined,
+          type: 'users',
+          typeLabel: 'Users',
+          route: '/settings/users',
+          icon: faUser
+        });
+      }
+    });
+
+    // Search teams
+    teams.forEach((team: any) => {
+      if (
+        team.name?.toLowerCase().includes(query) ||
+        team.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: team.id,
+          name: team.name,
+          description: team.description,
+          type: 'teams',
+          typeLabel: 'Teams',
+          route: '/settings/teams',
+          icon: faUsers
+        });
+      }
+    });
+
+    // Search workspaces
+    workspaces.forEach((workspace: any) => {
+      if (
+        workspace.name?.toLowerCase().includes(query) ||
+        workspace.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: workspace.id,
+          name: workspace.name,
+          description: workspace.description,
+          type: 'workspaces',
+          typeLabel: 'Workspaces',
+          route: '/settings/workspaces',
+          icon: faDiagramProject
+        });
+      }
+    });
+
+    // Search spots
+    spots.forEach((spot: any) => {
+      if (
+        spot.name?.toLowerCase().includes(query) ||
+        spot.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: spot.id,
+          name: spot.name,
+          description: spot.description,
+          type: 'spots',
+          typeLabel: 'Spots',
+          route: '/settings/spots',
+          icon: faLocationDot
+        });
+      }
+    });
+
+    // Search statuses
+    statuses.forEach((status: any) => {
+      if (status.name?.toLowerCase().includes(query)) {
+        results.push({
+          id: status.id,
+          name: status.name,
+          description: status.action,
+          type: 'statuses',
+          typeLabel: 'Statuses',
+          route: '/settings/statuses',
+          icon: faSitemap
+        });
+      }
+    });
+
+    // Search priorities
+    priorities.forEach((priority: any) => {
+      if (priority.name?.toLowerCase().includes(query)) {
+        results.push({
+          id: priority.id,
+          name: priority.name,
+          type: 'priorities',
+          typeLabel: 'Priorities',
+          route: '/settings/priorities',
+          icon: faArrowUpWideShort
+        });
+      }
+    });
+
+    // Search SLAs
+    slas.forEach((sla: any) => {
+      if (
+        sla.name?.toLowerCase().includes(query) ||
+        sla.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: sla.id,
+          name: sla.name || `SLA ${sla.id}`,
+          description: sla.description,
+          type: 'slas',
+          typeLabel: 'SLAs',
+          route: '/settings/slas',
+          icon: faStopwatch
+        });
+      }
+    });
+
+    // Search forms
+    forms.forEach((form: any) => {
+      if (
+        form.name?.toLowerCase().includes(query) ||
+        form.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: form.id,
+          name: form.name,
+          description: form.description,
+          type: 'forms',
+          typeLabel: 'Forms',
+          route: '/settings/forms',
+          icon: faClipboardList
+        });
+      }
+    });
+
+    // Search approvals
+    approvals.forEach((approval: any) => {
+      if (
+        approval.name?.toLowerCase().includes(query) ||
+        approval.description?.toLowerCase().includes(query)
+      ) {
+        results.push({
+          id: approval.id,
+          name: approval.name,
+          description: approval.description,
+          type: 'approvals',
+          typeLabel: 'Approvals',
+          route: '/settings/approvals',
+          icon: faSquareCheck
+        });
+      }
+    });
+
+    // Group results by type
+    const grouped = results.reduce((acc, result) => {
+      if (!acc[result.type]) {
+        acc[result.type] = [];
+      }
+      acc[result.type].push(result);
+      return acc;
+    }, {} as Record<string, ModelSearchResult[]>);
+
+    // Sort results within each group by name
+    Object.keys(grouped).forEach(key => {
+      grouped[key].sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    // Limit results per type to 5
+    const limited: ModelSearchResult[] = [];
+    Object.keys(grouped).forEach(key => {
+      limited.push(...grouped[key].slice(0, 5));
+    });
+
+    return {
+      models: limited
+    };
+  }, [searchQuery, templates, categories, tags, users, teams, workspaces, spots, statuses, priorities, slas, forms, approvals]);
+
+  const handleUnifiedSearchResultClick = (result: ModelSearchResult) => {
+    trackSettingAccess(result.type);
+    setSearchQuery('');
+    setIsSearchOpen(false);
+    // Navigate with edit parameter to open the item automatically
+    navigate(`${result.route}?edit=${result.id}`);
+  };
 
   // Get recently accessed settings
   const recentSettings = useMemo(() => {
@@ -901,9 +1160,6 @@ function Settings() {
       case 'motivation':
         navigate('/settings/motivation');
         break;
-      case 'gamification':
-        navigate('/settings/gamification');
-        break;
       default:
         console.log(`Unknown setting: ${settingId}`);
     }
@@ -934,23 +1190,13 @@ function Settings() {
           <div className="space-y-4">
             {filteredFavoriteSettings.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
-                {searchQuery ? (
-                  <>
-                    <Search className="mb-3 h-8 w-8 text-muted-foreground" />
-                    <p className="font-medium">No favorites match your search</p>
-                    <p className="text-sm">Try a different search term</p>
-                  </>
-                ) : (
-                  <>
-                    <FontAwesomeIcon icon={faStarSolid} className="mb-3 text-2xl text-yellow-500" />
-                    <p className="font-medium">{favoritesEmptyLabel}</p>
-                    <p className="text-sm">{favoritesHelperLabel}</p>
-                  </>
-                )}
+                <FontAwesomeIcon icon={faStarSolid} className="mb-3 text-2xl text-yellow-500" />
+                <p className="font-medium">{favoritesEmptyLabel}</p>
+                <p className="text-sm">{favoritesHelperLabel}</p>
               </div>
             ) : (
               <>
-                {!searchQuery && <div className="text-sm text-muted-foreground">{dragHint}</div>}
+                <div className="text-sm text-muted-foreground">{dragHint}</div>
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -995,12 +1241,11 @@ function Settings() {
           transition={SETTINGS_TAB_ANIMATION.transition}
         >
           <div className="space-y-4">
-            {!searchQuery && <div className="text-sm text-muted-foreground">{dragHint}</div>}
+            <div className="text-sm text-muted-foreground">{dragHint}</div>
             {filteredBasicSettings.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
-                <Search className="mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="font-medium">No basic settings match your search</p>
-                <p className="text-sm">Try a different search term</p>
+                <FontAwesomeIcon icon={faCog} className="mb-3 text-4xl" />
+                <p className="font-medium">No basic settings</p>
               </div>
             ) : (
               <DndContext
@@ -1082,6 +1327,108 @@ function Settings() {
           </div>
         </motion.div>
       )
+    },
+    {
+      value: 'plugins',
+      label: t('settings.tabs.plugins', 'Plugins'),
+      content: (
+        <motion.div
+          className="space-y-4 flex-1 h-full"
+          key="plugins"
+          initial={{ x: getSettingsTabInitialX(prevActiveTab, 'plugins') }}
+          animate={{ x: 0 }}
+          transition={SETTINGS_TAB_ANIMATION.transition}
+        >
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              {t('settings.plugins.description', 'Configure settings for enabled plugins')}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {(() => {
+                // Plugin display info mapping
+                const pluginInfoMap: Record<string, { icon: any; color: string; settingsRoute: string; mainRoute?: string }> = {
+                  'kpi-cards': {
+                    icon: faChartBar,
+                    color: 'text-blue-500',
+                    settingsRoute: '/settings/kpi-cards',
+                    mainRoute: '/settings/kpi-cards/manage'
+                  },
+                  'gamification': {
+                    icon: faTrophy,
+                    color: 'text-purple-500',
+                    settingsRoute: '/settings/gamification',
+                    mainRoute: '/gamification'
+                  },
+                  'boards': {
+                    icon: faUsers,
+                    color: 'text-violet-500',
+                    settingsRoute: '/settings/boards',
+                    mainRoute: '/boards'
+                  },
+                  'broadcasts': {
+                    icon: faBell,
+                    color: 'text-red-500',
+                    settingsRoute: '/settings/broadcasts',
+                    mainRoute: '/broadcasts'
+                  },
+                  'compliance': {
+                    icon: faFileAlt,
+                    color: 'text-emerald-500',
+                    settingsRoute: '/settings/compliance',
+                    mainRoute: '/compliance/standards'
+                  },
+                };
+
+                // Get enabled plugins that have display info
+                const enabledPlugins = plugins.filter(p => p.is_enabled && pluginInfoMap[p.slug]);
+                
+                if (enabledPlugins.length === 0) {
+                  return (
+                    <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
+                      <FontAwesomeIcon icon={faCog} className="mb-3 text-4xl" />
+                      <p className="font-medium">{t('settings.plugins.noPlugins', 'No plugins require configuration')}</p>
+                      <p className="text-sm">{t('settings.plugins.noPluginsDescription', 'Enable plugins in the admin panel to see them here')}</p>
+                    </div>
+                  );
+                }
+
+                return enabledPlugins.map((plugin) => {
+                  const info = pluginInfoMap[plugin.slug];
+                  if (!info) return null;
+
+                  return (
+                    <Card
+                      key={plugin.slug}
+                      className="transition-all duration-300 hover:shadow-xl hover:scale-[1.03] hover:-translate-y-1 cursor-pointer h-[180px] overflow-hidden border-2 hover:border-primary/20"
+                      onClick={() => navigate(info.settingsRoute)}
+                    >
+                      <CardHeader className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className={`text-4xl ${info.color}`}>
+                            <FontAwesomeIcon icon={info.icon} />
+                          </div>
+                          <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
+                            Enabled
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <CardTitle className="text-2xl font-bold">
+                            {plugin.name || t(`plugins.${plugin.slug}.title`, plugin.slug)}
+                          </CardTitle>
+                          <CardDescription>
+                            {plugin.description || t(`plugins.${plugin.slug}.description`, '')}
+                          </CardDescription>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </motion.div>
+      )
     }
   ];
 
@@ -1116,30 +1463,112 @@ function Settings() {
             </div>
           </div>
           
-          {/* Search Bar */}
-          <div className="flex-shrink-0">
+          {/* Unified Search Bar */}
+          <div className="flex-shrink-0 relative">
             <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
               <Input
                 ref={searchInputRef}
-                placeholder="Search settings... (Press /)"
+                placeholder="Search settings & models... (Press /)"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearchQuery(value);
+                  setIsSearchOpen(value.length > 0);
+                }}
+                onFocus={() => {
+                  if (searchQuery.length > 0) {
+                    setIsSearchOpen(true);
+                  }
+                }}
+                onBlur={(e) => {
+                  // Don't close if clicking inside dropdown
+                  const relatedTarget = e.relatedTarget as HTMLElement;
+                  if (!relatedTarget?.closest('.search-dropdown')) {
+                    setTimeout(() => setIsSearchOpen(false), 200);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchQuery('');
+                    setIsSearchOpen(false);
+                    searchInputRef.current?.blur();
+                  }
+                }}
                 className="pl-9 pr-9 h-10"
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchQuery('');
+                    setIsSearchOpen(false);
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-10"
+                  aria-label="Clear search"
                 >
-                  Esc
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
-            {searchQuery && (
-              <p className="text-xs text-muted-foreground mt-1 text-right">
-                {filteredBasicSettings.length + filteredAdvancedSettings.length + filteredFavoriteSettings.length} results
-              </p>
+            {isSearchOpen && searchQuery.length > 0 && (
+              <div 
+                className="absolute top-full mt-2 right-0 w-96 bg-popover border border-border rounded-md shadow-lg z-[100] max-h-96 overflow-hidden"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                {unifiedSearchResults.models.length > 0 ? (
+                  <div className="max-h-96 overflow-y-auto">
+                    {Object.entries(
+                      unifiedSearchResults.models.reduce((acc, result) => {
+                        if (!acc[result.type]) {
+                          acc[result.type] = [];
+                        }
+                        acc[result.type].push(result);
+                        return acc;
+                      }, {} as Record<string, ModelSearchResult[]>)
+                    ).map(([type, results]) => (
+                      <div key={type} className="border-b last:border-b-0">
+                        <div className="px-3 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          {results[0].typeLabel} ({results.length})
+                        </div>
+                        {results.map((result) => (
+                          <button
+                            key={`${result.type}-${result.id}`}
+                            onClick={() => handleUnifiedSearchResultClick(result)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            className="w-full px-3 py-2 text-left hover:bg-accent transition-colors flex items-start gap-3 group"
+                          >
+                            <FontAwesomeIcon
+                              icon={result.icon}
+                              className="w-4 h-4 mt-0.5 text-muted-foreground group-hover:text-foreground transition-colors"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-foreground truncate">
+                                {result.name}
+                              </div>
+                              {result.description && (
+                                <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                  {result.description}
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <Search className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm font-medium text-foreground">No results found</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Try searching for templates, categories, users, teams, etc.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

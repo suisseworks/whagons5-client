@@ -100,6 +100,9 @@ const genericSliceConfigs = [
     // Plugin System
     { name: 'plugins', table: 'wh_plugins', endpoint: '/plugins', store: 'plugins', hashFields: ['id','slug','name','description','version','is_enabled','updated_at'] },
     { name: 'pluginRoutes', table: 'wh_plugin_routes', endpoint: '/plugin-routes', store: 'plugin_routes', hashFields: ['id','plugin_id','method','path','controller','action','updated_at'] },
+    
+    // KPI Cards (Custom dashboard metrics)
+    { name: 'kpiCards', table: 'wh_kpi_cards', endpoint: '/kpi-cards', store: 'kpi_cards', hashFields: ['id','name','type','query_config','display_config','position','is_enabled','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -171,6 +174,7 @@ export const {
     complianceAudits,
     plugins,
     pluginRoutes,
+    kpiCards,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -248,6 +252,7 @@ export const genericEventNames = {
     complianceAudits: genericSlices.slices.complianceAudits.eventNames,
     plugins: genericSlices.slices.plugins.eventNames,
     pluginRoutes: genericSlices.slices.pluginRoutes.eventNames,
+    kpiCards: genericSlices.slices.kpiCards.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -316,4 +321,5 @@ export const genericActions = {
     complianceAudits: genericSlices.slices.complianceAudits.actions,
     plugins: genericSlices.slices.plugins.actions,
     pluginRoutes: genericSlices.slices.pluginRoutes.actions,
+    kpiCards: genericSlices.slices.kpiCards.actions,
 } as const;

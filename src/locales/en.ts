@@ -152,6 +152,61 @@ export const enTranslations: Record<string, string> = {
   "plugins.customPluginDescription": "Create a custom plugin to organize and access your features",
   "plugins.untitled": "Untitled Plugin",
   
+  // KPI Cards plugin translations
+  "plugins.kpiCards.title": "Custom KPI Cards",
+  "plugins.kpiCards.description": "Create custom metrics cards for workspaces",
+  
+  // KPI Cards settings translations
+  "kpiCards.title": "Custom KPI Cards",
+  "kpiCards.description": "Create and manage custom metrics cards for workspace dashboards",
+  "kpiCards.addCard": "Add Card",
+  "kpiCards.noCards": "No KPI Cards",
+  "kpiCards.noCardsDescription": "Create your first custom KPI card to get started",
+  "kpiCards.dragToReorder": "Drag cards to reorder them",
+  "kpiCards.confirmDelete": "Are you sure you want to delete this KPI card?",
+  "kpiCards.deleted": "KPI card deleted successfully",
+  "kpiCards.enabled": "KPI card enabled",
+  "kpiCards.disabled": "KPI card disabled",
+  "kpiCards.updated": "KPI card updated successfully",
+  "kpiCards.created": "KPI card created successfully",
+  "kpiCards.reordered": "Cards reordered successfully",
+  "kpiCards.global": "Global",
+  
+  // KPI Card types
+  "kpiCards.types.taskCount": "Task Count",
+  "kpiCards.types.taskPercentage": "Percentage",
+  "kpiCards.types.trend": "Trend (7 days)",
+  "kpiCards.types.customQuery": "Custom Query",
+  "kpiCards.types.external": "External",
+  
+  // KPI Card Builder translations
+  "kpiCards.builder.createTitle": "Create KPI Card",
+  "kpiCards.builder.editTitle": "Edit KPI Card",
+  "kpiCards.builder.description": "Step {step} of 3",
+  "kpiCards.builder.name": "Card Name",
+  "kpiCards.builder.namePlaceholder": "My Custom KPI",
+  "kpiCards.builder.type": "Card Type",
+  "kpiCards.builder.workspace": "Workspace Scope",
+  "kpiCards.builder.allWorkspaces": "All Workspaces",
+  "kpiCards.builder.queryConfigDescription": "Configure the data query for this KPI card",
+  "kpiCards.builder.filters": "Filters",
+  "kpiCards.builder.filtersDescription": "Select which tasks to count",
+  "kpiCards.builder.statusFilter": "Status Filter",
+  "kpiCards.builder.days": "Number of Days",
+  "kpiCards.builder.customQuery": "Query Configuration (JSON)",
+  "kpiCards.builder.color": "Color Theme",
+  "kpiCards.builder.helperText": "Helper Text (Optional)",
+  "kpiCards.builder.helperTextPlaceholder": "Additional information...",
+  "kpiCards.builder.preview": "Preview",
+  "kpiCards.builder.untitled": "Untitled Card",
+  "kpiCards.builder.noHelperText": "No helper text",
+  
+  // Settings plugins tab
+  "settings.tabs.plugins": "Plugins",
+  "settings.plugins.description": "Configure settings for enabled plugins",
+  "settings.plugins.noPlugins": "No plugins require configuration",
+  "settings.plugins.noPluginsDescription": "Enable plugins in the admin panel to see them here",
+  
   // Profile translations
   "profile.title": "Profile",
   "profile.editProfile": "Edit Profile",

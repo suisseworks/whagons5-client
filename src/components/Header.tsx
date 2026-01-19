@@ -109,6 +109,7 @@ function Header() {
             'spot-types': 'Spot Types',
             boards: 'Boards',
             plugins: 'Plugins',
+            'kpi-cards': 'KPI Cards',
         };
         const getLabel = (seg: string, index: number) => {
             // Special handling for boards board ID
@@ -133,11 +134,19 @@ function Header() {
         } else if (parts[0] === 'settings' && parts.length > 1) {
             // For settings subpages, create breadcrumbs like: Settings > Subpage
             acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
-            for (let i = 1; i < parts.length; i++) {
-                const seg = parts[i];
-                path += `/${seg}`;
-                const label = getLabel(seg, i);
-                acc.push({ label, to: `/settings${path}` });
+            
+            // Special case for kpi-cards: Settings > Plugins > Custom KPI Cards
+            if (parts[1] === 'kpi-cards') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('kpiCards.title', 'Custom KPI Cards'), to: '/settings/kpi-cards/manage' });
+            } else {
+                // Regular settings subpages
+                for (let i = 1; i < parts.length; i++) {
+                    const seg = parts[i];
+                    path += `/${seg}`;
+                    const label = getLabel(seg, i);
+                    acc.push({ label, to: `/settings${path}` });
+                }
             }
         } else if (parts[0] === 'boards' && parts.length > 1) {
             // For boards, skip the "boards" segment and show: Board Name (or Board Name > Subpage)
@@ -855,10 +864,8 @@ function Header() {
                     <div className="flex items-center gap-4">
                         {/* Quick filter chips */}
                         <div className="flex items-center gap-2">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+                        <button 
+                            className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
                             title={t('workspace.filters.allTasks', 'All tasks')}
                             onClick={() => {
                                 dispatch(setFilterModel(null));
@@ -870,13 +877,11 @@ function Header() {
                             }}
                         >
                             {t('workspace.filters.all', 'All')}
-                        </Button>
+                        </button>
                         {quickPresets.map((p: any, idx: number) => (
-                            <Button
+                            <button
                                 key={p.id || idx}
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+                                className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
                                 title={p.name}
                                 onClick={() => {
                                     dispatch(setFilterModel(p.model));
@@ -888,29 +893,25 @@ function Header() {
                                 }}
                             >
                                 {p.name}
-                            </Button>
+                            </button>
                         ))}
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground"
+                        <button 
+                            className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
                             title={t('workspace.filters.customFilters', 'Custom filters')}
                             onClick={() => {
                                 window.dispatchEvent(new CustomEvent('workspace-filter-dialog-open', { detail: {} }));
                             }}
                         >
                             {t('workspace.filters.filters', 'Filters…')}
-                        </Button>
+                        </button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-8 px-3 rounded-lg text-[12px] text-foreground/70 border border-border/30 hover:bg-foreground/5 hover:text-foreground" 
+                                <button 
+                                    className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
                                     title={t('workspace.filters.morePresets', 'More presets')}
                                 >
                                     {t('workspace.filters.more', 'More…')}
-                                </Button>
+                                </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="min-w-[240px]">
                                 <DropdownMenuLabel>{t('workspace.filters.applyPreset', 'Apply preset')}</DropdownMenuLabel>
@@ -936,9 +937,13 @@ function Header() {
 
                         {/* Group by control */}
                         <div className="flex items-center gap-2 ml-auto">
-                            <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('workspace.group.group', 'Group')}</Label>
+                            <Label className="text-sm whitespace-nowrap font-semibold" style={{ color: '#000000' }}>{t('workspace.group.group', 'Group')}</Label>
                             <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
-                                <SelectTrigger size="sm" className="h-8 rounded-lg px-3 text-[12px] text-foreground/65 border-border/30 hover:bg-foreground/5 w-[120px]">
+                                <SelectTrigger size="sm" className="h-8 rounded-md px-3 text-sm font-semibold w-[120px] border" style={{ 
+                                    backgroundColor: '#ffffff', 
+                                    color: '#000000',
+                                    borderColor: '#9ca3af'
+                                }}>
                                     <SelectValue placeholder={t('workspace.group.group', 'Group')} />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -951,7 +956,7 @@ function Header() {
                             {groupBy !== 'none' && (
                                 <div className="flex items-center gap-2">
                                     <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
-                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">{t('workspace.group.collapse', 'Collapse')}</Label>
+                                    <Label className="text-sm whitespace-nowrap font-semibold" style={{ color: '#000000' }}>{t('workspace.group.collapse', 'Collapse')}</Label>
                                 </div>
                             )}
                         </div>

@@ -1839,3 +1839,88 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
   transform-style: preserve-3d;
 }
 
+/* New task row animation - flying in effect */
+@keyframes taskFlyIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-100px) scale(0.8) rotateX(-15deg);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 0.9;
+    transform: translateY(10px) scale(1.02) rotateX(2deg);
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0deg);
+    filter: blur(0);
+  }
+}
+
+.ag-theme-quartz .ag-row.wh-new-task-row,
+.ag-theme-quartz-dark .ag-row.wh-new-task-row,
+.wh-modern-grid .ag-row.wh-new-task-row,
+.wh-workspace-grid .ag-row.wh-new-task-row {
+  animation: taskFlyIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center top;
+  will-change: transform, opacity, filter;
+}
+
+/* Add a subtle glow effect during animation */
+.ag-theme-quartz .ag-row.wh-new-task-row .ag-cell,
+.ag-theme-quartz-dark .ag-row.wh-new-task-row .ag-cell,
+.wh-modern-grid .ag-row.wh-new-task-row .ag-cell,
+.wh-workspace-grid .ag-row.wh-new-task-row .ag-cell {
+  animation: taskCellGlow 1.2s ease-out forwards;
+}
+
+@keyframes taskCellGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(89, 195, 195, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(89, 195, 195, 0.3);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* Force visible filter buttons - HIGH SPECIFICITY */
+button.filter-button-visible,
+button.h-8.px-3.rounded-md.text-sm.font-semibold.border.filter-button-visible,
+div[class*="flex items-center gap-2"] button.filter-button-visible {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #9ca3af !important;
+  border: 1px solid #9ca3af !important;
+  font-weight: 600 !important;
+}
+
+button.filter-button-visible:hover,
+button.h-8.px-3.rounded-md.text-sm.font-semibold.border.filter-button-visible:hover,
+div[class*="flex items-center gap-2"] button.filter-button-visible:hover {
+  background-color: #f3f4f6 !important;
+  background: #f3f4f6 !important;
+  border-color: #6b7280 !important;
+  border: 1px solid #6b7280 !important;
+}
+
+/* Force visible Select and Labels - ONLY in filter toolbar */
+div[class*="flex items-center gap-2 ml-auto"] button[data-radix-select-trigger],
+div[class*="flex items-center gap-2 ml-auto"] [data-radix-select-trigger],
+div[class*="flex items-center gap-2 ml-auto"] .SelectTrigger,
+button[role="combobox"].h-8 {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #9ca3af !important;
+  border: 1px solid #9ca3af !important;
+}
+
+div[class*="flex items-center gap-2 ml-auto"] label.text-sm.whitespace-nowrap.font-semibold {
+  color: #000000 !important;
+}
+

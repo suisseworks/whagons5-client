@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -195,6 +195,7 @@ function PluginCardDisplay({
 			inventory: 'hover:border-teal-500/40 hover:shadow-teal-500/20',
 			tools: 'hover:border-orange-500/40 hover:shadow-orange-500/20',
 			integrations: 'hover:border-indigo-500/40 hover:shadow-indigo-500/20',
+			gamification: 'hover:border-purple-500/40 hover:shadow-purple-500/20',
 		};
 		
 		return borderColors[pluginId] || 'hover:border-gray-500/40 hover:shadow-gray-500/20';
@@ -846,6 +847,21 @@ function Plugins() {
 					'Build custom integrations with API access'
 				]
 			},
+			gamification: {
+				features: [
+					'Set up gamification elements and rewards',
+					'Engage users with points, badges, and leaderboards',
+					'Track user achievements and progress',
+					'Configure reward systems and milestones',
+					'Monitor engagement metrics and participation'
+				],
+				benefits: [
+					'Increase user engagement and motivation',
+					'Recognize and reward top performers',
+					'Create friendly competition with leaderboards',
+					'Track progress and celebrate achievements'
+				]
+			},
 		};
 
 		return {
@@ -862,6 +878,14 @@ function Plugins() {
 	const handlePluginClick = (pluginId: string, isEnabled: boolean) => {
 		if (pluginId === 'integrations') {
 			navigate('/integrations');
+			return;
+		}
+		if (pluginId === 'kpi-cards') {
+			navigate('/settings/kpi-cards');
+			return;
+		}
+		if (pluginId === 'gamification') {
+			navigate('/settings/gamification');
 			return;
 		}
 		if (isEnabled) {
@@ -1002,6 +1026,22 @@ function Plugins() {
 				description: t('plugins.integrations.description', 'Manage webhooks, API keys, and external integrations'),
 				icon: faLink,
 				color: 'text-indigo-500',
+				configurable: true,
+			},
+			{
+				id: 'kpi-cards',
+				title: t('plugins.kpiCards.title', 'Custom KPI Cards'),
+				description: t('plugins.kpiCards.description', 'Create custom metrics cards for workspaces'),
+				icon: faChartBar,
+				color: 'text-blue-500',
+				configurable: true,
+			},
+			{
+				id: 'gamification',
+				title: t('plugins.gamification.title', 'Gamification'),
+				description: t('plugins.gamification.description', 'Set up gamification elements and rewards'),
+				icon: faTrophy,
+				color: 'text-purple-500',
 				configurable: true,
 			},
 		];

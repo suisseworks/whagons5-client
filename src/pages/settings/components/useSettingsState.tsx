@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
 
@@ -57,6 +58,7 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
   onError
 }: UseSettingsStateOptions<T>): UseSettingsStateReturn<T> {
   const dispatch = useDispatch<AppDispatch>();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Redux state
   const { value: items, loading, error } = useSelector((state: RootState) => state[entityName] as { value: T[]; loading: boolean; error: string | null });
@@ -193,6 +195,23 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     setIsDeleteDialogOpen(false);
     setDeletingItem(null);
   }, []);
+
+  // Auto-open edit dialog if edit parameter is in URL
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && items.length > 0 && !isEditDialogOpen) {
+      const itemId = parseInt(editId, 10);
+      const itemToEdit = items.find((item: T) => item.id === itemId);
+      if (itemToEdit) {
+        setEditingItem(itemToEdit);
+        setIsEditDialogOpen(true);
+        // Remove edit parameter from URL
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('edit');
+        setSearchParams(newSearchParams, { replace: true });
+      }
+    }
+  }, [searchParams, items, isEditDialogOpen, setEditingItem, setIsEditDialogOpen, setSearchParams]);
   
   return {
     // Data

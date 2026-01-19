@@ -2,7 +2,9 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface StatisticItem {
@@ -60,7 +62,8 @@ export function SettingsLayout({
   gridComponent,
   beforeContent,
   afterContent,
-  wrapChildrenFullHeight = true
+  wrapChildrenFullHeight = true,
+  search
 }: SettingsLayoutProps) {
 
   return (
@@ -86,6 +89,31 @@ export function SettingsLayout({
               )}
             </div>
           </div>
+
+          {/* Center: Search Bar */}
+          {search && (
+            <div className="flex-shrink-0">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={search.placeholder || "Search..."}
+                  value={search.value}
+                  onChange={(e) => search.onChange(e.target.value)}
+                  className="pl-9 pr-9 h-10"
+                />
+                {search.value && (
+                  <button
+                    type="button"
+                    onClick={() => search.onChange('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Right: Actions */}
           <div className="flex items-center space-x-2 flex-shrink-0">

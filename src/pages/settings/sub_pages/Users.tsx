@@ -9,7 +9,7 @@ import { faUser, faChartBar, faEnvelope, faUsers } from "@fortawesome/free-solid
 import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Team, UserTeam, Invitation, Role } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -60,7 +60,6 @@ import dayjs from "dayjs";
 
 function Users() {
   const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
   const { t } = useLanguage();
   const tu = (key: string, fallback: string) => t(`settings.users.${key}`, fallback);
   // Redux state for related data
@@ -1326,8 +1325,9 @@ function Users() {
         isSubmitting={isCreating}
         error={formError}
         submitDisabled={isCreating}
+        contentClassName="sm:max-w-2xl"
       >
-        <div className="grid gap-4">
+        <div className="space-y-5">
           <TextField
             id="create-name"
             label={tu('dialogs.createUser.fields.name', 'Name')}
@@ -1343,13 +1343,28 @@ function Users() {
             onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
             required
           />
-          <TextField
-            id="create-color"
-            label={tu('dialogs.createUser.fields.color', 'Color')}
-            type="color"
-            value={createFormData.color}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="create-color" className="text-sm font-medium">
+              {tu('dialogs.createUser.fields.color', 'Color')}
+            </Label>
+            <div className="flex items-center gap-3">
+              <input
+                id="create-color"
+                type="color"
+                value={createFormData.color || '#3b82f6'}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, color: e.target.value }))}
+                className="h-12 w-24 rounded-md border border-input cursor-pointer"
+              />
+              <div 
+                className="flex-1 h-12 rounded-md border border-input flex items-center justify-center font-mono text-sm font-medium"
+                style={{ backgroundColor: createFormData.color || '#3b82f6' }}
+              >
+                <span className="px-3 py-1 rounded bg-background/80 backdrop-blur-sm shadow-sm">
+                  {createFormData.color || '#3b82f6'}
+                </span>
+              </div>
+            </div>
+          </div>
           <SelectField
             id="create-job_position_id"
             label={tu('dialogs.createUser.fields.jobPosition', 'Job Position')}
@@ -1371,39 +1386,45 @@ function Users() {
             value={createFormData.organization_name}
             onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
           />
-          <CheckboxField
-            id="create-is_admin"
-            label={tu('dialogs.createUser.fields.admin', 'Admin')}
-            checked={createFormData.is_admin}
-            onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
-            description={tu('dialogs.createUser.fields.adminDescription', 'Grant admin role')}
-          />
-          <CheckboxField
-            id="create-has_active_subscription"
-            label={tu('dialogs.createUser.fields.subscription', 'Subscription')}
-            checked={createFormData.has_active_subscription}
-            onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
-            description={tu('dialogs.createUser.fields.subscriptionDescription', 'Active subscription')}
-          />
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label className="text-right pt-2">{tu('dialogs.createUser.fields.teams', 'Teams')}</Label>
-            <div className="col-span-3">
-              <MultiSelect
-                options={teams.map((team: Team) => ({
-                  value: team.id.toString(),
-                  label: team.name
-                }))}
-                onValueChange={setCreateSelectedTeams}
-                defaultValue={createSelectedTeams}
-                placeholder={
-                  teamsLoading && teams.length === 0
-                    ? tu('multiSelect.loadingTeams', 'Loading teams...')
-                    : tu('multiSelect.selectTeams', 'Select teams...')
-                }
-                maxCount={10}
-                className="w-full"
+          
+          <div className="space-y-4 pt-2">
+            <div className="space-y-3">
+              <CheckboxField
+                id="create-is_admin"
+                label={tu('dialogs.createUser.fields.admin', 'Admin')}
+                checked={createFormData.is_admin}
+                onChange={(checked) => setCreateFormData(prev => ({ ...prev, is_admin: checked }))}
+                description={tu('dialogs.createUser.fields.adminDescription', 'Grant admin role')}
+              />
+              <CheckboxField
+                id="create-has_active_subscription"
+                label={tu('dialogs.createUser.fields.subscription', 'Subscription')}
+                checked={createFormData.has_active_subscription}
+                onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
+                description={tu('dialogs.createUser.fields.subscriptionDescription', 'Active subscription')}
               />
             </div>
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <Label className="text-sm font-medium">
+              {tu('dialogs.createUser.fields.teams', 'Teams')}
+            </Label>
+            <MultiSelect
+              options={teams.map((team: Team) => ({
+                value: team.id.toString(),
+                label: team.name
+              }))}
+              onValueChange={setCreateSelectedTeams}
+              defaultValue={createSelectedTeams}
+              placeholder={
+                teamsLoading && teams.length === 0
+                  ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                  : tu('multiSelect.selectTeams', 'Select teams...')
+              }
+              maxCount={10}
+              className="w-full"
+            />
           </div>
         </div>
       </SettingsDialog>
@@ -1527,7 +1548,7 @@ function Users() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingUser}
-        contentClassName="max-w-[80vw] sm:max-w-4xl"
+        contentClassName="max-w-[85vw] sm:max-w-5xl"
         footerActions={
           editingUser ? (
             <Button
@@ -1547,19 +1568,29 @@ function Users() {
       >
         {editingUser && (
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="flex w-full gap-2 flex-wrap md:flex-nowrap">
-              <TabsTrigger value="basic" className="flex-1 px-6 py-2.5">
+            <TabsList className="grid w-full grid-cols-3 gap-1 h-auto p-1 bg-muted/50 rounded-lg mb-6">
+              <TabsTrigger 
+                value="basic" 
+                className="px-4 py-3 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+              >
                 {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
               </TabsTrigger>
-              <TabsTrigger value="professional" className="flex-1 px-6 py-2.5">
+              <TabsTrigger 
+                value="professional" 
+                className="px-4 py-3 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+              >
                 {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
               </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex-1 px-6 py-2.5">
+              <TabsTrigger 
+                value="permissions" 
+                className="px-4 py-3 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+              >
                 {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="basic" className="mt-4 min-h-[200px]">
-              <div className="grid gap-4">
+            
+            <TabsContent value="basic" className="mt-0 space-y-6 min-h-[300px] pt-2">
+              <div className="space-y-5">
                 <TextField
                   id="edit-name"
                   label={tu('dialogs.editUser.fields.name', 'Name')}
@@ -1575,17 +1606,33 @@ function Users() {
                   onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
                   required
                 />
-                <TextField
-                  id="edit-color"
-                  label={tu('dialogs.editUser.fields.color', 'Color')}
-                  type="color"
-                  value={editFormData.color}
-                  onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-color" className="text-sm font-medium">
+                    {tu('dialogs.editUser.fields.color', 'Color')} *
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="edit-color"
+                      type="color"
+                      value={editFormData.color}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, color: e.target.value }))}
+                      className="h-12 w-24 rounded-md border border-input cursor-pointer"
+                    />
+                    <div 
+                      className="flex-1 h-12 rounded-md border border-input flex items-center justify-center font-mono text-sm font-medium"
+                      style={{ backgroundColor: editFormData.color }}
+                    >
+                      <span className="px-3 py-1 rounded bg-background/80 backdrop-blur-sm shadow-sm">
+                        {editFormData.color || '#000000'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
-            <TabsContent value="professional" className="mt-4 min-h-[200px]">
-              <div className="grid gap-4">
+            
+            <TabsContent value="professional" className="mt-0 space-y-6 min-h-[300px] pt-2">
+              <div className="space-y-5">
                 <SelectField
                   id="edit-job_position_id"
                   label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
@@ -1609,35 +1656,36 @@ function Users() {
                 />
               </div>
             </TabsContent>
-            <TabsContent value="permissions" className="mt-4 min-h-[200px]">
-              <div className="grid gap-4">
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">
-                    {tu('dialogs.editUser.fields.globalRoles', 'Roles Globales')}
-                    <span className="text-muted-foreground text-xs font-normal ml-1">(Opcional)</span>
-                  </Label>
-                  <div className="col-span-3">
-                    <MultiSelect
-                      options={roles
-                        .filter((role: Role) => role.scope === 'GLOBAL')
-                        .map((role: Role) => ({
-                          value: role.name,
-                          label: role.name
-                        }))}
-                      onValueChange={setSelectedGlobalRoles}
-                      defaultValue={selectedGlobalRoles}
-                      placeholder={
-                        roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
-                          ? tu('multiSelect.noGlobalRoles', 'No global roles available')
-                          : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
-                      }
-                      maxCount={10}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
+            
+            <TabsContent value="permissions" className="mt-0 space-y-6 min-h-[300px] pt-2">
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">
+                      {tu('dialogs.editUser.fields.globalRoles', 'Roles Globales')}
+                      <span className="text-muted-foreground text-xs font-normal ml-2">(Optional)</span>
+                    </Label>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {tu('dialogs.editUser.fields.globalRolesHelp', 'Los roles globales son opcionales. Puedes dejar este campo vacío si no necesitas asignar roles globales al usuario.')}
                     </p>
                   </div>
+                  <MultiSelect
+                    options={roles
+                      .filter((role: Role) => role.scope === 'GLOBAL')
+                      .map((role: Role) => ({
+                        value: role.name,
+                        label: role.name
+                      }))}
+                    onValueChange={setSelectedGlobalRoles}
+                    defaultValue={selectedGlobalRoles}
+                    placeholder={
+                      roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
+                        ? tu('multiSelect.noGlobalRoles', 'No global roles available')
+                        : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
+                    }
+                    maxCount={10}
+                    className="w-full"
+                  />
                 </div>
               </div>
             </TabsContent>

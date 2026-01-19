@@ -24,6 +24,7 @@ import {
   useStatusChange,
   useDoneStatusId,
   useLatestRef,
+  useNewTaskAnimation,
 } from './workspaceTable/hooks';
 import {
   loadAgGridModules,
@@ -238,6 +239,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   const getDoneStatusId = useDoneStatusId(globalStatusesRef);
   const handleChangeStatus = useStatusChange(statusMap, getDoneStatusId, categories);
+  
+  // Track newly created tasks for animation
+  const { isNewTask, newTaskIds } = useNewTaskAnimation();
 
   const { useClientSide, clientRows, setClientRows } = useWorkspaceTableMode({
     gridApi: gridRef.current?.api,
@@ -285,6 +289,63 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   }, []);
 
   const getRowStyle = useMemo(() => (_params: any) => undefined, []);
+  
+  // Apply animation class to newly created task rows
+  // Include newTaskIds in dependencies to ensure it updates when new tasks are added
+  const getRowClass = useMemo(() => (params: any) => {
+    if (!params?.data) return '';
+    // Try multiple ID field names to handle different data structures
+    const taskId = params.data.id || params.data.ID || params.data.Id || params.data.task_id;
+    if (!taskId) return '';
+    
+    // Check for new tasks
+    if (isNewTask(taskId)) {
+      return 'wh-new-task-row';
+    }
+    
+    return '';
+  }, [isNewTask, newTaskIds]);
+  
+  // Force AG Grid to refresh row classes when new tasks are detected
+  useEffect(() => {
+    if (newTaskIds.size > 0 && gridRef.current?.api && modulesLoaded) {
+      // Wait for grid refresh to complete, then apply animation classes
+      // The grid refresh happens with 100ms debounce, so we wait a bit longer
+      const timeout = setTimeout(() => {
+        try {
+          const api = gridRef.current?.api;
+          if (!api) return;
+          
+          // Get all new task row nodes and apply the class directly to DOM elements
+          const newRowIds = Array.from(newTaskIds);
+          newRowIds.forEach(id => {
+            try {
+              const rowNode = api.getRowNode?.(String(id));
+              if (rowNode) {
+                // Get the row element from AG Grid
+                const rowElement = (rowNode as any).rowElement;
+                if (rowElement && rowElement.classList && !rowElement.classList.contains('wh-new-task-row')) {
+                  rowElement.classList.add('wh-new-task-row');
+                }
+                // Also refresh the row to trigger getRowClass
+                api.refreshCells?.({ 
+                  rowNodes: [rowNode],
+                  force: true 
+                });
+              }
+            } catch (e) {
+              // Ignore errors for individual rows
+            }
+          });
+        } catch (e) {
+          // Ignore errors, grid might not be ready
+          console.debug('Failed to refresh row classes for animation:', e);
+        }
+      }, 250); // Wait 250ms to ensure grid refresh has completed and rows are rendered
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [newTaskIds, modulesLoaded]);
 
   const getRows = useMemo(
     () => buildGetRows(TasksCache, {
@@ -423,6 +484,38 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     const cleanup = setupTaskEventHandlers({ refreshGrid, workspaceId });
     return cleanup;
   }, [refreshGrid, workspaceId]);
+  
+  // Handle row data updates to apply animation classes
+  const onRowDataUpdated = useCallback(() => {
+    if (newTaskIds.size > 0 && gridRef.current?.api) {
+      // Small delay to ensure rows are fully rendered
+      setTimeout(() => {
+        try {
+          const api = gridRef.current?.api;
+          if (!api) return;
+          
+          // Apply animation class to all new task rows
+          const newRowIds = Array.from(newTaskIds);
+          newRowIds.forEach(id => {
+            try {
+              // Try both string and number ID formats
+              const rowNode = api.getRowNode?.(String(id)) || api.getRowNode?.(id);
+              if (rowNode) {
+                const rowElement = (rowNode as any).rowElement;
+                if (rowElement && rowElement.classList && !rowElement.classList.contains('wh-new-task-row')) {
+                  rowElement.classList.add('wh-new-task-row');
+                }
+              }
+            } catch (e) {
+              // Ignore errors for individual rows
+            }
+          });
+        } catch (e) {
+          // Ignore errors
+        }
+      }, 100); // Increased delay to ensure rows are rendered
+    }
+  }, [newTaskIds]);
 
   // Grid ready hook
   const onGridReady = useGridReady({
@@ -473,11 +566,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
             headerCheckbox: false,
           }}
           getRowStyle={getRowStyle}
+          getRowClass={getRowClass}
           onGridReady={onGridReady}
           onFirstDataRendered={() => {
             if (!gridRef.current?.api) return;
             onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+            onRowDataUpdated();
           }}
+          onRowDataUpdated={onRowDataUpdated}
           onFilterChanged={(e: any) => {
             handleGridFilterChanged({ api: e.api, onFiltersChanged });
             if (!useClientSide) {
