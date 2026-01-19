@@ -9,7 +9,7 @@ import {
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import React, { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import AssistantWidget from '@/components/AssistantWidget';
+import AssistantWidget from '@/features/ai-chat/AssistantWidget';
 
 // Define sidebar width constants to keep them in sync
 const CUSTOM_SIDEBAR_WIDTH = 15;

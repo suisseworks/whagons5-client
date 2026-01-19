@@ -32,6 +32,7 @@ export interface EncryptionConfig {
 export const DISABLED_ENCRYPTION_STORES: string[] = [
   // Only disable encryption for tasks (legacy requirement for TasksCache)
   'tasks',
+  'users'
 ];
 
 /**
