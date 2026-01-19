@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
+import { genericActions, genericInternalActions } from '@/store/genericSlices';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -39,7 +39,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
 import toast from 'react-hot-toast';
-import api from '@/api/whagonsApi';
+import { api } from '@/api/whagonsApi';
 import KpiCardBuilder from './kpi/KpiCardBuilder';
 
 interface KpiQueryConfig {
@@ -198,8 +198,8 @@ export default function KpiCardsManage() {
 
   // Load KPI cards on mount
   useEffect(() => {
-    dispatch(genericActions.kpiCards.getFromIndexedDB());
-    dispatch(genericActions.kpiCards.fetchFromAPI());
+    dispatch(genericInternalActions.kpiCards.getFromIndexedDB());
+    dispatch(genericInternalActions.kpiCards.fetchFromAPI());
   }, [dispatch]);
 
   // Sort cards by position
@@ -237,7 +237,7 @@ export default function KpiCardsManage() {
       try {
         await api.post('/kpi-cards/reorder', { cards: reorderData });
         // Refresh from API
-        dispatch(genericActions.kpiCards.fetchFromAPI());
+        dispatch(genericInternalActions.kpiCards.fetchFromAPI());
         toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
       } catch (error) {
         console.error('Error reordering cards:', error);
@@ -305,7 +305,7 @@ export default function KpiCardsManage() {
       await api.post(`/kpi-cards/${id}/toggle`, { is_enabled: enabled });
       
       // Refresh from API to get updated state
-      await dispatch(genericActions.kpiCards.fetchFromAPI());
+      await dispatch(genericInternalActions.kpiCards.fetchFromAPI());
       
       // Dismiss loading and show success
       toast.dismiss(loadingToast);

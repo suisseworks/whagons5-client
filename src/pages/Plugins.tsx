@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -197,6 +197,8 @@ function PluginCardDisplay({
 			tools: 'hover:border-orange-500/40 hover:shadow-orange-500/20',
 			integrations: 'hover:border-indigo-500/40 hover:shadow-indigo-500/20',
 			gamification: 'hover:border-purple-500/40 hover:shadow-purple-500/20',
+			analytics: 'hover:border-blue-500/40 hover:shadow-blue-500/20',
+			motivation: 'hover:border-yellow-500/40 hover:shadow-yellow-500/20',
 		};
 		
 		return borderColors[pluginId] || 'hover:border-gray-500/40 hover:shadow-gray-500/20';
@@ -852,6 +854,36 @@ function Plugins() {
 					'Track progress and celebrate achievements'
 				]
 			},
+			analytics: {
+				features: [
+					'Track and analyze workspace data and performance metrics',
+					'Create interactive dashboards with real-time metrics',
+					'Generate customizable reports and visualizations',
+					'Analyze trends and performance tracking',
+					'Export data and share insights'
+				],
+				benefits: [
+					'Make data-driven decisions with comprehensive insights',
+					'Monitor workspace performance and productivity',
+					'Identify trends and patterns in your data',
+					'Share reports and analytics with your team'
+				]
+			},
+			motivation: {
+				features: [
+					'Configure motivation and engagement settings',
+					'Set up motivational quotes and reminders',
+					'Track user engagement and motivation metrics',
+					'Personalized goal tracking and achievements',
+					'Recognition systems and celebrations'
+				],
+				benefits: [
+					'Increase user engagement and motivation',
+					'Boost productivity with daily inspiration',
+					'Track progress and celebrate achievements',
+					'Create a positive and motivating work environment'
+				]
+			},
 		};
 
 		return {
@@ -876,6 +908,14 @@ function Plugins() {
 		}
 		if (pluginId === 'gamification') {
 			navigate('/settings/gamification');
+			return;
+		}
+		if (pluginId === 'analytics') {
+			navigate('/settings/analytics');
+			return;
+		}
+		if (pluginId === 'motivation') {
+			navigate('/settings/motivation');
 			return;
 		}
 		if (isEnabled) {
@@ -1034,6 +1074,22 @@ function Plugins() {
 				color: 'text-purple-500',
 				configurable: true,
 			},
+			{
+				id: 'analytics',
+				title: t('plugins.analytics.title', 'Analytics'),
+				description: t('plugins.analytics.description', 'Track and analyze your workspace data and performance metrics'),
+				icon: faChartLine,
+				color: 'text-blue-500',
+				configurable: true,
+			},
+			{
+				id: 'motivation',
+				title: t('plugins.motivation.title', 'Motivation'),
+				description: t('plugins.motivation.description', 'Configure motivation and engagement settings'),
+				icon: faRocket,
+				color: 'text-yellow-500',
+				configurable: true,
+			},
 		];
 
 		// Convert custom plugins to PluginCard format
@@ -1154,7 +1210,7 @@ function Plugins() {
 
 	return (
 		<>
-			<div className="p-6 space-y-6">
+			<div className="p-6 space-y-6 max-w-screen-2xl mx-auto">
 				<div className="flex items-center justify-between">
 					<h1 className="text-2xl font-bold">{t('plugins.title', 'Plugins')}</h1>
 					<div className="flex items-center gap-3">

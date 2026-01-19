@@ -20,7 +20,6 @@ export default function LightningRainEffect({ onClose }: LightningRainEffectProp
   const [isDarkMode, setIsDarkMode] = useState(() => 
     document.documentElement.classList.contains('dark')
   );
-
   useEffect(() => {
     // Detect theme changes
     const updateThemeState = () => {
@@ -75,15 +74,60 @@ export default function LightningRainEffect({ onClose }: LightningRainEffectProp
 
     // Draw lightning bolt
     const drawLightning = (startX: number, startY: number) => {
-      // Lightning color adapts to theme
-      const lightningColor = isDarkMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(100, 150, 255, 0.95)';
-      ctx.strokeStyle = lightningColor;
-      ctx.lineWidth = 4;
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = isDarkMode ? 'white' : 'rgba(100, 150, 255, 0.8)';
+      // Lightning color adapts to theme - brighter in light mode
+      const lightningColor = isDarkMode 
+        ? 'rgba(255, 255, 255, 0.95)' 
+        : 'rgba(255, 255, 255, 0.98)'; // Bright white for light mode
+      const glowColor = isDarkMode 
+        ? 'rgba(255, 255, 255, 0.8)' 
+        : 'rgba(200, 220, 255, 0.9)'; // Blue-white glow for light mode
+      
+      // Draw outer glow layer (thicker, more transparent)
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = isDarkMode ? 8 : 12; // Thicker in light mode
+      ctx.shadowBlur = isDarkMode ? 30 : 50; // More blur in light mode
+      ctx.shadowColor = isDarkMode ? 'white' : 'rgba(150, 200, 255, 1)';
       
       let x = startX;
       let y = startY;
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      
+      while (y < canvas.height) {
+        const segmentLength = Math.random() * 60 + 40;
+        const angle = (Math.random() - 0.5) * 0.6;
+        
+        x += Math.sin(angle) * segmentLength;
+        y += segmentLength;
+        
+        ctx.lineTo(x, y);
+        
+        // Add branches occasionally
+        if (Math.random() > 0.65) {
+          const branchX = x;
+          const branchY = y;
+          const branchAngle = (Math.random() - 0.5) * 1.8;
+          const branchLength = Math.random() * 120 + 60;
+          
+          ctx.lineTo(
+            branchX + Math.sin(branchAngle) * branchLength,
+            branchY + branchLength * 0.5
+          );
+          ctx.moveTo(x, y);
+        }
+      }
+      
+      ctx.stroke();
+      
+      // Draw inner bright core (thinner, more opaque)
+      ctx.strokeStyle = lightningColor;
+      ctx.lineWidth = isDarkMode ? 4 : 6; // Thicker core in light mode
+      ctx.shadowBlur = isDarkMode ? 15 : 25;
+      ctx.shadowColor = isDarkMode ? 'white' : 'rgba(255, 255, 255, 1)';
+      
+      x = startX;
+      y = startY;
       
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -189,9 +233,9 @@ export default function LightningRainEffect({ onClose }: LightningRainEffectProp
       {/* Flash overlay */}
       <div 
         className={`absolute inset-0 transition-opacity duration-75 ${
-          isDarkMode ? 'bg-white' : 'bg-blue-200'
+          isDarkMode ? 'bg-white' : 'bg-blue-100'
         } ${
-          flash ? (isDarkMode ? 'opacity-25' : 'opacity-15') : 'opacity-0'
+          flash ? (isDarkMode ? 'opacity-25' : 'opacity-20') : 'opacity-0'
         }`}
       />
       {/* Rain canvas */}
@@ -199,21 +243,6 @@ export default function LightningRainEffect({ onClose }: LightningRainEffectProp
         ref={canvasRef}
         className="w-full h-full"
       />
-      {onClose && (
-        <div className={`fixed bottom-4 right-4 pointer-events-auto backdrop-blur-sm px-4 py-2 rounded-lg transition-colors ${
-          isDarkMode 
-            ? 'bg-white/10 hover:bg-white/20 text-white' 
-            : 'bg-black/10 hover:bg-black/20 text-black'
-        }`}>
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-medium">Storm</div>
-            <div className="text-xs opacity-75">(Ctrl+M)</div>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

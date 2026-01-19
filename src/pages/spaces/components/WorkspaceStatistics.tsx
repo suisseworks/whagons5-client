@@ -487,7 +487,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
 
     return (
       <div className="flex-1 min-h-0 overflow-auto p-4">
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-screen-2xl mx-auto">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, idx) => SkeletonStatCard(`stat-skeleton-${idx}`))}
           </div>
@@ -519,7 +519,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
 
   return (
     <div className="flex-1 min-h-0 overflow-auto p-4">
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-screen-2xl mx-auto">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {renderStatCard('Total Tasks', statistics.totalTasks, faTasks)}

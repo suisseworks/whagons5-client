@@ -246,21 +246,6 @@ export default function RadiographyEffect({ onClose }: RadiographyEffectProps) {
         className="w-full h-full pointer-events-none"
         style={{ pointerEvents: 'none', backgroundColor: 'transparent' }}
       />
-      {onClose && (
-        <div className={`fixed bottom-4 right-4 pointer-events-auto backdrop-blur-sm px-4 py-2 rounded-lg transition-colors ${
-          isDarkMode 
-            ? 'bg-white/10 hover:bg-white/20 text-white' 
-            : 'bg-black/10 hover:bg-black/20 text-black'
-        }`}>
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-medium">Depth Perspective</div>
-            <div className="text-xs opacity-75">(Ctrl+M)</div>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

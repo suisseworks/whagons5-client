@@ -50,7 +50,7 @@ import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
 import toast from 'react-hot-toast';
 import type { AppDispatch } from '@/store/store';
 import { executeKpiQuery } from '@/services/kpiCardService';
-import { genericActions } from '@/store/genericSlices';
+import { genericActions, genericInternalActions } from '@/store/genericSlices';
 
 const WORKSPACE_TAB_PATHS = {
   grid: '',
@@ -867,8 +867,8 @@ export const Workspace = () => {
   useEffect(() => {
     if (!kpiCardsLoadedRef.current) {
       kpiCardsLoadedRef.current = true;
-      dispatch(genericActions.kpiCards.getFromIndexedDB());
-      dispatch(genericActions.kpiCards.fetchFromAPI());
+      dispatch(genericInternalActions.kpiCards.getFromIndexedDB());
+      dispatch(genericInternalActions.kpiCards.fetchFromAPI());
     }
   }, [dispatch]);
 

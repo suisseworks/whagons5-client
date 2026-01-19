@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="WHagons  Aprobaciones y SLAs (4/5)">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22c55e" stop-opacity="0.62"/>
+      <stop offset="0.55" stop-color="#0ea5e9" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#6f47ff" stop-opacity="0.78"/>
+    </linearGradient>
+    <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="675" fill="#0b1220"/>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <circle cx="240" cy="200" r="220" fill="#000" opacity="0.14" filter="url(#blur)"/>
+  <circle cx="980" cy="510" r="240" fill="#000" opacity="0.12" filter="url(#blur)"/>
+
+  <g>
+    <rect x="70" y="60" width="1060" height="555" rx="28" fill="url(#glass)" stroke="#fff" stroke-opacity="0.16"/>
+    <text x="100" y="150" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="18" fill="#fff" opacity="0.82" font-weight="800">
+      Teaser 4/5 · Aprobaciones + SLAs
+    </text>
+    <text x="100" y="220" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="54" fill="#fff" opacity="0.96" font-weight="900">
+      Control sin fricción.
+    </text>
+    <text x="100" y="284" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="24" fill="#fff" opacity="0.75">
+      Aprobaciones claras + tiempos visibles (SLA).
+    </text>
+
+    <g transform="translate(620, 160)" opacity="0.92">
+      <rect x="0" y="0" width="470" height="380" rx="22" fill="#000" opacity="0.22" stroke="#fff" stroke-opacity="0.12"/>
+
+      <rect x="24" y="24" width="190" height="18" rx="9" fill="#fff" opacity="0.18"/>
+      <rect x="24" y="56" width="280" height="14" rx="7" fill="#fff" opacity="0.12"/>
+
+      <g transform="translate(24, 104)">
+        <rect x="0" y="0" width="422" height="78" rx="18" fill="#fff" opacity="0.09"/>
+        <circle cx="28" cy="39" r="10" fill="#f59e0b" opacity="0.9"/>
+        <rect x="52" y="26" width="210" height="14" rx="7" fill="#fff" opacity="0.20"/>
+        <rect x="52" y="46" width="160" height="12" rx="6" fill="#fff" opacity="0.12"/>
+        <rect x="300" y="22" width="104" height="34" rx="17" fill="#22c55e" opacity="0.88"/>
+        <text x="318" y="44" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="13" fill="#0b1220" font-weight="900">APROBADO</text>
+      </g>
+
+      <g transform="translate(24, 200)">
+        <rect x="0" y="0" width="422" height="78" rx="18" fill="#fff" opacity="0.09"/>
+        <circle cx="28" cy="39" r="10" fill="#23ddff" opacity="0.85"/>
+        <rect x="52" y="26" width="240" height="14" rx="7" fill="#fff" opacity="0.20"/>
+        <rect x="52" y="46" width="180" height="12" rx="6" fill="#fff" opacity="0.12"/>
+        <rect x="300" y="22" width="104" height="34" rx="17" fill="#0ea5e9" opacity="0.78"/>
+        <text x="320" y="44" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="13" fill="#0b1220" font-weight="900">SLA 6h</text>
+      </g>
+
+      <g transform="translate(24, 296)">
+        <rect x="0" y="0" width="422" height="60" rx="18" fill="#fff" opacity="0.09"/>
+        <rect x="18" y="22" width="230" height="14" rx="7" fill="#fff" opacity="0.18"/>
+        <rect x="292" y="18" width="112" height="24" rx="12" fill="#ff61d5" opacity="0.72"/>
+        <text x="310" y="35" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="13" fill="#0b1220" font-weight="900">2h restante</text>
+      </g>
+    </g>
+  </g>
+</svg>

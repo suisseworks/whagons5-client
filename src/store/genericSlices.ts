@@ -404,6 +404,7 @@ export const genericActions = {
     complianceAudits: publicActions(genericInternalActions.complianceAudits),
     plugins: publicActions(genericInternalActions.plugins),
     pluginRoutes: publicActions(genericInternalActions.pluginRoutes),
+    kpiCards: publicActions(genericInternalActions.kpiCards),
     scheduleTemplates: publicActions(genericInternalActions.scheduleTemplates),
     scheduleTemplateDays: publicActions(genericInternalActions.scheduleTemplateDays),
     userSchedules: publicActions(genericInternalActions.userSchedules),

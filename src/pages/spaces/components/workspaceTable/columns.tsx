@@ -14,6 +14,8 @@ import { getContrastTextColor } from './columnUtils/color';
 import { useIconDefinition } from './columnUtils/icon';
 import { promptForComment } from './columnUtils/promptForComment';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { api } from '@/api/whagonsApi';
+import { celebrateTaskCompletion } from '@/utils/confetti';
 
 
 export function buildWorkspaceColumns(opts: any) {
@@ -52,6 +54,7 @@ export function buildWorkspaceColumns(opts: any) {
     onDeleteTask,
     onLogTask,
     slaMap = {},
+    getDoneStatusId,
   } = opts;
 
   const appendCellClass = (existing: any, cls: string) => {
@@ -465,7 +468,59 @@ export function buildWorkspaceColumns(opts: any) {
               p.data.approval_completed_at = updatedTask.approval_completed_at;
             }
             if (updatedTask.status_id !== undefined) {
+              const oldStatusId = p.data.status_id;
               p.data.status_id = updatedTask.status_id;
+              
+              // Check if approval decision changed status to a final/done status and trigger celebration
+              if (decision === 'approved' && updatedTask.status_id !== undefined) {
+                const newStatusId = Number(updatedTask.status_id);
+                const oldStatusIdNum = oldStatusId ? Number(oldStatusId) : null;
+                
+                // Only trigger if status actually changed
+                if (newStatusId !== oldStatusIdNum) {
+                  let isDoneStatus = false;
+                  
+                  // First check: use getDoneStatusId if available (most reliable)
+                  if (getDoneStatusId) {
+                    const doneStatusId = getDoneStatusId();
+                    if (doneStatusId !== undefined && newStatusId === doneStatusId) {
+                      isDoneStatus = true;
+                    }
+                  }
+                  
+                  // Second check: use statusMap detection (fallback)
+                  if (!isDoneStatus && statusMap) {
+                    const newStatusMeta = statusMap[newStatusId];
+                    if (newStatusMeta) {
+                      const action = String(newStatusMeta.action || '').toUpperCase();
+                      const nameLower = String(newStatusMeta.name || '').toLowerCase();
+                      // Check for DONE, FINISHED actions, or name includes done/complete/finished
+                      isDoneStatus = action === 'DONE' || action === 'FINISHED' || 
+                                    nameLower.includes('done') || nameLower.includes('complete') || nameLower.includes('finished');
+                    }
+                  }
+                  
+                  // Check if celebration is enabled for this status
+                  const newStatusMeta = statusMap?.[newStatusId];
+                  const celebrationEnabled = newStatusMeta?.celebration_enabled !== false; // Default to true if not set
+                  
+                  if (isDoneStatus && celebrationEnabled) {
+                    console.log('[Confetti Debug] Approval decision changed status to done, triggering celebration:', {
+                      taskId: p.data?.id,
+                      oldStatusId: oldStatusIdNum,
+                      newStatusId,
+                      statusName: newStatusMeta?.name,
+                      action: newStatusMeta?.action,
+                      celebrationEnabled
+                    });
+                    
+                    // Get category celebration effect if available
+                    const taskCategory = categoryMap?.[Number(p.data?.category_id)];
+                    const categoryCelebrationEffect = taskCategory?.celebration_effect;
+                    celebrateTaskCompletion(categoryCelebrationEffect);
+                  }
+                }
+              }
             }
           }
           

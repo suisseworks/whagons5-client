@@ -7,6 +7,7 @@ import {
   Plus,
   Globe,
   Lock,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,7 +121,7 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
             }}
           >
             {collapsed ? (
-              <Users2 className="w-5 h-5" style={{ color: 'var(--sidebar-text-primary)' }} />
+              <FileText className="w-5 h-5" style={{ color: 'var(--sidebar-text-primary)' }} />
             ) : (
               <>
                 <CollapsibleTrigger className="flex items-center cursor-pointer hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] rounded-sm flex-1 p-1 transition-all">
@@ -196,7 +197,7 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
                           )}
                           <div className="flex items-center min-w-0 flex-1">
                             <IconBadge color="#3b82f6" size={18}>
-                              <Users2 size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                              <FileText size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                             </IconBadge>
                             {collapsed ? (
                               <span className="sr-only">{board.name}</span>

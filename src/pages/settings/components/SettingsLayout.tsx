@@ -67,7 +67,7 @@ export function SettingsLayout({
 }: SettingsLayoutProps) {
 
   return (
-    <div className="h-full flex flex-col overflow-hidden space-y-3 bg-background">
+    <div className="h-full flex flex-col overflow-hidden space-y-3 bg-background max-w-screen-2xl mx-auto w-full px-6">
       {/* Title and Actions Row - No Breadcrumbs Here */}
       <div className="py-4 flex-shrink-0 border-b border-border/40">
         <div className="flex items-start justify-between gap-4">

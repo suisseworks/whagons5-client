@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Whagons Presell — Screens 1200x675</title>
+    <style>
+      :root {
+        /* Branding (desde public/whagons.svg) */
+        --whagons: #27c1a7;
+        --ink: #0a0f1a;
+        --bg: #070b12;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel2: rgba(255, 255, 255, 0.08);
+        --line: rgba(255, 255, 255, 0.12);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.68);
+        --shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        background:
+          radial-gradient(1000px 700px at 18% 10%, rgba(39, 193, 167, 0.22), transparent 62%),
+          radial-gradient(900px 650px at 70% 18%, rgba(59, 130, 246, 0.14), transparent 60%),
+          radial-gradient(900px 700px at 40% 90%, rgba(124, 58, 237, 0.12), transparent 60%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      .wrap { max-width: 1320px; margin: 0 auto; padding: 22px 18px 60px; }
+      .hint {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .grid { display: grid; gap: 18px; }
+
+      /* Canvas 1200x675 exacto */
+      .canvas {
+        width: 1200px;
+        height: 675px;
+        position: relative;
+        margin: 0 auto;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: var(--shadow);
+        background:
+          radial-gradient(900px 700px at 18% 18%, rgba(39, 193, 167, 0.22), transparent 58%),
+          radial-gradient(900px 700px at 78% 22%, rgba(59, 130, 246, 0.14), transparent 60%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+      }
+      .frame {
+        position: absolute;
+        inset: 14px;
+        z-index: 1;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+
+      .topbar {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(0, 0, 0, 0.18);
+        backdrop-filter: blur(10px);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .brand img {
+        width: 84px;
+        height: auto;
+        filter: drop-shadow(0 6px 14px rgba(0,0,0,0.4));
+      }
+      .brand .title {
+        font-weight: 900;
+        letter-spacing: 0.2px;
+        font-size: 13px;
+        margin: 0;
+      }
+      .brand .sub {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .filters {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.86);
+      }
+      .chipAccent {
+        border-color: rgba(39, 193, 167, 0.55);
+        background: rgba(39, 193, 167, 0.14);
+        color: rgba(255, 255, 255, 0.92);
+      }
+
+      .overlay {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        right: 16px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        pointer-events: none;
+        z-index: 3;
+      }
+      .overlay:before {
+        content: "";
+        position: absolute;
+        inset: -16px -16px auto -16px;
+        height: 190px;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+        pointer-events: none;
+        z-index: -1;
+      }
+      .headline {
+        pointer-events: none;
+        max-width: 720px;
+      }
+      .headline .big {
+        margin: 0;
+        font-size: 34px;
+        line-height: 1.05;
+        letter-spacing: -0.6px;
+        font-weight: 1000;
+        text-shadow: 0 18px 40px rgba(0,0,0,0.55);
+      }
+      .headline .small {
+        margin: 8px 0 0;
+        color: rgba(255,255,255,0.76);
+        font-size: 14px;
+        line-height: 1.35;
+        text-shadow: 0 14px 28px rgba(0,0,0,0.5);
+      }
+      .badge {
+        pointer-events: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(0, 0, 0, 0.18);
+        backdrop-filter: blur(10px);
+        color: rgba(255,255,255,0.92);
+        font-weight: 800;
+        font-size: 12px;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--whagons);
+        box-shadow: 0 0 0 5px rgba(39, 193, 167, 0.16);
+      }
+
+      .content {
+        padding: 86px 16px 16px;
+        height: calc(100% - 58px);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 12px;
+        height: 100%;
+      }
+      .panel {
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        overflow: hidden;
+      }
+      .panelHead {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .panelHead .h {
+        font-weight: 900;
+        font-size: 12px;
+        margin: 0;
+        letter-spacing: 0.2px;
+      }
+      .panelHead .m { color: var(--muted); font-size: 11px; }
+      .panelBody { padding: 12px; }
+
+      .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .kpi {
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.14);
+        padding: 10px;
+      }
+      .kpi .label { color: var(--muted); font-size: 11px; margin: 0; }
+      .kpi .value { font-weight: 1000; font-size: 18px; margin: 6px 0 0; }
+      .kpi .delta { margin: 6px 0 0; font-size: 11px; color: rgba(255,255,255,0.78); }
+      .up { color: rgba(39, 193, 167, 0.95); }
+      .down { color: rgba(239, 68, 68, 0.95); }
+
+      .spark {
+        margin-top: 10px;
+        height: 120px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
+          radial-gradient(400px 160px at 30% 30%, rgba(39, 193, 167, 0.15), transparent 60%);
+        position: relative;
+        overflow: hidden;
+      }
+      .spark:before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px) 0 0 / 60px 100%,
+          linear-gradient(180deg, rgba(255,255,255,0.06) 1px, transparent 1px) 0 0 / 100% 40px;
+        opacity: 0.35;
+      }
+      .spark svg {
+        position: absolute;
+        inset: 0;
+      }
+
+      .list { display: grid; gap: 8px; }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .row .l { display: grid; gap: 2px; }
+      .row .t { font-weight: 900; font-size: 12px; }
+      .row .s { color: var(--muted); font-size: 11px; }
+      .sev { font-weight: 900; font-size: 11px; padding: 6px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); }
+      .sevHigh { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.35); }
+      .sevMed { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.35); }
+      .sevLow { background: rgba(39,193,167,0.14); border-color: rgba(39,193,167,0.35); }
+
+      .table {
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0,0,0,0.14);
+        overflow: hidden;
+      }
+      .table .tr {
+        display: grid;
+        grid-template-columns: 0.7fr 1fr 0.8fr 0.9fr;
+        gap: 10px;
+        padding: 10px 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 11px;
+        color: rgba(255,255,255,0.86);
+      }
+      .table .th {
+        background: rgba(255,255,255,0.04);
+        border-top: none;
+        font-weight: 900;
+        color: rgba(255,255,255,0.9);
+      }
+      .bar {
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.10);
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.10);
+      }
+      .bar > span { display: block; height: 100%; background: linear-gradient(90deg, rgba(39,193,167,0.95), rgba(59,130,246,0.75)); }
+
+      .challenge {
+        display: grid;
+        gap: 10px;
+      }
+      .challenge .card {
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(0,0,0,0.14);
+        padding: 10px;
+      }
+      .challenge .card .h { font-weight: 1000; font-size: 12px; margin: 0; }
+      .challenge .card .p { margin: 6px 0 0; color: rgba(255,255,255,0.78); font-size: 11px; line-height: 1.35; }
+      .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .badgeMini {
+        font-size: 11px;
+        font-weight: 900;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.05);
+      }
+      .badgeMiniAccent { border-color: rgba(39,193,167,0.45); background: rgba(39,193,167,0.14); }
+
+      /* Helpers */
+      .hideTitle { display: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p class="hint">
+        Pantallas 1200×675 listas para screenshot. Abrir con Vite: <b>/presell/screens.html</b>.
+      </p>
+      <div class="grid">
+        <!-- SCREEN 1 -->
+        <div class="canvas" id="screen-1">
+          <div class="overlay">
+            <div class="headline">
+              <p class="big">Tu operación, en 1 pantalla.</p>
+              <p class="small">KPIs clave, tendencia y riesgos prioritarios para decidir más rápido.</p>
+            </div>
+            <div class="badge"><span class="dot"></span> Nuevo Whagons</div>
+          </div>
+          <div class="frame">
+            <div class="topbar">
+              <div class="brand">
+                <img src="/whagons.svg" alt="Whagons" />
+                <div>
+                  <p class="title">Panel Ejecutivo</p>
+                  <p class="sub">Resumen operativo • Hoy</p>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip chipAccent">Sitio: Central</span>
+                <span class="chip">Turno: AM</span>
+                <span class="chip">Últimos 7 días</span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="layout">
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">KPIs principales</p>
+                    <span class="m">Actualizado hace 2 min</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="cards">
+                      <div class="kpi">
+                        <p class="label">OTIF</p>
+                        <p class="value">96%</p>
+                        <p class="delta up">▲ +2.1 pts</p>
+                      </div>
+                      <div class="kpi">
+                        <p class="label">Atrasos</p>
+                        <p class="value">8</p>
+                        <p class="delta down">▼ +3</p>
+                      </div>
+                      <div class="kpi">
+                        <p class="label">Incidencias</p>
+                        <p class="value">3</p>
+                        <p class="delta up">▲ -2</p>
+                      </div>
+                    </div>
+                    <div class="spark" aria-hidden="true">
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none">
+                        <path
+                          d="M0 120 C 70 110, 110 60, 160 70 S 270 120, 330 95 S 420 60, 470 78 S 540 120, 600 72"
+                          fill="none"
+                          stroke="rgba(39,193,167,0.95)"
+                          stroke-width="4"
+                        />
+                        <path
+                          d="M0 130 C 70 115, 110 80, 160 88 S 270 135, 330 110 S 420 88, 470 98 S 540 130, 600 96"
+                          fill="none"
+                          stroke="rgba(59,130,246,0.65)"
+                          stroke-width="3"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Top riesgos (hoy)</p>
+                    <span class="m">Prioridad</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="list">
+                      <div class="row">
+                        <div class="l">
+                          <div class="t">Capacidad en rampa</div>
+                          <div class="s">+18% vs promedio</div>
+                        </div>
+                        <span class="sev sevHigh">ALTA</span>
+                      </div>
+                      <div class="row">
+                        <div class="l">
+                          <div class="t">Retrasos en ruta 12</div>
+                          <div class="s">Tendencia 3 días</div>
+                        </div>
+                        <span class="sev sevMed">MEDIA</span>
+                      </div>
+                      <div class="row">
+                        <div class="l">
+                          <div class="t">Incidencias por turno</div>
+                          <div class="s">Turno AM vs PM</div>
+                        </div>
+                        <span class="sev sevLow">BAJA</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 2 -->
+        <div class="canvas" id="screen-2">
+          <div class="overlay">
+            <div class="headline">
+              <p class="big">Del KPI a la acción.</p>
+              <p class="small">Drivers, desglose y responsables. Menos reuniones, más ejecución.</p>
+            </div>
+            <div class="badge"><span class="dot"></span> KPI → Acción</div>
+          </div>
+          <div class="frame">
+            <div class="topbar">
+              <div class="brand">
+                <img src="/whagons.svg" alt="Whagons" />
+                <div>
+                  <p class="title">KPI Accionable</p>
+                  <p class="sub">OTIF • Drivers y acciones</p>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip chipAccent">KPI: OTIF</span>
+                <span class="chip">Fecha: Semana</span>
+                <span class="chip">Vista: Equipos</span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="layout">
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Detalle de KPI</p>
+                    <span class="m">Click para profundizar</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="cards">
+                      <div class="kpi">
+                        <p class="label">OTIF</p>
+                        <p class="value">96%</p>
+                        <p class="delta up">▲ +2.1 pts</p>
+                      </div>
+                      <div class="kpi">
+                        <p class="label">Causas top</p>
+                        <p class="value">3</p>
+                        <p class="delta">En foco</p>
+                      </div>
+                      <div class="kpi">
+                        <p class="label">Acciones abiertas</p>
+                        <p class="value">5</p>
+                        <p class="delta down">▼ 2 vencidas</p>
+                      </div>
+                    </div>
+                    <div class="table" style="margin-top: 10px;">
+                      <div class="tr th">
+                        <div>Driver</div>
+                        <div>Detalle</div>
+                        <div>Impacto</div>
+                        <div>Acción</div>
+                      </div>
+                      <div class="tr">
+                        <div>Retraso</div>
+                        <div>Ruta 12 • 3 días</div>
+                        <div><div class="bar"><span style="width: 72%"></span></div></div>
+                        <div>Asignar</div>
+                      </div>
+                      <div class="tr">
+                        <div>Picking</div>
+                        <div>Turno PM • Variación</div>
+                        <div><div class="bar"><span style="width: 48%"></span></div></div>
+                        <div>Crear tarea</div>
+                      </div>
+                      <div class="tr">
+                        <div>Capacidad</div>
+                        <div>Rampa • +18%</div>
+                        <div><div class="bar"><span style="width: 64%"></span></div></div>
+                        <div>Escalar</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Acción recomendada</p>
+                    <span class="m">1 minuto</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="row" style="margin-bottom: 10px;">
+                      <div class="l">
+                        <div class="t">Asignar responsable</div>
+                        <div class="s">Ruta 12 • seguimiento diario</div>
+                      </div>
+                      <span class="sev sevMed">HOY</span>
+                    </div>
+                    <div class="challenge">
+                      <div class="card">
+                        <p class="h">Checklist sugerido</p>
+                        <p class="p">Validar capacidad, horarios de salida y puntos de congestión. Registrar evidencia.</p>
+                        <div class="badges">
+                          <span class="badgeMini badgeMiniAccent">Dueño: Operación</span>
+                          <span class="badgeMini">SLA: 24h</span>
+                          <span class="badgeMini">Impacto alto</span>
+                        </div>
+                      </div>
+                      <div class="card">
+                        <p class="h">Crear acción</p>
+                        <p class="p">Genera seguimiento y notifica al equipo con criterios claros.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 3 -->
+        <div class="canvas" id="screen-3">
+          <div class="overlay">
+            <div class="headline">
+              <p class="big">Alertas antes de que explote.</p>
+              <p class="small">Anomalías vs histórico con severidad, contexto y responsable.</p>
+            </div>
+            <div class="badge"><span class="dot"></span> Alertas</div>
+          </div>
+          <div class="frame">
+            <div class="topbar">
+              <div class="brand">
+                <img src="/whagons.svg" alt="Whagons" />
+                <div>
+                  <p class="title">Alertas y Anomalías</p>
+                  <p class="sub">Prioriza por impacto</p>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip chipAccent">Severidad: Alta</span>
+                <span class="chip">Ventana: 14 días</span>
+                <span class="chip">Equipo: Todos</span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="layout">
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Feed de alertas</p>
+                    <span class="m">Hoy</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="list">
+                      <div class="row">
+                        <div class="l">
+                          <div class="t">Anomalía: Atrasos en ruta 12</div>
+                          <div class="s">+65% vs histórico (14d)</div>
+                        </div>
+                        <span class="sev sevHigh">ALTA</span>
+                      </div>
+                      <div class="row">
+                        <div class="l">
+                          <div class="t">Capacidad: rampa saturada</div>
+                          <div class="s">Pico fuera de patrón</div>
+                        </div>
+                        <span class="sev sevMed">MEDIA</span>
+                      </div>
+                      <div class="row">
+                        <div class="l">
+                          <div class="t">Incidencias: turno PM</div>
+                          <div class="s">+2 sigma vs promedio</div>
+                        </div>
+                        <span class="sev sevMed">MEDIA</span>
+                      </div>
+                    </div>
+                    <div class="spark" style="margin-top: 10px;">
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none">
+                        <path d="M0 118 C 80 115, 140 112, 190 110 S 290 102, 340 92 S 420 80, 470 75 S 540 70, 600 46" fill="none" stroke="rgba(239,68,68,0.9)" stroke-width="4"/>
+                        <path d="M0 128 C 80 125, 140 123, 190 122 S 290 120, 340 118 S 420 116, 470 115 S 540 114, 600 112" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="3"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Detalle (vs histórico)</p>
+                    <span class="m">Ruta 12</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="kpi" style="margin-bottom: 10px;">
+                      <p class="label">Desvío detectado</p>
+                      <p class="value">+65%</p>
+                      <p class="delta down">▼ Riesgo alto hoy</p>
+                    </div>
+                    <div class="row">
+                      <div class="l">
+                        <div class="t">Siguiente paso</div>
+                        <div class="s">Asignar y seguir 24h</div>
+                      </div>
+                      <span class="sev sevHigh">ASIGNAR</span>
+                    </div>
+                    <div class="challenge" style="margin-top: 10px;">
+                      <div class="card">
+                        <p class="h">Recomendación</p>
+                        <p class="p">Revisar puntos de congestión y tiempos de salida. Confirmar recursos y rutas alternas.</p>
+                      </div>
+                      <div class="card">
+                        <p class="h">Responsable</p>
+                        <p class="p">Operación • Turno AM (notificar)</p>
+                        <div class="badges">
+                          <span class="badgeMini badgeMiniAccent">Due: Hoy</span>
+                          <span class="badgeMini">Evidencia</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 4 -->
+        <div class="canvas" id="screen-4">
+          <div class="overlay">
+            <div class="headline">
+              <p class="big">Comparativos que alinean.</p>
+              <p class="small">Ranking, heatmap y brechas por equipo/turno/sitio (sin discusiones).</p>
+            </div>
+            <div class="badge"><span class="dot"></span> Comparativos</div>
+          </div>
+          <div class="frame">
+            <div class="topbar">
+              <div class="brand">
+                <img src="/whagons.svg" alt="Whagons" />
+                <div>
+                  <p class="title">Tablero por Equipo/Turno</p>
+                  <p class="sub">Gestión diaria con datos</p>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip chipAccent">Sitio: Central</span>
+                <span class="chip">Semana</span>
+                <span class="chip">Vista: Ranking</span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="layout">
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Ranking</p>
+                    <span class="m">OTIF • Semana</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="table">
+                      <div class="tr th">
+                        <div>#</div>
+                        <div>Equipo</div>
+                        <div>OTIF</div>
+                        <div>Brecha</div>
+                      </div>
+                      <div class="tr">
+                        <div>1</div>
+                        <div>Equipo A</div>
+                        <div>97%</div>
+                        <div><div class="bar"><span style="width: 84%"></span></div></div>
+                      </div>
+                      <div class="tr">
+                        <div>2</div>
+                        <div>Equipo C</div>
+                        <div>96%</div>
+                        <div><div class="bar"><span style="width: 78%"></span></div></div>
+                      </div>
+                      <div class="tr">
+                        <div>3</div>
+                        <div>Equipo B</div>
+                        <div>94%</div>
+                        <div><div class="bar"><span style="width: 62%"></span></div></div>
+                      </div>
+                      <div class="tr">
+                        <div>4</div>
+                        <div>Equipo D</div>
+                        <div>92%</div>
+                        <div><div class="bar"><span style="width: 46%"></span></div></div>
+                      </div>
+                    </div>
+                    <div class="spark" style="margin-top: 10px;">
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none">
+                        <path d="M0 110 C 70 95, 130 120, 190 90 S 300 70, 360 85 S 460 130, 520 88 S 570 60, 600 74" fill="none" stroke="rgba(39,193,167,0.95)" stroke-width="4"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Heatmap</p>
+                    <span class="m">Brechas</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="challenge">
+                      <div class="card">
+                        <p class="h">Dónde mejorar</p>
+                        <p class="p">Turno PM muestra mayor variación. Revisar proceso de salida y picking.</p>
+                        <div class="badges">
+                          <span class="badgeMini">Turno PM</span>
+                          <span class="badgeMini badgeMiniAccent">Impacto alto</span>
+                          <span class="badgeMini">Acción: hoy</span>
+                        </div>
+                      </div>
+                      <div class="card">
+                        <p class="h">Mejor práctica</p>
+                        <p class="p">Equipo A: checklist de salida + control de capacidad en rampa.</p>
+                      </div>
+                    </div>
+                    <div class="spark" style="margin-top: 10px;">
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none">
+                        <rect x="60" y="40" width="120" height="50" rx="10" fill="rgba(39,193,167,0.22)" stroke="rgba(255,255,255,0.12)"/>
+                        <rect x="200" y="40" width="120" height="50" rx="10" fill="rgba(59,130,246,0.16)" stroke="rgba(255,255,255,0.12)"/>
+                        <rect x="340" y="40" width="120" height="50" rx="10" fill="rgba(239,68,68,0.16)" stroke="rgba(255,255,255,0.12)"/>
+                        <rect x="480" y="40" width="120" height="50" rx="10" fill="rgba(245,158,11,0.16)" stroke="rgba(255,255,255,0.12)"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCREEN 5 -->
+        <div class="canvas" id="screen-5">
+          <div class="overlay">
+            <div class="headline">
+              <p class="big">Motivación que mejora KPIs.</p>
+              <p class="small">Retos semanales, progreso y reconocimiento conectados al resultado.</p>
+            </div>
+            <div class="badge"><span class="dot"></span> Retos + Progreso</div>
+          </div>
+          <div class="frame">
+            <div class="topbar">
+              <div class="brand">
+                <img src="/whagons.svg" alt="Whagons" />
+                <div>
+                  <p class="title">Motivación</p>
+                  <p class="sub">Reto semanal • Progreso</p>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip chipAccent">Reto: OTIF 97%</span>
+                <span class="chip">Semana</span>
+                <span class="chip">Equipos</span>
+              </div>
+            </div>
+            <div class="content">
+              <div class="layout">
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Reto de la semana</p>
+                    <span class="m">Reglas claras</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="challenge">
+                      <div class="card">
+                        <p class="h">Objetivo</p>
+                        <p class="p">Mantener OTIF ≥ 97% durante 5 días. Reporte automático al cierre del turno.</p>
+                        <div class="badges">
+                          <span class="badgeMini badgeMiniAccent">Impacto: alto</span>
+                          <span class="badgeMini">Duración: 5 días</span>
+                          <span class="badgeMini">Criterios: claros</span>
+                        </div>
+                      </div>
+                      <div class="card">
+                        <p class="h">Progreso</p>
+                        <p class="p">Equipo A 4/5 • Equipo C 3/5 • Equipo B 2/5 • Equipo D 2/5</p>
+                        <div class="bar" style="margin-top: 8px;"><span style="width: 78%"></span></div>
+                      </div>
+                      <div class="card">
+                        <p class="h">Reconocimiento</p>
+                        <p class="p">Badges por consistencia, calidad y mejora continua.</p>
+                        <div class="badges">
+                          <span class="badgeMini badgeMiniAccent">Constancia</span>
+                          <span class="badgeMini">Calidad</span>
+                          <span class="badgeMini">Mejora</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panelHead">
+                    <p class="h">Leaderboard</p>
+                    <span class="m">Transparente</span>
+                  </div>
+                  <div class="panelBody">
+                    <div class="table">
+                      <div class="tr th">
+                        <div>#</div>
+                        <div>Equipo</div>
+                        <div>Puntos</div>
+                        <div>Estado</div>
+                      </div>
+                      <div class="tr">
+                        <div>1</div>
+                        <div>Equipo A</div>
+                        <div>128</div>
+                        <div class="up">En racha</div>
+                      </div>
+                      <div class="tr">
+                        <div>2</div>
+                        <div>Equipo C</div>
+                        <div>114</div>
+                        <div class="up">Mejorando</div>
+                      </div>
+                      <div class="tr">
+                        <div>3</div>
+                        <div>Equipo B</div>
+                        <div>98</div>
+                        <div class="down">En riesgo</div>
+                      </div>
+                      <div class="tr">
+                        <div>4</div>
+                        <div>Equipo D</div>
+                        <div>92</div>
+                        <div class="down">Atención</div>
+                      </div>
+                    </div>
+                    <div class="spark" style="margin-top: 10px;">
+                      <svg viewBox="0 0 600 160" preserveAspectRatio="none">
+                        <path d="M0 120 C 90 110, 140 85, 200 92 S 320 130, 380 102 S 470 70, 520 86 S 570 110, 600 78" fill="none" stroke="rgba(39,193,167,0.95)" stroke-width="4"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

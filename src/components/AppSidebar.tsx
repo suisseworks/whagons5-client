@@ -23,6 +23,7 @@ import {
   Activity, // Add Activity icon
   BarChart3, // Add BarChart3 icon for KPI Cards
   Trophy, // Add Trophy icon for gamification
+  LineChart, // Add LineChart icon for analytics
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -119,7 +120,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     enabled: true,
     pinned: false,
     name: 'Boards',
-    icon: Users2,
+    icon: FileText,
     iconColor: '#8b5cf6', // violet-500 to match plugin card
     route: '/settings/boards', // Link to boards settings when unpinned
   },
@@ -149,6 +150,24 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     icon: Trophy,
     iconColor: '#a855f7', // purple-500
     route: '/gamification',
+  },
+  {
+    id: 'analytics',
+    enabled: true,
+    pinned: false,
+    name: 'Analytics',
+    icon: LineChart,
+    iconColor: '#3b82f6', // blue-500
+    route: '/analytics',
+  },
+  {
+    id: 'motivation',
+    enabled: true,
+    pinned: false,
+    name: 'Motivation',
+    icon: Sparkles,
+    iconColor: '#eab308', // yellow-500
+    route: '/motivation',
   },
 ];
 

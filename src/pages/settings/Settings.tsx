@@ -30,6 +30,7 @@ import {
   faSquareCheck,
   faLayerGroup,
   faChartBar,
+  faChartLine,
   faStar as faStarSolid,
   faBell,
   faFileAlt
@@ -521,14 +522,6 @@ function Settings() {
       count: 0,
       description: t('settings.cards.schedules.description', 'Manage schedules and time-based workflows'),
       color: 'text-orange-500'
-    },
-    {
-      id: 'motivation',
-      title: t('settings.cards.motivation.title', 'Motivation'),
-      icon: faRocket,
-      count: 0,
-      description: t('settings.cards.motivation.description', 'Configure motivation and engagement settings'),
-      color: 'text-yellow-500'
     },
   ], [counts.slas, counts.forms, counts.workflows, t]);
 
@@ -1157,9 +1150,6 @@ function Settings() {
       case 'schedules':
         navigate('/settings/schedules');
         break;
-      case 'motivation':
-        navigate('/settings/motivation');
-        break;
       default:
         console.log(`Unknown setting: ${settingId}`);
     }
@@ -1360,6 +1350,18 @@ function Settings() {
                     settingsRoute: '/settings/gamification',
                     mainRoute: '/gamification'
                   },
+                  'analytics': {
+                    icon: faChartLine,
+                    color: 'text-blue-500',
+                    settingsRoute: '/settings/analytics',
+                    mainRoute: '/analytics'
+                  },
+                  'motivation': {
+                    icon: faRocket,
+                    color: 'text-yellow-500',
+                    settingsRoute: '/settings/motivation',
+                    mainRoute: '/motivation'
+                  },
                   'boards': {
                     icon: faUsers,
                     color: 'text-violet-500',
@@ -1433,7 +1435,7 @@ function Settings() {
   ];
 
   return (
-    <div className="p-4 pt-0 space-y-4">
+    <div className="p-4 pt-0 space-y-4 max-w-screen-2xl mx-auto">
       {/* Header with Title, Stats, and Search */}
       <div className="space-y-4 pb-4 border-b border-border/40">
         <div className="flex items-start justify-between gap-4">

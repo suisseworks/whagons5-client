@@ -7,6 +7,8 @@ import { CheckCircle2, Clock, XCircle, Check, X } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { promptForComment } from '../columnUtils/promptForComment';
 import { ColumnBuilderOptions } from './types';
+import { api } from '@/api/whagonsApi';
+import { celebrateTaskCompletion } from '@/utils/confetti';
 
 function formatSlaDuration(seconds?: number | null) {
   const secs = Number(seconds);
@@ -177,6 +179,8 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
     getUserDisplayName,
     currentUserId,
     slaMap,
+    statusMap,
+    getDoneStatusId,
   } = opts;
 
   const row = p?.data || {};
@@ -232,7 +236,7 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
       return;
     }
     try {
-      await api.post('/approvals/decide', {
+      const response = await api.post('/approvals/decide', {
         task_id: p.data?.id,
         approval_id: approvalId,
         approver_user_id: approverUserIdToSend,
@@ -240,9 +244,69 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
         comment,
         task_status_id: p.data?.status_id,
       });
+      
       if (p.data) {
+        const oldStatusId = p.data.status_id;
         p.data.approval_status = decision;
         p.data.approval_completed_at = new Date().toISOString();
+        
+        // Check if response includes updated task with new status_id
+        const updatedTask = response.data?.data?.task;
+        if (updatedTask?.status_id !== undefined) {
+          p.data.status_id = updatedTask.status_id;
+        }
+        
+        // Check if approval decision changed status to a final/done status and trigger celebration
+        if (decision === 'approved' && p.data.status_id !== undefined) {
+          const newStatusId = Number(p.data.status_id);
+          const oldStatusIdNum = oldStatusId ? Number(oldStatusId) : null;
+          
+          // Only trigger if status actually changed
+          if (newStatusId !== oldStatusIdNum) {
+            let isDoneStatus = false;
+            
+            // First check: use getDoneStatusId if available (most reliable)
+            if (getDoneStatusId) {
+              const doneStatusId = getDoneStatusId();
+              if (doneStatusId !== undefined && newStatusId === doneStatusId) {
+                isDoneStatus = true;
+              }
+            }
+            
+            // Second check: use statusMap detection (fallback)
+            if (!isDoneStatus && statusMap) {
+              const newStatusMeta = statusMap[newStatusId];
+              if (newStatusMeta) {
+                const action = String(newStatusMeta.action || '').toUpperCase();
+                const nameLower = String(newStatusMeta.name || '').toLowerCase();
+                // Check for DONE, FINISHED actions, or name includes done/complete/finished
+                isDoneStatus = action === 'DONE' || action === 'FINISHED' || 
+                              nameLower.includes('done') || nameLower.includes('complete') || nameLower.includes('finished');
+              }
+            }
+            
+            // Check if celebration is enabled for this status
+            const newStatusMeta = statusMap?.[newStatusId];
+            const celebrationEnabled = newStatusMeta?.celebration_enabled !== false; // Default to true if not set
+            
+            if (isDoneStatus && celebrationEnabled) {
+              console.log('[Confetti Debug] Approval decision changed status to done, triggering celebration:', {
+                taskId: p.data?.id,
+                oldStatusId: oldStatusIdNum,
+                newStatusId,
+                statusName: newStatusMeta?.name,
+                action: newStatusMeta?.action,
+                celebrationEnabled
+              });
+              
+              // Get category celebration effect if available
+              const taskCategory = categoryMap?.[Number(p.data?.category_id)];
+              const categoryCelebrationEffect = taskCategory?.celebration_effect;
+              celebrateTaskCompletion(categoryCelebrationEffect);
+            }
+          }
+        }
+        
         try { p.api?.refreshCells({ force: true }); } catch {}
       }
       try {

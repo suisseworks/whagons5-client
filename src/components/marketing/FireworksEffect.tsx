@@ -157,17 +157,6 @@ export default function FireworksEffect({ onClose }: FireworksEffectProps) {
         ref={canvasRef}
         className="w-full h-full"
       />
-      {onClose && (
-        <div className="fixed bottom-4 right-4 pointer-events-auto bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg transition-colors">
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-medium">Fireworks</div>
-            <div className="text-xs opacity-75">(Ctrl+C)</div>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

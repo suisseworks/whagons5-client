@@ -140,8 +140,8 @@ const WorkspaceLink = ({
   collapsed: boolean;
   iconColor?: string;
 }) => {
-  const isActive = pathname === to;
-  const baseClasses = "flex items-center transition-colors rounded-[8px]";
+  const isActive = pathname === to || pathname.startsWith(to);
+  const baseClasses = "flex items-center transition-colors rounded-[8px] relative";
   const activeClasses = isActive 
     ? "bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]" 
     : "text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]";
@@ -151,7 +151,12 @@ const WorkspaceLink = ({
       <Link
         to={to}
         className={`${baseClasses} ${activeClasses} justify-center`}
-        style={{ width: '32px', height: '32px' }}
+        style={{ 
+          width: '32px', 
+          height: '32px',
+          fontWeight: isActive ? 600 : 500,
+          boxShadow: isActive ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+        }}
         title={label}
       >
         <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
@@ -165,13 +170,14 @@ const WorkspaceLink = ({
   return (
     <Link
       to={to}
-      className={`${baseClasses} ${activeClasses} relative overflow-hidden`}
+      className={`${baseClasses} ${activeClasses} overflow-hidden`}
       style={{
         height: '36px',
         padding: '8px 12px',
         gap: '10px',
         fontWeight: isActive ? 600 : 500,
-        fontSize: '15px'
+        fontSize: '15px',
+        boxShadow: isActive ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
       }}
     >
       <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>

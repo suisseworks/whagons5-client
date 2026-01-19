@@ -958,6 +958,37 @@ const ASSET_CONFIG: Array<{
   }
 ];
 
+// Motivational quotes array
+const MOTIVATIONAL_QUOTES = [
+  "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+  "The only way to do great work is to love what you do.",
+  "Innovation distinguishes between a leader and a follower.",
+  "The future belongs to those who believe in the beauty of their dreams.",
+  "Excellence is not a skill, it's an attitude.",
+  "Don't watch the clock; do what it does. Keep going.",
+  "The only limit to our realization of tomorrow will be our doubts of today.",
+  "Success usually comes to those who are too busy to be looking for it.",
+  "The way to get started is to quit talking and begin doing.",
+  "Innovation is the ability to see change as an opportunity, not a threat.",
+  "Your limitation—it's only your imagination.",
+  "Great things never come from comfort zones.",
+  "Dream it. Wish it. Do it.",
+  "Success doesn't just find you. You have to go out and get it.",
+  "The harder you work for something, the greater you'll feel when you achieve it.",
+];
+
+// Random hero images from Unsplash
+const HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1645736315000-6f788915923b?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=1920&q=80",
+  "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1920&q=80",
+];
+
 function Global() {
   const {
     config: activeBrand,
@@ -968,6 +999,14 @@ function Global() {
   const { language, setLanguage, t } = useLanguage();
   const [celebrationType, setCelebrationTypeState] = useState<CelebrationType>(() => getCelebrationType());
   const [fontStyle, setFontStyleState] = useState<FontStyle>(() => getFontStyle());
+  
+  // Random hero image and quote on mount
+  const [heroImage, setHeroImage] = useState(() => 
+    HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)]
+  );
+  const [motivationalQuote, setMotivationalQuote] = useState(() =>
+    MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
+  );
 
   // Initialize font style on mount
   useEffect(() => {
@@ -1197,42 +1236,52 @@ function Global() {
       iconColor="#0ea5e9"
       wrapChildrenFullHeight={false}
     >
-      <Tabs defaultValue="defaults" className="space-y-6 pb-12">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">
+      <div className="max-w-5xl mx-auto w-full">
+        <Tabs defaultValue="defaults" className="space-y-6 pb-12">
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border pb-6 pt-4 mb-6">
+          <div className="flex flex-col gap-6">
+            <p className="text-sm text-muted-foreground max-w-2xl">
               {t(
                 "settings.global.intro",
                 "Configure how your org looks and behaves at a global level. Switch tabs to access different modules."
               )}
             </p>
+            <div className="flex gap-2 border-b border-border -mb-6">
+              <TabsList className="inline-flex h-auto items-center justify-start rounded-none bg-transparent p-0 text-muted-foreground border-0 w-auto">
+                <TabsTrigger 
+                  value="defaults"
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent hover:text-foreground hover:border-muted-foreground/50"
+                >
+                  {t("settings.global.tabs.defaults", "Platform Defaults")}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="branding"
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent hover:text-foreground hover:border-muted-foreground/50"
+                >
+                  {t("settings.global.tabs.branding", "Branding & Identity")}
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
-          <TabsList className="w-full justify-start overflow-x-auto lg:w-auto">
-            <TabsTrigger value="defaults">
-              {t("settings.global.tabs.defaults", "Platform Defaults")}
-            </TabsTrigger>
-            <TabsTrigger value="branding">
-              {t("settings.global.tabs.branding", "Branding & Identity")}
-            </TabsTrigger>
-          </TabsList>
         </div>
 
         <TabsContent value="defaults">
           <Card>
-            <div className="h-48 relative overflow-hidden">
+            <div className="h-64 relative overflow-hidden rounded-t-lg">
               <img 
-                src="https://images.unsplash.com/photo-1645736315000-6f788915923b?auto=format&fit=crop&w=1920&q=80"
-                alt="Warehouse operations"
+                src={heroImage}
+                alt="Inspirational workspace"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <FontAwesomeIcon icon={faGlobe} className="text-5xl mb-2 opacity-90" />
-                  <h3 className="text-xl font-semibold">
-                    {t("settings.global.defaults.cardTitle", "Platform defaults")}
-                  </h3>
-                </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/70"></div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
+                <FontAwesomeIcon icon={faGlobe} className="text-4xl mb-3 text-white opacity-90" />
+                <h3 className="text-2xl font-bold text-white mb-3 drop-shadow-lg">
+                  {t("settings.global.defaults.cardTitle", "Platform defaults")}
+                </h3>
+                <p className="text-sm md:text-base text-white/95 text-center max-w-2xl leading-relaxed drop-shadow-md italic">
+                  "{motivationalQuote}"
+                </p>
               </div>
             </div>
             <CardContent className="pt-6 space-y-6">
@@ -1379,29 +1428,41 @@ function Global() {
 
         <TabsContent value="branding" className="space-y-6">
           <Tabs defaultValue="presets" className="space-y-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    "settings.global.branding.tabs.helper",
-                    "Choose a preset theme or create a custom design with your brand colors."
-                  )}
-                </p>
+            <div className="flex flex-col gap-6">
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                {t(
+                  "settings.global.branding.tabs.helper",
+                  "Choose a preset theme or create a custom design with your brand colors."
+                )}
+              </p>
+              <div className="flex gap-2 border-b border-border -mb-6">
+                <TabsList className="inline-flex h-auto items-center justify-start rounded-none bg-transparent p-0 text-muted-foreground border-0 w-auto">
+                  <TabsTrigger 
+                    value="presets"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent hover:text-foreground hover:border-muted-foreground/50"
+                  >
+                    {t("settings.global.branding.tabs.presets", "Preset Themes")}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="custom"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent hover:text-foreground hover:border-muted-foreground/50"
+                  >
+                    {t("settings.global.branding.tabs.custom", "Custom Designer")}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="assets"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent hover:text-foreground hover:border-muted-foreground/50"
+                  >
+                    {t("settings.global.branding.tabs.assets", "Logos & Icons")}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="rollout"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent hover:text-foreground hover:border-muted-foreground/50"
+                  >
+                    {t("settings.global.branding.tabs.rollout", "Rollout Controls")}
+                  </TabsTrigger>
+                </TabsList>
               </div>
-              <TabsList className="w-full justify-start overflow-x-auto lg:w-auto">
-                <TabsTrigger value="presets">
-                  {t("settings.global.branding.tabs.presets", "Preset Themes")}
-                </TabsTrigger>
-                <TabsTrigger value="custom">
-                  {t("settings.global.branding.tabs.custom", "Custom Designer")}
-                </TabsTrigger>
-                <TabsTrigger value="assets">
-                  {t("settings.global.branding.tabs.assets", "Logos & Icons")}
-                </TabsTrigger>
-                <TabsTrigger value="rollout">
-                  {t("settings.global.branding.tabs.rollout", "Rollout Controls")}
-                </TabsTrigger>
-              </TabsList>
             </div>
 
             <TabsContent value="presets" className="space-y-6">
@@ -2043,6 +2104,7 @@ function Global() {
         </TabsContent>
 
       </Tabs>
+      </div>
 
       {hasPendingChanges && (
         <div className="fixed bottom-6 right-6 z-50 max-w-xl">

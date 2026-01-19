@@ -9,7 +9,7 @@ import { faUser, faChartBar, faEnvelope, faUsers } from "@fortawesome/free-solid
 import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Team, UserTeam, Invitation, Role } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -65,6 +65,7 @@ import dayjs from "dayjs";
 
 function Users() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const { t } = useLanguage();
   const tu = (key: string, fallback: string) => t(`settings.users.${key}`, fallback);
   // Redux state for related data
@@ -314,7 +315,17 @@ function Users() {
       // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       handleCloseTeamsDialog();
     } catch (err: any) {
-      setFormError(err?.message || 'Error updating teams');
+      // Provide better error messages for network errors
+      let errorMessage = 'Error updating teams';
+      if (err?.message?.includes('Network Error') || err?.code === 'ERR_NETWORK' || err?.code === 'ERR_CONNECTION_REFUSED') {
+        errorMessage = 'Unable to connect to the server. Please check if the API server is running.';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      setFormError(errorMessage);
+      console.error('Error saving teams:', err);
     } finally {
       setIsSavingTeams(false);
     }
@@ -1683,23 +1694,6 @@ function Users() {
                       {tu('dialogs.editUser.fields.globalRolesHelp', 'Los roles globales son opcionales. Puedes dejar este campo vacío si no necesitas asignar roles globales al usuario.')}
                     </p>
                   </div>
-                  <MultiSelect
-                    options={roles
-                      .filter((role: Role) => role.scope === 'GLOBAL')
-                      .map((role: Role) => ({
-                        value: role.name,
-                        label: role.name
-                      }))}
-                    onValueChange={setSelectedGlobalRoles}
-                    defaultValue={selectedGlobalRoles}
-                    placeholder={
-                      roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
-                        ? tu('multiSelect.noGlobalRoles', 'No global roles available')
-                        : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
-                    }
-                    maxCount={10}
-                    className="w-full"
-                  />
                 </div>
               </div>
             </TabsContent>
