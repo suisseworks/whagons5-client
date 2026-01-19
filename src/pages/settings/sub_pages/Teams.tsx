@@ -78,13 +78,8 @@ function Teams() {
   const { value: categories } = useSelector((state: RootState) => state.categories);
   const { value: tasks } = useSelector((state: RootState) => state.tasks);
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
-  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
-
-  useEffect(() => {
-    dispatch((genericActions as any).roles.getFromIndexedDB?.());
-    dispatch((genericActions as any).roles.fetchFromAPI?.());
-  }, [dispatch]);
+  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
   
   // Use shared state management
   const {

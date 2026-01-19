@@ -1,5 +1,6 @@
 import { combineReducers } from "@reduxjs/toolkit";
 import { createGenericSlices } from "./genericSliceFactory";
+import type { GenericSliceActions } from "./genericSliceFactory";
 
 // Import all type interfaces
 // Type imports kept for reference; not used directly in this file
@@ -24,15 +25,12 @@ const genericSliceConfigs = [
 
     // User Management
     { name: 'users', table: 'wh_users', endpoint: '/users', store: 'users', hashFields: ['id','google_uuid','name','email','role_id','job_position_id','spots','color','url_picture','organization_name','tenant_domain_prefix','stripe_id','is_admin','has_active_subscription','initialization_stage','updated_at'] },
-    { name: 'roles', table: 'wh_roles', endpoint: '/roles', store: 'roles', hashFields: ['id','name','description','updated_at'] },
-    { name: 'permissions', table: 'wh_permissions', endpoint: '/permissions', store: 'permissions', hashFields: ['id','name','key','group','type','updated_at'] },
   { name: 'userTeams', table: 'wh_user_team', endpoint: '/user-teams', store: 'user_teams', hashFields: ['id','user_id','team_id','role_id','updated_at'] },
-    { name: 'userPermissions', table: 'wh_user_permission', endpoint: '/user-permissions', store: 'user_permissions', hashFields: ['id','user_id','permission_id','updated_at'] },
-    { name: 'rolePermissions', table: 'wh_role_permission', endpoint: '/role-permissions', store: 'role_permissions', hashFields: ['id','role_id','permission_id','updated_at'] },
 
     // Task Relations
     { name: 'taskUsers', table: 'wh_task_user', endpoint: '/task-users', store: 'task_users', hashFields: ['id','task_id','user_id','updated_at'] },
     { name: 'taskTags', table: 'wh_task_tag', endpoint: '/task-tags', store: 'task_tags', hashFields: ['id','task_id','tag_id','user_id','updated_at'] },
+    { name: 'taskShares', table: 'wh_task_shares', endpoint: '/task-shares', store: 'task_shares', hashFields: ['id','task_id','shared_by_user_id','shared_to_user_id','shared_to_team_id','permission','revoked_at','updated_at'] },
     { name: 'taskLogs', table: 'wh_task_logs', endpoint: '/task-logs', store: 'task_logs', hashFields: ['id','uuid','task_id','user_id','action','old_values','new_values','updated_at'] },
     { name: 'statusTransitionLogs', table: 'wh_status_transition_logs', endpoint: '/status-transition-logs', store: 'status_transition_logs', hashFields: ['id','task_id','type','from_status','to_status','start','end','user_id','updated_at'] },
 
@@ -100,6 +98,11 @@ const genericSliceConfigs = [
     // Plugin System
     { name: 'plugins', table: 'wh_plugins', endpoint: '/plugins', store: 'plugins', hashFields: ['id','slug','name','description','version','is_enabled','updated_at'] },
     { name: 'pluginRoutes', table: 'wh_plugin_routes', endpoint: '/plugin-routes', store: 'plugin_routes', hashFields: ['id','plugin_id','method','path','controller','action','updated_at'] },
+
+    // Schedule Management
+    { name: 'scheduleTemplates', table: 'wh_schedule_templates', endpoint: '/schedule-templates', store: 'schedule_templates', hashFields: ['id','name','description','schedule_type','weekly_hours','updated_at'] },
+    { name: 'scheduleTemplateDays', table: 'wh_schedule_template_days', endpoint: '/schedule-template-days', store: 'schedule_template_days', hashFields: ['id','template_id','day_of_week','is_working_day','start_time','end_time','break_duration','break_start_time','updated_at'] },
+    { name: 'userSchedules', table: 'wh_user_schedules', endpoint: '/user-schedules', store: 'user_schedules', hashFields: ['id','user_id','template_id','effective_from','effective_to','timezone','updated_at'] },
 ];
 
 // Create all generic slices at once
@@ -117,13 +120,10 @@ export const {
     taskForms,
     fieldOptions,
     users,
-    roles,
-    permissions,
     userTeams,
-    userPermissions,
-    rolePermissions,
     taskUsers,
     taskTags,
+    taskShares,
     taskLogs,
     statusTransitionLogs,
     statuses,
@@ -171,6 +171,9 @@ export const {
     complianceAudits,
     plugins,
     pluginRoutes,
+    scheduleTemplates,
+    scheduleTemplateDays,
+    userSchedules,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -194,13 +197,10 @@ export const genericEventNames = {
     taskForms: genericSlices.slices.taskForms.eventNames,
     fieldOptions: genericSlices.slices.fieldOptions.eventNames,
     users: genericSlices.slices.users.eventNames,
-    roles: genericSlices.slices.roles.eventNames,
-    permissions: genericSlices.slices.permissions.eventNames,
     userTeams: genericSlices.slices.userTeams.eventNames,
-    userPermissions: genericSlices.slices.userPermissions.eventNames,
-    rolePermissions: genericSlices.slices.rolePermissions.eventNames,
     taskUsers: genericSlices.slices.taskUsers.eventNames,
     taskTags: genericSlices.slices.taskTags.eventNames,
+    taskShares: genericSlices.slices.taskShares.eventNames,
     taskLogs: genericSlices.slices.taskLogs.eventNames,
     statusTransitionLogs: genericSlices.slices.statusTransitionLogs.eventNames,
     statuses: genericSlices.slices.statuses.eventNames,
@@ -248,10 +248,24 @@ export const genericEventNames = {
     complianceAudits: genericSlices.slices.complianceAudits.eventNames,
     plugins: genericSlices.slices.plugins.eventNames,
     pluginRoutes: genericSlices.slices.pluginRoutes.eventNames,
+    scheduleTemplates: genericSlices.slices.scheduleTemplates.eventNames,
+    scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.eventNames,
+    userSchedules: genericSlices.slices.userSchedules.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
-export const genericActions = {
+type PublicGenericSliceActions<T = any> = Omit<GenericSliceActions<T>, "getFromIndexedDB" | "fetchFromAPI">;
+
+function publicActions<T>(actions: GenericSliceActions<T>): PublicGenericSliceActions<T> {
+    const { getFromIndexedDB: _getFromIndexedDB, fetchFromAPI: _fetchFromAPI, ...rest } = actions as any;
+    return rest;
+}
+
+/**
+ * Internal-only actions (store layer).
+ * Includes `getFromIndexedDB` and `fetchFromAPI` for login hydration/repair flows.
+ */
+export const genericInternalActions = {
     spotCustomFields: genericSlices.slices.spotCustomFields.actions,
     templateCustomFields: genericSlices.slices.templateCustomFields.actions,
     taskCustomFieldValues: genericSlices.slices.taskCustomFieldValues.actions,
@@ -262,13 +276,10 @@ export const genericActions = {
     taskForms: genericSlices.slices.taskForms.actions,
     fieldOptions: genericSlices.slices.fieldOptions.actions,
     users: genericSlices.slices.users.actions,
-    roles: genericSlices.slices.roles.actions,
-    permissions: genericSlices.slices.permissions.actions,
     userTeams: genericSlices.slices.userTeams.actions,
-    userPermissions: genericSlices.slices.userPermissions.actions,
-    rolePermissions: genericSlices.slices.rolePermissions.actions,
     taskUsers: genericSlices.slices.taskUsers.actions,
     taskTags: genericSlices.slices.taskTags.actions,
+    taskShares: genericSlices.slices.taskShares.actions,
     taskLogs: genericSlices.slices.taskLogs.actions,
     statusTransitionLogs: genericSlices.slices.statusTransitionLogs.actions,
     statuses: genericSlices.slices.statuses.actions,
@@ -316,4 +327,78 @@ export const genericActions = {
     complianceAudits: genericSlices.slices.complianceAudits.actions,
     plugins: genericSlices.slices.plugins.actions,
     pluginRoutes: genericSlices.slices.pluginRoutes.actions,
+    scheduleTemplates: genericSlices.slices.scheduleTemplates.actions,
+    scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.actions,
+    userSchedules: genericSlices.slices.userSchedules.actions,
+} as const;
+
+/**
+ * Public actions (UI layer).
+ * Intentionally excludes `getFromIndexedDB` and `fetchFromAPI` to prevent ad-hoc hydration/fetching.
+ */
+export const genericActions = {
+    spotCustomFields: publicActions(genericInternalActions.spotCustomFields),
+    templateCustomFields: publicActions(genericInternalActions.templateCustomFields),
+    taskCustomFieldValues: publicActions(genericInternalActions.taskCustomFieldValues),
+    spotCustomFieldValues: publicActions(genericInternalActions.spotCustomFieldValues),
+    forms: publicActions(genericInternalActions.forms),
+    formFields: publicActions(genericInternalActions.formFields),
+    formVersions: publicActions(genericInternalActions.formVersions),
+    taskForms: publicActions(genericInternalActions.taskForms),
+    fieldOptions: publicActions(genericInternalActions.fieldOptions),
+    users: publicActions(genericInternalActions.users),
+    userTeams: publicActions(genericInternalActions.userTeams),
+    taskUsers: publicActions(genericInternalActions.taskUsers),
+    taskTags: publicActions(genericInternalActions.taskTags),
+    taskShares: publicActions(genericInternalActions.taskShares),
+    taskLogs: publicActions(genericInternalActions.taskLogs),
+    statusTransitionLogs: publicActions(genericInternalActions.statusTransitionLogs),
+    statuses: publicActions(genericInternalActions.statuses),
+    priorities: publicActions(genericInternalActions.priorities),
+    spots: publicActions(genericInternalActions.spots),
+    tags: publicActions(genericInternalActions.tags),
+    spotTypes: publicActions(genericInternalActions.spotTypes),
+    statusTransitions: publicActions(genericInternalActions.statusTransitions),
+    statusTransitionGroups: publicActions(genericInternalActions.statusTransitionGroups),
+    slas: publicActions(genericInternalActions.slas),
+    slaPolicies: publicActions(genericInternalActions.slaPolicies),
+    slaAlerts: publicActions(genericInternalActions.slaAlerts),
+    approvals: publicActions(genericInternalActions.approvals),
+    approvalApprovers: publicActions(genericInternalActions.approvalApprovers),
+    taskApprovalInstances: publicActions(genericInternalActions.taskApprovalInstances),
+    broadcasts: publicActions(genericInternalActions.broadcasts),
+    broadcastAcknowledgments: publicActions(genericInternalActions.broadcastAcknowledgments),
+    categoryPriorities: publicActions(genericInternalActions.categoryPriorities),
+    invitations: publicActions(genericInternalActions.invitations),
+    sessionLogs: publicActions(genericInternalActions.sessionLogs),
+    configLogs: publicActions(genericInternalActions.configLogs),
+    taskAttachments: publicActions(genericInternalActions.taskAttachments),
+    taskNotes: publicActions(genericInternalActions.taskNotes),
+    taskRecurrences: publicActions(genericInternalActions.taskRecurrences),
+    workspaceChat: publicActions(genericInternalActions.workspaceChat),
+    exceptions: publicActions(genericInternalActions.exceptions),
+    // Core entities (converted from custom)
+    categories: publicActions(genericInternalActions.categories),
+    categoryCustomFields: publicActions(genericInternalActions.categoryCustomFields),
+    customFields: publicActions(genericInternalActions.customFields),
+    teams: publicActions(genericInternalActions.teams),
+    templates: publicActions(genericInternalActions.templates),
+    messages: publicActions(genericInternalActions.messages),
+    workflows: publicActions(genericInternalActions.workflows),
+    workspaces: publicActions(genericInternalActions.workspaces),
+    // Boards
+    boards: publicActions(genericInternalActions.boards),
+    boardMembers: publicActions(genericInternalActions.boardMembers),
+    boardMessages: publicActions(genericInternalActions.boardMessages),
+    boardAttachments: publicActions(genericInternalActions.boardAttachments),
+    jobPositions: publicActions(genericInternalActions.jobPositions),
+    complianceStandards: publicActions(genericInternalActions.complianceStandards),
+    complianceRequirements: publicActions(genericInternalActions.complianceRequirements),
+    complianceMappings: publicActions(genericInternalActions.complianceMappings),
+    complianceAudits: publicActions(genericInternalActions.complianceAudits),
+    plugins: publicActions(genericInternalActions.plugins),
+    pluginRoutes: publicActions(genericInternalActions.pluginRoutes),
+    scheduleTemplates: publicActions(genericInternalActions.scheduleTemplates),
+    scheduleTemplateDays: publicActions(genericInternalActions.scheduleTemplateDays),
+    userSchedules: publicActions(genericInternalActions.userSchedules),
 } as const;

@@ -120,20 +120,6 @@ function BoardDetail() {
   // Filter members for this board
   const boardMembers = members.filter((m: any) => m.board_id === parseInt(boardId || '0'));
 
-  // Load data on mount
-  useEffect(() => {
-    dispatch(genericActions.boards.getFromIndexedDB());
-    dispatch(genericActions.boardMessages.getFromIndexedDB());
-    dispatch(genericActions.boardMembers.getFromIndexedDB());
-    dispatch(genericActions.boardAttachments.getFromIndexedDB());
-    dispatch(genericActions.users.getFromIndexedDB());
-
-    const parsedBoardId = boardId ? parseInt(boardId, 10) : 0;
-    if (parsedBoardId > 0) {
-      dispatch(genericActions.boardMessages.fetchFromAPI({ board_id: parsedBoardId }) as any);
-    }
-  }, [dispatch, boardId]);
-
   const handleCreateMessage = async (data: { content: string; title?: string; is_pinned?: boolean }) => {
     // Normalize content - ensure it's a string (can be empty or whitespace for image-only posts)
     if (data.content === null || data.content === undefined) {

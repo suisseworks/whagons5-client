@@ -7,7 +7,7 @@ import { ApprovalActionsManager } from './ApprovalActionsManager';
 import { Approval } from '@/store/types';
 import { genericActions } from '@/store/genericSlices';
 import type { AppDispatch } from '@/store/store';
-import apiClient from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 import toast from 'react-hot-toast';
 
 interface ApprovalActionsDialogProps {
@@ -42,13 +42,17 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
       const rejectedToSave = actionsToSave?.rejected ?? rejectedActions;
 
       // Use the dedicated actions endpoint
-      await apiClient.put(`/approvals/${approval.id}/actions`, {
+      await actionsApi.put(`/approvals/${approval.id}/actions`, {
         on_approved_actions: approvedToSave,
         on_rejected_actions: rejectedToSave,
       });
 
-      // Refresh the approvals data to get the updated actions
-      await dispatch(genericActions.approvals.fetchFromAPI());
+      // Update local state; cache will be updated via realtime notifications / background validation
+      dispatch((genericActions as any).approvals.updateItem({
+        id: approval.id,
+        on_approved_actions: approvedToSave,
+        on_rejected_actions: rejectedToSave,
+      }));
 
       if (showSuccessToast) {
         toast.success('Approval actions saved successfully');

@@ -31,13 +31,7 @@ function BroadcastsPage() {
   const [selectedBroadcast, setSelectedBroadcast] = useState<Broadcast | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
-  // Load broadcasts on mount
-  useEffect(() => {
-    dispatch(genericActions.broadcasts.getFromIndexedDB());
-    dispatch(genericActions.broadcasts.fetchFromAPI());
-    dispatch(genericActions.broadcastAcknowledgments.getFromIndexedDB());
-    dispatch(genericActions.broadcastAcknowledgments.fetchFromAPI());
-  }, [dispatch]);
+  // Data is hydrated on login; this page should not trigger ad-hoc IndexedDB/API loading.
 
   // Filter broadcasts by tab
   const filteredBroadcasts = broadcasts.filter((broadcast: Broadcast) => {

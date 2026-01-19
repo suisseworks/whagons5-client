@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { signUpWithEmail, signInWithGoogle, logout } from './auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
-import { api, updateAuthToken } from '@/api/whagonsApi';
+import { updateAuthToken } from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 import { InitializationStage } from '@/types/user';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -38,7 +39,7 @@ const SignUp: React.FC = () => {
     try {
       console.log('idToken', idToken);
 
-      const response = await api.post(`/login`,
+      const response = await actionsApi.post(`/login`,
         {
           "token": idToken
         },

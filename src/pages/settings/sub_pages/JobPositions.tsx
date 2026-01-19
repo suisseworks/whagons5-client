@@ -83,11 +83,6 @@ function JobPositions() {
 	const dispatch = useDispatch<AppDispatch>();
 	const { t } = useLanguage();
 
-	useEffect(() => {
-		dispatch((genericActions as any).jobPositions.getFromIndexedDB());
-		dispatch((genericActions as any).jobPositions.fetchFromAPI());
-	}, [dispatch]);
-
 	const {
 		items,
 		filteredItems,

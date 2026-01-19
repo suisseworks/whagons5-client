@@ -91,10 +91,6 @@ function Boards() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load boards on mount
-  useEffect(() => {
-    dispatch(genericActions.boards.getFromIndexedDB());
-  }, [dispatch]);
 
   // Load pinned boards on mount
   useEffect(() => {

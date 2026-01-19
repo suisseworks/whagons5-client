@@ -29,11 +29,7 @@ function PendingAcknowledgmentsWidget() {
   // Local state
   const [selectedBroadcast, setSelectedBroadcast] = useState<Broadcast | null>(null);
 
-  // Load data
-  useEffect(() => {
-    dispatch(genericActions.broadcasts.getFromIndexedDB());
-    dispatch(genericActions.broadcastAcknowledgments.getFromIndexedDB());
-  }, [dispatch]);
+  // Data is hydrated on login; this widget should not trigger ad-hoc IndexedDB/API loading.
 
   // Filter broadcasts that are pending for current user
   const pendingBroadcasts = broadcasts.filter((broadcast: Broadcast) => {

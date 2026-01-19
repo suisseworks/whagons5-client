@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 import { User, OnboardingData, InitializationStage } from '@/types/user';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
@@ -102,7 +102,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const updateUserProfile = async (data: Partial<OnboardingData>, newStage?: number) => {
     setLoading(true);
     try {
-      const response = await api.patch('/users/me', {
+      const response = await actionsApi.patch('/users/me', {
         ...data,
         ...(newStage !== undefined && { initialization_stage: newStage })
       });
@@ -128,7 +128,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       // Always use the generated tenant identifier as the subdomain prefix
       const domain = `${safeTenant}.${import.meta.env.VITE_API_URL}`;
       
-      const response = await api.post('/users/me/create-and-assign-tenant', {
+      const response = await actionsApi.post('/users/me/create-and-assign-tenant', {
         name: organizationName,
         domain: domain,
         // Use the generated tenant identifier as the database name as well

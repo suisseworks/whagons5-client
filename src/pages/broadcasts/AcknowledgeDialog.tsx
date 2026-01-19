@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuthUser } from '@/providers/AuthProvider';
 import { Broadcast } from '@/types/broadcast';
-import api from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 
 interface AcknowledgeDialogProps {
   broadcast: Broadcast;
@@ -25,7 +24,6 @@ interface AcknowledgeDialogProps {
 
 function AcknowledgeDialog({ broadcast, onClose }: AcknowledgeDialogProps) {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const currentUser = useAuthUser();
 
   // Local state
@@ -38,9 +36,8 @@ function AcknowledgeDialog({ broadcast, onClose }: AcknowledgeDialogProps) {
     setError('');
     
     try {
-      // Call the acknowledge endpoint
-      await api.post(`/broadcasts/${broadcast.id}/acknowledge`, {
-        comment: comment.trim() || null,
+      await actionsApi.post(`/broadcasts/${broadcast.id}/acknowledge`, {
+        comment: comment?.trim() ? comment.trim() : null,
       });
 
       // Show success message (you can use a toast here)

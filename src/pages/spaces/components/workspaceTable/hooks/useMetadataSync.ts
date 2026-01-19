@@ -3,9 +3,6 @@
  */
 
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 
 export function useMetadataSync(opts: {
   gridRef: React.RefObject<any>;
@@ -22,7 +19,6 @@ export function useMetadataSync(opts: {
   spotMap: Record<number, any>;
   taskCustomFieldValues: any[];
 }) {
-  const dispatch = useDispatch<AppDispatch>();
   const {
     gridRef,
     reduxState,
@@ -38,24 +34,6 @@ export function useMetadataSync(opts: {
     spotMap,
     taskCustomFieldValues,
   } = opts;
-
-  // Ensure user metadata is hydrated so owner avatars reflect configured colors
-  useEffect(() => {
-    dispatch((genericActions as any).users.getFromIndexedDB());
-    dispatch((genericActions as any).users.fetchFromAPI?.());
-  }, [dispatch]);
-
-  // Load taskTags, tags, notes, attachments, custom field values on mount
-  useEffect(() => {
-    dispatch(genericActions.taskTags.getFromIndexedDB());
-    dispatch(genericActions.tags.getFromIndexedDB());
-    dispatch(genericActions.taskNotes.getFromIndexedDB());
-    dispatch(genericActions.taskAttachments.getFromIndexedDB());
-    dispatch(genericActions.approvalApprovers.getFromIndexedDB());
-    dispatch(genericActions.taskApprovalInstances.getFromIndexedDB());
-    dispatch(genericActions.taskCustomFieldValues.getFromIndexedDB());
-    dispatch(genericActions.taskCustomFieldValues.fetchFromAPI());
-  }, [dispatch]);
 
   // Keep grid cells in sync with hydrated metadata (batched to avoid many small effects)
   useEffect(() => {

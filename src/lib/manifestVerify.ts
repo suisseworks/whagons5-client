@@ -1,4 +1,4 @@
-import { api as apiClient } from '@/api/whagonsApi';
+import { api as apiClient } from '@/store/api/internalApi';
 import * as ed25519 from '@noble/ed25519';
 
 type Manifest = { kid: string; globalRoot: string; blockRoots: Array<{ id: number; hash: string }>; sig: string };

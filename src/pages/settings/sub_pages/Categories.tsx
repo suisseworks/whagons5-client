@@ -182,21 +182,6 @@ function Categories() {
   const workspacesState = useSelector((state: RootState) => (state as any).workspaces) as { value?: any[] } | undefined;
   const workspaces: any[] = workspacesState?.value ?? [];
 
-  // Ensure local IndexedDB hydration on mount (no network requests)
-  useEffect(() => {
-    dispatch((genericActions as any).categories.getFromIndexedDB());
-    dispatch((genericActions as any).categories.fetchFromAPI());
-    dispatch((genericActions as any).teams.getFromIndexedDB());
-    dispatch((genericActions as any).slas.getFromIndexedDB());
-    dispatch((genericActions as any).approvals.getFromIndexedDB());
-    dispatch((genericActions as any).approvals.fetchFromAPI());
-    dispatch((genericActions as any).statusTransitionGroups.getFromIndexedDB());
-    dispatch((genericActions as any).statusTransitionGroups.fetchFromAPI());
-    dispatch((genericActions as any).categoryCustomFields.getFromIndexedDB());
-    dispatch((genericActions as any).workspaces.getFromIndexedDB());
-    dispatch((genericActions as any).workspaces.fetchFromAPI());
-  }, [dispatch]);
-
   // Use shared state management
   const {
     items: categories,

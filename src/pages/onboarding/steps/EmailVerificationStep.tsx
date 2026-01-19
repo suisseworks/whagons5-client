@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 interface EmailVerificationStepProps {
@@ -16,7 +16,7 @@ const EmailVerificationStep: React.FC<EmailVerificationStepProps> = ({ email, on
     setIsResending(true);
     try {
       // Update to use your actual backend endpoint for resending verification
-      const response = await api.post('/auth/resend-verification', { email });
+      const response = await actionsApi.post('/auth/resend-verification', { email });
       if (response.status === 200) {
         setResendSuccess(true);
         setTimeout(() => setResendSuccess(false), 3000);

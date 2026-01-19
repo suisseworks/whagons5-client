@@ -1,18 +1,19 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShieldAlt, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { ColDef } from "ag-grid-community";
-import type { Role, Permission, RolePermission } from "@/store/types";
-import { AppDispatch, RootState } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
+import type { Role, Permission } from "@/store/types";
+import { RootState, AppDispatch } from "@/store/store";
 import { Button } from "@/components/ui/button";
-import api from "@/api/whagonsApi";
+import { actionsApi } from "@/api/whagonsActionsApi";
+import { api } from "@/store/api/internalApi";
+import { addRole, updateRole, removeRole } from "@/store/reducers/rolesSlice";
+
 import {
   SettingsLayout,
   SettingsGrid,
   SettingsDialog,
-  useSettingsState,
   createActionsCellRenderer,
   TextField,
   TextAreaField,
@@ -25,49 +26,109 @@ function RolesAndPermissions() {
   const tu = (key: string, fallback: string) => t(`settings.rolesAndPermissions.${key}`, fallback);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Load roles and permissions data on mount
+  // Roles from Redux (loaded by DataManager)
+  const { value: roles, loading, error } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean; error: string | null };
+  
+  // Permissions fetched from API (not a wh_* table)
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Role | null>(null);
+  const [deletingItem, setDeletingItem] = useState<Role | null>(null);
+  
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return roles;
+    const query = searchQuery.toLowerCase();
+    return roles.filter(role => 
+      role.name?.toLowerCase().includes(query) || 
+      role.description?.toLowerCase().includes(query)
+    );
+  }, [roles, searchQuery]);
+  
+  const handleEdit = (role: Role) => {
+    setEditingItem(role);
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleDelete = (role: Role) => {
+    setDeletingItem(role);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const handleCloseDeleteDialog = () => {
+    setIsDeleteDialogOpen(false);
+    setDeletingItem(null);
+  };
+  
+  // Fetch permissions on mount (permissions is not a wh_* table)
   useEffect(() => {
-    dispatch((genericActions as any).roles.getFromIndexedDB());
-    dispatch((genericActions as any).roles.fetchFromAPI());
-    dispatch((genericActions as any).permissions.getFromIndexedDB());
-    dispatch((genericActions as any).permissions.fetchFromAPI());
-    dispatch((genericActions as any).rolePermissions.getFromIndexedDB());
-    dispatch((genericActions as any).rolePermissions.fetchFromAPI());
-  }, [dispatch]);
-
-  const { value: permissions = [], loading: permissionsLoading } = useSelector((state: RootState) =>
-    state.permissions as { value: Permission[]; loading: boolean }
-  );
-
-  const { value: rolePermissions = [] } = useSelector((state: RootState) =>
-    state.rolePermissions as { value: RolePermission[] }
-  );
-
-  const {
-    filteredItems,
-    loading,
-    error,
-    searchQuery,
-    setSearchQuery,
-    createItem,
-    updateItem,
-    deleteItem,
-    isSubmitting,
-    formError,
-    isCreateDialogOpen,
-    setIsCreateDialogOpen,
-    isEditDialogOpen,
-    setIsEditDialogOpen,
-    isDeleteDialogOpen,
-    editingItem,
-    deletingItem,
-    handleEdit,
-    handleDelete,
-    handleCloseDeleteDialog
-  } = useSettingsState<Role>({
-    entityName: "roles",
-    searchFields: ["name", "description"]
-  });
+    const fetchPermissions = async () => {
+      try {
+        const response = await api.get('/permissions');
+        if (response.data?.data) {
+          setPermissions(response.data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch permissions:', error);
+      }
+    };
+    
+    fetchPermissions();
+  }, []);
+  
+  // CRUD functions for roles
+  const createItem = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      const response = await actionsApi.post('/roles', data);
+      if (response.data?.data) {
+        dispatch(addRole(response.data.data));
+        setIsCreateDialogOpen(false);
+      }
+    } catch (error: any) {
+      setFormError(error.response?.data?.message || 'Failed to create role');
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const updateItem = async (id: number, updates: any) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      const response = await actionsApi.patch(`/roles/${id}`, updates);
+      if (response.data?.data) {
+        dispatch(updateRole(response.data.data));
+        setIsEditDialogOpen(false);
+      }
+    } catch (error: any) {
+      setFormError(error.response?.data?.message || 'Failed to update role');
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const deleteItem = async (id: number) => {
+    try {
+      setIsSubmitting(true);
+      setFormError(null);
+      await actionsApi.delete(`/roles/${id}`);
+      dispatch(removeRole(id));
+      setIsDeleteDialogOpen(false);
+    } catch (error: any) {
+      setFormError(error.response?.data?.message || 'Failed to delete role');
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Form state for controlled components
   const [createFormData, setCreateFormData] = useState<{
@@ -122,16 +183,8 @@ function RolesAndPermissions() {
   }, [editingItem]);
 
   // Sync selected permissions when role changes in modal
-  useEffect(() => {
-    if (!selectedRoleId) {
-      setSelectedPermIds(new Set());
-      return;
-    }
-    const current = rolePermissions
-      .filter((rp: RolePermission) => rp.role_id === selectedRoleId)
-      .map((rp: RolePermission) => String(rp.permission_id));
-    setSelectedPermIds(new Set(current));
-  }, [selectedRoleId, rolePermissions]);
+  // Permissions are loaded when opening the permissions dialog via handleOpenPermissions
+  // No need for a separate effect here
 
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, Permission[]> = {};
@@ -237,7 +290,7 @@ function RolesAndPermissions() {
         .map((idStr) => permissions.find((p) => String(p.id) === idStr)?.name)
         .filter((name): name is string => Boolean(name));
 
-      await api.put(`/roles/${selectedRoleId}/permissions`, {
+      await actionsApi.put(`/roles/${selectedRoleId}/permissions`, {
         permissions: selectedNames,
       });
 
@@ -245,28 +298,33 @@ function RolesAndPermissions() {
     } finally {
       setIsSavingPerms(false);
     }
-  }, [permissions, selectedPermIds, selectedRoleId]);
+  }, [selectedPermIds, selectedRoleId]);
 
-  const handleOpenPermissions = useCallback((role: Role) => {
+  const handleOpenPermissions = useCallback(async (role: Role) => {
     setSelectedRoleId(role.id);
     setSelectedRoleName(role.name || '');
-    // Fetch current permissions from backend for this role
-    (async () => {
-      try {
-        setIsLoadingRolePerms(true);
-        const resp = await api.get(`/roles/${role.id}/permissions`);
-        const names: string[] = resp?.data?.permissions || [];
-        const ids = permissions
-          .filter((p) => names.includes(p.name))
-          .map((p) => String(p.id));
-        setSelectedPermIds(new Set(ids));
-      } catch (error) {
-        console.error('Failed to load role permissions', error);
-        setSelectedPermIds(new Set());
-      } finally {
-        setIsLoadingRolePerms(false);
-      }
-    })();
+    setIsLoadingRolePerms(true);
+    
+    try {
+      // Fetch role permissions from API
+      const response = await api.get(`/roles/${role.id}/permissions`);
+      const permissionNames = response.data?.permissions || [];
+      
+      // Map permission names to IDs
+      const ids = permissionNames
+        .map((name: string) => {
+          const perm = permissions.find((p: Permission) => p.name === name);
+          return perm ? String(perm.id) : null;
+        })
+        .filter((id: string | null): id is string => id !== null);
+      
+      setSelectedPermIds(new Set(ids));
+    } catch (error) {
+      console.error('Failed to load role permissions', error);
+      setSelectedPermIds(new Set());
+    } finally {
+      setIsLoadingRolePerms(false);
+    }
     setIsPermissionsDialogOpen(true);
   }, [permissions]);
 
@@ -396,7 +454,7 @@ function RolesAndPermissions() {
       icon={faShieldAlt}
       iconColor="#6366f1"
       backPath="/settings"
-      loading={{ isLoading: loading || permissionsLoading, message: tu('loading', 'Loading roles...') }}
+      loading={{ isLoading: loading, message: tu('loading', 'Loading roles...') }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       search={{
         placeholder: tu('searchPlaceholder', 'Search roles...'),

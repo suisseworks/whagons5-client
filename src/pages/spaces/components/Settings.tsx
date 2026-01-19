@@ -10,7 +10,6 @@ import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
 import { genericActions } from '@/store/genericSlices';
 import { useAuth } from "@/providers/AuthProvider";
-import { api } from "@/api/whagonsApi";
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";

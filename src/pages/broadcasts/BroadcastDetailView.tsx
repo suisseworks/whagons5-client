@@ -79,11 +79,7 @@ function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
 
   const [filter, setFilter] = useState<'all' | 'acknowledged' | 'pending' | 'dismissed'>('all');
 
-  // Load acknowledgments
-  useEffect(() => {
-    dispatch(genericActions.broadcastAcknowledgments.fetchFromAPI());
-    dispatch(genericActions.users.getFromIndexedDB());
-  }, [dispatch, broadcast.id]);
+  // Data is hydrated on login; this view should not trigger ad-hoc IndexedDB/API loading.
 
   const getUserName = (userId: number) => {
     const user = users.find((u: any) => u.id === userId);
@@ -283,12 +279,6 @@ function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
         broadcast={broadcast}
         onClose={() => {
           setShowAcknowledgeDialog(false);
-          // Refresh acknowledgments after acknowledgment
-          dispatch(genericActions.broadcastAcknowledgments.fetchFromAPI());
-          dispatch(genericActions.broadcasts.fetchFromAPI());
-          // Also refresh the detail view
-          dispatch(genericActions.broadcastAcknowledgments.getFromIndexedDB());
-          dispatch(genericActions.broadcasts.getFromIndexedDB());
         }}
       />
     )}

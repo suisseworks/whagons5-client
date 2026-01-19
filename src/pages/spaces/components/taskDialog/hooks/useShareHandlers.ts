@@ -1,4 +1,4 @@
-import api from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 
 export function useShareHandlers(params: any) {
   const {
@@ -21,7 +21,7 @@ export function useShareHandlers(params: any) {
     setShareError(null);
     setShareSuccess(null);
     try {
-      await api.post(`/tasks/${taskId}/share`, {
+      await actionsApi.post(`/tasks/${taskId}/share`, {
         shared_to_team_id: shareTeamId,
         permission: sharePermission,
       });
@@ -44,7 +44,7 @@ export function useShareHandlers(params: any) {
     setShareError(null);
     setShareSuccess(null);
     try {
-      await api.post(`/tasks/${taskId}/share`, {
+      await actionsApi.post(`/tasks/${taskId}/share`, {
         shared_to_user_id: shareUserId,
         permission: sharePermission,
       });

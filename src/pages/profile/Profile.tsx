@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { api } from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,9 +20,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
 import { ImageCropper } from '@/components/ImageCropper';
-import { RootState, AppDispatch } from '@/store/store';
-import { UserTeam, Team, Role } from '@/store/types';
-import { genericActions } from '@/store/genericSlices';
+import { RootState } from '@/store/store';
+import { UserTeam, Team } from '@/store/types';
 
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
@@ -100,15 +99,34 @@ const calculateZodiacSign = (month: number | null, day: number | null): string |
     return null;
 };
 
+// Extended User type to match actual API response
+interface ExtendedUser {
+    id: number;
+    name?: string;
+    email: string;
+    url_picture?: string | null;
+    color?: string | null;
+    birthday_month?: number | null;
+    birthday_day?: number | null;
+    gender?: string | null;
+    zodiac_sign?: string | null;
+    phone?: string | null;
+    bio?: string | null;
+    hobbies?: string[] | null;
+    organization_name?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    teams?: Array<{ id: number; name: string; description?: string; color?: string; role_id?: number; role_name?: string }>;
+    [key: string]: any;
+}
+
 function Profile() {
     const { t } = useLanguage();
-    const dispatch = useDispatch<AppDispatch>();
     const { user: userData, userLoading, refetchUser } = useAuth();
     // Keep previous userData to prevent blank screen during refetch
-    const [previousUserData, setPreviousUserData] = useState(userData);
+    const [previousUserData, setPreviousUserData] = useState<ExtendedUser | null>(userData ? (userData as unknown as ExtendedUser) : null);
     const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
     const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
-    const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -116,12 +134,12 @@ function Profile() {
     // Update previousUserData when userData changes, but keep it if userData becomes null during loading
     useEffect(() => {
         if (userData) {
-            setPreviousUserData(userData);
+            setPreviousUserData(userData as unknown as ExtendedUser);
         }
     }, [userData]);
     
     // Use previousUserData if current userData is null but we're loading (prevents blank screen)
-    const displayUserData = userData || (userLoading ? previousUserData : null);
+    const displayUserData: ExtendedUser | null = (userData ? (userData as unknown as ExtendedUser) : null) || (userLoading ? previousUserData : null);
     const [editForm, setEditForm] = useState({
         name: '',
         url_picture: '',
@@ -142,14 +160,7 @@ function Profile() {
     const [newHobby, setNewHobby] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Load teams and roles data when component mounts
-    useEffect(() => {
-        dispatch(genericActions.teams.getFromIndexedDB?.() as any);
-        dispatch(genericActions.teams.fetchFromAPI?.() as any);
-        dispatch(genericActions.roles.getFromIndexedDB?.() as any);
-        dispatch(genericActions.roles.fetchFromAPI?.() as any);
-        dispatch(genericActions.userTeams.getFromIndexedDB?.() as any);
-    }, [dispatch]);
+    // DataManager handles data loading, no need to call internal functions here
 
     // Initialize form when user data is available
     useEffect(() => {
@@ -326,7 +337,7 @@ function Profile() {
                 url_picture: editForm.url_picture || null,
             };
             
-            const response = await api.patch('/users/me', payload);
+            const response = await actionsApi.patch('/users/me', payload);
             
             if (response.status === 200) {
                 console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
@@ -455,7 +466,27 @@ function Profile() {
         
         return userTeamRelationships.map((ut: UserTeam) => {
             const team = teams.find((t: Team) => t.id === ut.team_id);
-            const role = ut.role_id ? roles.find((r: Role) => r.id === ut.role_id) : null;
+            // Extract role info from userData if teams are loaded with role info
+            let role: { id: number; name: string; description: string | null } | null = null;
+            if (ut.role_id) {
+                // Check if role info comes with userData teams (userData might have teams array with role_id)
+                const userDataTyped = userData ? (userData as unknown as ExtendedUser) : null;
+                const teamFromUserData = userDataTyped?.teams?.find((t) => t.id === ut.team_id);
+                if (teamFromUserData?.role_id === ut.role_id && teamFromUserData?.role_name) {
+                    role = {
+                        id: ut.role_id,
+                        name: teamFromUserData.role_name,
+                        description: null
+                    };
+                } else {
+                    // Fallback to showing role_id
+                    role = {
+                        id: ut.role_id,
+                        name: `Role #${ut.role_id}`,
+                        description: null
+                    };
+                }
+            }
             
             return {
                 team: team ? {
@@ -464,11 +495,7 @@ function Profile() {
                     color: team.color,
                     description: team.description
                 } : null,
-                role: role ? {
-                    id: role.id,
-                    name: role.name,
-                    description: role.description
-                } : null
+                role: role
             };
         }).filter(item => item.team !== null);
     };
@@ -531,6 +558,11 @@ function Profile() {
                 </div>
             </div>
         );
+    }
+
+    // Guard: displayUserData should not be null at this point, but TypeScript doesn't know that
+    if (!displayUserData) {
+        return null;
     }
 
     return (

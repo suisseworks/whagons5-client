@@ -14,10 +14,6 @@ export const ComplianceStandards = () => {
     const dispatch = useDispatch<AppDispatch>();
     const { value: standards, loading } = useSelector((state: RootState) => state.complianceStandards);
 
-    useEffect(() => {
-        dispatch(genericActions.complianceStandards.getFromIndexedDB());
-        dispatch(genericActions.complianceStandards.fetchFromAPI());
-    }, [dispatch]);
 
     return (
         <PageContainer title="Compliance Standards">

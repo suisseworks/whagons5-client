@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.12.0';
+const CURRENT_DB_VERSION = '1.13.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -174,7 +174,9 @@ export class DB {
           if (!db.objectStoreNames.contains('role_permissions')) {
             db.createObjectStore('role_permissions', { keyPath: 'id' });
           }
-          // task_users store removed - user assignments are now stored as JSON in tasks.user_ids
+          if (!db.objectStoreNames.contains('task_users')) {
+            db.createObjectStore('task_users', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('status_transitions')) {
             db.createObjectStore('status_transitions', { keyPath: 'id' });
           }
@@ -186,6 +188,9 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('task_tags')) {
             db.createObjectStore('task_tags', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('task_shares')) {
+            db.createObjectStore('task_shares', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('spot_types')) {
             db.createObjectStore('spot_types', { keyPath: 'id' });
@@ -344,6 +349,17 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('compliance_audits')) {
             db.createObjectStore('compliance_audits', { keyPath: 'id' });
+          }
+
+          // Schedule Management
+          if (!db.objectStoreNames.contains('schedule_templates')) {
+            db.createObjectStore('schedule_templates', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('schedule_template_days')) {
+            db.createObjectStore('schedule_template_days', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('user_schedules')) {
+            db.createObjectStore('user_schedules', { keyPath: 'id' });
           }
 
           // Avatar image cache (base64 or blob references)
@@ -537,7 +553,9 @@ export class DB {
       | 'role_permissions'
 
       | 'status_transitions'
+      | 'task_users'
       | 'task_tags'
+      | 'task_shares'
       | 'spot_types'
       | 'slas'
       | 'sla_policies'
@@ -556,6 +574,9 @@ export class DB {
       | 'broadcast_acknowledgments'
       | 'plugins'
       | 'plugin_routes'
+      | 'schedule_templates'
+      | 'schedule_template_days'
+      | 'user_schedules'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
@@ -601,7 +622,9 @@ export class DB {
       | 'role_permissions'
 
       | 'status_transitions'
+      | 'task_users'
       | 'task_tags'
+      | 'task_shares'
       | 'spot_types'
       | 'slas'
       | 'sla_policies'
@@ -620,6 +643,9 @@ export class DB {
       | 'broadcast_acknowledgments'
       | 'plugins'
       | 'plugin_routes'
+      | 'schedule_templates'
+      | 'schedule_template_days'
+      | 'user_schedules'
       | 'spot_custom_fields'
       | 'template_custom_fields'
       | 'task_custom_field_values'
