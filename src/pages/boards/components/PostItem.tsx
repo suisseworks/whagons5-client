@@ -60,12 +60,7 @@ export function PostItem({
     return matches;
   });
 
-  // Load attachments when message is displayed
-  useEffect(() => {
-    if (message.id) {
-      dispatch(genericActions.boardAttachments.fetchFromAPI({ board_message_id: message.id }) as any);
-    }
-  }, [dispatch, message.id]);
+
 
   const getInitials = (name: string) => {
     return name

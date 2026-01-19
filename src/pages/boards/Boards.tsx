@@ -48,10 +48,6 @@ function Boards() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load boards on mount
-  useEffect(() => {
-    dispatch(genericActions.boards.getFromIndexedDB());
-  }, [dispatch]);
 
   // Filter boards based on search (excluding soft-deleted boards)
   const filteredBoards = boards.filter((board: Board) => {

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithGoogle, signInWithEmail, linkGoogleProvider } from './auth';
-import { api, updateAuthToken } from '@/api/whagonsApi';
+import { updateAuthToken } from '@/api/whagonsApi';
+import { actionsApi } from '@/api/whagonsActionsApi';
 import { AuthError, AuthErrorCodes, GoogleAuthProvider } from '@firebase/auth';
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import { InitializationStage } from '@/types/user';
@@ -119,7 +120,7 @@ const SignIn: React.FC = () => {
     try {
       console.log('idToken', idToken);
 
-      const response = await api.post(`/login`,
+      const response = await actionsApi.post(`/login`,
         {
           "token": idToken
         },

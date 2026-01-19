@@ -68,14 +68,7 @@ function Tags() {
 	const { t } = useLanguage();
 	const tt = (key: string, fallback: string) => t(`settings.tags.${key}`, fallback);
 	const { value: categories } = useSelector((state: RootState) => state.categories);
-    // Hydrate local cache and ensure server sync similar to other settings pages
-    useEffect(() => {
-        // Tags data
-        dispatch((genericActions as any).tags.getFromIndexedDB());
-        dispatch((genericActions as any).tags.fetchFromAPI());
-        // Categories for lookup
-        dispatch((genericActions as any).categories.getFromIndexedDB());
-    }, [dispatch]);
+
 
 	const {
 		items: tags,

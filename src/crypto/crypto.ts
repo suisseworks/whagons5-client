@@ -1,5 +1,5 @@
 import { DB } from "@/store/indexedDB/DB";
-import { api as apiClient } from '../api/whagonsApi';
+import { api as apiClient } from '@/store/api/internalApi';
 
 let worker: Worker | null = null;
 let workerListenerAttached = false;

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -11,9 +12,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import api from '@/api/whagonsApi';
 import { Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { genericActions } from '@/store/genericSlices';
+import { actionsApi } from '@/api/whagonsActionsApi';
+import type { RootState } from '@/store/store';
 
 interface TaskShare {
   id: number;
@@ -37,49 +40,37 @@ interface TaskShareManagerProps {
 }
 
 export default function TaskShareManager({ taskId, onShareChange }: TaskShareManagerProps) {
-  const [shares, setShares] = useState<TaskShare[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [revokeTarget, setRevokeTarget] = useState<{ userId?: number; teamId?: number } | null>(null);
+  const dispatch = useDispatch<any>();
+  // Get all task shares from Redux and filter by task_id
+  const allShares = useSelector((state: RootState) => (state as any).taskShares?.value || []) as TaskShare[];
+  const shares = allShares.filter(
+    (share) => share.task_id === taskId && !share.revoked_at
+  );
+  const loading = useSelector((state: RootState) => (state as any).taskShares?.loading || false);
+  
+  const [revokeTarget, setRevokeTarget] = useState<{ shareId?: number; userId?: number; teamId?: number } | null>(null);
   const [revoking, setRevoking] = useState(false);
-
-  const loadShares = async () => {
-    if (!taskId) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.get(`/tasks/${taskId}/shares`);
-      const sharesData = response.data?.data || response.data || [];
-      // Filter out revoked shares for display
-      const activeShares = sharesData.filter((share: TaskShare) => !share.revoked_at);
-      setShares(activeShares);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load shares');
-      console.error('Failed to load shares:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadShares();
-  }, [taskId]);
 
   const handleRevoke = async () => {
     if (!revokeTarget || !taskId) return;
 
     setRevoking(true);
     try {
-      await api.delete(`/tasks/${taskId}/share`, {
-        data: {
-          shared_to_user_id: revokeTarget.userId,
-          shared_to_team_id: revokeTarget.teamId,
-        },
-      });
+      // If we have the share ID, use generic slice removeAsync
+      if (revokeTarget.shareId) {
+        await dispatch(genericActions.taskShares.removeAsync(revokeTarget.shareId)).unwrap();
+      } else {
+        // Fallback to nested endpoint for backward compatibility
+        await actionsApi.delete(`/tasks/${taskId}/share`, {
+          data: {
+            shared_to_user_id: revokeTarget.userId,
+            shared_to_team_id: revokeTarget.teamId,
+          },
+        });
+      }
       setRevokeTarget(null);
-      await loadShares();
       onShareChange?.();
+      toast.success('Share revoked successfully');
     } catch (err: any) {
       console.error('Failed to revoke share:', err);
       toast.error(err?.response?.data?.message || 'Failed to revoke share');
@@ -111,13 +102,6 @@ export default function TaskShareManager({ taskId, onShareChange }: TaskShareMan
     );
   }
 
-  if (error) {
-    return (
-      <div className="text-sm text-destructive py-2">
-        {error}
-      </div>
-    );
-  }
 
   if (shares.length === 0) {
     return (
@@ -164,6 +148,7 @@ export default function TaskShareManager({ taskId, onShareChange }: TaskShareMan
                 variant="ghost"
                 size="sm"
                 onClick={() => setRevokeTarget({
+                  shareId: share.id,
                   userId: share.shared_to_user_id || undefined,
                   teamId: share.shared_to_team_id || undefined,
                 })}

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +17,6 @@ import {
 	faCircleInfo
 } from '@fortawesome/free-solid-svg-icons';
 import toast from 'react-hot-toast';
-import api from '@/api/whagonsApi';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 interface Plugin {
@@ -34,48 +35,25 @@ interface Plugin {
 
 export default function PluginManagement() {
 	const { t } = useLanguage();
-	const [plugins, setPlugins] = useState<Plugin[]>([]);
-	const [loading, setLoading] = useState(true);
+	const dispatch = useDispatch();
+	const plugins = useSelector((state: RootState) => (state as any).plugins?.value || []) as Plugin[];
 	const [toggling, setToggling] = useState<Record<string, boolean>>({});
-
-	const fetchPlugins = async () => {
-		setLoading(true);
-		try {
-			const response = await api.get('/plugins?with_routes=true');
-			if (response.data?.data) {
-				setPlugins(response.data.data);
-			}
-		} catch (error) {
-			console.error('Error fetching plugins:', error);
-			toast.error(t('errors.failedToFetchPlugins', 'Failed to fetch plugins'));
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	useEffect(() => {
-		fetchPlugins();
-	}, []);
 
 	const handleToggle = async (plugin: Plugin) => {
 		setToggling(prev => ({ ...prev, [plugin.slug]: true }));
 		try {
-			const response = await api.patch(`/plugins/${plugin.slug}/toggle`, {
+			await actionsApi.patch(`/plugins/${plugin.slug}/toggle`, {
 				is_enabled: !plugin.is_enabled,
 			});
 
-			if (response.data?.data) {
-				setPlugins(prev =>
-					prev.map(p =>
-						p.slug === plugin.slug
-							? { ...p, is_enabled: !p.is_enabled }
-							: p
-					)
-				);
-				toast.success(
-					`${plugin.name} has been ${!plugin.is_enabled ? 'enabled' : 'disabled'}`
-				);
-			}
+			// Update Redux via generic slice
+			dispatch(genericActions.plugins.updateAsync({
+				id: plugin.id,
+				updates: { is_enabled: !plugin.is_enabled }
+			}));
+			toast.success(
+				`${plugin.name} has been ${!plugin.is_enabled ? 'enabled' : 'disabled'}`
+			);
 		} catch (error) {
 			console.error('Error toggling plugin:', error);
 			toast.error(

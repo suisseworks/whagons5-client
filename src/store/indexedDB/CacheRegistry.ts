@@ -4,7 +4,7 @@ import { TasksCache } from "./TasksCache";
 import { genericCaches } from "../genericSlices";
 // Import Redux store and actions
 import { store } from "../store";
-import { genericActions } from "../genericSlices";
+import { genericInternalActions } from "../genericSlices";
 import { getTasksFromIndexedDB } from "../reducers/tasksSlice";
 
 type CacheHandler = {
@@ -45,7 +45,7 @@ const syncByTable: Record<string, SyncHandler> = {
 	// All other tables handled by generic slices
 	...Object.entries(genericCaches).reduce((acc, [key, cache]) => {
 		const tableName = cache.getTableName();
-		const actions = genericActions[key as keyof typeof genericActions];
+		const actions = genericInternalActions[key as keyof typeof genericInternalActions];
 		if (actions && (actions as any).getFromIndexedDB) {
 			return {
 				...acc,

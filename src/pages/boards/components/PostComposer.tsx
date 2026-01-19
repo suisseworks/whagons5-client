@@ -173,9 +173,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
         // Wait for all uploads to complete
         await Promise.all(uploadPromises);
         
-        // Refresh attachments from IndexedDB first (fast), then API (ensures sync)
-        dispatch(genericActions.boardAttachments.getFromIndexedDB());
-        await dispatch(genericActions.boardAttachments.fetchFromAPI({ board_message_id: messageId }) as any);
+        // Attachments are written via `addAsync` and will also sync via realtime/background validation.
       }
 
       // Step 3: Clear form

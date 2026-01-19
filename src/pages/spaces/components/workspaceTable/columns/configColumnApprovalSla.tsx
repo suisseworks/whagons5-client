@@ -5,7 +5,6 @@
 import dayjs from 'dayjs';
 import { CheckCircle2, Clock, XCircle, Check, X } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import api from '@/api/whagonsApi';
 import { promptForComment } from '../columnUtils/promptForComment';
 import { ColumnBuilderOptions } from './types';
 

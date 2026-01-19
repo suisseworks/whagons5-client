@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Category } from "@/store/types";
-import api from "@/api/whagonsApi";
 import { useLanguage } from "@/providers/LanguageProvider";
 
 type CategoryFieldAssignment = { 
@@ -70,93 +69,14 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     return (customFields as CustomField[]).filter(f => !assignedFieldIds.has(Number(f.id)));
   }, [customFields, assignedFieldIds]);
 
-  const loadData = useCallback(async () => {
-    if (!category) return;
-    try {
-      await Promise.all([
-        dispatch(genericActions.customFields.fetchFromAPI() as any),
-        dispatch(genericActions.categoryCustomFields.fetchFromAPI() as any),
-      ]);
-      await refreshFromCache();
-    } catch (e) {
-      console.error('Error loading fields/assignments', e);
-    }
-  }, [dispatch, category]);
-
-  // Load data when dialog opens
+  // Data is hydrated on login; this dialog should not trigger ad-hoc IndexedDB/API loading.
   React.useEffect(() => {
     if (open && category) {
-      loadData();
+      setInlineError(null);
+      // Reset local overrides so we display the hydrated Redux data.
+      setLocalAssignments([]);
     }
-  }, [open, category, loadData]);
-
-  // Local cache refresh helper
-  const refreshFromCache = useCallback(async () => {
-    if (!category) return;
-    try {
-      const rows = await genericCaches.categoryCustomFields.getAll();
-      const cid = Number(category.id);
-      const filtered = rows.filter((r: any) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
-      if (filtered.length === 0) {
-        // Fallback to Redux state if cache is empty (e.g., encryption not ready)
-        const reduxRows = (categoryCustomFields as any[]).filter((r) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid);
-        const recentlyMutated = Date.now() - lastMutationRef.current < 2000;
-        if (reduxRows.length) {
-          // Merge with local (preserve optimistic entries)
-          setLocalAssignments(prev => {
-            const byId = new Map<number, any>();
-            for (const r of reduxRows as any[]) if (r && r.id != null) byId.set(Number(r.id), r);
-            const out: any[] = [];
-            // Include server/redux rows first
-            for (const r of byId.values()) out.push(r);
-            // Preserve any optimistic (negative id) not yet matched
-            for (const r of prev) if (r && r.id < 0) out.push(r);
-            return out;
-          });
-          return;
-        }
-        // If nothing yet and we just mutated, keep current local view to avoid flash-removal
-        if (recentlyMutated) {
-          return;
-        }
-      }
-      if (filtered.length > 0) {
-        // Merge cache rows with any optimistic rows: replace optimistic if same field/category
-        setLocalAssignments(prev => {
-          const out: any[] = [];
-          const byId = new Map<number, any>();
-          const byKey = new Map<string, any>();
-          for (const r of filtered as any[]) {
-            if (r && r.id != null) byId.set(Number(r.id), r);
-            const key = `${Number((r as any)?.field_id ?? (r as any)?.fieldId)}-${Number((r as any)?.category_id ?? (r as any)?.categoryId)}`;
-            byKey.set(key, r);
-          }
-          // Start with server rows
-          for (const r of byId.values()) out.push(r);
-          // Add optimistic ones that don't have a matching server row yet
-          for (const r of prev) {
-            if (r && r.id < 0) {
-              const key = `${Number((r as any)?.field_id ?? (r as any)?.fieldId)}-${Number((r as any)?.category_id ?? (r as any)?.categoryId)}`;
-              if (!byKey.has(key)) out.push(r);
-            }
-          }
-          return out;
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, [category]);
-
-  // Subscribe to generic events to keep the dialog in sync
-  React.useEffect(() => {
-    if (!open || !category) return;
-    const names = genericEventNames.categoryCustomFields;
-    const off1 = genericEvents.on(names.CREATED, refreshFromCache);
-    const off2 = genericEvents.on(names.UPDATED, refreshFromCache);
-    const off3 = genericEvents.on(names.DELETED, refreshFromCache);
-    return () => { off1(); off2(); off3(); };
-  }, [open, category, refreshFromCache]);
+  }, [open, category]);
 
   const addAssignment = async () => {
     if (!category || !newFieldId) return;
@@ -199,21 +119,6 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         if (idx !== -1) copy[idx] = saved as any; else copy.push(saved as any);
         return copy;
       });
-      // Background refresh
-      refreshFromCache();
-
-      // Debug: verify server and cache immediately
-      try {
-        const resp = await api.get('/category-field-assignments', { params: { category_id: Number(category.id), per_page: 1000 } });
-        const serverRows = (resp.data?.data ?? resp.data?.rows ?? resp.data) as any[];
-        console.log('[CFM] server list', serverRows);
-      const cacheRows = await genericCaches.categoryCustomFields.getAll();
-        console.log('[CFM] cache list (all)', cacheRows);
-        const cid = Number(category.id);
-        console.log('[CFM] cache list (filtered)', cacheRows.filter((r: any) => Number((r as any)?.category_id ?? (r as any)?.categoryId) === cid));
-      } catch (e) {
-        console.log('[CFM] debug fetch error', e);
-      }
     } catch (e: any) {
       console.error('Error adding assignment', e?.response?.data || e);
       // If server add fails, remove our optimistic row
@@ -229,7 +134,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     setAssignSubmitting(true);
     try {
       await dispatch(genericActions.categoryCustomFields.removeAsync(assignment.id)).unwrap();
-      await refreshFromCache();
+      setLocalAssignments(prev => prev.filter((r: any) => r?.id !== assignment.id));
     } catch (e) {
       console.error('Error removing assignment', e);
     } finally {
@@ -240,7 +145,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   const updateAssignment = async (assignmentId: number, updates: Partial<CategoryFieldAssignment>) => {
     try {
       await dispatch(genericActions.categoryCustomFields.updateAsync({ id: assignmentId, updates } as any)).unwrap();
-      await refreshFromCache();
+      setLocalAssignments(prev => prev.map((r: any) => (r?.id === assignmentId ? { ...r, ...(updates as any) } : r)));
     } catch (e) {
       console.error('Error updating assignment', e);
     }
@@ -258,7 +163,6 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         updateAssignment(a.id, { order: desired } as any);
       }
     }
-    await refreshFromCache();
   };
 
   // Helpers to render default value editor by field type

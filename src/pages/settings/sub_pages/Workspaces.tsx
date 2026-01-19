@@ -22,7 +22,7 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { useLanguage } from "@/providers/LanguageProvider";
 import { useAuth } from "@/providers/AuthProvider";
-import { api } from "@/api/whagonsApi";
+import { actionsApi } from "@/api/whagonsActionsApi";
 
 // Custom cell renderer for workspace name with color indicator
 const WorkspaceNameCellRenderer = (props: ICellRendererParams) => {
@@ -128,7 +128,7 @@ function Workspaces() {
       
       // Update server
       console.log('Sending API request with settings:', newSettings);
-      const response = await api.patch('/users/me', { settings: newSettings });
+      const response = await actionsApi.patch('/users/me', { settings: newSettings });
       console.log('API request successful', response.data);
       
       // Verify the response contains the updated settings

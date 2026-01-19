@@ -3,6 +3,9 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 // Custom slice with advanced features (only tasks)
 import { tasksSlice } from "./reducers/tasksSlice";
 
+// Roles slice (not a wh_* table, special slice for Spatie roles)
+import rolesReducer from "./reducers/rolesSlice";
+
 // Tenant availability slice
 import tenantAvailabilityReducer from "./reducers/tenantAvailabilitySlice";
 
@@ -15,6 +18,9 @@ import { genericSlices } from "./genericSlices";
 const appReducer = combineReducers({
     // Only custom slice with advanced features (tasks)
     tasks: tasksSlice.reducer,
+
+    // Roles slice (Spatie roles table, not wh_*)
+    roles: rolesReducer,
 
     // Tenant availability checking
     tenantAvailability: tenantAvailabilityReducer,

@@ -10,7 +10,7 @@ import {
 import { User } from '../types/user';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
-import { genericActions } from '@/store/genericSlices';
+import { genericInternalActions } from '@/store/genericSlices';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
 
@@ -281,8 +281,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               } catch (err) {
                 console.warn('AuthProvider: loadCoreFromIndexedDB failed (continuing to network hydration)', err);
               }
-
-              // Background validation
               (async () => {
                 try {
                   await dataManager.validateAndRefresh();
@@ -406,14 +404,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
 
-  // Always refresh userTeams from API after hydration so membership changes (e.g., leaving a team) propagate to the cache/state
-  useEffect(() => {
-    // Skip if no tenant - don't call tenant APIs during onboarding
-    if (loading || userLoading || hydrating || !firebaseUser || !user?.tenant_domain_prefix) return;
-    dispatch(genericActions.userTeams.fetchFromAPI?.() as any).catch((err: any) => {
-      console.warn('AuthProvider: failed to refresh userTeams from API', err);
-    });
-  }, [loading, userLoading, hydrating, firebaseUser, user?.tenant_domain_prefix, dispatch]);
+  // Note: userTeams is now validated via DataManager.validateAndRefresh() 
+  // which uses batch integrity checking - no need for separate fetch here
 
   // Refresh tasks when the user's team memberships change so stale team tasks disappear from local cache
   useEffect(() => {

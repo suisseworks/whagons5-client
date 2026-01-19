@@ -689,7 +689,7 @@ function Approvals() {
   const { value: categories } = useSelector((s: RootState) => (s as any).categories || { value: [] }) as { value: Array<{ id: number; name?: string; approval_id?: number | null }> };
   const { value: slas } = useSelector((s: RootState) => (s as any).slas || { value: [] }) as { value: Array<{ id: number; name?: string }> };
   const { value: users } = useSelector((s: RootState) => (s as any).users || { value: [] }) as { value: any[] };
-  const { value: roles } = useSelector((s: RootState) => (s as any).roles || { value: [] }) as { value: any[] };
+  const { value: roles } = useSelector((s: RootState) => s.roles) as { value: any[] };
   const tasks = useSelector((s: any) => (s?.tasks?.value) || []) as any[];
   const { value: approvalsStateValue } = useSelector((s: RootState) => (s as any).approvals || { value: [] }) as { value: Approval[] };
 
@@ -1037,32 +1037,6 @@ function Approvals() {
     };
     await updateItem((editingItem as any).id, updates);
   };
-
-  // Initial load: hydrate from IndexedDB then refresh from API
-  useEffect(() => {
-    dispatch(genericActions.approvals.getFromIndexedDB());
-    dispatch(genericActions.approvals.fetchFromAPI());
-    // Load approvers for counts and manager
-    dispatch(genericActions.approvalApprovers.getFromIndexedDB());
-    dispatch(genericActions.approvalApprovers.fetchFromAPI());
-    // Load users and roles for approver selection UI
-    dispatch(genericActions.users.getFromIndexedDB());
-    dispatch(genericActions.users.fetchFromAPI());
-    dispatch(genericActions.roles.getFromIndexedDB());
-    dispatch(genericActions.roles.fetchFromAPI());
-    dispatch(genericActions.statuses.getFromIndexedDB());
-    dispatch(genericActions.statuses.fetchFromAPI());
-    dispatch(genericActions.customFields.getFromIndexedDB());
-    dispatch(genericActions.customFields.fetchFromAPI());
-    dispatch(genericActions.priorities.getFromIndexedDB());
-    dispatch(genericActions.priorities.fetchFromAPI());
-    dispatch(genericActions.categories.getFromIndexedDB());
-    dispatch(genericActions.categories.fetchFromAPI());
-    dispatch(genericActions.slas.getFromIndexedDB());
-    dispatch(genericActions.slas.fetchFromAPI());
-    dispatch(genericActions.templates.getFromIndexedDB());
-    dispatch(genericActions.templates.fetchFromAPI());
-  }, [dispatch]);
 
   return (
     <div className="p-4 pt-0 h-full">

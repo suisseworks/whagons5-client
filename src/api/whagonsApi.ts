@@ -399,6 +399,7 @@ api.interceptors.response.use(
 export const isTenantSwitchingInProgress = () => false;
 export const waitForTenantSwitching = async () => Promise.resolve();
 
-export default api;
-
-export { api, web };
+// Note: `api` is exported here ONLY for internalApi.ts to re-export.
+// UI components MUST NOT import `api` directly - use actionsApi from @/api/whagonsActionsApi instead.
+// Store layer should import from @/store/api/internalApi
+export { api };

@@ -1,4 +1,4 @@
-import api from './whagonsApi';
+import { api } from '@/store/api/internalApi';
 import { getFileUrl } from './assetApi';
 
 export interface WorkspaceResource {

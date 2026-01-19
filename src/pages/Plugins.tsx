@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy } from '@fortawesome/free-solid-svg-icons';
@@ -17,7 +18,7 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
-import api from '@/api/whagonsApi';
+import { RootState } from '@/store/store';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -668,28 +669,17 @@ function Plugins() {
 		return unsubscribe;
 	}, []);
 
-	// Fetch plugin statuses from backend
+	// Fetch plugin statuses from Redux (plugins is a generic slice)
+	const plugins = useSelector((state: RootState) => (state as any).plugins?.value || []);
 	useEffect(() => {
-		const fetchPluginStatuses = async () => {
-			try {
-				const response = await api.get('/plugins');
-				if (response.data?.data) {
-					const statuses: Record<string, boolean> = {};
-					response.data.data.forEach((p: BackendPlugin) => {
-						statuses[p.slug] = p.is_enabled;
-					});
-					setPluginStatuses(statuses);
-				}
-			} catch (error) {
-				console.error('Error fetching plugin statuses:', error);
-				// Don't show error toast, just log it
-			} finally {
-				setLoadingStatuses(false);
-			}
-		};
-
-		fetchPluginStatuses();
-	}, []);
+		if (plugins.length > 0) {
+			const statuses: Record<string, boolean> = {};
+			plugins.forEach((p: BackendPlugin) => {
+				statuses[p.slug] = p.is_enabled;
+			});
+			setPluginStatuses(statuses);
+		}
+	}, [plugins]);
 
 	// Plugin details for modal
 	const getPluginDetails = (pluginId: string): PluginModalData | null => {

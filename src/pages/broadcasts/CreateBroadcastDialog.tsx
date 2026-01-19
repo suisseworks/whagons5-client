@@ -39,7 +39,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
   // Redux state
   const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
   const { value: teams } = useSelector((state: RootState) => (state as any).teams || { value: [] });
-  const { value: roles } = useSelector((state: RootState) => (state as any).roles || { value: [] });
+  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: any[]; loading: boolean };
 
   // Form state
   const [formData, setFormData] = useState<BroadcastFormData>({
@@ -53,14 +53,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recipientTab, setRecipientTab] = useState('manual');
 
-  // Load reference data
-  useEffect(() => {
-    if (open) {
-      dispatch(genericActions.users.getFromIndexedDB());
-      dispatch(genericActions.teams.getFromIndexedDB());
-      dispatch(genericActions.roles.getFromIndexedDB());
-    }
-  }, [open, dispatch]);
+  // Data is hydrated on login; this dialog should not trigger ad-hoc IndexedDB/API loading.
 
   const validateRecipients = (): boolean => {
     const { recipient_selection_type, recipient_config } = formData;

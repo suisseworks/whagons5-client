@@ -187,10 +187,6 @@ function Templates() {
     is_private: false
   });
 
-  useEffect(() => {
-    dispatch(genericActions.complianceRequirements.fetchFromAPI());
-    dispatch(genericActions.complianceMappings.fetchFromAPI());
-  }, [dispatch]);
 
   useEffect(() => {
     if (isEditDialogOpen && editingTemplate) {

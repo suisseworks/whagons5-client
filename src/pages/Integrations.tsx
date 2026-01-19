@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLink, faPlus, faEdit, faTrash, faCheck, faX, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { useLanguage } from '@/providers/LanguageProvider';
-import api from '@/api/whagonsApi';
 import toast from 'react-hot-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
