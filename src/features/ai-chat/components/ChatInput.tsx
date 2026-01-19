@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { ContentItem, ImageData, PdfData } from "../models";
 import WaveIcon from "./WaveIcon";
-import api from "@/api/whagonsApi";
+import { api } from "@/store/api/internalApi";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 
 const { VITE_API_URL } = getEnvVariables();
