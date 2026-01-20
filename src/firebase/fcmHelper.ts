@@ -163,18 +163,32 @@ function getNotificationUrl(data: any): string {
       return data.broadcast_id ? `/broadcasts?id=${data.broadcast_id}` : '/broadcasts';
     case 'task_assigned':
     case 'task_created_assigned':
-      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+      return data.workspace_id && data.task_id
+        ? `/workspace/${data.workspace_id}?taskId=${data.task_id}`
+        : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'task_updated':
-      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+      return data.workspace_id && data.task_id
+        ? `/workspace/${data.workspace_id}?taskId=${data.task_id}`
+        : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'approval_requested':
-      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+      return data.workspace_id && data.task_id
+        ? `/workspace/${data.workspace_id}?taskId=${data.task_id}`
+        : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'approval_approved':
-      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+      return data.workspace_id && data.task_id
+        ? `/workspace/${data.workspace_id}?taskId=${data.task_id}`
+        : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'message':
       return data.message_id ? `/messages?id=${data.message_id}` : '/messages';
     default:
       return '/';
   }
+}
+
+function spaNavigate(url: string) {
+  // Let React Router handle navigation (no hard reload).
+  // App.tsx listens for this event and calls navigate().
+  window.dispatchEvent(new CustomEvent('wh:navigate', { detail: { url } }));
 }
 
 /**
@@ -218,35 +232,7 @@ export async function setupForegroundMessageHandler() {
  * Handle notification click - navigate to relevant page
  */
 function handleNotificationClick(data: any) {
-  const type = data.type;
-  
-  switch (type) {
-    case 'broadcast':
-      if (data.broadcast_id) {
-        window.location.href = `/broadcasts?id=${data.broadcast_id}`;
-      }
-      break;
-    case 'task_assigned':
-    case 'task_created_assigned':
-    case 'task_updated':
-    case 'approval_requested':
-    case 'approval_approved':
-      // Navigate to workspace if available, otherwise fallback to tasks
-      if (data.workspace_id) {
-        window.location.href = `/workspace/${data.workspace_id}`;
-      } else if (data.task_id) {
-        window.location.href = `/tasks`;
-      }
-      break;
-    case 'message':
-      if (data.message_id) {
-        window.location.href = `/messages?id=${data.message_id}`;
-      }
-      break;
-    default:
-      // Generic notification - go to home
-      window.location.href = '/';
-  }
+  spaNavigate(getNotificationUrl(data));
 }
 
 /**

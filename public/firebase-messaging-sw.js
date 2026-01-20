@@ -162,13 +162,14 @@ function getNotificationUrl(data) {
     case 'broadcast':
       return data.broadcast_id ? `/broadcasts?id=${data.broadcast_id}` : '/broadcasts';
     case 'task_assigned':
-      return data.task_id ? `/tasks/${data.task_id}` : '/tasks';
+    case 'task_created_assigned':
+      return data.workspace_id ? `/workspace/${data.workspace_id}?taskId=${data.task_id}` : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'task_updated':
-      return data.task_id ? `/tasks/${data.task_id}` : '/tasks';
+      return data.workspace_id ? `/workspace/${data.workspace_id}?taskId=${data.task_id}` : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'approval_requested':
-      return data.task_id ? `/tasks/${data.task_id}` : '/tasks';
+      return data.workspace_id ? `/workspace/${data.workspace_id}?taskId=${data.task_id}` : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'approval_approved':
-      return data.task_id ? `/tasks/${data.task_id}` : '/tasks';
+      return data.workspace_id ? `/workspace/${data.workspace_id}?taskId=${data.task_id}` : (data.task_id ? `/tasks?taskId=${data.task_id}` : '/tasks');
     case 'message':
       return data.message_id ? `/messages?id=${data.message_id}` : '/messages';
     case 'test':
@@ -219,27 +220,15 @@ self.addEventListener('notificationclick', (event) => {
       }
       break;
     case 'task_assigned':
-      if (data.task_id) {
-        urlToOpen = `/tasks/${data.task_id}`;
-      }
-      break;
+    case 'task_created_assigned':
     case 'task_updated':
-      if (data.task_id) {
-        urlToOpen = `/tasks/${data.task_id}`;
-      } else {
-        urlToOpen = '/tasks';
-      }
-      break;
     case 'approval_requested':
-      if (data.task_id) {
-        urlToOpen = `/tasks/${data.task_id}`;
-      } else {
-        urlToOpen = '/tasks';
-      }
-      break;
     case 'approval_approved':
-      if (data.task_id) {
-        urlToOpen = `/tasks/${data.task_id}`;
+      // Navigate to workspace if available, otherwise fallback to tasks
+      if (data.workspace_id && data.task_id) {
+        urlToOpen = `/workspace/${data.workspace_id}?taskId=${data.task_id}`;
+      } else if (data.task_id) {
+        urlToOpen = `/tasks?taskId=${data.task_id}`;
       } else {
         urlToOpen = '/tasks';
       }

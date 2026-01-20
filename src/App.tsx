@@ -102,6 +102,15 @@ const ServiceWorkerListener = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Listen for in-app navigation events (used by FCM foreground notifications)
+    const handleSpaNavigate = (event: Event) => {
+      const custom = event as CustomEvent<any>;
+      const url = custom?.detail?.url;
+      if (typeof url === 'string' && url.length > 0) {
+        navigate(url);
+      }
+    };
+
     // Listen for messages from service worker
     const handleMessage = async (event: MessageEvent) => {
       if (!event.data) return;
@@ -134,9 +143,11 @@ const ServiceWorkerListener = () => {
       }
     };
 
+    window.addEventListener('wh:navigate', handleSpaNavigate as any);
     navigator.serviceWorker?.addEventListener('message', handleMessage);
 
     return () => {
+      window.removeEventListener('wh:navigate', handleSpaNavigate as any);
       navigator.serviceWorker?.removeEventListener('message', handleMessage);
     };
   }, [navigate]);

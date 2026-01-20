@@ -67,6 +67,10 @@ export const Workspace = () => {
   const id = getWorkspaceIdFromPath(location.pathname);
   const workspaceBasePath = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
   const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+
+  // Get taskId from URL query parameters
+  const searchParams = new URLSearchParams(location.search);
+  const taskIdFromUrl = searchParams.get('taskId');
   
   // Helper function to get current tab from URL (matches UrlTabs logic)
   const getCurrentTabFromUrl = (): WorkspaceTabKey => {
@@ -261,6 +265,36 @@ export const Workspace = () => {
     window.addEventListener('wh:rowDensityChanged', handler);
     return () => window.removeEventListener('wh:rowDensityChanged', handler);
   }, []);
+
+  // Handle opening task from URL parameter (from notifications)
+  useEffect(() => {
+    if (!taskIdFromUrl) return;
+
+    // Fetch task from cache and open dialog
+    (async () => {
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+        
+        const taskId = Number(taskIdFromUrl);
+        if (!Number.isFinite(taskId)) return;
+
+        const task = await TasksCache.getTask(String(taskId));
+        if (task) {
+          setSelectedTask(task);
+          setOpenEditTask(true);
+
+          // Remove taskId from URL to prevent reopening on refresh
+          const newSearchParams = new URLSearchParams(location.search);
+          newSearchParams.delete('taskId');
+          const newSearch = newSearchParams.toString();
+          const newUrl = location.pathname + (newSearch ? `?${newSearch}` : '');
+          navigate(newUrl, { replace: true });
+        }
+      } catch (error) {
+        console.error('Failed to open task from URL:', error);
+      }
+    })();
+  }, [taskIdFromUrl, location.pathname, location.search, navigate]);
 
   // Selected tasks (for bulk actions)
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
