@@ -128,8 +128,16 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       // Exclude FontAwesome from pre-bundling to avoid circular dependency issues
       exclude: ['@fortawesome/pro-regular-svg-icons', '@fortawesome/fontawesome-common-types'],
-      // Explicitly include firebase to ensure side effects are preserved
-      include: ['firebase/app', 'firebase/messaging', 'firebase/auth'],
+      // Explicitly include firebase and all @firebase packages to ensure proper resolution
+      include: [
+        'firebase/app',
+        'firebase/messaging',
+        'firebase/auth',
+        '@firebase/app',
+        '@firebase/messaging',
+        '@firebase/auth',
+        '@firebase/component',
+      ],
     },
     build: {
       // Enable build caching for faster rebuilds
