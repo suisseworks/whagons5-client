@@ -96,10 +96,8 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
       const errorMessage = error?.message || error?.response?.data?.message || error?.toString() || "Failed to delete task";
       const status = error?.response?.status || error?.status;
 
-      // Check if it's a permission error (403)
-      if (status === 403 || errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
-        toast.error(t('errors.noPermissionDeleteTask', "You do not have permission to delete this task."), { duration: 5000 });
-      } else {
+      // 403 errors are now handled by API interceptor, only show other errors
+      if (status !== 403) {
         toast.error(errorMessage, { duration: 5000 });
       }
     } finally {

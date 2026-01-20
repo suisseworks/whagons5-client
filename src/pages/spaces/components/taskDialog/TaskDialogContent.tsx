@@ -229,6 +229,7 @@ export default function TaskDialogContent({
     mode,
     task,
     taskTags: data.taskTags,
+    taskUsers: data.taskUsers,
     workspaceTemplates: computed.workspaceTemplates,
     workspaceCategories: computed.workspaceCategories,
     formInitializedRef,
@@ -389,9 +390,8 @@ export default function TaskDialogContent({
       const errorMessage = e?.message || 'Failed to save task';
       const status = e?.response?.status;
       const toast = (await import('react-hot-toast')).default;
-      if (status === 403 || errorMessage.includes('permission')) {
-        toast.error(t('errors.noPermissionCreateTask', 'You do not have permission to create tasks in this category.'), { duration: 5000 });
-      } else {
+      // 403 errors are now handled by API interceptor, only show other errors
+      if (status !== 403) {
         toast.error(errorMessage, { duration: 5000 });
       }
     } finally {

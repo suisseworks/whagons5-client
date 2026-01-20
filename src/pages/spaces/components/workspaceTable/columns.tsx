@@ -14,6 +14,7 @@ import { getContrastTextColor } from './columnUtils/color';
 import { useIconDefinition } from './columnUtils/icon';
 import { promptForComment } from './columnUtils/promptForComment';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { getAssignedUserIdsFromTaskUsers, getAssignedUsersFromTaskUsers } from './utils/userUtils';
 
 
 export function buildWorkspaceColumns(opts: any) {
@@ -37,6 +38,7 @@ export function buildWorkspaceColumns(opts: any) {
     density = 'comfortable',
     tagMap,
     taskTagsMap,
+    taskUsers = [],
     tagDisplayMode = 'icon-text',
     visibleColumns,
     workspaceCustomFields,
@@ -1343,11 +1345,12 @@ export function buildWorkspaceColumns(opts: any) {
       width: 140,
       filter: 'agSetColumnFilter',
       filterValueGetter: (p: any) => {
-        const ids = p.data?.user_ids;
-        if (!Array.isArray(ids)) return null;
-        return ids
-          .map((id: any) => Number(id))
-          .filter((n: number) => Number.isFinite(n));
+        // Use taskUsers table to get assigned user IDs
+        const taskId = p.data?.id;
+        if (!taskId) return null;
+        const userIds = getAssignedUserIdsFromTaskUsers(taskId, taskUsers);
+        if (userIds.length === 0) return null;
+        return userIds;
       },
       filterParams: {
         values: (params: any) => {
@@ -1375,9 +1378,9 @@ export function buildWorkspaceColumns(opts: any) {
           );
         }
         if (!usersLoaded) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
-        const userIds = p.data?.user_ids;
-        if (userIds == null) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
-        const users = getUsersFromIds(userIds, userMap) || [];
+        // Use taskUsers table to get assigned users
+        const taskId = p.data?.id;
+        const users = getAssignedUsersFromTaskUsers(taskId, taskUsers, userMap) || [];
         if (users.length === 0) return (
           <div className="flex items-center h-full py-1">
             <button

@@ -94,13 +94,16 @@ export function useStatusChange(
         return true;
       } catch (e: any) {
         console.warn('Status change failed', e);
-        const errorMessage = e?.message || e?.response?.data?.message || t('errors.noPermissionChangeStatus', 'Failed to change task status');
-        const isPermissionError = e?.response?.status === 403 || errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('unauthorized');
-        if (isPermissionError) {
-          toast.error(t('errors.noPermissionChangeStatus', 'You do not have permission to change task status.'), { duration: 5000 });
-        } else {
-          toast.error(errorMessage, { duration: 5000 });
+        // 403 errors are handled by API interceptor - don't show duplicate toast
+        const status = e?.response?.status || e?.status;
+        if (status === 403) {
+          console.log('403 error caught, already handled by API interceptor');
+          return false;
         }
+        
+        // Only show toast for non-403 errors
+        const errorMessage = e?.message || e?.response?.data?.message || t('errors.noPermissionChangeStatus', 'Failed to change task status');
+        toast.error(errorMessage, { duration: 5000 });
         return false;
       }
     };

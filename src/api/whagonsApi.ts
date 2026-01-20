@@ -8,6 +8,9 @@ const { VITE_API_URL, VITE_DEVELOPMENT} = getEnvVariables();
 // Simple obfuscation key (in production, this should be more secure)
 const OBFUSCATION_KEY = 'whagons-auth-key-2024';
 
+// Deduplication for 403 error toasts - prevent showing same error multiple times
+let last403Toast = { message: '', timestamp: 0 };
+
 const PROTOCOL = VITE_DEVELOPMENT === 'true' ? 'http' : 'https';
 
 // Simple obfuscation functions
@@ -360,6 +363,23 @@ api.interceptors.response.use(
 
       // Force re-login on landlord for any other failing endpoint by rejecting
       // so callers can handle the 404 and re-init auth flow.
+      return Promise.reject(error);
+    }
+
+    // Handle 403 Forbidden errors - display server message via toast
+    if (error.response?.status === 403) {
+      const serverMessage = error.response?.data?.message || error.response?.data?.error || 'You do not have permission to perform this action.';
+      
+      // Deduplicate: only show toast if it's a different message or more than 1 second has passed
+      const now = Date.now();
+      if (last403Toast.message !== serverMessage || (now - last403Toast.timestamp) > 1000) {
+        last403Toast = { message: serverMessage, timestamp: now };
+        // Dynamically import toast to avoid circular dependencies
+        const toast = (await import('react-hot-toast')).default;
+        toast.error(serverMessage, { duration: 5000 });
+      }
+      
+      // Still reject the error so callers can handle it if needed
       return Promise.reject(error);
     }
 
