@@ -8,6 +8,7 @@ import { Workspace, Task, Category, Team } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import {
   SettingsLayout,
@@ -18,6 +19,7 @@ import {
   TextField,
   SelectField
 } from "../components";
+import { MultiSelect } from "@/components/ui/multi-select";
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { useLanguage } from "@/providers/LanguageProvider";
@@ -272,7 +274,8 @@ function Workspaces() {
     description: '',
     color: '#3b82f6',
     icon: 'fas fa-folder',
-    type: 'standard',
+    type: 'project',
+    teams: [] as string[],
     category_id: null as number | null
   });
 
@@ -281,18 +284,25 @@ function Workspaces() {
     description: '',
     color: '#3b82f6',
     icon: 'fas fa-folder',
-    type: 'standard',
+    type: 'project',
+    teams: [] as string[],
     category_id: null as number | null
   });
 
   useEffect(() => {
     if (isEditDialogOpen && editingWorkspace) {
+      // Get teams from workspace (stored as JSON array)
+      const workspaceTeams = Array.isArray((editingWorkspace as any).teams) 
+        ? (editingWorkspace as any).teams.map((id: number) => id.toString())
+        : [];
+      
       setEditFormData({
         name: editingWorkspace.name || '',
         description: editingWorkspace.description || '',
         color: editingWorkspace.color || '#3b82f6',
         icon: editingWorkspace.icon || 'fas fa-folder',
-        type: (editingWorkspace as any).type || 'standard',
+        type: (editingWorkspace as any).type === 'DEFAULT' ? 'DEFAULT' : 'project',
+        teams: workspaceTeams,
         category_id: editingWorkspace.category_id || null
       });
     }
@@ -322,17 +332,14 @@ function Workspaces() {
   };
 
   const handleDeleteWorkspace = (workspace: Workspace) => {
-    if (canDeleteWorkspace(workspace)) {
-      deleteItem(workspace.id);
-    } else {
-      handleDelete(workspace);
-    }
+    // Always show confirmation dialog
+    handleDelete(workspace);
   };
 
   const handleDeleteFromEdit = () => {
     if (editingWorkspace) {
       setIsEditDialogOpen(false);
-      handleDeleteWorkspace(editingWorkspace);
+      handleDelete(editingWorkspace);
     }
   };
 
@@ -458,10 +465,29 @@ function Workspaces() {
       headerName: tw('grid.columns.type', 'Type'),
       flex: 1,
       minWidth: 120,
-      valueGetter: (params) => (params.data as any)?.type || 'standard',
+      valueGetter: (params) => {
+        const type = (params.data as any)?.type;
+        // Backend returns 'DEFAULT' or 'PROJECT', normalize for display
+        if (type === 'DEFAULT') return 'DEFAULT';
+        if (type === 'PROJECT') return 'PROJECT';
+        // Fallback for any legacy data
+        return type || 'PROJECT';
+      },
       cellRenderer: (params: ICellRendererParams) => {
-        const type = params.value || 'standard';
-        return <Badge variant="outline">{type}</Badge>;
+        const type = params.value || 'PROJECT';
+        const displayType = type === 'DEFAULT' 
+          ? tw('grid.columns.typeDefault', 'Default')
+          : type === 'PROJECT'
+          ? tw('grid.columns.typeProject', 'Project')
+          : type;
+        return (
+          <Badge 
+            variant={type === 'DEFAULT' ? 'default' : 'outline'}
+            className={type === 'DEFAULT' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : ''}
+          >
+            {displayType}
+          </Badge>
+        );
       }
     },
     {
@@ -533,7 +559,7 @@ function Workspaces() {
       resizable: false,
       pinned: 'right'
     }
-  ], [categories, handleEdit, handleDeleteWorkspace, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
+  ], [categories, handleEdit, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -545,13 +571,20 @@ function Workspaces() {
       throw new Error(tw('validation.nameRequired', 'Workspace name is required'));
     }
 
+    // Validate teams selection - at least one team is required
+    if (!createFormData.teams || createFormData.teams.length === 0) {
+      throw new Error(tw('validation.teamsRequired', 'Please select at least one team'));
+    }
+
+    // User-created workspaces are always PROJECT type
     const workspaceData: any = {
       name: name.trim(),
       description: (formData.get('description') as string) || null,
       color: createFormData.color,
       icon: createFormData.icon,
-      type: createFormData.type,
-      category_id: createFormData.category_id
+      type: 'PROJECT', // Always PROJECT for user-created workspaces
+      teams: createFormData.teams.map(teamId => parseInt(teamId, 10)), // Convert string IDs to integers
+      category_id: createFormData.category_id || null
     };
 
     await createItem(workspaceData);
@@ -561,7 +594,8 @@ function Workspaces() {
       description: '',
       color: '#3b82f6',
       icon: 'fas fa-folder',
-      type: 'standard',
+      type: 'project',
+      teams: [],
       category_id: null
     });
   };
@@ -577,14 +611,30 @@ function Workspaces() {
       throw new Error(tw('validation.nameRequired', 'Workspace name is required'));
     }
 
+    const workspaceType = (editingWorkspace as any).type || 'PROJECT';
+    const isDefaultWorkspace = workspaceType === 'DEFAULT';
+
+    // For DEFAULT workspaces, don't allow changing teams or type
+    // For PROJECT workspaces, validate teams if provided
+    if (!isDefaultWorkspace && editFormData.teams && editFormData.teams.length === 0) {
+      throw new Error(tw('validation.teamsRequired', 'Please select at least one team'));
+    }
+
     const updates: any = {
       name: name.trim(),
       description: (formData.get('description') as string) || null,
       color: editFormData.color,
       icon: editFormData.icon,
-      type: editFormData.type,
       category_id: editFormData.category_id
     };
+
+    // Only update type and teams for PROJECT workspaces
+    if (!isDefaultWorkspace) {
+      updates.type = 'PROJECT'; // Always PROJECT for editable workspaces
+      if (editFormData.teams && editFormData.teams.length > 0) {
+        updates.teams = editFormData.teams.map(teamId => parseInt(teamId, 10));
+      }
+    }
 
     await updateItem(editingWorkspace.id, updates);
   };
@@ -993,7 +1043,8 @@ function Workspaces() {
               description: '',
               color: '#3b82f6',
               icon: 'fas fa-folder',
-              type: 'standard',
+              type: 'project',
+              teams: [],
               category_id: null
             });
           }
@@ -1025,15 +1076,45 @@ function Workspaces() {
             value={createFormData.color}
             onChange={(color) => setCreateFormData(prev => ({ ...prev, color }))}
           />
+          <div className="space-y-2">
+            <Label htmlFor="create-teams" className="text-sm font-medium">
+              {tw('dialogs.create.fields.teams', 'Teams')} <span className="text-red-500">*</span>
+            </Label>
+            <MultiSelect
+              options={teams.map((team: Team) => ({
+                value: team.id.toString(),
+                label: team.name
+              }))}
+              onValueChange={(value) => setCreateFormData(prev => ({ ...prev, teams: value }))}
+              defaultValue={createFormData.teams}
+              placeholder={
+                teams.length === 0
+                  ? tw('dialogs.create.fields.loadingTeams', 'Loading teams...')
+                  : tw('dialogs.create.fields.selectTeams', 'Select teams...')
+              }
+              maxCount={10}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              {tw('dialogs.create.fields.teamsHint', 'Select at least one team for this workspace')}
+            </p>
+          </div>
           <SelectField
-            id="type"
-            label={tw('dialogs.create.fields.type', 'Type')}
-            value={createFormData.type}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, type: value }))}
+            id="category"
+            label={tw('dialogs.create.fields.category', 'Category')}
+            value={createFormData.category_id ? createFormData.category_id.toString() : 'none'}
+            onChange={(value) => {
+              const categoryId = value && value !== 'none' && value !== '' ? parseInt(value, 10) : null;
+              setCreateFormData(prev => ({ ...prev, category_id: categoryId }));
+            }}
             options={[
-              { value: 'standard', label: tw('dialogs.create.fields.typeStandard', 'Standard') },
-              { value: 'project', label: tw('dialogs.create.fields.typeProject', 'Project') },
-              { value: 'department', label: tw('dialogs.create.fields.typeDepartment', 'Department') }
+              { value: 'none', label: tw('dialogs.create.fields.noCategory', 'No category') },
+              ...categories
+                .filter((cat: Category) => !cat.workspace_id) // Only show categories without workspaces
+                .map((cat: Category) => ({
+                  value: cat.id.toString(),
+                  label: cat.name
+                }))
             ]}
           />
         </div>
@@ -1050,7 +1131,8 @@ function Workspaces() {
               description: '',
               color: '#3b82f6',
               icon: 'fas fa-folder',
-              type: 'standard',
+              type: 'project',
+              teams: [],
               category_id: null
             });
           }
@@ -1096,17 +1178,69 @@ function Workspaces() {
               value={editFormData.color}
               onChange={(color) => setEditFormData(prev => ({ ...prev, color }))}
             />
-            <SelectField
-              id="edit-type"
-              label={tw('dialogs.edit.fields.type', 'Type')}
-              value={editFormData.type}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, type: value }))}
-              options={[
-                { value: 'standard', label: tw('dialogs.edit.fields.typeStandard', 'Standard') },
-                { value: 'project', label: tw('dialogs.edit.fields.typeProject', 'Project') },
-                { value: 'department', label: tw('dialogs.edit.fields.typeDepartment', 'Department') }
-              ]}
-            />
+            {(() => {
+              const workspaceType = (editingWorkspace as any).type || 'PROJECT';
+              const isDefaultWorkspace = workspaceType === 'DEFAULT';
+              
+              return (
+                <>
+                  {isDefaultWorkspace ? (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        {tw('dialogs.edit.fields.type', 'Type')}
+                      </Label>
+                      <div className="text-sm text-muted-foreground p-2 bg-muted rounded-md">
+                        {tw('dialogs.edit.fields.typeDefault', 'Default (bound to category - cannot be changed)')}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-teams" className="text-sm font-medium">
+                          {tw('dialogs.edit.fields.teams', 'Teams')} <span className="text-red-500">*</span>
+                        </Label>
+                        <MultiSelect
+                          options={teams.map((team: Team) => ({
+                            value: team.id.toString(),
+                            label: team.name
+                          }))}
+                          onValueChange={(value) => setEditFormData(prev => ({ ...prev, teams: value }))}
+                          defaultValue={editFormData.teams}
+                          placeholder={
+                            teams.length === 0
+                              ? tw('dialogs.edit.fields.loadingTeams', 'Loading teams...')
+                              : tw('dialogs.edit.fields.selectTeams', 'Select teams...')
+                          }
+                          maxCount={10}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {tw('dialogs.edit.fields.teamsHint', 'Select at least one team for this workspace')}
+                        </p>
+                      </div>
+                      <SelectField
+                        id="edit-category"
+                        label={tw('dialogs.edit.fields.category', 'Category')}
+                        value={editFormData.category_id ? editFormData.category_id.toString() : 'none'}
+                        onChange={(value) => {
+                          const categoryId = value && value !== 'none' && value !== '' ? parseInt(value, 10) : null;
+                          setEditFormData(prev => ({ ...prev, category_id: categoryId }));
+                        }}
+                        options={[
+                          { value: 'none', label: tw('dialogs.edit.fields.noCategory', 'No category') },
+                          ...categories
+                            .filter((cat: Category) => !cat.workspace_id || cat.workspace_id === editingWorkspace.id)
+                            .map((cat: Category) => ({
+                              value: cat.id.toString(),
+                              label: cat.name
+                            }))
+                        ]}
+                      />
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </SettingsDialog>

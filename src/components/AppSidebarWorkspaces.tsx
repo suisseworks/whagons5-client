@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Plus,
@@ -40,9 +40,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ColorPicker, ColorPickerAlpha, ColorPickerFormat, ColorPickerHue, ColorPickerSelection, ColorPickerEyeDropper } from '@/components/ui/shadcn-io/color-picker';
+import { MultiSelect } from '@/components/ui/multi-select';
 import Color, { ColorLike } from 'color';
-import { Workspace } from '@/store/types';
+import { Workspace, Team, Category } from '@/store/types';
 import { genericActions } from '@/store/genericSlices';
+import { RootState } from '@/store/store';
 import {
   DndContext,
   closestCenter,
@@ -394,7 +396,19 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const [workspaceName, setWorkspaceName] = useState('');
   const [workspaceDescription, setWorkspaceDescription] = useState('');
   const [workspaceColor, setWorkspaceColor] = useState('#3b82f6');
-  const [workspaceType, setWorkspaceType] = useState('standard');
+  const [workspaceType, setWorkspaceType] = useState('project');
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('none');
+
+  // Get teams and categories from Redux store
+  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
+  const { value: categories } = useSelector((state: RootState) => state.categories) as { value: Category[] };
+  
+  // Filter categories that don't already have a workspace (DEFAULT workspaces are 1:1 with categories)
+  // Only show categories that don't have a workspace_id for optional association
+  const availableCategories = useMemo(() => {
+    return categories.filter((cat: Category) => !cat.workspace_id);
+  }, [categories]);
 
   const [orderKey, setOrderKey] = useState(0);
   // Keep previous workspaces to prevent disappearing during transitions
@@ -485,23 +499,43 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       return;
     }
 
-    try {
-      await dispatch((genericActions.workspaces.addAsync as any)({
-        name: workspaceName.trim(),
-        description: workspaceDescription.trim() || null,
-        color: workspaceColor,
-        icon: 'fas fa-folder',
-        type: workspaceType
-      })).unwrap();
+    // Validate teams selection - at least one team is required
+    if (!selectedTeams || selectedTeams.length === 0) {
+      alert(t('sidebar.pleaseSelectAtLeastOneTeam', 'Please select at least one team.'));
+      return;
+    }
 
+    // User-created workspaces are always PROJECT type
+    // DEFAULT workspaces are only created automatically with categories
+    const workspaceData: any = {
+      name: workspaceName.trim(),
+      description: workspaceDescription.trim() || null,
+      color: workspaceColor,
+      icon: 'fas fa-folder',
+      type: 'PROJECT',
+      teams: selectedTeams.map(teamId => parseInt(teamId, 10)) // Convert string IDs to integers
+    };
+
+    // Add category_id if one was selected (optional for PROJECT workspaces)
+    if (selectedCategoryId && selectedCategoryId !== 'none') {
+      workspaceData.category_id = parseInt(selectedCategoryId, 10);
+    }
+
+    try {
+      await dispatch((genericActions.workspaces.addAsync as any)(workspaceData)).unwrap();
+
+      // Reset form
       setWorkspaceName('');
       setWorkspaceDescription('');
       setWorkspaceColor('#3b82f6');
-      setWorkspaceType('standard');
+      setWorkspaceType('project');
+      setSelectedTeams([]);
+      setSelectedCategoryId('none');
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating workspace:', error);
-      alert(t('sidebar.failedToCreateWorkspace', 'Failed to create workspace. Please try again.'));
+      const errorMessage = error?.message || t('sidebar.failedToCreateWorkspace', 'Failed to create workspace. Please try again.');
+      alert(errorMessage);
     }
   };
 
@@ -640,7 +674,9 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           setWorkspaceName('');
           setWorkspaceDescription('');
           setWorkspaceColor('#3b82f6');
-          setWorkspaceType('standard');
+          setWorkspaceType('project');
+          setSelectedTeams([]);
+          setSelectedCategoryId('none');
         }
       }}>
         <DialogContent className="sm:max-w-[425px]">
@@ -716,20 +752,51 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="workspace-type" className="text-right">
-                {t('sidebar.workspaceType', 'Type')}
+              <Label htmlFor="workspace-teams" className="text-right">
+                {t('sidebar.workspaceTeams', 'Teams')} <span className="text-red-500">*</span>
               </Label>
               <div className="col-span-3">
-                <Select value={workspaceType} onValueChange={setWorkspaceType}>
-                  <SelectTrigger id="workspace-type">
-                    <SelectValue placeholder={t('sidebar.selectType', 'Select type')} />
+                <MultiSelect
+                  options={teams.map((team: Team) => ({
+                    value: team.id.toString(),
+                    label: team.name
+                  }))}
+                  onValueChange={setSelectedTeams}
+                  defaultValue={selectedTeams}
+                  placeholder={
+                    teams.length === 0
+                      ? t('sidebar.loadingTeams', 'Loading teams...')
+                      : t('sidebar.selectTeams', 'Select teams...')
+                  }
+                  maxCount={10}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('sidebar.workspaceTeamsHint', 'Select at least one team for this workspace')}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="workspace-category" className="text-right">
+                {t('sidebar.workspaceCategory', 'Category')}
+              </Label>
+              <div className="col-span-3">
+                <Select value={selectedCategoryId || 'none'} onValueChange={setSelectedCategoryId}>
+                  <SelectTrigger id="workspace-category">
+                    <SelectValue placeholder={t('sidebar.selectCategoryOptional', 'Select category (optional)')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="standard">{t('sidebar.workspaceTypeStandard', 'Standard')}</SelectItem>
-                    <SelectItem value="project">{t('sidebar.workspaceTypeProject', 'Project')}</SelectItem>
-                    <SelectItem value="department">{t('sidebar.workspaceTypeDepartment', 'Department')}</SelectItem>
+                    <SelectItem value="none">{t('sidebar.noCategory', 'No category')}</SelectItem>
+                    {availableCategories.map((category: Category) => (
+                      <SelectItem key={category.id} value={category.id.toString()}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('sidebar.workspaceCategoryHint', 'Optionally associate this workspace with a category')}
+                </p>
               </div>
             </div>
           </div>
