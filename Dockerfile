@@ -27,13 +27,10 @@ ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
 # Note: BRYNTUM_USERNAME and BRYNTUM_PASSWORD are used in RUN commands, not set as ENV
 
 # Copy package files
-COPY package.json bun.lockb* package-lock.json* pnpm-lock.yaml* ./
+COPY package.json bun.lock* bun.lockb* package-lock.json* pnpm-lock.yaml* ./
 
-# Create .npmrc from build args (without printing credentials) and install dependencies
-# Use BuildKit secret mount pattern: if .npmrc is provided via --secret id=npmrc,src=.npmrc,
-# it will be mounted at /app/.npmrc. Otherwise, create from build args silently.
-# To use secret: docker build --secret id=npmrc,src=.npmrc
-RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
+# Create .npmrc from build args and install dependencies
+RUN set -ex && \
     if [ -z "$FONTAWESOME_PACKAGE_TOKEN" ]; then \
       echo "ERROR: FONTAWESOME_PACKAGE_TOKEN is not set!" && exit 1; \
     fi && \
@@ -46,12 +43,13 @@ RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
     echo "//npm.fontawesome.com/:_authToken=$FONTAWESOME_PACKAGE_TOKEN" >> .npmrc && \
     echo "@bryntum:registry=https://npm.bryntum.com" >> .npmrc && \
     echo "//npm.bryntum.com/:_authToken=$BRYNTUM_AUTH" >> .npmrc && \
-    echo "Installing dependencies with npm (reliable authentication)..." && \
-    npm ci --legacy-peer-deps && \
-    echo "Verifying Firebase packages installation..." && \
-    ls -la node_modules/@firebase/auth 2>/dev/null || echo "WARNING: @firebase/auth not found" && \
-    ls -la node_modules/firebase 2>/dev/null || echo "WARNING: firebase not found" && \
-    echo "Dependencies installed successfully!"
+    echo "=== Starting dependency installation ===" && \
+    bun install && \
+    echo "=== Verifying installation ===" && \
+    ls -la node_modules/.bin/vite && \
+    ls -la node_modules/@firebase/auth && \
+    ls -la node_modules/firebase && \
+    echo "=== Dependencies installed successfully ==="
 
 # Copy source code
 COPY . .
