@@ -200,33 +200,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const skipFCM = import.meta.env.VITE_SKIP_FCM === 'true';
       
       if (skipFCM) {
-        console.log('⏭️  [FCM] Skipping (VITE_SKIP_FCM=true)');
         return;
       }
-
-      console.log('🔔 FCM Init Check:', {
-        hasFirebaseUser: !!fbUser,
-        hasUserData: !!userData,
-        hasTenantPrefix: !!userData?.tenant_domain_prefix,
-        tenantPrefix: userData?.tenant_domain_prefix,
-        notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'N/A'
-      });
 
       // Only initialize FCM if user is authenticated (Firebase user exists)
       if (!fbUser || !userData) {
-        console.log('⏭️  Skipping FCM initialization - user not authenticated');
         return;
       }
 
-      console.log('🚀 Initializing FCM for authenticated user...');
       const token = await requestNotificationPermission();
       
       if (token) {
-        console.log('✅ Push notifications enabled');
         // Setup listener for foreground messages
         setupForegroundMessageHandler();
-      } else {
-        console.log('ℹ️  Push notifications not available or permission denied');
       }
     } catch (error) {
       console.error('❌ FCM initialization error:', error);

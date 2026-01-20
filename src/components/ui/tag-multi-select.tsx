@@ -85,10 +85,13 @@ export function TagMultiSelect({
                     onClick={(e) => handleRemove(tag.id, e)}
                   >
                     <span className="truncate max-w-[100px]">{tag.name}</span>
-                    <button
-                      className="rounded-full outline-none focus:ring-2 focus:ring-offset-1 focus:ring-ring"
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="rounded-full outline-none focus:ring-2 focus:ring-offset-1 focus:ring-ring cursor-pointer"
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
                           handleRemove(tag.id, e)
                         }
                       }}
@@ -99,7 +102,7 @@ export function TagMultiSelect({
                       onClick={(e) => handleRemove(tag.id, e)}
                     >
                       <X className="h-2.5 w-2.5 opacity-70 hover:opacity-100" />
-                    </button>
+                    </span>
                   </div>
                 ))}
               </div>

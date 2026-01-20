@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 
 export function useTaskDialogComputed(params: any) {
-  const computeStart = performance.now();
   const {
     mode,
     propWorkspaceId,
@@ -14,7 +13,6 @@ export function useTaskDialogComputed(params: any) {
     categoryId,
     categoryPriorityAssignments,
     userTeamIds,
-    currentWorkspace,
     approvalId,
     selectedTemplate,
     statuses,
@@ -98,21 +96,6 @@ export function useTaskDialogComputed(params: any) {
   const workspaceTemplates = useMemo(() => {
     let filtered = templates;
     
-    console.log('[useTaskDialogComputed] Templates filtering:', {
-      mode,
-      totalTemplates: templates.length,
-      currentWorkspace: currentWorkspaceData,
-      workspaceId,
-      allCategories: categories.map((c: any) => ({ id: c.id, name: c.name, workspace_id: c.workspace_id })),
-      allTemplates: templates.map((t: any) => ({ 
-        id: t.id, 
-        name: t.name, 
-        category_id: t.category_id,
-        enabled: t.enabled,
-        is_private: t.is_private
-      })),
-    });
-    
     if (mode === 'create-all') {
       filtered = templates.filter((template: any) => {
         if (template?.enabled === false) return false;
@@ -123,11 +106,9 @@ export function useTaskDialogComputed(params: any) {
       });
     } else {
       if (!currentWorkspaceData) {
-        console.log('[useTaskDialogComputed] No currentWorkspaceData');
         return [];
       }
       if (currentWorkspaceData.type !== "DEFAULT") {
-        console.log('[useTaskDialogComputed] Workspace is not DEFAULT type:', currentWorkspaceData.type);
         return [];
       }
       
@@ -135,13 +116,6 @@ export function useTaskDialogComputed(params: any) {
         if (template?.enabled === false) return false;
         const cat = categories.find((c: any) => c.id === template.category_id);
         const match = cat && cat.workspace_id === currentWorkspaceData.id;
-        console.log('[useTaskDialogComputed] Template:', template.name, {
-          categoryId: template.category_id,
-          categoryName: cat?.name,
-          categoryWorkspaceId: cat?.workspace_id,
-          currentWorkspaceId: currentWorkspaceData.id,
-          match
-        });
         return match;
       });
     }
@@ -153,8 +127,6 @@ export function useTaskDialogComputed(params: any) {
       const categoryTeamId = Number(cat.team_id);
       return userTeamIds.includes(categoryTeamId);
     });
-    
-    console.log('[useTaskDialogComputed] Final templates:', finalFiltered.length, finalFiltered.map((t: any) => t.name));
     
     return finalFiltered;
   }, [templates, currentWorkspaceData, mode, categories, workspaces, userTeamIds, workspaceId]);
@@ -192,13 +164,6 @@ export function useTaskDialogComputed(params: any) {
       const initialStatusId = Number.isFinite(fromId) ? fromId : (Number.isFinite(toId) ? toId : null);
 
       if (initialStatusId != null) {
-        const statusName = statuses.find((s: any) => Number(s?.id) === initialStatusId)?.name;
-        console.log('[categoryInitialStatusId] Using group initial status:', {
-          groupId,
-          statusId: initialStatusId,
-          statusName,
-          initialTransitionId: candidate?.id,
-        });
         return initialStatusId;
       }
     }
@@ -206,11 +171,6 @@ export function useTaskDialogComputed(params: any) {
     // Fallback to status with initial flag or first status
     const initial = (statuses || []).find((s: any) => s.initial === true);
     const fallbackId = (initial || statuses[0])?.id || null;
-    console.log('[categoryInitialStatusId] Using fallback status:', {
-      fallbackId,
-      statusName: statuses.find((s: any) => s.id === fallbackId)?.name,
-      reason: groupTransitions.length === 0 ? 'No transitions found' : 'No valid initial status'
-    });
     return fallbackId;
   }, [statuses, mode, currentCategory, statusTransitions]);
 

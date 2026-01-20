@@ -1,7 +1,8 @@
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { AppRouter } from './router/AppRouter';
 import { useEffect, useState } from 'react';
 import { useAuth } from './providers/AuthProvider';
+import { showNotificationToast, getNotificationIcon } from './components/ui/NotificationToast';
 import RadiographyEffect from './components/marketing/RadiographyEffect';
 import SnowEffect from './components/marketing/SnowEffect';
 import RainEffect from './components/marketing/RainEffect';
@@ -96,6 +97,53 @@ const EffectsLayer = () => {
   );
 };
 
+// Component to handle service worker messages
+const ServiceWorkerListener = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Listen for messages from service worker
+    const handleMessage = async (event: MessageEvent) => {
+      if (!event.data) return;
+
+      // Handle notification clicks
+      if (event.data.type === 'NOTIFICATION_CLICKED') {
+        if (event.data.url) {
+          navigate(event.data.url);
+        }
+      }
+
+      // Handle new notifications - refresh from IndexedDB and show toast
+      if (event.data.type === 'NEW_NOTIFICATION') {
+        const notification = event.data.notification;
+        
+        // Show beautiful toast notification
+        showNotificationToast({
+          title: notification?.title || 'New Notification',
+          body: notification?.body || '',
+          onClick: notification?.url ? () => navigate(notification.url) : undefined,
+          icon: getNotificationIcon(notification?.data?.type),
+          duration: 6000,
+        });
+        
+        // Dynamically import to avoid circular dependencies
+        const { store } = await import('./store/store');
+        const { genericInternalActions } = await import('./store/genericSlices');
+        
+        await store.dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
+      }
+    };
+
+    navigator.serviceWorker?.addEventListener('message', handleMessage);
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleMessage);
+    };
+  }, [navigate]);
+
+  return null;
+};
+
 export const App = () => {
   return (
     <BrowserRouter
@@ -104,6 +152,7 @@ export const App = () => {
         v7_relativeSplatPath: true,
       }}
     >
+      <ServiceWorkerListener />
       <AppRouter />
       <EffectsLayer />
     </BrowserRouter>

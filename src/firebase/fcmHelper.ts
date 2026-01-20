@@ -1,7 +1,7 @@
 import { getToken, onMessage } from "firebase/messaging";
 import { getMessagingInstance } from "./firebaseConfig";
 import { api } from "@/api/whagonsApi";
-import toast from "react-hot-toast";
+import { showNotificationToast, getNotificationIcon } from "@/components/ui/NotificationToast";
 
 // VAPID key from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || "";
@@ -15,8 +15,6 @@ if (!VAPID_KEY) {
  * Request notification permission and register FCM token
  */
 export async function requestNotificationPermission(): Promise<string | null> {
-  console.log('🔔 [FCM] Starting notification permission request...');
-  
   // Get messaging instance (initializes if needed)
   const messaging = await getMessagingInstance();
   
@@ -24,15 +22,11 @@ export async function requestNotificationPermission(): Promise<string | null> {
     console.warn('⚠️  [FCM] Messaging not supported in this browser');
     return null;
   }
-  
-  console.log('✅ [FCM] Messaging instance ready');
 
   // Check current permission status
   const currentPermission = Notification.permission;
-  console.log('🔍 [FCM] Current notification permission:', currentPermission);
   
   if (currentPermission === 'denied') {
-    console.log('🚫 [FCM] User previously denied notifications');
     return null;
   }
 
@@ -41,25 +35,17 @@ export async function requestNotificationPermission(): Promise<string | null> {
     
     // Only ask if not already granted
     if (permission === 'default') {
-      console.log('📢 [FCM] Requesting notification permission from user...');
       permission = await Notification.requestPermission();
-      console.log('📋 [FCM] Permission result:', permission);
-    } else {
-      console.log('ℹ️  [FCM] Permission already', permission);
     }
     
     if (permission !== 'granted') {
-      console.log('❌ [FCM] Notification permission not granted');
       return null;
     }
 
     // Service worker should already be registered by getMessagingInstance()
-    console.log('🔍 [FCM] Getting service worker registration...');
     const registration = await navigator.serviceWorker.ready;
-    console.log('✅ [FCM] Service worker registration ready');
 
     // Get FCM token from Firebase
-    console.log('🔑 [FCM] Requesting token from Firebase...');
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: registration
@@ -69,8 +55,6 @@ export async function requestNotificationPermission(): Promise<string | null> {
       console.error('Failed to get FCM token');
       return null;
     }
-
-    console.log('✅ FCM Token obtained:', token.substring(0, 20) + '...');
 
     // Register with backend
     await registerTokenWithBackend(token, 'web');
@@ -92,14 +76,12 @@ async function registerTokenWithBackend(
   try {
     const deviceId = getOrCreateDeviceId();
     
-    const response = await api.post('/fcm-tokens', {
+    await api.post('/fcm-tokens', {
       fcm_token: fcmToken,
       platform: platform,
       device_id: deviceId,
       app_version: import.meta.env.VITE_APP_VERSION || '1.0.0'
     });
-    
-    console.log('✅ FCM token registered with backend');
     
     // Store locally for comparison (detect token changes)
     localStorage.setItem('wh-fcm-token', fcmToken);
@@ -107,7 +89,6 @@ async function registerTokenWithBackend(
   } catch (error: any) {
     // Handle duplicate token error gracefully
     if (error.response?.status === 409 || error.response?.data?.message?.includes('duplicate')) {
-      console.log('ℹ️  FCM token already registered');
       localStorage.setItem('wh-fcm-token', fcmToken);
       localStorage.setItem('wh-fcm-registered', 'true');
     } else {
@@ -130,9 +111,69 @@ export async function unregisterToken() {
     });
     localStorage.removeItem('wh-fcm-token');
     localStorage.removeItem('wh-fcm-registered');
-    console.log('✅ FCM token unregistered');
   } catch (error) {
     console.error('❌ Failed to unregister FCM token:', error);
+  }
+}
+
+/**
+ * Store notification in IndexedDB
+ */
+async function storeNotification(payload: any) {
+  try {
+    const { DB } = await import('@/store/indexedDB/DB');
+    const { store } = await import('@/store/store');
+    const { genericActions } = await import('@/store/genericSlices');
+    
+    if (!DB.inited || !DB.db) {
+      console.warn('⚠️ DB not initialized, skipping notification storage');
+      return;
+    }
+
+    const notification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: payload.notification?.title || 'New Notification',
+      body: payload.notification?.body || '',
+      data: payload.data || {},
+      type: payload.data?.type || 'default',
+      url: getNotificationUrl(payload.data),
+      received_at: new Date().toISOString(),
+      viewed_at: null, // Set when user opens dropdown
+    };
+
+    const tx = DB.db.transaction(['notifications'], 'readwrite');
+    const objectStore = tx.objectStore('notifications');
+    await objectStore.add(notification);
+
+    // Update Redux state
+    store.dispatch(genericActions.notifications.addAsync(notification) as any);
+  } catch (error) {
+    console.error('❌ Error storing notification:', error);
+  }
+}
+
+/**
+ * Get notification URL based on data
+ */
+function getNotificationUrl(data: any): string {
+  if (!data) return '/';
+  
+  switch (data.type) {
+    case 'broadcast':
+      return data.broadcast_id ? `/broadcasts?id=${data.broadcast_id}` : '/broadcasts';
+    case 'task_assigned':
+    case 'task_created_assigned':
+      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+    case 'task_updated':
+      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+    case 'approval_requested':
+      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+    case 'approval_approved':
+      return data.workspace_id ? `/workspace/${data.workspace_id}` : (data.task_id ? `/tasks` : '/');
+    case 'message':
+      return data.message_id ? `/messages?id=${data.message_id}` : '/messages';
+    default:
+      return '/';
   }
 }
 
@@ -144,31 +185,22 @@ export async function setupForegroundMessageHandler() {
   
   if (!messaging) return;
   
-  onMessage(messaging, (payload) => {
-    console.log('📨 Foreground notification received:', payload);
-    
+  onMessage(messaging, async (payload) => {
     const title = payload.notification?.title || 'New Notification';
     const body = payload.notification?.body || '';
     const data = payload.data || {};
 
-    // Show toast notification (text only - no JSX in .ts file)
-    const toastId = toast(
-      `${title}\n${body}`,
-      {
-        duration: 6000,
-        position: 'top-right',
-        icon: '🔔',
-        style: {
-          cursor: 'pointer'
-        }
-      }
-    );
-    
-    // Handle click on toast
-    const toastElement = document.querySelector(`[data-toast-id="${toastId}"]`);
-    if (toastElement) {
-      toastElement.addEventListener('click', () => handleNotificationClick(data));
-    }
+    // Store notification in IndexedDB
+    await storeNotification(payload);
+
+    // Show beautiful toast notification
+    showNotificationToast({
+      title,
+      body,
+      icon: getNotificationIcon(data.type),
+      onClick: () => handleNotificationClick(data),
+      duration: 6000,
+    });
 
     // Also show browser notification if permission granted
     if (Notification.permission === 'granted' && document.hidden) {
@@ -195,8 +227,15 @@ function handleNotificationClick(data: any) {
       }
       break;
     case 'task_assigned':
-      if (data.task_id) {
-        window.location.href = `/tasks/${data.task_id}`;
+    case 'task_created_assigned':
+    case 'task_updated':
+    case 'approval_requested':
+    case 'approval_approved':
+      // Navigate to workspace if available, otherwise fallback to tasks
+      if (data.workspace_id) {
+        window.location.href = `/workspace/${data.workspace_id}`;
+      } else if (data.task_id) {
+        window.location.href = `/tasks`;
       }
       break;
     case 'message':
@@ -205,8 +244,8 @@ function handleNotificationClick(data: any) {
       }
       break;
     default:
-      // Generic notification - go to notifications page
-      window.location.href = '/notifications';
+      // Generic notification - go to home
+      window.location.href = '/';
   }
 }
 

@@ -103,6 +103,9 @@ const genericSliceConfigs = [
     { name: 'scheduleTemplates', table: 'wh_schedule_templates', endpoint: '/schedule-templates', store: 'schedule_templates', hashFields: ['id','name','description','schedule_type','weekly_hours','updated_at'] },
     { name: 'scheduleTemplateDays', table: 'wh_schedule_template_days', endpoint: '/schedule-template-days', store: 'schedule_template_days', hashFields: ['id','template_id','day_of_week','is_working_day','start_time','end_time','break_duration','break_start_time','updated_at'] },
     { name: 'userSchedules', table: 'wh_user_schedules', endpoint: '/user-schedules', store: 'user_schedules', hashFields: ['id','user_id','template_id','effective_from','effective_to','timezone','updated_at'] },
+
+    // Notifications (client-side only, no backend table)
+    { name: 'notifications', table: '', endpoint: '', store: 'notifications', hashFields: [] },
 ];
 
 // Create all generic slices at once
@@ -174,6 +177,7 @@ export const {
     scheduleTemplates,
     scheduleTemplateDays,
     userSchedules,
+    notifications,
 } = genericSlices.slices;
 
 // Export individual caches for CacheRegistry
@@ -251,6 +255,7 @@ export const genericEventNames = {
     scheduleTemplates: genericSlices.slices.scheduleTemplates.eventNames,
     scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.eventNames,
     userSchedules: genericSlices.slices.userSchedules.eventNames,
+    notifications: genericSlices.slices.notifications.eventNames,
 } as const;
 
 // Export actions for each slice with proper typing
@@ -330,6 +335,7 @@ export const genericInternalActions = {
     scheduleTemplates: genericSlices.slices.scheduleTemplates.actions,
     scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.actions,
     userSchedules: genericSlices.slices.userSchedules.actions,
+    notifications: genericSlices.slices.notifications.actions,
 } as const;
 
 /**
@@ -401,4 +407,5 @@ export const genericActions = {
     scheduleTemplates: publicActions(genericInternalActions.scheduleTemplates),
     scheduleTemplateDays: publicActions(genericInternalActions.scheduleTemplateDays),
     userSchedules: publicActions(genericInternalActions.userSchedules),
+    notifications: publicActions(genericInternalActions.notifications),
 } as const;
