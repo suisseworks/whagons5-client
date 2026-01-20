@@ -1,5 +1,6 @@
 import { useEffect, startTransition } from 'react';
 import { normalizeDefaultUserIds } from '../utils/fieldHelpers';
+import { getAssignedUserIdsFromTaskUsers } from '../../workspaceTable/utils/userUtils';
 
 export function useFormInitialization(params: any) {
   const {
@@ -7,6 +8,7 @@ export function useFormInitialization(params: any) {
     mode,
     task,
     taskTags,
+    taskUsers,
     workspaceTemplates,
     workspaceCategories,
     formInitializedRef,
@@ -49,7 +51,9 @@ export function useFormInitialization(params: any) {
       setStatusId(task.status_id ? Number(task.status_id) : null);
       setTemplateId(task.template_id ? Number(task.template_id) : null);
       setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
-      setSelectedUserIds(Array.isArray(task.user_ids) ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n)) : []);
+      // Get assigned user IDs from taskUsers table
+      const assignedUserIds = getAssignedUserIdsFromTaskUsers(task.id, taskUsers || []);
+      setSelectedUserIds(assignedUserIds);
       setSlaId(task.sla_id ? Number(task.sla_id) : null);
       setApprovalId(task.approval_id ? Number(task.approval_id) : null);
       setIsSubmitting(false);
@@ -115,5 +119,5 @@ export function useFormInitialization(params: any) {
     }, 0); // Minimal delay - just enough to let Sheet start rendering
     
     return () => clearTimeout(timer);
-  }, [open, mode, task?.id, taskTags, workspaceTemplates, workspaceCategories]);
+  }, [open, mode, task?.id, taskTags, taskUsers, workspaceTemplates, workspaceCategories]);
 }

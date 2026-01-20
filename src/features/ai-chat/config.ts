@@ -12,7 +12,7 @@
 //   "anthropic/claude-3.5-sonnet" - Anthropic Claude 3.5 Sonnet via OpenRouter
 //   "accounts/fireworks/models/glm-4p7" - Fireworks GLM-4 Plus 7B
 //export const PREFERRED_MODEL = "accounts/fireworks/models/qwen3-vl-30b-a3b-instruct";
-export const PREFERRED_MODEL = "z-ai/glm-4.5-air:free";
+export const PREFERRED_MODEL = "gemini-2.0-flash";
 
 /**
  * Get the preferred model, checking localStorage first, then falling back to PREFERRED_MODEL

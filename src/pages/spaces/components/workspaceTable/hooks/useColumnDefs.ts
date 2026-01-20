@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from 'react';
-import { buildWorkspaceColumns } from '../columns';
+import { buildWorkspaceColumns } from '../columns/index';
 import { ColumnBuilderOptions } from '../columns/types';
 
 export function useColumnDefs(opts: ColumnBuilderOptions & {

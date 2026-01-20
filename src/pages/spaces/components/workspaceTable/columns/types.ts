@@ -22,6 +22,7 @@ export interface ColumnBuilderOptions {
   density?: 'compact' | 'comfortable' | 'spacious';
   tagMap: Record<number, any>;
   taskTagsMap: Map<number, number[]>;
+  taskUsers: any[];
   tagDisplayMode?: 'icon' | 'icon-text';
   visibleColumns?: string[];
   workspaceCustomFields: any[];

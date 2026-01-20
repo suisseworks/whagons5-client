@@ -29,6 +29,7 @@ export const useGridReduxState = () => {
   const slas = useSelector((s: RootState) => (s as any).slas?.value as any[] || []);
   const tags = useSelector((s: RootState) => (s as any).tags?.value as any[] || []);
   const taskTags = useSelector((s: RootState) => (s as any).taskTags?.value as any[] || []);
+  const taskUsers = useSelector((s: RootState) => (s as any).taskUsers?.value as any[] || []);
   const customFields = useSelector((s: RootState) => (s as any).customFields?.value as any[] || []);
   const categoryCustomFields = useSelector((s: RootState) => (s as any).categoryCustomFields?.value as any[] || []);
   const taskCustomFieldValues = useSelector((s: RootState) => (s as any).taskCustomFieldValues?.value as any[] || []);
@@ -49,6 +50,7 @@ export const useGridReduxState = () => {
     slas,
     tags,
     taskTags,
+    taskUsers,
     customFields,
     categoryCustomFields,
     taskCustomFieldValues,

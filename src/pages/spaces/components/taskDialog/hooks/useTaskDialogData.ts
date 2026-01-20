@@ -19,6 +19,7 @@ export function useTaskDialogData() {
   const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
   const { value: tags = [] } = useSelector((s: RootState) => (s as any).tags || { value: [] });
   const { value: taskTags = [] } = useSelector((s: RootState) => (s as any).taskTags || { value: [] });
+  const { value: taskUsers = [] } = useSelector((s: RootState) => (s as any).taskUsers || { value: [] });
   const { value: customFields = [] } = useSelector((s: RootState) => (s as any).customFields || { value: [] });
   const { value: categoryCustomFields = [] } = useSelector((s: RootState) => (s as any).categoryCustomFields || { value: [] });
   const { value: taskCustomFieldValues = [] } = useSelector((s: RootState) => (s as any).taskCustomFieldValues || { value: [] });
@@ -70,6 +71,7 @@ export function useTaskDialogData() {
     templates,
     tags,
     taskTags,
+    taskUsers,
     customFields,
     categoryCustomFields,
     taskCustomFieldValues,
