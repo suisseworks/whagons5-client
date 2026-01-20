@@ -97,62 +97,62 @@ function NotificationPreferences() {
   const notificationTypes = [
     {
       key: 'broadcasts' as keyof NotificationPreferences,
-      label: 'Broadcasts',
-      description: 'Important announcements and system-wide messages',
+      label: t('notifications.broadcasts.label'),
+      description: t('notifications.broadcasts.description'),
       icon: '📢'
     },
     {
       key: 'task_assignments' as keyof NotificationPreferences,
-      label: 'Task Assignments',
-      description: 'When you are assigned to a new task',
+      label: t('notifications.task_assignments.label'),
+      description: t('notifications.task_assignments.description'),
       icon: '📋'
     },
     {
       key: 'task_mentions' as keyof NotificationPreferences,
-      label: 'Task Mentions',
-      description: 'When someone mentions you in a task',
+      label: t('notifications.task_mentions.label'),
+      description: t('notifications.task_mentions.description'),
       icon: '@'
     },
     {
       key: 'task_comments' as keyof NotificationPreferences,
-      label: 'Task Comments',
-      description: 'New comments on tasks you follow',
+      label: t('notifications.task_comments.label'),
+      description: t('notifications.task_comments.description'),
       icon: '💬'
     },
     {
       key: 'task_status_changes' as keyof NotificationPreferences,
-      label: 'Task Status Changes',
-      description: 'When task status changes on tasks you follow',
+      label: t('notifications.task_status_changes.label'),
+      description: t('notifications.task_status_changes.description'),
       icon: '🔄'
     },
     {
       key: 'messages' as keyof NotificationPreferences,
-      label: 'Messages',
-      description: 'Direct messages and workspace messages',
+      label: t('notifications.messages.label'),
+      description: t('notifications.messages.description'),
       icon: '✉️'
     },
     {
       key: 'approval_requests' as keyof NotificationPreferences,
-      label: 'Approval Requests',
-      description: 'When you need to approve something',
+      label: t('notifications.approval_requests.label'),
+      description: t('notifications.approval_requests.description'),
       icon: '✅'
     },
     {
       key: 'approval_decisions' as keyof NotificationPreferences,
-      label: 'Approval Decisions',
-      description: 'When your approval request is decided',
+      label: t('notifications.approval_decisions.label'),
+      description: t('notifications.approval_decisions.description'),
       icon: '⚖️'
     },
     {
       key: 'sla_alerts' as keyof NotificationPreferences,
-      label: 'SLA Alerts',
-      description: 'Service level agreement warnings',
+      label: t('notifications.sla_alerts.label'),
+      description: t('notifications.sla_alerts.description'),
       icon: '⏰'
     },
     {
       key: 'workflow_notifications' as keyof NotificationPreferences,
-      label: 'Workflow Notifications',
-      description: 'Automated workflow triggers and updates',
+      label: t('notifications.workflow_notifications.label'),
+      description: t('notifications.workflow_notifications.description'),
       icon: '⚙️'
     },
   ];

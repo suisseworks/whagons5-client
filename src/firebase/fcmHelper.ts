@@ -11,8 +11,9 @@ if (!VAPID_KEY) {
   console.warn('Get your VAPID key from: Firebase Console > Project Settings > Cloud Messaging > Web Push certificates');
 }
 
-// Module-level flag to track FCM initialization state
-let fcmInitialized = false;
+// Module-level flags to track FCM state
+let fcmInitialized = false; // Tracks permission/token registration state
+let handlerInitialized = false; // Tracks foreground message handler setup state
 let messageHandlerUnsubscribe: Unsubscribe | null = null;
 
 /**
@@ -130,8 +131,9 @@ export async function unregisterToken() {
     messageHandlerUnsubscribe = null;
   }
 
-  // Reset initialization flag
+  // Reset initialization flags
   fcmInitialized = false;
+  handlerInitialized = false;
 
   const token = localStorage.getItem('wh-fcm-token');
   if (!token) return;
@@ -227,7 +229,7 @@ function spaNavigate(url: string) {
  */
 export async function setupForegroundMessageHandler() {
   // Return early if handler is already set up
-  if (messageHandlerUnsubscribe) {
+  if (handlerInitialized || messageHandlerUnsubscribe) {
     return;
   }
 
@@ -263,8 +265,8 @@ export async function setupForegroundMessageHandler() {
     }
   });
 
-  // Mark as initialized after handler is set up
-  fcmInitialized = true;
+  // Mark handler as initialized after handler is set up
+  handlerInitialized = true;
 }
 
 /**

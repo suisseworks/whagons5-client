@@ -45,6 +45,7 @@ import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 import { useLanguage } from "@/providers/LanguageProvider";
 import { ActiveFilterChips } from "@/components/ActiveFilterChips";
 import { genericActions, genericInternalActions } from "@/store/genericSlices";
+import { cleanupExpiredNotifications, markAllViewedNotifications } from "@/store/reducers/notificationThunks";
 import { DB } from "@/store/indexedDB/DB";
 
 
@@ -101,87 +102,14 @@ function Header() {
 
     // Cleanup expired notifications (24h after viewed) on mount and load notifications
     useEffect(() => {
-        const cleanupAndLoad = async () => {
-            try {
-                if (!DB.inited || !DB.db) return;
-                
-                const now = Date.now();
-                const tx = DB.db.transaction(['notifications'], 'readwrite');
-                const store = tx.objectStore('notifications');
-                
-                // Get all notifications
-                const allNotifs = await new Promise<any[]>((resolve, reject) => {
-                    const request = store.getAll();
-                    request.onsuccess = () => resolve(request.result || []);
-                    request.onerror = () => reject(request.error);
-                });
-                
-                // Delete notifications that were viewed more than 24 hours ago
-                const expiredIds = allNotifs
-                    .filter(n => n.viewed_at && (now - new Date(n.viewed_at).getTime()) >= (24 * 60 * 60 * 1000))
-                    .map(n => n.id);
-                
-                if (expiredIds.length > 0) {
-                    // Collect delete request promises
-                    const deletePromises = expiredIds.map(id => {
-                        return new Promise<void>((resolve, reject) => {
-                            const request = store.delete(id);
-                            request.onsuccess = () => resolve();
-                            request.onerror = () => reject(request.error);
-                        });
-                    });
-                    
-                    // Await all delete operations and transaction completion
-                    const txPromise = new Promise<void>((resolve, reject) => {
-                        tx.oncomplete = () => resolve();
-                        tx.onerror = () => reject(tx.error);
-                        tx.onabort = () => reject(new Error('Transaction aborted'));
-                    });
-                    
-                    await Promise.all([...deletePromises, txPromise]);
-                }
-                
-                // Load notifications from IndexedDB
-                await dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
-            } catch (error) {
-                console.error('Error cleaning up notifications:', error);
-            }
-        };
-
-        cleanupAndLoad();
+        dispatch(cleanupExpiredNotifications() as any);
     }, [dispatch]);
 
 
     // Mark all notifications as viewed when dropdown opens
     const handleDropdownOpenChange = useCallback(async (open: boolean) => {
         if (open && unviewedCount > 0) {
-            try {
-                if (!DB.db) return;
-                
-                const now = new Date().toISOString();
-                const tx = DB.db.transaction(['notifications'], 'readwrite');
-                const store = tx.objectStore('notifications');
-                
-                // Queue all put operations without awaiting each one
-                for (const notification of notifications) {
-                    if (!notification.viewed_at) {
-                        const updated = { ...notification, viewed_at: now };
-                        store.put(updated);
-                    }
-                }
-                
-                // Wait for transaction to complete before dispatching
-                await new Promise<void>((resolve, reject) => {
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                    tx.onabort = () => reject(new Error('Transaction aborted'));
-                });
-                
-                // Reload from IndexedDB after transaction completes
-                await dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
-            } catch (error) {
-                console.error('Error marking notifications as viewed:', error);
-            }
+            dispatch(markAllViewedNotifications(notifications) as any);
         }
     }, [unviewedCount, notifications, dispatch]);
 

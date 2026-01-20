@@ -50,7 +50,8 @@ function handleBrowserPrompt(result: FrontendToolResult, sendMessage?: SendMessa
         ? '(User provided empty response)' 
         : userInput;
       
-      console.log('[BROWSER_PROMPT] User response:', responseMessage);
+      // Log metadata only, not the actual user input to avoid PII exposure
+      console.log('[BROWSER_PROMPT] User responded', userInput.trim() === '' ? '(empty)' : '(non-empty)');
       
       // Send it back as a message
       setTimeout(() => {
