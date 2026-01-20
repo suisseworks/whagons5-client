@@ -29,9 +29,6 @@ ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
 # Copy package files
 COPY package.json bun.lockb* package-lock.json* pnpm-lock.yaml* ./
 
-# Verify Node version (should be 20+)
-RUN node --version && npm --version && bun --version
-
 # Create .npmrc from build args (without printing credentials) and install dependencies
 # Use BuildKit secret mount pattern: if .npmrc is provided via --secret id=npmrc,src=.npmrc,
 # it will be mounted at /app/.npmrc. Otherwise, create from build args silently.
