@@ -8,11 +8,11 @@ import {
   initializeAuth,
 } from '../api/whagonsApi';
 import { User } from '../types/user';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
-import { genericInternalActions } from '@/store/genericSlices';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
+import { fetchNotificationPreferences } from '../store/reducers/notificationPreferencesSlice';
 
 // Custom caches with advanced features
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
@@ -23,6 +23,7 @@ import {
 } from '@/crypto/crypto';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
+import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
 
 // Define context types
 interface AuthContextType {
@@ -164,16 +165,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [hydrating, setHydrating] = useState<boolean>(false);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  
   // Only access userTeams if user has a tenant (avoid fetching during onboarding)
   // Must check user state OUTSIDE of useSelector to avoid triggering slice auto-fetch
   const hasTenant = user?.tenant_domain_prefix;
+  
+  // Memoized selector with shallow equality check to prevent unnecessary rerenders
   const userTeams = useSelector(
     (state: RootState) => {
       if (!hasTenant) {
         return [] as Array<{ team_id?: number }>;
       }
       return ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>;
-    }
+    },
+    shallowEqual // Use shallow equality to compare array contents
   );
   const teamKey = useMemo(() => {
     if (!hasTenant) return '';
@@ -187,6 +192,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return ids.join(',');
   }, [userTeams, hasTenant]);
   const prevTeamKeyRef = useRef<string | null>(null);
+
+  // Initialize FCM (Firebase Cloud Messaging) for push notifications
+  const initializeFCM = async (userData: User | null, fbUser: FirebaseUser | null) => {
+    try {
+      // Allow FCM in local development if using trusted certificates (mkcert)
+      // Skip only if explicitly set in env or on unsecured localhost
+      const skipFCM = import.meta.env.VITE_SKIP_FCM === 'true';
+      
+      if (skipFCM) {
+        return;
+      }
+
+      // Only initialize FCM if user is authenticated (Firebase user exists)
+      if (!fbUser || !userData) {
+        return;
+      }
+
+      const token = await requestNotificationPermission();
+      
+      if (token) {
+        // Setup listener for foreground messages
+        setupForegroundMessageHandler();
+      }
+    } catch (error) {
+      console.error('❌ FCM initialization error:', error);
+      // Don't crash app if FCM fails
+    }
+  };
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
     if (!firebaseUser) {
@@ -236,6 +269,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userData = response.data.data || response.data;
           setUser(userData);
           // console.log('AuthContext: User data loaded successfully');
+
+          // Initialize FCM for push notifications BEFORE hydration
+          // This runs for all logged-in users, not just those with tenants
+          (async () => {
+            try {
+              await initializeFCM(userData, firebaseUser);
+            } catch (error) {
+              console.error('FCM initialization failed:', error);
+            }
+          })();
+
+          // Load notification preferences at login
+          dispatch(fetchNotificationPreferences());
 
           // Kick off background hydration so UI can render immediately
           (async () => {
@@ -374,6 +420,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         CryptoHandler.setTenantMode(false);
         setHydrating(false);
         setHydrationError(null);
+        
+        // Unregister FCM token on logout
+        try {
+          await unregisterToken();
+        } catch (err) {
+          console.warn('AuthProvider: failed to unregister FCM token on logout', err);
+        }
+        
         try {
           await zeroizeKeys();
         } catch {}

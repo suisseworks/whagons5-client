@@ -34,10 +34,6 @@ type WorkspaceStats = {
 };
 
 function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
-  // Debug: Log props
-  useEffect(() => {
-    console.log('WorkspaceStatistics - Component mounted/updated, workspaceId:', workspaceId);
-  }, [workspaceId]);
   
   // Redux state - ensure we get arrays, not undefined
   const categories = useSelector((state: RootState) => (state.categories as any)?.value ?? []) as Category[];
@@ -61,15 +57,9 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   useEffect(() => {
     const loadTasks = async () => {
       try {
-        console.log('WorkspaceStatistics - ===== LOADING TASKS =====');
-        console.log('WorkspaceStatistics - workspaceId:', workspaceId, 'type:', typeof workspaceId);
-        console.log('WorkspaceStatistics - TasksCache.initialized:', TasksCache.initialized);
-        
         // Initialize cache if needed
         if (!TasksCache.initialized) {
-          console.log('WorkspaceStatistics - Initializing TasksCache...');
           await TasksCache.init();
-          console.log('WorkspaceStatistics - TasksCache initialized');
         }
         
         // Build query filter
@@ -78,37 +68,14 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           const wsId = parseInt(workspaceId);
           if (!isNaN(wsId)) {
             query.workspace_id = wsId;
-            console.log('WorkspaceStatistics - Filtering by workspace_id:', wsId);
-          } else {
-            console.log('WorkspaceStatistics - Invalid workspaceId, getting all tasks');
           }
-        } else {
-          console.log('WorkspaceStatistics - No workspace filter, getting all tasks');
         }
-        
-        console.log('WorkspaceStatistics - Query:', JSON.stringify(query));
         
         // Query tasks from cache
         const result = await TasksCache.queryTasks(query);
-        console.log('WorkspaceStatistics - Query result:', result);
-        console.log('WorkspaceStatistics - Result rows:', result?.rows?.length);
-        console.log('WorkspaceStatistics - Result rowCount:', result?.rowCount);
-        
         const loadedTasks = result?.rows || [];
-        
-        console.log('WorkspaceStatistics - Loaded tasks count:', loadedTasks.length, 'for workspace:', workspaceId);
-        if (loadedTasks.length > 0) {
-          console.log('WorkspaceStatistics - Sample task:', loadedTasks[0]);
-          console.log('WorkspaceStatistics - Sample task workspace_id:', loadedTasks[0]?.workspace_id);
-        } else {
-          console.warn('WorkspaceStatistics - NO TASKS LOADED!');
-        }
-        
         setWorkspaceTasks(loadedTasks);
-        console.log('WorkspaceStatistics - ===== TASKS LOADED =====');
       } catch (error) {
-        console.error('WorkspaceStatistics - ERROR loading tasks:', error);
-        console.error('WorkspaceStatistics - Error stack:', (error as Error).stack);
         setWorkspaceTasks([]);
       }
     };
@@ -124,7 +91,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     
     // Don't calculate if tasks aren't loaded yet
     if (workspaceTasks.length === 0 && statsLoading === false) {
-      console.log('WorkspaceStatistics - Waiting for tasks to load...');
       return;
     }
     
@@ -135,12 +101,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-      console.log('WorkspaceStatistics - calculateStatistics called');
-      console.log('WorkspaceStatistics - workspaceTasks.length:', workspaceTasks.length);
-      console.log('WorkspaceStatistics - Sample task:', workspaceTasks[0]);
-      console.log('WorkspaceStatistics - categories.length:', (categories as any[]).length);
-      console.log('WorkspaceStatistics - statuses.length:', (statuses as any[]).length);
-      console.log('WorkspaceStatistics - priorities.length:', (priorities as any[]).length);
       // Tasks by status (with actual status names)
       const statusCounts = new Map<number, { name: string; count: number; color?: string }>();
       workspaceTasks.forEach((task: Task) => {
@@ -356,12 +316,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         tasksBySpot
       };
       
-      console.log('WorkspaceStatistics - ===== STATISTICS CALCULATED =====');
-      console.log('WorkspaceStatistics - Total tasks:', finalStats.totalTasks);
-      console.log('WorkspaceStatistics - Tasks by status:', finalStats.tasksByStatus.length);
-      console.log('WorkspaceStatistics - Tasks by category:', finalStats.tasksByCategory.length);
-      console.log('WorkspaceStatistics - Final stats:', finalStats);
-      
       setStatistics(finalStats);
     } catch (error) {
       console.error('Error calculating statistics:', error);
@@ -409,11 +363,9 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     
     // Only calculate if we have workspaceTasks data
     if (workspaceTasks.length === 0) {
-      console.log('WorkspaceStatistics - No tasks available yet, waiting...');
       return;
     }
     
-    console.log('WorkspaceStatistics - Triggering calculation with', workspaceTasks.length, 'tasks');
     lastCalculatedWorkspaceRef.current = workspaceId;
     calculateStatistics();
   }, [workspaceId, workspaceTasks, calculateStatistics]); // eslint-disable-line react-hooks-exhaustive-deps

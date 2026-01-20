@@ -11,7 +11,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Plus, Layers, Search } from "lucide-react";
+import { User, LogOut, Plus, Layers, Search, Bell, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { useSelector, useDispatch } from "react-redux";
@@ -44,6 +44,9 @@ import { Switch } from '@/components/ui/switch';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 import { useLanguage } from "@/providers/LanguageProvider";
 import { ActiveFilterChips } from "@/components/ActiveFilterChips";
+import { genericActions, genericInternalActions } from "@/store/genericSlices";
+import { cleanupExpiredNotifications, markAllViewedNotifications } from "@/store/reducers/notificationThunks";
+import { DB } from "@/store/indexedDB/DB";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache
@@ -66,6 +69,10 @@ function Header() {
     const boardsState = useSelector((s: RootState) => (s as any).boards);
     const { value: boards = [] } = boardsState || {};
 
+    // Get notifications
+    const notificationsState = useSelector((s: RootState) => (s as any).notifications);
+    const { value: allNotifications = [] } = notificationsState || {};
+
     // Redux UI state selectors
     const currentFilterModel = useSelector(selectFilterModel);
     const searchText = useSelector(selectSearchText);
@@ -77,6 +84,34 @@ function Header() {
     const isSettings = useMemo(() => location.pathname.startsWith('/settings'), [location.pathname]);
     const isAnalytics = useMemo(() => location.pathname.startsWith('/analytics'), [location.pathname]);
     const { t } = useLanguage();
+
+    // Filter and sort notifications: remove expired (24h after viewed), show newest first
+    const notifications = useMemo(() => {
+        const now = Date.now();
+        const valid = allNotifications.filter((n: any) => {
+            if (!n.viewed_at) return true; // Keep unviewed notifications
+            const viewedTime = new Date(n.viewed_at).getTime();
+            return (now - viewedTime) < (24 * 60 * 60 * 1000); // 24 hours after viewed
+        });
+        return valid.sort((a: any, b: any) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime());
+    }, [allNotifications]);
+
+    const unviewedCount = useMemo(() => {
+        return notifications.filter((n: any) => !n.viewed_at).length;
+    }, [notifications]);
+
+    // Cleanup expired notifications (24h after viewed) on mount and load notifications
+    useEffect(() => {
+        dispatch(cleanupExpiredNotifications() as any);
+    }, [dispatch]);
+
+
+    // Mark all notifications as viewed when dropdown opens
+    const handleDropdownOpenChange = useCallback(async (open: boolean) => {
+        if (open && unviewedCount > 0) {
+            dispatch(markAllViewedNotifications(notifications) as any);
+        }
+    }, [unviewedCount, notifications, dispatch]);
 
 
 
@@ -754,7 +789,7 @@ function Header() {
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
                     
                     {/* Profile with notification badge */}
-                    <DropdownMenu>
+                    <DropdownMenu onOpenChange={handleDropdownOpenChange}>
                         <DropdownMenuTrigger asChild>
                             <div className="relative inline-block">
                                 <button className="h-9 w-9 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-accent/50 transition-all overflow-hidden">
@@ -772,23 +807,78 @@ function Header() {
                                     </Avatar>
                                 </button>
                                 {/* Notification badge */}
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-extrabold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 ring-2 ring-background shadow-sm z-10" style={{ fontFeatureSettings: '"tnum"', textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
-                                    4
-                                </span>
+                                {unviewedCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-extrabold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 ring-2 ring-background shadow-sm z-10" style={{ fontFeatureSettings: '"tnum"', textRendering: 'optimizeLegibility', WebkitFontSmoothing: 'antialiased' }}>
+                                        {unviewedCount}
+                                    </span>
+                                )}
                             </div>
                         </DropdownMenuTrigger>
 
-                        <DropdownMenuContent align="end" className="w-64">
+                        <DropdownMenuContent align="end" className="w-80">
                             {/* Notifications section */}
                             <div className="px-2 py-1.5 border-b border-border/50">
                                 <div className="flex items-center justify-between mb-2">
                                     <DropdownMenuLabel className="px-0 py-0 text-sm font-semibold">Notifications</DropdownMenuLabel>
-                                    <span className="text-xs text-muted-foreground">4 new</span>
+                                    {notifications.length > 0 && (
+                                        <button
+                                            onClick={async () => {
+                                                // Clear all notifications
+                                                if (DB.db) {
+                                                    const tx = DB.db.transaction(['notifications'], 'readwrite');
+                                                    const store = tx.objectStore('notifications');
+                                                    await store.clear();
+                                                    // Reload from IndexedDB (which is now empty)
+                                                    dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
+                                                }
+                                            }}
+                                            className="text-xs text-destructive hover:underline"
+                                        >
+                                            Clear all
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="max-h-[200px] overflow-y-auto space-y-1">
-                                    <div className="text-sm text-muted-foreground px-2 py-1.5 rounded-md hover:bg-accent/50 cursor-pointer">
-                                        No notifications
-                                    </div>
+                                <div className="max-h-[300px] overflow-y-auto space-y-1">
+                                    {notifications.length === 0 ? (
+                                        <div className="text-sm text-muted-foreground px-2 py-4 text-center">
+                                            No notifications
+                                        </div>
+                                    ) : (
+                                        notifications.map((notification: any) => (
+                                            <div
+                                                key={notification.id}
+                                                className="group relative px-3 py-2 rounded-md hover:bg-accent/50 cursor-pointer transition-colors"
+                                                onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    
+                                                    // Navigate to notification URL if available
+                                                    if (notification.url) {
+                                                        navigate(notification.url);
+                                                    }
+                                                    
+                                                    // Delete notification after navigation
+                                                    await dispatch(genericActions.notifications.removeAsync(notification.id) as any);
+                                                }}
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <Bell className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-foreground line-clamp-1">
+                                                            {notification.title}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                                            {notification.body}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground mt-1">
+                                                            {new Date(notification.received_at).toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <X className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </div>
                             <DropdownMenuItem onClick={() => {

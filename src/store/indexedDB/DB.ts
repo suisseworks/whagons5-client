@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.13.0';
+const CURRENT_DB_VERSION = '1.14.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -360,6 +360,13 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('user_schedules')) {
             db.createObjectStore('user_schedules', { keyPath: 'id' });
+          }
+
+          // Notifications (client-side only)
+          if (!db.objectStoreNames.contains('notifications')) {
+            const store = db.createObjectStore('notifications', { keyPath: 'id' });
+            store.createIndex('received_at', 'received_at', { unique: false });
+            store.createIndex('viewed_at', 'viewed_at', { unique: false });
           }
 
           // Avatar image cache (base64 or blob references)

@@ -154,6 +154,15 @@ let inflightLoad: Promise<T[]> | null = null;
                 dispatch((slice.actions as any).updateItem({ id, ...(updates as any) }));
                 GenericEvents.emit(events.UPDATED, { id, ...(updates as any) });
 
+                // Local-only store (no API endpoint): just persist to IndexedDB
+                if (!endpoint) {
+                    const merged = { ...(previous as any), ...(updates as any), id } as any;
+                    await cacheInstance.update(id as any, merged);
+                    dispatch((slice.actions as any).updateItem(merged));
+                    GenericEvents.emit(events.UPDATED, merged);
+                    return { id, updates };
+                }
+
                 // Remote update
                 const saved = await cacheInstance.updateRemote(id as any, updates as any);
 
@@ -189,6 +198,12 @@ let inflightLoad: Promise<T[]> | null = null;
                 dispatch((slice.actions as any).addItem(optimistic));
                 GenericEvents.emit(events.CREATED, optimistic);
 
+                // Local-only store (no API endpoint): just persist to IndexedDB
+                if (!endpoint) {
+                    await cacheInstance.add(item as any);
+                    return item as T;
+                }
+
                 // Create on server
                 const saved = await cacheInstance.createRemote(item as any);
 
@@ -221,6 +236,13 @@ let inflightLoad: Promise<T[]> | null = null;
                 // Optimistic remove from Redux
                 dispatch((slice.actions as any).removeItem(id));
                 GenericEvents.emit(events.DELETED, { id });
+
+                // Local-only store (no API endpoint)
+                if (!endpoint) {
+                    try { await cacheInstance.remove(id); } catch {}
+                    dispatch(getFromIndexedDB());
+                    return id;
+                }
 
                 // Remote delete (404 means already deleted, treat as success)
                 try {

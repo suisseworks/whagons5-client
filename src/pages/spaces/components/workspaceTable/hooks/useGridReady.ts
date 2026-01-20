@@ -46,10 +46,8 @@ export function useGridReady(opts: {
       
       const ds = { rowCount: undefined, getRows };
       params.api.setGridOption('datasource', ds);
-      console.log('[WT Filters] onGridReady refreshing infinite cache');
       params.api.refreshInfiniteCache();
     } else {
-      console.log('[WT Filters] onGridReady client-side refresh');
       // Ensure sort is set before refreshing
       try {
         const sortModel = params.api.getSortModel?.() || [];

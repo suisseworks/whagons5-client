@@ -96,7 +96,6 @@ export class DataManager {
   }
 
   async validateAndRefresh() {
-    console.log('🔍 [DataManager] validateAndRefresh() CALLED');
     // Batch validate all entities (including tasks) using ONE batch endpoint call
     // Retry logic for transient DB closure errors
     const maxRetries = 2;
@@ -106,14 +105,12 @@ export class DataManager {
       try {
         // Ensure DB is ready before validation
         if (attempt > 0) {
-          console.log(`DataManager: retrying validation after DB reopen (attempt ${attempt + 1}/${maxRetries + 1})`);
           // Wait a bit for DB to stabilize
           await new Promise(resolve => setTimeout(resolve, 200));
           // Ensure DB is initialized
           await DB.init();
           const ready = await DB.whenReady(3000);
           if (!ready) {
-            console.warn('DataManager: DB not ready after retry wait');
             continue;
           }
         }
@@ -123,14 +120,10 @@ export class DataManager {
           .filter((c: any): c is GenericCache => !!c);
         
         // Run generic caches and tasks validation in parallel to avoid blocking
-        console.log('[DataManager] Starting parallel validation...');
-        const start = performance.now();
-        
         await Promise.all([
           // 1. Generic caches (batched)
           GenericCache.validateMultiple(caches, ['wh_tasks'])
             .then(res => {
-              console.log('[DataManager] Generic validation finished', Object.keys(res.results).length);
               return res;
             })
             .catch(e => {
@@ -144,14 +137,11 @@ export class DataManager {
               await TasksCache.init();
               // Call without server data to trigger self-fetch of global hash
               await TasksCache.validateTasks();
-              console.log('[DataManager] Tasks validation finished');
             } catch (e) {
               console.warn('DataManager: tasks cache validate failed', e);
             }
           })()
         ]);
-        
-        console.log(`[DataManager] All validation finished in ${(performance.now() - start).toFixed(0)}ms. Starting Redux refresh...`);
         
         // Small delay to ensure IDB transactions are fully committed/visible
         await new Promise(resolve => setTimeout(resolve, 50));

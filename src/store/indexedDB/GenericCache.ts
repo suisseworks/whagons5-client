@@ -7,7 +7,7 @@ export interface GenericCacheOptions {
 	/** Server table name (e.g., 'wh_tasks') used by integrity endpoints */
 	table: string;
 	/** REST resource path (e.g., '/tasks') */
-	endpoint: string;
+	endpoint?: string;
 	/** IndexedDB object store name (e.g., 'tasks') */
 	store: string;
 	/** Row primary key field, defaults to 'id' */
@@ -23,7 +23,7 @@ export interface GenericCacheOptions {
 export class GenericCache {
 	// table kept for future integrity APIs; currently unused directly
 	private readonly table: string;
-	private readonly endpoint: string;
+	private readonly endpoint?: string;
 	private readonly store: string;
 	private readonly idField: string;
 	private readonly hashFields?: string[];
@@ -129,6 +129,10 @@ export class GenericCache {
 	 * Create on server and return created row (tries common REST response shapes)
 	 */
 	async createRemote(row: any): Promise<any> {
+		// Local-only store (no API endpoint)
+		if (!this.endpoint) {
+			return row;
+		}
 		try {
 			const resp = await api.post(this.endpoint, row);
 			
@@ -154,6 +158,10 @@ export class GenericCache {
 	 * Update on server and return updated row (tries common REST response shapes)
 	 */
 	async updateRemote(id: IdType, updates: any): Promise<any> {
+		// Local-only store (no API endpoint)
+		if (!this.endpoint) {
+			return { ...(updates ?? {}), [this.idField]: id };
+		}
 		const resp = await api.patch(`${this.endpoint}/${id}`, updates);
 		return (resp.data?.data ?? resp.data?.row ?? resp.data);
 	}
@@ -162,6 +170,10 @@ export class GenericCache {
 	 * Delete on server
 	 */
 	async deleteRemote(id: IdType): Promise<boolean> {
+		// Local-only store (no API endpoint)
+		if (!this.endpoint) {
+			return true;
+		}
 		await api.delete(`${this.endpoint}/${id}`);
 		return true;
 	}
@@ -173,6 +185,10 @@ export class GenericCache {
 	}
 
 	async fetchAll(params: Record<string, any> = {}): Promise<boolean> {
+		// Local-only store (no API endpoint)
+		if (!this.endpoint) {
+			return true;
+		}
 		try {
 			const resp = await api.get(this.endpoint, { params });
 			
