@@ -1,5 +1,5 @@
-# Use Bun for building and serving
-FROM oven/bun:1.3.2
+# Use latest Bun image (includes Node 20+ required by Firebase packages)
+FROM oven/bun:latest
 
 WORKDIR /app
 
@@ -29,15 +29,8 @@ ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
 # Copy package files
 COPY package.json bun.lockb* package-lock.json* pnpm-lock.yaml* ./
 
-# Install npm (needed for reliable registry authentication)
-# Configure .npmrc and install dependencies with npm using BuildKit secrets
-# Bun doesn't reliably authenticate with private registries, so we use npm for installation
-# Bun can use the node_modules that npm installs
-RUN apt-get update && \
-    apt-get install -y npm && \
-    npm --version && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Verify Node version (should be 20+)
+RUN node --version && npm --version && bun --version
 
 # Create .npmrc from build args (without printing credentials) and install dependencies
 # Use BuildKit secret mount pattern: if .npmrc is provided via --secret id=npmrc,src=.npmrc,
@@ -58,6 +51,9 @@ RUN --mount=type=secret,id=npmrc,target=/app/.npmrc \
     echo "//npm.bryntum.com/:_authToken=$BRYNTUM_AUTH" >> .npmrc && \
     echo "Installing dependencies with npm (reliable authentication)..." && \
     npm ci --legacy-peer-deps && \
+    echo "Verifying Firebase packages installation..." && \
+    ls -la node_modules/@firebase/auth 2>/dev/null || echo "WARNING: @firebase/auth not found" && \
+    ls -la node_modules/firebase 2>/dev/null || echo "WARNING: firebase not found" && \
     echo "Dependencies installed successfully!"
 
 # Copy source code
