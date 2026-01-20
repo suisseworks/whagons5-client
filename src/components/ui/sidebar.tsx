@@ -219,7 +219,11 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-150 ease-out",
+          // NOTE:
+          // Do NOT animate this width. Animating the gap width continuously resizes the main content,
+          // and components like AG Grid will do expensive layout work on every frame (jitter + forced reflow).
+          // The sidebar panel itself remains animated (see sidebar-container), but the layout change is snapped.
+          "relative w-(--sidebar-width) bg-transparent",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
