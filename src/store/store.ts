@@ -12,6 +12,9 @@ import tenantAvailabilityReducer from "./reducers/tenantAvailabilitySlice";
 // UI state slice
 import uiStateReducer from "./reducers/uiStateSlice";
 
+// Notification preferences slice
+import notificationPreferencesReducer from "./reducers/notificationPreferencesSlice";
+
 // All other slices (30+ tables) handled by generic factory
 import { genericSlices } from "./genericSlices";
 
@@ -27,6 +30,9 @@ const appReducer = combineReducers({
 
     // UI state (filter model, search text, grouping, presets)
     uiState: uiStateReducer,
+
+    // Notification preferences
+    notificationPreferences: notificationPreferencesReducer,
 
     // All other slices (30+ tables) handled by generic factory
     ...genericSlices.reducers,

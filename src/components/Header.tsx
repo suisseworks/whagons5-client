@@ -122,9 +122,23 @@ function Header() {
                     .map(n => n.id);
                 
                 if (expiredIds.length > 0) {
-                    for (const id of expiredIds) {
-                        await store.delete(id);
-                    }
+                    // Collect delete request promises
+                    const deletePromises = expiredIds.map(id => {
+                        return new Promise<void>((resolve, reject) => {
+                            const request = store.delete(id);
+                            request.onsuccess = () => resolve();
+                            request.onerror = () => reject(request.error);
+                        });
+                    });
+                    
+                    // Await all delete operations and transaction completion
+                    const txPromise = new Promise<void>((resolve, reject) => {
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => reject(tx.error);
+                        tx.onabort = () => reject(new Error('Transaction aborted'));
+                    });
+                    
+                    await Promise.all([...deletePromises, txPromise]);
                 }
                 
                 // Load notifications from IndexedDB
@@ -148,16 +162,23 @@ function Header() {
                 const tx = DB.db.transaction(['notifications'], 'readwrite');
                 const store = tx.objectStore('notifications');
                 
-                // Mark all unviewed notifications as viewed
+                // Queue all put operations without awaiting each one
                 for (const notification of notifications) {
                     if (!notification.viewed_at) {
                         const updated = { ...notification, viewed_at: now };
-                        await store.put(updated);
+                        store.put(updated);
                     }
                 }
                 
-                // Reload from IndexedDB
-                dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
+                // Wait for transaction to complete before dispatching
+                await new Promise<void>((resolve, reject) => {
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(new Error('Transaction aborted'));
+                });
+                
+                // Reload from IndexedDB after transaction completes
+                await dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
             } catch (error) {
                 console.error('Error marking notifications as viewed:', error);
             }

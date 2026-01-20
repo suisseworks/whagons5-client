@@ -1,4 +1,4 @@
-import { getToken, onMessage } from "firebase/messaging";
+import { getToken, onMessage, Unsubscribe } from "firebase/messaging";
 import { getMessagingInstance } from "./firebaseConfig";
 import { api } from "@/api/whagonsApi";
 import { showNotificationToast, getNotificationIcon } from "@/components/ui/NotificationToast";
@@ -11,10 +11,25 @@ if (!VAPID_KEY) {
   console.warn('Get your VAPID key from: Firebase Console > Project Settings > Cloud Messaging > Web Push certificates');
 }
 
+// Module-level flag to track FCM initialization state
+let fcmInitialized = false;
+let messageHandlerUnsubscribe: Unsubscribe | null = null;
+
 /**
- * Request notification permission and register FCM token
+ * Request notification permission and register FCM token (idempotent - only requests once per session)
  */
 export async function requestNotificationPermission(): Promise<string | null> {
+  // Return early if already initialized (permission already requested)
+  if (fcmInitialized) {
+    // Return existing token if available
+    const existingToken = localStorage.getItem('wh-fcm-token');
+    if (existingToken) {
+      return existingToken;
+    }
+    // If initialized but no token, still return null (permission might have been denied)
+    return null;
+  }
+
   // Get messaging instance (initializes if needed)
   const messaging = await getMessagingInstance();
   
@@ -59,6 +74,9 @@ export async function requestNotificationPermission(): Promise<string | null> {
     // Register with backend
     await registerTokenWithBackend(token, 'web');
     
+    // Mark as initialized after successful token registration
+    fcmInitialized = true;
+    
     return token;
   } catch (error) {
     console.error('Error in FCM registration:', error);
@@ -99,9 +117,22 @@ async function registerTokenWithBackend(
 }
 
 /**
- * Unregister FCM token (call on logout)
+ * Unregister FCM token and cleanup handlers (call on logout)
  */
 export async function unregisterToken() {
+  // Unsubscribe message handler if it exists
+  if (messageHandlerUnsubscribe) {
+    try {
+      messageHandlerUnsubscribe();
+    } catch (error) {
+      console.warn('Failed to unsubscribe FCM message handler:', error);
+    }
+    messageHandlerUnsubscribe = null;
+  }
+
+  // Reset initialization flag
+  fcmInitialized = false;
+
   const token = localStorage.getItem('wh-fcm-token');
   if (!token) return;
 
@@ -192,14 +223,19 @@ function spaNavigate(url: string) {
 }
 
 /**
- * Setup foreground message handler
+ * Setup foreground message handler (idempotent - only sets up once per session)
  */
 export async function setupForegroundMessageHandler() {
+  // Return early if handler is already set up
+  if (messageHandlerUnsubscribe) {
+    return;
+  }
+
   const messaging = await getMessagingInstance();
   
   if (!messaging) return;
   
-  onMessage(messaging, async (payload) => {
+  messageHandlerUnsubscribe = onMessage(messaging, async (payload) => {
     const title = payload.notification?.title || 'New Notification';
     const body = payload.notification?.body || '';
     const data = payload.data || {};
@@ -226,6 +262,9 @@ export async function setupForegroundMessageHandler() {
       });
     }
   });
+
+  // Mark as initialized after handler is set up
+  fcmInitialized = true;
 }
 
 /**

@@ -2,8 +2,12 @@
  * Hook for handling workspace changes
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+
+export interface UseWorkspaceChangeReturn {
+  error: string | null;
+}
 
 export function useWorkspaceChange(opts: {
   workspaceId: string;
@@ -11,12 +15,16 @@ export function useWorkspaceChange(opts: {
   gridRef: React.RefObject<any>;
   refreshGrid: () => void;
   exitEditMode: (api?: any) => void;
-}) {
+}): UseWorkspaceChangeReturn {
   const { workspaceId, modulesLoaded, gridRef, refreshGrid, exitEditMode } = opts;
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAndRefresh = async () => {
       if (!modulesLoaded) return;
+      
+      // Clear any previous errors
+      setError(null);
       
       // Exit edit mode when workspace changes
       exitEditMode(gridRef.current?.api);
@@ -42,8 +50,19 @@ export function useWorkspaceChange(opts: {
         if (taskCount === 0 && workspaceId !== 'all' && workspaceId !== 'shared') {
           try {
             await TasksCache.fetchTasks();
-          } catch (fetchError) {
-            // Silently fail - cache will be updated on next validation
+          } catch (fetchError: any) {
+            const errorMessage = `[useWorkspaceChange] Failed to fetch tasks for workspace ${workspaceId}`;
+            const errorDetails = fetchError?.message || fetchError?.toString() || 'Unknown error';
+            
+            console.error(errorMessage, {
+              workspaceId,
+              error: errorDetails,
+              stack: fetchError?.stack,
+              response: fetchError?.response?.data,
+            });
+            
+            setError(errorMessage);
+            // Cache will be updated on next validation
           }
         }
         
@@ -51,8 +70,19 @@ export function useWorkspaceChange(opts: {
         if (gridRef.current?.api) {
           refreshGrid();
         }
-      } catch (error) {
-        // Silently handle errors - grid will refresh anyway
+      } catch (error: any) {
+        const errorMessage = `[useWorkspaceChange] Error during workspace change check for workspace ${workspaceId}`;
+        const errorDetails = error?.message || error?.toString() || 'Unknown error';
+        
+        console.error(errorMessage, {
+          workspaceId,
+          error: errorDetails,
+          stack: error?.stack,
+          response: error?.response?.data,
+        });
+        
+        setError(errorMessage);
+        
         // Still try to refresh grid even if check failed
         if (gridRef.current?.api) {
           refreshGrid();
@@ -62,4 +92,6 @@ export function useWorkspaceChange(opts: {
     
     checkAndRefresh();
   }, [workspaceId, refreshGrid, modulesLoaded, exitEditMode, gridRef]);
+
+  return { error };
 }

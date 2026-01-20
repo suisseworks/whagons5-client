@@ -52,28 +52,113 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
       });
     }
 
-    // Ensure service worker is ready
-    await navigator.serviceWorker.ready;
+    // Wait for service worker to be ready (this ensures registration.active exists)
+    const readyRegistration = await navigator.serviceWorker.ready;
     
-    // Check if service worker is controlling the page
+    // Wait for service worker to become active/controlling if not already
     if (!navigator.serviceWorker.controller) {
-      const refreshKey = 'fcm-sw-refresh-count';
-      const refreshCount = parseInt(sessionStorage.getItem(refreshKey) || '0');
+      console.log('[FCM Config] Service worker not yet controlling, waiting for activation...');
       
-      if (refreshCount < 2) {
-        // Try up to 2 reloads
-        sessionStorage.setItem(refreshKey, String(refreshCount + 1));
+      // Wait for service worker to become active and controlling
+      const swActivated = await new Promise<boolean>((resolve) => {
+        // Double-check if controller appeared (race condition)
+        if (navigator.serviceWorker.controller) {
+          resolve(true);
+          return;
+        }
+
+        let resolved = false;
+        const cleanup = () => {
+          if (resolved) return;
+          resolved = true;
+          
+          if (readyRegistration.active) {
+            readyRegistration.active.removeEventListener('statechange', handleStateChange);
+          }
+          readyRegistration.removeEventListener('updatefound', handleUpdateFound);
+          navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        };
+
+        // Listen for service worker state changes
+        const handleStateChange = () => {
+          if (resolved) return;
+          const activeWorker = readyRegistration.active;
+          if (activeWorker && activeWorker.state === 'activated') {
+            // Give it a moment to become controlling
+            setTimeout(() => {
+              if (navigator.serviceWorker.controller) {
+                cleanup();
+                resolve(true);
+              }
+            }, 100);
+          }
+        };
+
+        // Listen for new service worker installation
+        const handleUpdateFound = () => {
+          if (resolved) return;
+          const newWorker = readyRegistration.installing || readyRegistration.waiting;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', handleStateChange);
+            // Check current state immediately
+            if (newWorker.state === 'activated') {
+              handleStateChange();
+            }
+          }
+        };
+
+        // Listen for controller change (most reliable indicator)
+        const handleControllerChange = () => {
+          if (resolved) return;
+          if (navigator.serviceWorker.controller) {
+            cleanup();
+            resolve(true);
+          }
+        };
+
+        // Set up listeners
+        if (readyRegistration.active) {
+          readyRegistration.active.addEventListener('statechange', handleStateChange);
+          // Check current state immediately
+          if (readyRegistration.active.state === 'activated') {
+            handleStateChange();
+          }
+        }
         
-        // Use hard reload to force SW activation
-        window.location.reload();
-        return null;
-      } else {
-        sessionStorage.removeItem(refreshKey);
+        readyRegistration.addEventListener('updatefound', handleUpdateFound);
+        navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+        // Timeout after 5 seconds - don't block forever
+        setTimeout(() => {
+          if (!resolved) {
+            cleanup();
+            console.warn('[FCM Config] Service worker activation timeout - may need manual refresh');
+            // Show non-blocking prompt to user (only if in browser context)
+            if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+              const shouldRefresh = window.confirm(
+                'Firebase messaging needs a page refresh to work properly. Refresh now?'
+              );
+              if (shouldRefresh) {
+                window.location.reload();
+              }
+            }
+            resolve(false);
+          }
+        }, 5000);
+      });
+
+      if (!swActivated) {
+        console.warn('[FCM Config] Service worker not activated, messaging may not work until refresh');
         messagingInitialized = true;
         return null;
       }
-    } else {
-      sessionStorage.removeItem('fcm-sw-refresh-count');
+    }
+
+    // Final verification: service worker must be controlling before proceeding
+    if (!navigator.serviceWorker.controller) {
+      console.warn('[FCM Config] Service worker is not controlling the page - messaging may not work');
+      messagingInitialized = true;
+      return null;
     }
 
     try {
@@ -103,5 +188,10 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
   return messagingInstance;
 }
 
-// Legacy export for backwards compatibility
-export const messaging = messagingInstance;
+/**
+ * Get messaging instance synchronously (returns current instance, may be null if not initialized)
+ * For guaranteed initialization, use getMessagingInstance() instead
+ */
+export function getMessagingSync(): Messaging | null {
+  return messagingInstance;
+}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -6,22 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell, BellOff, Check, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
-import toast from 'react-hot-toast';
-import api from '@/api/whagonsApi';
 import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
-
-interface NotificationPreferences {
-  broadcasts: boolean;
-  task_assignments: boolean;
-  task_mentions: boolean;
-  task_comments: boolean;
-  task_status_changes: boolean;
-  messages: boolean;
-  approval_requests: boolean;
-  approval_decisions: boolean;
-  sla_alerts: boolean;
-  workflow_notifications: boolean;
-}
+import { AppDispatch, RootState } from '@/store/store';
+import { 
+  fetchNotificationPreferences, 
+  updateNotificationPreferences,
+  type NotificationPreferences 
+} from '@/store/reducers/notificationPreferencesSlice';
 
 const defaultPreferences: NotificationPreferences = {
   broadcasts: true,
@@ -38,16 +30,25 @@ const defaultPreferences: NotificationPreferences = {
 
 function NotificationPreferences() {
   const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
+  const dispatch = useDispatch<AppDispatch>();
+  
+  // Get preferences and loading/saving state from Redux
+  const { preferences, loading, saving } = useSelector((state: RootState) => state.notificationPreferences);
+  const [localPreferences, setLocalPreferences] = useState<NotificationPreferences>(preferences);
   const [hasChanges, setHasChanges] = useState(false);
   const [fcmEnabled, setFcmEnabled] = useState(false);
 
+  // Load preferences on mount
   useEffect(() => {
-    loadPreferences();
+    dispatch(fetchNotificationPreferences());
     checkFCMStatus();
-  }, []);
+  }, [dispatch]);
+
+  // Sync local preferences with Redux state
+  useEffect(() => {
+    setLocalPreferences(preferences);
+    setHasChanges(false);
+  }, [preferences]);
 
   const checkFCMStatus = async () => {
     const isReady = await isFCMReady();
@@ -55,45 +56,12 @@ function NotificationPreferences() {
     setFcmEnabled(isReady && isRegistered);
   };
 
-  const loadPreferences = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/notification-preferences');
-      const data = response.data?.data || response.data;
-      
-      if (data.notifications) {
-        setPreferences(data.notifications);
-      }
-    } catch (error: any) {
-      console.error('Failed to load notification preferences:', error);
-      toast.error('Failed to load notification preferences');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const savePreferences = async () => {
-    try {
-      setSaving(true);
-      await api.put('/notification-preferences', {
-        notifications: preferences
-      });
-      
-      toast.success('Notification preferences saved successfully');
-      setHasChanges(false);
-    } catch (error: any) {
-      console.error('Failed to save notification preferences:', error);
-      toast.error('Failed to save notification preferences');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleToggle = (key: keyof NotificationPreferences) => {
-    setPreferences(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    const updated = {
+      ...localPreferences,
+      [key]: !localPreferences[key]
+    };
+    setLocalPreferences(updated);
     setHasChanges(true);
   };
 
@@ -103,7 +71,7 @@ function NotificationPreferences() {
       [key]: true
     }), {} as NotificationPreferences);
     
-    setPreferences(allEnabled);
+    setLocalPreferences(allEnabled);
     setHasChanges(true);
   };
 
@@ -113,8 +81,17 @@ function NotificationPreferences() {
       [key]: false
     }), {} as NotificationPreferences);
     
-    setPreferences(allDisabled);
+    setLocalPreferences(allDisabled);
     setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    dispatch(updateNotificationPreferences(localPreferences));
+  };
+
+  const handleCancel = () => {
+    setLocalPreferences(preferences);
+    setHasChanges(false);
   };
 
   const notificationTypes = [
@@ -278,7 +255,7 @@ function NotificationPreferences() {
               </div>
               <Switch
                 id={type.key}
-                checked={preferences[type.key]}
+                checked={localPreferences[type.key]}
                 onCheckedChange={() => handleToggle(type.key)}
                 disabled={saving}
               />
@@ -291,13 +268,13 @@ function NotificationPreferences() {
         <div className="flex justify-end gap-2 sticky bottom-4">
           <Button
             variant="outline"
-            onClick={loadPreferences}
+            onClick={handleCancel}
             disabled={saving}
           >
             Cancel
           </Button>
           <Button
-            onClick={savePreferences}
+            onClick={handleSave}
             disabled={saving}
             className="gap-2"
           >

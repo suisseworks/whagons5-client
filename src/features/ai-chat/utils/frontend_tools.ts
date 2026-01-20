@@ -71,28 +71,102 @@ function handleBrowserPrompt(result: FrontendToolResult, sendMessage?: SendMessa
 }
 
 /**
+ * Validates that a navigation path is safe to use.
+ * Allows:
+ * - Relative paths starting with "/" (e.g., "/dashboard", "/tasks/123")
+ * - Same-origin absolute URLs
+ * 
+ * Rejects:
+ * - Protocol-relative URLs (e.g., "//evil.com")
+ * - JavaScript URLs (e.g., "javascript:alert('xss')")
+ * - External domains
+ * - Malformed URLs
+ */
+function validateNavigationPath(path: string): { valid: boolean; error?: string } {
+  if (!path || typeof path !== 'string') {
+    return { valid: false, error: 'Invalid path: path must be a non-empty string' };
+  }
+
+  // Allow safe relative paths (must start with "/" and not "//")
+  if (path.startsWith('/') && !path.startsWith('//')) {
+    // Additional check: ensure it's not a protocol-relative URL disguised as a path
+    if (path.match(/^\/\/[^\/]/)) {
+      return { valid: false, error: 'Invalid path: protocol-relative URLs are not allowed' };
+    }
+    return { valid: true };
+  }
+
+  // For absolute URLs, parse and validate
+  try {
+    const url = new URL(path, window.location.origin);
+    
+    // Reject javascript: and other dangerous protocols
+    const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+    if (dangerousProtocols.some(proto => url.protocol.toLowerCase().startsWith(proto))) {
+      return { valid: false, error: `Invalid path: dangerous protocol "${url.protocol}" is not allowed` };
+    }
+
+    // Only allow same-origin URLs
+    if (url.origin === window.location.origin) {
+      return { valid: true };
+    }
+
+    // Reject external domains
+    return { 
+      valid: false, 
+      error: `Invalid path: external domain "${url.hostname}" is not allowed` 
+    };
+  } catch (error) {
+    // URL parsing failed - might be a malformed URL or relative path that doesn't start with "/"
+    return { 
+      valid: false, 
+      error: `Invalid path: "${path}" is not a valid relative path or same-origin URL` 
+    };
+  }
+}
+
+/**
  * Handler function for Browser_Navigate tool
  * Navigates to a different route without reloading the browser
+ * Only navigates when action === "browser_navigate" and path is validated as safe
  */
 function handleBrowserNavigate(result: FrontendToolResult, sendMessage?: SendMessageCallback, navigate?: NavigateCallback): boolean {
-  // Handle both tool_result format (path directly) and frontend_tool_prompt format (action + data.path)
-  const path = result.path || result.data?.path;
   const action = result.action;
   
-  if ((action === "browser_navigate" || !action) && path) {
-    console.log('[BROWSER_NAVIGATE] Navigating to:', path);
-    
-    if (navigate) {
-      navigate(path);
-      return true;
-    } else {
-      // Fallback to window.location if navigate callback is not provided
-      console.warn('[BROWSER_NAVIGATE] Navigate callback not provided, using window.location');
-      window.location.href = path;
-      return true;
-    }
+  // Only proceed if action is explicitly "browser_navigate"
+  if (action !== "browser_navigate") {
+    return false;
   }
-  return false;
+
+  // Handle both tool_result format (path directly) and frontend_tool_prompt format (action + data.path)
+  const path = result.path || result.data?.path;
+  
+  if (!path) {
+    console.warn('[BROWSER_NAVIGATE] No path provided');
+    return false;
+  }
+
+  // Validate the path before navigating
+  const validation = validateNavigationPath(path);
+  
+  if (!validation.valid) {
+    // Log error and do not navigate
+    console.error('[BROWSER_NAVIGATE] Validation failed:', validation.error, 'Path:', path);
+    return false;
+  }
+
+  // Path is valid, proceed with navigation
+  console.log('[BROWSER_NAVIGATE] Navigating to:', path);
+  
+  if (navigate) {
+    navigate(path);
+    return true;
+  } else {
+    // Fallback to window.location if navigate callback is not provided
+    console.warn('[BROWSER_NAVIGATE] Navigate callback not provided, using window.location');
+    window.location.href = path;
+    return true;
+  }
 }
 
 /**

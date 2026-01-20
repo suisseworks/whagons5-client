@@ -12,6 +12,7 @@ import { useDispatch, useSelector, shallowEqual } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
+import { fetchNotificationPreferences } from '../store/reducers/notificationPreferencesSlice';
 
 // Custom caches with advanced features
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
@@ -278,6 +279,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.error('FCM initialization failed:', error);
             }
           })();
+
+          // Load notification preferences at login
+          dispatch(fetchNotificationPreferences());
 
           // Kick off background hydration so UI can render immediately
           (async () => {
