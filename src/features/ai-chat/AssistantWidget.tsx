@@ -139,6 +139,22 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const [showScrollToBottom, setShowScrollToBottom] = useState<boolean>(false);
   const [scrollBtnLeft, setScrollBtnLeft] = useState<number | undefined>(undefined);
   const unsubscribeWSRef = useRef<(() => void) | null>(null);
+  // Keep a single WS subscription per conversation and route events through a ref so we don't
+  // have to unsubscribe/re-subscribe (which can close the socket and cause intermittent timeouts).
+  const wsEventHandlerRef = useRef<(data: any) => void>(() => {});
+  const stableWsHandlerRef = useRef<(data: any) => void>();
+  // Only keep the message WS warm between sends for voice mode.
+  const keepWsOpenForVoiceRef = useRef<boolean>(false);
+  const wsIdleCloseTimerRef = useRef<number | null>(null);
+  if (!stableWsHandlerRef.current) {
+    stableWsHandlerRef.current = (data: any) => {
+      try {
+        wsEventHandlerRef.current?.(data);
+      } catch (e) {
+        console.error("[WS] handler error:", e);
+      }
+    };
+  }
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const previousConversationIdRef = useRef<string>(conversationId);
@@ -146,6 +162,22 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const expectingTtsRef = useRef<boolean>(false);
   const ttsCloseTimerRef = useRef<number | null>(null);
   const lastTtsChunkAtRef = useRef<number>(0);
+
+  const scheduleWsIdleClose = useCallback((ms: number) => {
+    try {
+      if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+      wsIdleCloseTimerRef.current = window.setTimeout(() => {
+        // Only auto-close if we're still in voice-keepalive mode.
+        if (!keepWsOpenForVoiceRef.current) return;
+        if (unsubscribeWSRef.current) {
+          try { unsubscribeWSRef.current(); } catch {}
+          unsubscribeWSRef.current = null;
+        }
+        wsManager.close(conversationId);
+        wsIdleCloseTimerRef.current = null;
+      }, ms);
+    } catch {}
+  }, [conversationId]);
 
   // Prime AudioContext on a real user gesture to avoid autoplay restrictions blocking TTS playback.
   const primeTtsAudio = useCallback(() => {
@@ -285,6 +317,10 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
         ttsCloseTimerRef.current = null;
       } catch {}
+      try {
+        if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+        wsIdleCloseTimerRef.current = null;
+      } catch {}
     };
   }, []);
 
@@ -294,10 +330,21 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       stopListening();
       try { ttsPlayerRef.current?.stop(); } catch {}
       expectingTtsRef.current = false;
+      keepWsOpenForVoiceRef.current = false;
       try {
         if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
         ttsCloseTimerRef.current = null;
       } catch {}
+      try {
+        if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+        wsIdleCloseTimerRef.current = null;
+      } catch {}
+      // Close message WS when widget closes (avoid keeping sockets around in background).
+      if (unsubscribeWSRef.current) {
+        try { unsubscribeWSRef.current(); } catch {}
+        unsubscribeWSRef.current = null;
+      }
+      wsManager.close(conversationId);
     }
   }, [open, stopListening]);
 
@@ -310,6 +357,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const handleSubmit = async (content: string | ContentItem[], opts?: SubmitOptions) => {
     if (gettingResponse) return;
     setGettingResponse(true);
+
+    // Voice mode: keep the message WS warm between sends. Text mode: do not.
+    keepWsOpenForVoiceRef.current = opts?.inputMode === "voice";
 
     // Create conversation if it doesn't exist
     if (messages.length === 0) {
@@ -385,20 +435,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
           ttsPlayerRef.current.enqueueBase64Mp3(audioB64);
 
-          // While audio is actively streaming, keep the WS open. We'll close after a period of silence.
-          if (expectingTtsRef.current) {
-            try {
-              if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
-              ttsCloseTimerRef.current = window.setTimeout(() => {
-                const msSinceLastChunk = Date.now() - (lastTtsChunkAtRef.current || 0);
-                if (msSinceLastChunk < 12000) return;
-                if (unsubscribeWSRef.current) {
-                  try { unsubscribeWSRef.current(); } catch {}
-                  unsubscribeWSRef.current = null;
-                }
-                ttsCloseTimerRef.current = null;
-              }, 14000);
-            } catch {}
+          // In voice mode, keep the WS open between turns but still auto-close after a longer idle.
+          if (keepWsOpenForVoiceRef.current) {
+            scheduleWsIdleClose(60000);
           }
         }
         return;
@@ -410,10 +449,15 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           ttsCloseTimerRef.current = null;
         } catch {}
 
-        // If we were holding the socket open for trailing audio, close now.
-        if (unsubscribeWSRef.current) {
-          try { unsubscribeWSRef.current(); } catch {}
-          unsubscribeWSRef.current = null;
+        // For voice mode, keep the WS open between turns.
+        if (keepWsOpenForVoiceRef.current) {
+          scheduleWsIdleClose(60000);
+        } else {
+          // Non-voice: close promptly once the streaming context ends.
+          if (unsubscribeWSRef.current) {
+            try { unsubscribeWSRef.current(); } catch {}
+            unsubscribeWSRef.current = null;
+          }
         }
         return;
       }
@@ -428,20 +472,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           console.error("WebSocket error:", data.error || data.message);
         }
 
-        // For voice mode, keep the socket open briefly to receive trailing TTS audio chunks.
-        // This prevents cutting audio while still clearing the loading indicator immediately.
-        if (expectingTtsRef.current) {
-          try {
-            if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
-            ttsCloseTimerRef.current = window.setTimeout(() => {
-              expectingTtsRef.current = false;
-              if (unsubscribeWSRef.current) {
-                try { unsubscribeWSRef.current(); } catch {}
-                unsubscribeWSRef.current = null;
-              }
-              ttsCloseTimerRef.current = null;
-            }, 20000);
-          } catch {}
+        // Voice mode: keep WS warm between turns (still auto-close after idle).
+        if (keepWsOpenForVoiceRef.current) {
+          scheduleWsIdleClose(60000);
           return;
         }
 
@@ -598,23 +631,39 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       });
     };
 
+    // Ensure the stable subscription always uses the latest handler closure for this submit.
+    wsEventHandlerRef.current = handleWebSocketEvent;
+
     const ensureSubscription = () => {
-      if (unsubscribeWSRef.current) {
-        try { unsubscribeWSRef.current(); } catch {}
-        unsubscribeWSRef.current = null;
-      }
-      
-      wsManager.close(conversationId);
-      
+      // If we're already subscribed for this conversation, keep it. (The stable handler will
+      // invoke the latest closure via wsEventHandlerRef.)
+      if (unsubscribeWSRef.current) return;
+
       const selectedModel = getPreferredModel();
-      unsubscribeWSRef.current = wsManager.subscribe(conversationId, handleWebSocketEvent, selectedModel);
+      unsubscribeWSRef.current = wsManager.subscribe(
+        conversationId,
+        stableWsHandlerRef.current!,
+        selectedModel
+      );
     };
 
     try {
       abortControllerRef.current = false;
+      // If we have a pending timer that would close the WS after TTS, cancel it when starting a new send.
+      try {
+        if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+        ttsCloseTimerRef.current = null;
+      } catch {}
+      // If we have a pending idle close (voice keepalive), cancel it when starting a new send.
+      try {
+        if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+        wsIdleCloseTimerRef.current = null;
+      } catch {}
       ensureSubscription();
 
-      const maxWaitTime = 5000;
+      // Increased timeout for voice chat scenarios where server might be processing previous requests
+      // Also allow CONNECTING state since the connection might be establishing
+      const maxWaitTime = opts?.inputMode === "voice" ? 15000 : 10000;
       const checkInterval = 100;
       const maxAttempts = maxWaitTime / checkInterval;
       
@@ -623,6 +672,15 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         const wsState = wsManager.getState(conversationId);
         if (wsState === WebSocket.OPEN) {
           connected = true;
+          break;
+        }
+        // Don't fail if still connecting - give it more time
+        if (wsState === WebSocket.CONNECTING && i < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          continue;
+        }
+        // If closed or closing, break early
+        if (wsState === WebSocket.CLOSED || wsState === WebSocket.CLOSING) {
           break;
         }
         await new Promise(resolve => setTimeout(resolve, checkInterval));
@@ -692,6 +750,10 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     
     try {
       try { ttsPlayerRef.current?.stop(); } catch {}
+      if (unsubscribeWSRef.current) {
+        try { unsubscribeWSRef.current(); } catch {}
+        unsubscribeWSRef.current = null;
+      }
       wsManager.close(conversationId);
       console.log('[WS] Stopped chat by closing WebSocket connection');
     } catch (e) {
