@@ -146,7 +146,7 @@ export function ActionEditor({ action, open, onOpenChange, onSave, approvalId }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-visible flex flex-col">
         <DialogHeader>
           <DialogTitle>Configure Action: {ACTION_TYPE_LABELS[editedAction.action]}</DialogTitle>
           <DialogDescription>
@@ -154,7 +154,7 @@ export function ActionEditor({ action, open, onOpenChange, onSave, approvalId }:
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4 overflow-y-auto flex-1 min-h-0">
           {renderConfigForm()}
         </div>
 

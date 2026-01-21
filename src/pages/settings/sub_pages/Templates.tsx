@@ -765,9 +765,7 @@ function Templates() {
       field: 'actions',
       headerName: tt('grid.columns.actions', 'Actions'),
       width: 100,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,

@@ -184,7 +184,7 @@ function Tags() {
 			headerName: tt('grid.columns.actions', 'Actions'),
 			width: 100,
 			suppressSizeToFit: true,
-			cellRenderer: createActionsCellRenderer({ onEdit: handleEdit }),
+			cellRenderer: () => null,
 			sortable: false,
 			filter: false,
 			resizable: false,

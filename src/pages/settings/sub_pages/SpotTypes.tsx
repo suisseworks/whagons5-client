@@ -2,7 +2,7 @@ import { useMemo, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { ColDef } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLayerGroup, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faLayerGroup, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 // import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +66,7 @@ function SpotTypes() {
     { field: 'description', headerName: 'Description', flex: 3, minWidth: 220 },
     {
       field: 'actions', headerName: 'Actions', width: 120,
-      cellRenderer: createActionsCellRenderer({ onEdit: handleEdit, onDelete: handleDelete }),
+      cellRenderer: () => null,
       sortable: false, filter: false, resizable: false, pinned: 'right'
     }
   ], [handleEdit, handleDelete]);
@@ -159,6 +159,24 @@ function SpotTypes() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={!editingItem}
+        footerActions={
+          editingItem ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingItem);
+              }}
+              disabled={isSubmitting}
+              title="Delete Spot Type"
+              aria-label="Delete Spot Type"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          ) : null
+        }
       >
         {editingItem && (
           <div className="grid gap-4">

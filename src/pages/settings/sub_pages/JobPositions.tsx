@@ -200,9 +200,7 @@ function JobPositions() {
 			headerName: t("settings.jobPositions.grid.columns.actions", "Actions"),
 			width: 110,
 			pinned: "right",
-			cellRenderer: createActionsCellRenderer({
-				onEdit: handleEdit
-			}),
+			cellRenderer: () => null,
 			sortable: false,
 			filter: false,
 			resizable: false

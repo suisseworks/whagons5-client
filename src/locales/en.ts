@@ -955,4 +955,14 @@ export const enTranslations: Record<string, string> = {
   "notifications.sla_alerts.description": "Service level agreement warnings",
   "notifications.workflow_notifications.label": "Workflow Notifications",
   "notifications.workflow_notifications.description": "Automated workflow triggers and updates",
+
+  // Users Settings
+  "settings.users.dialogs.editUser.fields.globalRoles": "Global Roles",
+  "settings.users.dialogs.editUser.fields.optional": "Optional",
+  "settings.users.dialogs.editUser.fields.globalRolesHelp": "Global roles are optional. You can leave this field empty if you don't need to assign global roles to the user.",
+  "settings.users.dialogs.editUser.tabs.basic": "Basic Information",
+  "settings.users.dialogs.editUser.tabs.professional": "Professional Information",
+  "settings.users.dialogs.editUser.tabs.permissions": "Global Roles",
+  "settings.users.multiSelect.noGlobalRoles": "No global roles available",
+  "settings.users.multiSelect.selectGlobalRolesOptional": "Select global roles (optional)...",
 };

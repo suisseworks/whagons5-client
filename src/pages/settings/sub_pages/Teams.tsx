@@ -398,12 +398,31 @@ function Teams() {
       width: 170,
       cellRenderer: (p: ICellRendererParams) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleOpenUsersDialog(p.data)}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            data-grid-stop-row-click="true"
+            onPointerDown={(e) => {
+              // Prevent AG Grid from treating this as a row click (which would open Edit)
+              e.preventDefault();
+              e.stopPropagation();
+              // Radix/AG Grid can listen above React; stop the native event too
+              (e.nativeEvent as any)?.stopImmediatePropagation?.();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              (e.nativeEvent as any)?.stopImmediatePropagation?.();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              handleOpenUsersDialog(p.data);
+            }}
+          >
             {tt('grid.actions.manageUsers', 'Users')}
           </Button>
-          {createActionsCellRenderer({
-            onEdit: handleQuickEdit
-          })(p)}
         </div>
       ),
       sortable: false,

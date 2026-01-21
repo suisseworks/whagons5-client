@@ -118,14 +118,13 @@ const EnabledCellRenderer = ({ value }: ICellRendererParams & { t: (key: string,
 
 type CategoryActionsRendererParams = {
   onManageFields: (category: Category) => void;
-  onEdit: (category: Category) => void;
   getFieldCount: (categoryId: number) => number;
 };
 
 const CategoryActionsCellRenderer = (
   props: ICellRendererParams & CategoryActionsRendererParams
 ) => {
-  const { data, onManageFields, onEdit, getFieldCount } = props;
+  const { data, onManageFields, getFieldCount } = props;
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
   if (!data) return null;
@@ -138,7 +137,10 @@ const CategoryActionsCellRenderer = (
     handler: (category: Category) => void,
     event: React.MouseEvent
   ) => {
+    event.preventDefault();
     event.stopPropagation();
+    // Radix/AG Grid can listen above React; stop the native event too
+    (event.nativeEvent as any)?.stopImmediatePropagation?.();
     handler(category);
   };
 
@@ -147,20 +149,24 @@ const CategoryActionsCellRenderer = (
       <div className="flex items-center gap-2.5">
         <button
           type="button"
+          data-grid-stop-row-click="true"
+          onPointerDown={(e) => {
+            // Prevent AG Grid from treating this as a row click (which would open Edit)
+            e.preventDefault();
+            e.stopPropagation();
+            // Radix/AG Grid can listen above React; stop the native event too
+            (e.nativeEvent as any)?.stopImmediatePropagation?.();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            (e.nativeEvent as any)?.stopImmediatePropagation?.();
+          }}
           onClick={(event) => handleClick(onManageFields, event)}
           className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
         >
           <FontAwesomeIcon icon={faCubes} className="h-3 w-3 text-slate-500" />
           {label}
-        </button>
-
-        <button
-          type="button"
-          aria-label={tc('grid.actions.edit', 'Edit category')}
-          onClick={(event) => handleClick(onEdit, event)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-[0_1px_3px_rgba(15,23,42,0.12)] transition hover:bg-slate-50"
-        >
-          <FontAwesomeIcon icon={faPen} className="h-3 w-3" />
         </button>
       </div>
     </div>
@@ -544,7 +550,6 @@ function Categories() {
       cellRenderer: CategoryActionsCellRenderer,
       cellRendererParams: {
         onManageFields: openManageFields,
-        onEdit: handleEdit,
         getFieldCount: (id: number) => assignmentCountByCategory[Number(id)] || 0
       },
       sortable: false,

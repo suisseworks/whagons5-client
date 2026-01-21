@@ -1220,13 +1220,21 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: var(--radius-sm);
     transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-muted-foreground);
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
   }
 
   ::-webkit-scrollbar-corner {
@@ -1236,7 +1244,11 @@
   /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-border) var(--color-muted);
+    scrollbar-color: rgba(0, 0, 0, 0.3) var(--color-muted);
+  }
+
+  .dark * {
+    scrollbar-color: rgba(255, 255, 255, 0.3) var(--color-muted);
   }
 
   /* Enhanced styling for data grids and tables */
@@ -1266,11 +1278,11 @@
 
   /* Dark mode specific scrollbar adjustments */
   .dark ::-webkit-scrollbar-thumb {
-    background: oklch(0.4 0.08 177.71);
+    background: rgba(255, 255, 255, 0.3);
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-primary);
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .dark ::-webkit-scrollbar-track {

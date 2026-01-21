@@ -269,9 +269,7 @@ function Spots() {
       field: 'actions',
       headerName: ts('grid.columns.actions', 'Actions'),
       width: 100,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,

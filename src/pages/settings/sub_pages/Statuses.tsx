@@ -261,16 +261,7 @@ function Statuses() {
       width: 100,
       suppressSizeToFit: true,
       pinned: 'right',
-      cellRenderer: createActionsCellRenderer({
-        customActions: [
-          {
-            icon: faEdit,
-            variant: 'outline',
-            onClick: handleEditClick,
-            className: 'p-1 h-7 w-7'
-          }
-        ]
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false

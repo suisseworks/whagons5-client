@@ -944,6 +944,8 @@ export const esTranslations: Record<string, string> = {
   "settings.users.fields.noJobPosition": "Sin puesto",
   "settings.users.multiSelect.loadingTeams": "Cargando equipos...",
   "settings.users.multiSelect.selectTeams": "Selecciona equipos...",
+  "settings.users.multiSelect.noGlobalRoles": "No hay roles globales disponibles",
+  "settings.users.multiSelect.selectGlobalRolesOptional": "Selecciona roles globales (opcional)...",
 
   "settings.users.dialogs.createUser.title": "Crear usuario",
   "settings.users.dialogs.createUser.description": "Crea una nueva cuenta de usuario.",
@@ -970,9 +972,12 @@ export const esTranslations: Record<string, string> = {
   "settings.users.dialogs.editUser.fields.subscription": "Suscripción",
   "settings.users.dialogs.editUser.fields.subscriptionDescription": "Suscripción activa",
   "settings.users.dialogs.editUser.fields.teams": "Equipos",
+  "settings.users.dialogs.editUser.fields.globalRoles": "Roles Globales",
+  "settings.users.dialogs.editUser.fields.optional": "Opcional",
+  "settings.users.dialogs.editUser.fields.globalRolesHelp": "Los roles globales son opcionales. Puedes dejar este campo vacío si no necesitas asignar roles globales al usuario.",
   "settings.users.dialogs.editUser.tabs.basic": "Información básica",
   "settings.users.dialogs.editUser.tabs.professional": "Información profesional",
-  "settings.users.dialogs.editUser.tabs.permissions": "Permisos y equipos",
+  "settings.users.dialogs.editUser.tabs.permissions": "Roles Globales",
 
   "settings.users.dialogs.invitation.title": "Crear invitación",
   "settings.users.dialogs.invitation.description": "Crea un enlace de invitación. Los usuarios se agregarán automáticamente a los equipos seleccionados.",

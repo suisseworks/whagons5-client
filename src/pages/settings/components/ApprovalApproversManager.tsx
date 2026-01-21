@@ -6,6 +6,9 @@ import { genericActions, genericCaches, genericEventNames, genericEvents } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 
@@ -187,7 +190,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl overflow-visible max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Approvers{approval ? ` • ${approval.name}` : ''}</DialogTitle>
           <DialogDescription>
@@ -195,31 +198,38 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="flex items-center gap-2">
-            <select
-              className="px-3 py-2 border border-input bg-background rounded-md text-sm"
-              value={type}
-              onChange={(e) => setType(e.target.value as ApproverType)}
-            >
-              <option value="user">User</option>
-              <option value="role">Role</option>
-            </select>
-            <select
-              className="px-3 py-2 border border-input bg-background rounded-md text-sm"
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-            >
-              <option value="">Select {type}</option>
-              {availableOptions.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <Select value={type} onValueChange={(value) => setType(value as ApproverType)}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">User</SelectItem>
+                <SelectItem value="role">Role</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedId || undefined} onValueChange={setSelectedId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={`Select ${type}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableOptions.map(o => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {!isFirstApprover && (
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="rounded" />
-                Required
-              </label>
+              <div className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  id="required-checkbox"
+                  checked={required}
+                  onCheckedChange={(checked) => setRequired(checked === true)}
+                />
+                <Label htmlFor="required-checkbox" className="cursor-pointer">
+                  Required
+                </Label>
+              </div>
             )}
             <Button onClick={add} disabled={!selectedId} size="sm">
               <FontAwesomeIcon icon={faPlus} className="mr-2" />
@@ -233,8 +243,8 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
               <div className="text-xs text-muted-foreground mt-1">Choose a type and an item above, then click Add.</div>
             </div>
           ) : (
-            <div className="border rounded-md">
-              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-t-md">
+            <div className="border rounded-md max-h-[400px] overflow-y-auto">
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-t-md sticky top-0 z-10">
                 <div className="col-span-5">Approver</div>
                 <div className="col-span-2">Approval Type</div>
                 <div className="col-span-3">Required</div>
@@ -250,12 +260,10 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
                       <div className="text-sm capitalize">{i.approver_type === 'user' ? 'User' : 'Role'}</div>
                     </div>
                     <div className="col-span-3">
-                      <input
-                        type="checkbox"
-                        className="rounded"
+                      <Checkbox
                         checked={i.required}
                         disabled={items.length <= 1}
-                        onChange={() => toggleRequired(i.id)}
+                        onCheckedChange={() => toggleRequired(i.id)}
                         title={items.length <= 1 ? "Single approver is always required" : undefined}
                       />
                     </div>

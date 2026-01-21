@@ -6,6 +6,8 @@ import type { ColDef } from "ag-grid-community";
 import type { Role, Permission } from "@/store/types";
 import { RootState, AppDispatch } from "@/store/store";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { actionsApi } from "@/api/whagonsActionsApi";
 import { api } from "@/store/api/internalApi";
 import { addRole, updateRole, removeRole } from "@/store/reducers/rolesSlice";
@@ -385,7 +387,6 @@ function RolesAndPermissions() {
       width: 260,
       suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
         customActions: [
           {
             icon: faShieldAlt,
@@ -606,48 +607,40 @@ function RolesAndPermissions() {
         submitDisabled={isSavingPerms || !selectedRoleId}
         submitText={tu('permissionsDialog.save', 'Save')}
       >
-        <div className="flex items-center justify-between mb-4 gap-2">
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={activePermTab === 'general' ? 'default' : 'outline'}
-              onClick={() => setActivePermTab('general')}
-            >
-              {tu('permissionsDialog.tabGeneral', 'General')}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={activePermTab === 'settings' ? 'default' : 'outline'}
-              onClick={() => setActivePermTab('settings')}
-            >
-              {tu('permissionsDialog.tabSettings', 'Settings')}
-            </Button>
+        <Tabs value={activePermTab} onValueChange={(value) => setActivePermTab(value as 'general' | 'settings')} defaultValue="general" className="w-full">
+          <div className="flex items-center justify-between mb-4 gap-2">
+            <TabsList>
+              <TabsTrigger value="general">
+                {tu('permissionsDialog.tabGeneral', 'General')}
+              </TabsTrigger>
+              <TabsTrigger value="settings">
+                {tu('permissionsDialog.tabSettings', 'Settings')}
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAll}
+                disabled={permissions.length === 0 || isLoadingRolePerms}
+              >
+                {tu('permissionsDialog.selectAll', 'Select all')}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAll}
+                disabled={selectedPermIds.size === 0 || isLoadingRolePerms}
+              >
+                {tu('permissionsDialog.clearAll', 'Clear')}
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSelectAll}
-              disabled={permissions.length === 0 || isLoadingRolePerms}
-            >
-              {tu('permissionsDialog.selectAll', 'Select all')}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClearAll}
-              disabled={selectedPermIds.size === 0 || isLoadingRolePerms}
-            >
-              {tu('permissionsDialog.clearAll', 'Clear')}
-            </Button>
-          </div>
-        </div>
-        <div className={`max-h-[65vh] overflow-auto pr-2 space-y-4 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
-          {(activePermTab === 'general' ? generalGroups : settingsGroups).map(({ group, perms }) => {
+          <TabsContent value="general" className={`!flex !flex-col h-[65vh] overflow-y-auto overflow-x-hidden pr-2 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
+            <div className="space-y-4 flex-1">
+            {generalGroups.map(({ group, perms }) => {
             const { selectedCount, isAllSelected } = getGroupSelectionState(perms);
             return (
               <div key={group} className="border rounded-lg bg-muted/30 overflow-hidden">
@@ -697,11 +690,10 @@ function RolesAndPermissions() {
                             : 'bg-background border-border hover:bg-muted/50'
                         }`}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedPermIds.has(String(perm.id))}
-                          onChange={() => togglePermission(perm.id)}
-                          className="h-4 w-4 accent-primary shrink-0"
+                          onCheckedChange={() => togglePermission(perm.id)}
+                          className="shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm uppercase tracking-wide text-foreground">
@@ -716,7 +708,81 @@ function RolesAndPermissions() {
               </div>
             );
           })}
-        </div>
+            </div>
+          </TabsContent>
+          <TabsContent value="settings" className={`!flex !flex-col h-[65vh] overflow-y-auto overflow-x-hidden pr-2 ${isLoadingRolePerms ? 'opacity-60 pointer-events-none' : ''}`}>
+            <div className="space-y-4 flex-1">
+            {settingsGroups.map(({ group, perms }) => {
+              const { selectedCount, isAllSelected } = getGroupSelectionState(perms);
+              return (
+                <div key={group} className="border rounded-lg bg-muted/30 overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/60">
+                    <div className="flex items-center gap-3">
+                      <div className="font-semibold text-base capitalize">{group}</div>
+                      <span className="text-xs text-muted-foreground px-2 py-0.5 bg-background/60 rounded border">
+                        {selectedCount}/{perms.length}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isAllSelected ? "default" : "outline"}
+                        onClick={() => handleSelectGroup(perms)}
+                        disabled={perms.length === 0 || isLoadingRolePerms}
+                        className="h-8"
+                      >
+                        {tu('permissionsDialog.selectGroupAll', 'All')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleClearGroup(perms)}
+                        disabled={selectedCount === 0 || isLoadingRolePerms}
+                        className="h-8"
+                      >
+                        {tu('permissionsDialog.selectGroupNone', 'None')}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-3 grid gap-2 sm:grid-cols-2">
+                    {perms.map((perm) => {
+                      const raw = (perm as any).key || perm.name || [perm.action, perm.resource].filter(Boolean).join('-');
+                      const tokens = (raw || '').replace(/[.:/]/g, '-').split('-').filter(Boolean);
+                      const actionLabel = (tokens[0] || perm.action || '').toUpperCase();
+                      const displayName = actionLabel || `Permission ${perm.id}`;
+
+                      return (
+                        <label
+                          key={perm.id}
+                          className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-all ${
+                            selectedPermIds.has(String(perm.id))
+                              ? 'bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100'
+                              : 'bg-background border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={selectedPermIds.has(String(perm.id))}
+                            onCheckedChange={() => togglePermission(perm.id)}
+                            className="shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm uppercase tracking-wide text-foreground">
+                              {displayName}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{perm.name}</div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          </TabsContent>
+        </Tabs>
       </SettingsDialog>
 
       {/* Delete Dialog */}
