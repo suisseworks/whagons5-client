@@ -545,14 +545,16 @@ function RolesAndPermissions() {
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={() => {
                 setIsEditDialogOpen(false);
                 handleDelete(editingItem);
               }}
               disabled={isSubmitting}
+              title={tu('editDialog.delete', 'Delete')}
+              aria-label={tu('editDialog.delete', 'Delete')}
             >
-              <FontAwesomeIcon icon={faTrash} className="mr-2" />
-              {tu('editDialog.delete', 'Delete')}
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
           ) : null
         }

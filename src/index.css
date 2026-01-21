@@ -770,11 +770,11 @@
     color: #e7ecf5 !important;
   }
   .starwars .workspace-kpi-icon {
-    color: #0f172a !important;
+    color: inherit !important;
   }
   .starwars .workspace-kpi-icon svg {
-    color: #0f172a !important;
-    stroke: #0f172a !important;
+    color: currentColor !important;
+    stroke: currentColor !important;
     fill: none !important;
     opacity: 1 !important;
   }

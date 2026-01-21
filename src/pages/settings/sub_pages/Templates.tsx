@@ -1648,11 +1648,13 @@ function Templates() {
         <Button
           type="button"
           variant="destructive"
+          size="icon"
           onClick={() => editingTemplate && handleDeleteTemplate(editingTemplate)}
           disabled={isSubmitting}
+          title={tt('dialogs.edit.delete', 'Delete')}
+          aria-label={tt('dialogs.edit.delete', 'Delete')}
         >
-          <FontAwesomeIcon icon={faTrash} className="mr-2" />
-          {tt('dialogs.edit.delete', 'Delete')}
+          <FontAwesomeIcon icon={faTrash} />
         </Button>
       ) : undefined}
       >

@@ -1529,14 +1529,16 @@ function Users() {
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={() => {
                 setIsEditDialogOpen(false);
                 handleDelete(editingUser);
               }}
               disabled={isSubmitting}
+              title={tu('dialogs.deleteUser.title', 'Delete User')}
+              aria-label={tu('dialogs.deleteUser.title', 'Delete User')}
             >
-              <Trash className="h-4 w-4 mr-2" />
-              {tu('dialogs.deleteUser.title', 'Delete User')}
+              <Trash className="h-4 w-4" />
             </Button>
           ) : null
         }

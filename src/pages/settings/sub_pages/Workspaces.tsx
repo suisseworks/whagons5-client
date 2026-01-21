@@ -1067,11 +1067,13 @@ function Workspaces() {
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={handleDeleteFromEdit}
               disabled={isSubmitting}
+              title={tw('dialogs.delete.title', 'Delete Workspace')}
+              aria-label={tw('dialogs.delete.title', 'Delete Workspace')}
             >
-              <FontAwesomeIcon icon={faTrash} className="mr-2" />
-              {tw('dialogs.delete.title', 'Delete Workspace')}
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
           ) : undefined
         }

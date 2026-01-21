@@ -701,14 +701,16 @@ function Teams() {
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={() => {
                 setIsEditDialogOpen(false);
                 handleDeleteTeam(editingTeam);
               }}
               disabled={isSubmitting}
+              title={tt('dialogs.delete.title', 'Delete Team')}
+              aria-label={tt('dialogs.delete.title', 'Delete Team')}
             >
-              <Trash className="h-4 w-4 mr-2" />
-              {tt('dialogs.delete.title', 'Delete Team')}
+              <Trash className="h-4 w-4" />
             </Button>
           ) : null
         }

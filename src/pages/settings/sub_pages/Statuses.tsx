@@ -1055,15 +1055,16 @@ function Statuses() {
             <Button
               type="button"
               variant="destructive"
-              size="sm"
+              size="icon"
               onClick={() => {
                 setEditOpen(false);
                 setDeleteOpen(true);
               }}
               disabled={isUpdating}
+              title={ts("dialogs.edit.deleteButton", "Eliminar")}
+              aria-label={ts("dialogs.edit.deleteButton", "Eliminar")}
             >
-              <FontAwesomeIcon icon={faTrash} className="mr-2" />
-              {ts("dialogs.edit.deleteButton", "Eliminar")}
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
           ) : null
         }

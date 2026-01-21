@@ -129,6 +129,9 @@ export function SettingsGrid<T = any>({
         onRowClicked={(event: any) => {
           if (onRowClicked && event?.data) {
             onRowClicked(event.data as T);
+          } else if (onRowDoubleClicked && event?.data) {
+            // If onRowDoubleClicked is provided but onRowClicked is not, trigger edit on single click
+            onRowDoubleClicked(event.data as T);
           }
         }}
         onRowDoubleClicked={(event: any) => {

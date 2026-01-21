@@ -1210,11 +1210,13 @@ function Categories() {
           <Button
             type="button"
             variant="destructive"
+            size="icon"
             onClick={handleDeleteFromEdit}
             disabled={!editingCategory}
+            title={tc('dialogs.delete.button', 'Delete')}
+            aria-label={tc('dialogs.delete.button', 'Delete')}
           >
-            <FontAwesomeIcon icon={faTrash} className="mr-2" />
-            {tc('dialogs.delete.button', 'Delete')}
+            <FontAwesomeIcon icon={faTrash} />
           </Button>
         }
       >

@@ -385,11 +385,13 @@ function Tags() {
 					<Button
 						type="button"
 						variant="destructive"
+						size="icon"
 						onClick={handleDeleteFromEdit}
 						disabled={!editingItem}
+						title={tt('dialogs.delete.button', 'Delete')}
+						aria-label={tt('dialogs.delete.button', 'Delete')}
 					>
-						<FontAwesomeIcon icon={faTrash} className="mr-2" />
-						{tt('dialogs.delete.button', 'Delete')}
+						<FontAwesomeIcon icon={faTrash} />
 					</Button>
 				}
 			>

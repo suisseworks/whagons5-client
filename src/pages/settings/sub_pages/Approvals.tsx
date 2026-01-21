@@ -1735,11 +1735,12 @@ function Approvals() {
           <Button
             type="button"
             variant="destructive"
+            size="icon"
             onClick={openDeleteFromEdit}
             title={deleteSectionDescription}
+            aria-label={deleteDialogTitle}
           >
-            <FontAwesomeIcon icon={faTrash} className="mr-2" />
-            {deleteDialogTitle}
+            <FontAwesomeIcon icon={faTrash} />
           </Button>
         ) : undefined}
       >
