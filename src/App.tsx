@@ -1,8 +1,9 @@
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 import { AppRouter } from './router/AppRouter';
 import { useEffect, useState } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import toast from 'react-hot-toast';
+import { showNotificationToast, getNotificationIcon } from './components/ui/NotificationToast';
 import RadiographyEffect from './components/marketing/RadiographyEffect';
 import SnowEffect from './components/marketing/SnowEffect';
 import RainEffect from './components/marketing/RainEffect';
@@ -100,8 +101,8 @@ const EffectsLayer = () => {
         });
       }
 
-      // Ctrl+Shift+C - cycle through celebration effects
-      if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c') && !isInputFocused) {
+      // Ctrl+E - cycle through celebration effects
+      if (e.ctrlKey && e.key === 'e') {
         e.preventDefault();
         setCelebrationEffect(prev => {
           let next: CelebrationEffect;
@@ -145,6 +146,64 @@ const EffectsLayer = () => {
   );
 };
 
+// Component to handle service worker messages
+const ServiceWorkerListener = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Listen for in-app navigation events (used by FCM foreground notifications)
+    const handleSpaNavigate = (event: Event) => {
+      const custom = event as CustomEvent<any>;
+      const url = custom?.detail?.url;
+      if (typeof url === 'string' && url.length > 0) {
+        navigate(url);
+      }
+    };
+
+    // Listen for messages from service worker
+    const handleMessage = async (event: MessageEvent) => {
+      if (!event.data) return;
+
+      // Handle notification clicks
+      if (event.data.type === 'NOTIFICATION_CLICKED') {
+        if (event.data.url) {
+          navigate(event.data.url);
+        }
+      }
+
+      // Handle new notifications - refresh from IndexedDB and show toast
+      if (event.data.type === 'NEW_NOTIFICATION') {
+        const notification = event.data.notification;
+        
+        // Show beautiful toast notification
+        showNotificationToast({
+          title: notification?.title || 'New Notification',
+          body: notification?.body || '',
+          onClick: notification?.url ? () => navigate(notification.url) : undefined,
+          icon: getNotificationIcon(notification?.data?.type),
+          duration: 6000,
+        });
+        
+        // Dynamically import to avoid circular dependencies
+        const { store } = await import('./store/store');
+        const { genericInternalActions } = await import('./store/genericSlices');
+        
+        await store.dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
+      }
+    };
+
+    window.addEventListener('wh:navigate', handleSpaNavigate as any);
+    navigator.serviceWorker?.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('wh:navigate', handleSpaNavigate as any);
+      navigator.serviceWorker?.removeEventListener('message', handleMessage);
+    };
+  }, [navigate]);
+
+  return null;
+};
+
 export const App = () => {
   return (
     <BrowserRouter
@@ -153,6 +212,7 @@ export const App = () => {
         v7_relativeSplatPath: true,
       }}
     >
+      <ServiceWorkerListener />
       <AppRouter />
       <EffectsLayer />
     </BrowserRouter>

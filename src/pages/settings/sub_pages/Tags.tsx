@@ -184,7 +184,7 @@ function Tags() {
 			headerName: tt('grid.columns.actions', 'Actions'),
 			width: 100,
 			suppressSizeToFit: true,
-			cellRenderer: createActionsCellRenderer({ onEdit: handleEdit }),
+			cellRenderer: () => null,
 			sortable: false,
 			filter: false,
 			resizable: false,
@@ -385,11 +385,13 @@ function Tags() {
 					<Button
 						type="button"
 						variant="destructive"
+						size="icon"
 						onClick={handleDeleteFromEdit}
 						disabled={!editingItem}
+						title={tt('dialogs.delete.button', 'Delete')}
+						aria-label={tt('dialogs.delete.button', 'Delete')}
 					>
-						<FontAwesomeIcon icon={faTrash} className="mr-2" />
-						{tt('dialogs.delete.button', 'Delete')}
+						<FontAwesomeIcon icon={faTrash} />
 					</Button>
 				}
 			>

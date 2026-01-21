@@ -42,7 +42,7 @@ import {
   createGridContainer,
 } from './workspaceTable/grid/gridConfig';
 import { setupTaskEventHandlers } from './workspaceTable/handlers';
-import { buildWorkspaceColumns } from './workspaceTable/columns';
+import { buildWorkspaceColumns } from './workspaceTable/columns/index';
 import {
   useGridReduxState,
   useDerivedGridState,
@@ -175,6 +175,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     slas,
     tags,
     taskTags,
+    taskUsers,
     customFields,
     categoryCustomFields,
     taskCustomFieldValues,
@@ -238,10 +239,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   );
 
   const getDoneStatusId = useDoneStatusId(globalStatusesRef);
-  const handleChangeStatus = useStatusChange(statusMap, getDoneStatusId, categories);
+
   
   // Track newly created tasks for animation
   const { isNewTask, newTaskIds } = useNewTaskAnimation();
+  const handleChangeStatus = useStatusChange(statusMap, getDoneStatusId, categories, stableTaskApprovalInstances, approvalMap);
 
   const { useClientSide, clientRows, setClientRows } = useWorkspaceTableMode({
     gridApi: gridRef.current?.api,
@@ -420,6 +422,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     tagMap,
     taskTags,
     taskTagsMap,
+    taskUsers,
     tagDisplayMode,
     visibleColumns,
     workspaceCustomFields,
@@ -433,7 +436,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
     slaMap,
   } as any), [
-    statusMap, priorityMap, spotMap, userMap, tagMap, taskTags,
+    statusMap, priorityMap, spotMap, userMap, tagMap, taskTags, taskUsers,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,

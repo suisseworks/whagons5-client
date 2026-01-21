@@ -49,8 +49,7 @@ import { removeTaskAsync } from '@/store/reducers/tasksSlice';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
 import toast from 'react-hot-toast';
 import type { AppDispatch } from '@/store/store';
-import { executeKpiQuery } from '@/services/kpiCardService';
-import { genericActions, genericInternalActions } from '@/store/genericSlices';
+import { WorkspaceKpiCard } from '@/pages/spaces/components/WorkspaceKpiCard';
 
 const WORKSPACE_TAB_PATHS = {
   grid: '',
@@ -80,6 +79,10 @@ export const Workspace = () => {
   const id = getWorkspaceIdFromPath(location.pathname);
   const workspaceBasePath = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
   const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+
+  // Get taskId from URL query parameters
+  const searchParams = new URLSearchParams(location.search);
+  const taskIdFromUrl = searchParams.get('taskId');
   
   // Helper function to get current tab from URL (matches UrlTabs logic)
   const getCurrentTabFromUrl = (): WorkspaceTabKey => {
@@ -275,6 +278,36 @@ export const Workspace = () => {
     return () => window.removeEventListener('wh:rowDensityChanged', handler);
   }, []);
 
+  // Handle opening task from URL parameter (from notifications)
+  useEffect(() => {
+    if (!taskIdFromUrl) return;
+
+    // Fetch task from cache and open dialog
+    (async () => {
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+        
+        const taskId = Number(taskIdFromUrl);
+        if (!Number.isFinite(taskId)) return;
+
+        const task = await TasksCache.getTask(String(taskId));
+        if (task) {
+          setSelectedTask(task);
+          setOpenEditTask(true);
+
+          // Remove taskId from URL to prevent reopening on refresh
+          const newSearchParams = new URLSearchParams(location.search);
+          newSearchParams.delete('taskId');
+          const newSearch = newSearchParams.toString();
+          const newUrl = location.pathname + (newSearch ? `?${newSearch}` : '');
+          navigate(newUrl, { replace: true });
+        }
+      } catch (error) {
+        console.error('Failed to open task from URL:', error);
+      }
+    })();
+  }, [taskIdFromUrl, location.pathname, location.search, navigate]);
+
   // Selected tasks (for bulk actions)
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   // Delete dialog state
@@ -292,17 +325,30 @@ export const Workspace = () => {
     setSelectedIds([]);
     tableRef.current?.clearSelection?.();
     
-    // Delete all selected tasks
-    const deletePromises = taskIds.map(taskId => 
-      dispatch(removeTaskAsync(taskId)).unwrap().catch((error: any) => {
-        console.error(`Failed to delete task ${taskId}:`, error);
-        return { error, taskId };
+    // Delete all selected tasks (normalize results so typing stays consistent)
+    const results = await Promise.all(
+      taskIds.map(async (taskId) => {
+        try {
+          await dispatch(removeTaskAsync(taskId)).unwrap();
+          return { taskId, ok: true as const };
+        } catch (error: any) {
+          const status = error?.response?.status || error?.status;
+          // Only log non-403 errors (403 errors are handled by API interceptor)
+          if (status !== 403) {
+            console.error(`Failed to delete task ${taskId}:`, error);
+          }
+          return { taskId, ok: false as const, error };
+        }
       })
     );
-    
-    const results = await Promise.allSettled(deletePromises);
-    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.error));
-    const succeeded = results.filter(r => r.status === 'fulfilled' && !r.value?.error);
+
+    const succeeded = results.filter((r) => r.ok);
+    const failed = results.filter((r) => !r.ok);
+    // Filter out 403 errors (already handled by API interceptor)
+    const failedNon403 = failed.filter((r) => {
+      const status = r.error?.response?.status || r.error?.status;
+      return status !== 403;
+    });
     
     if (succeeded.length > 0) {
       toast.success(
@@ -313,9 +359,10 @@ export const Workspace = () => {
       );
     }
     
-    if (failed.length > 0) {
+    // Only show toast for non-403 errors (403 errors already shown by API interceptor)
+    if (failedNon403.length > 0) {
       toast.error(
-        `Failed to delete ${failed.length} task${failed.length > 1 ? 's' : ''}`,
+        `Failed to delete ${failedNon403.length} task${failedNon403.length > 1 ? 's' : ''}`,
         { duration: 5000 }
       );
     }
@@ -507,7 +554,6 @@ export const Workspace = () => {
   // Clear cache when workspace ID changes
   useEffect(() => {
     if (id) {
-      console.log(`Switching to workspace ${id}, clearing cache`);
       rowCache.current.clear();
     }
   }, [id, location.pathname]);
@@ -795,7 +841,7 @@ export const Workspace = () => {
   const completedLast7Days = stats.trend.reduce((sum, val) => sum + val, 0);
   const trendDelta = stats.trend.length >= 2 ? stats.trend[stats.trend.length - 1] - stats.trend[stats.trend.length - 2] : 0;
 
-  const TrendSparkline = ({ data }: { data: number[] }) => {
+  const TrendSparkline = ({ data, className }: { data: number[]; className?: string }) => {
     if (!data || data.length === 0) {
       return <div className="text-xs text-muted-foreground">—</div>;
     }
@@ -811,7 +857,12 @@ export const Workspace = () => {
     const lastY = height - ((data[data.length - 1] / max) * height);
 
     return (
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-10 text-sky-600" role="img" aria-label="7 day completion trend">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={`w-full h-10 ${className || 'text-sky-600'}`}
+        role="img"
+        aria-label="7 day completion trend"
+      >
         <polyline fill="none" stroke="currentColor" strokeWidth="2.4" points={points} strokeLinecap="round" />
         <circle cx={lastX} cy={lastY} r="2.6" fill="currentColor" />
       </svg>
@@ -823,474 +874,67 @@ export const Workspace = () => {
     label: string;
     value: string;
     icon: ReactNode;
-    badgeClass: string;
-    barClass: string;
+    accent: 'indigo' | 'amber' | 'emerald' | 'purple';
     sparkline?: ReactNode;
     helperText?: string;
   };
 
-  // KPI card order management
-  const getKpiOrderStorageKey = () => `wh_workspace_kpi_order_${id || 'all'}`;
-  
-  const loadKpiOrder = (): string[] => {
-    try {
-      const key = getKpiOrderStorageKey();
-      const raw = localStorage.getItem(key);
-      if (!raw) return ['total', 'inProgress', 'completedToday', 'trend'];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.map((id: any) => String(id)) : ['total', 'inProgress', 'completedToday', 'trend'];
-    } catch {
-      return ['total', 'inProgress', 'completedToday', 'trend'];
+  const kpiCards: KpiCard[] = [
+    {
+      key: 'total',
+      label: t('workspace.stats.total', 'Total'),
+      value: formatStatValue(stats.total),
+      icon: <BarChart3 className="h-5 w-5" />,
+      accent: 'indigo',
+    },
+    {
+      key: 'inProgress',
+      label: t('workspace.stats.inProgress', 'In progress'),
+      value: formatStatValue(stats.inProgress),
+      icon: <Activity className="h-5 w-5" />,
+      accent: 'amber',
+    },
+    {
+      key: 'completedToday',
+      label: t('workspace.stats.completedToday', 'Completed today'),
+      value: formatStatValue(stats.completedToday),
+      icon: <Sparkles className="h-5 w-5" />,
+      accent: 'emerald',
+      helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
+    },
+    {
+      key: 'trend',
+      label: t('workspace.stats.sevenDayTrend', '7-day trend'),
+      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
+      icon: <TrendingUp className="h-5 w-5" />,
+      accent: 'purple',
+      sparkline: <TrendSparkline data={stats.trend} className="text-purple-600" />,
+      helperText: statsArePending 
+        ? '' 
+        : completedLast7Days === 0 
+          ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
+          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`
     }
-  };
-
-  const saveKpiOrder = (ids: string[]) => {
-    try {
-      const key = getKpiOrderStorageKey();
-      localStorage.setItem(key, JSON.stringify(ids));
-    } catch {}
-  };
-
-  const [kpiOrder, setKpiOrder] = useState<string[]>(() => loadKpiOrder());
-
-  // Update order when workspace changes
-  useEffect(() => {
-    const newOrder = loadKpiOrder();
-    setKpiOrder(newOrder);
-  }, [id]);
-
-  // Load custom KPI cards from Redux
-  const customKpiCards = useSelector((state: RootState) => (state as any).kpiCards?.value ?? []);
-  
-  // Load custom KPI cards on mount (only once)
-  const kpiCardsLoadedRef = useRef(false);
-  useEffect(() => {
-    if (!kpiCardsLoadedRef.current) {
-      kpiCardsLoadedRef.current = true;
-      dispatch(genericInternalActions.kpiCards.getFromIndexedDB());
-      dispatch(genericInternalActions.kpiCards.fetchFromAPI());
-    }
-  }, [dispatch]);
-
-  const defaultKpiEnabledByKey = useMemo(() => {
-    const map = new Map<string, boolean>();
-    customKpiCards.forEach((card: any) => {
-      if (card?.query_config?.is_default && card?.query_config?.default_key) {
-        map.set(String(card.query_config.default_key), Boolean(card.is_enabled));
-      }
-    });
-    return map;
-  }, [customKpiCards]);
-
-  // Filter enabled custom cards for current workspace
-  const enabledCustomCards = useMemo(() => {
-    return customKpiCards.filter((card: any) => 
-      card.is_enabled &&
-      !card?.query_config?.is_default && (
-        card.workspace_id === null || 
-        card.workspace_id === (id === 'all' || !id ? null : parseInt(id))
-      )
-    );
-  }, [customKpiCards, id]);
-
-  // Execute queries for custom cards and store results
-  const [customCardResults, setCustomCardResults] = useState<Record<string, any>>({});
-  const loadingCustomCardsRef = useRef(false);
-  
-  useEffect(() => {
-    let cancelled = false;
-    
-    const loadCustomCardData = async () => {
-      // Prevent multiple simultaneous loads
-      if (loadingCustomCardsRef.current) return;
-      loadingCustomCardsRef.current = true;
-      
-      try {
-        const results: Record<string, any> = {};
-        
-        for (const card of enabledCustomCards) {
-          try {
-            const result = await executeKpiQuery(card, id || 'all');
-            if (!cancelled) {
-              results[card.id] = result;
-            }
-          } catch (error) {
-            console.error(`Error executing query for card ${card.id}:`, error);
-            if (!cancelled) {
-              results[card.id] = { value: '—' };
-            }
-          }
-        }
-        
-        if (!cancelled) {
-          setCustomCardResults(results);
-        }
-      } finally {
-        loadingCustomCardsRef.current = false;
-      }
-    };
-
-    if (enabledCustomCards.length > 0) {
-      loadCustomCardData();
-    } else {
-      setCustomCardResults({});
-    }
-    
-    // Listen for task events to refresh custom cards
-    const unsubs = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, loadCustomCardData),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, loadCustomCardData),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, loadCustomCardData),
-      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, loadCustomCardData),
-    ];
-    
-    return () => {
-      cancelled = true;
-      unsubs.forEach((u) => { try { u(); } catch {} });
-    };
-  }, [enabledCustomCards, id]); // Removed stats dependency to prevent constant re-renders
-
-  // Create all KPI cards with current stats (default + custom)
-  const allKpiCards = useMemo<KpiCard[]>(() => {
-    const isDefaultEnabled = (key: string) => {
-      const enabled = defaultKpiEnabledByKey.get(key);
-      return enabled !== false;
-    };
-
-    // Default cards - only include if enabled
-    const defaultCardConfigs = [
-      {
-        key: 'total',
-        label: t('workspace.stats.total', 'Total'),
-        value: formatStatValue(stats.total),
-        badgeClass: 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20',
-        barClass: 'from-indigo-500 via-indigo-400 to-indigo-500'
-      },
-      {
-        key: 'inProgress',
-        label: t('workspace.stats.inProgress', 'In progress'),
-        value: formatStatValue(stats.inProgress),
-        badgeClass: 'bg-gradient-to-br from-amber-500 to-orange-500 text-white border-amber-600 shadow-lg shadow-amber-500/20',
-        barClass: 'from-amber-500 via-amber-400 to-amber-500'
-      },
-      {
-        key: 'completedToday',
-        label: t('workspace.stats.completedToday', 'Completed today'),
-        value: formatStatValue(stats.completedToday),
-        badgeClass: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20',
-        barClass: 'from-emerald-500 via-emerald-400 to-emerald-500',
-        helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
-      },
-      {
-        key: 'trend',
-        label: t('workspace.stats.sevenDayTrend', '7-day trend'),
-        value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
-        badgeClass: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white border-purple-600 shadow-lg shadow-purple-500/20',
-        barClass: 'from-purple-500 via-purple-400 to-purple-500',
-        hasSparkline: true,
-        helperText: statsArePending 
-          ? '' 
-          : completedLast7Days === 0 
-            ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
-            : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`
-      }
-    ];
-
-    const defaultCards: KpiCard[] = defaultCardConfigs
-      .filter((config) => isDefaultEnabled(config.key))
-      .map((config) => ({
-        ...config,
-        icon: config.key === 'total' ? <BarChart3 className="h-5 w-5" /> :
-              config.key === 'inProgress' ? <Activity className="h-5 w-5" /> :
-              config.key === 'completedToday' ? <Sparkles className="h-5 w-5" /> :
-              <TrendingUp className="h-5 w-5" />,
-        sparkline: config.hasSparkline ? <TrendSparkline data={stats.trend} /> : undefined,
-      }));
-
-    // Custom cards
-    const customCards: KpiCard[] = enabledCustomCards.map((card: any) => {
-      const result = customCardResults[card.id];
-      const displayValue = result?.value !== undefined 
-        ? (typeof result.value === 'number' ? result.value.toLocaleString() : String(result.value))
-        : '—';
-
-      return {
-        key: `custom-${card.id}`,
-        label: card.name,
-        value: displayValue,
-        icon: <BarChart3 className="h-5 w-5" />,
-        badgeClass: card.display_config?.badgeClass || 'bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20',
-        barClass: card.display_config?.barClass || 'from-blue-500 via-blue-400 to-blue-500',
-        sparkline: card.type === 'trend' && result?.trend ? <TrendSparkline data={result.trend} /> : undefined,
-        helperText: card.display_config?.helperText,
-      };
-    });
-
-    // Merge default and custom cards
-    return [...defaultCards, ...customCards];
-  }, [stats, statsArePending, completedLast7Days, trendDelta, t, enabledCustomCards, customCardResults, defaultKpiEnabledByKey]);
-
-  // Sort KPI cards according to saved order
-  const kpiCards = useMemo(() => {
-    const cardMap = new Map(allKpiCards.map(card => [card.key, card]));
-    return kpiOrder
-      .map(key => cardMap.get(key))
-      .filter((card): card is KpiCard => Boolean(card))
-      .concat(allKpiCards.filter(card => !kpiOrder.includes(card.key)));
-  }, [kpiOrder, allKpiCards]);
-
-  const kpiSortableIds = useMemo(() => kpiCards.map(card => card.key), [kpiCards]);
-
-  // dnd-kit sensors
-  const kpiSensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 3,
-      },
-    })
-  );
-
-  // Refs to track drag state and prevent scroll
-  const kpiIsDraggingRef = useRef(false);
-  const kpiOriginalOverflowRef = useRef<string>('');
-  const kpiOriginalTouchActionRef = useRef<string>('');
-  const kpiOriginalPositionRef = useRef<string>('');
-  const kpiScrollPositionRef = useRef({ x: 0, y: 0 });
-  const kpiScrollLockAnimationFrameRef = useRef<number | null>(null);
-
-  // Prevent scrolling during drag
-  const handleKpiDragStart = (_event: DragStartEvent) => {
-    kpiIsDraggingRef.current = true;
-    
-    // Store original values
-    kpiOriginalOverflowRef.current = document.body.style.overflow || '';
-    kpiOriginalTouchActionRef.current = document.body.style.touchAction || '';
-    kpiOriginalPositionRef.current = document.body.style.position || '';
-    
-    // Store current scroll position
-    kpiScrollPositionRef.current = {
-      x: window.scrollX || document.documentElement.scrollLeft,
-      y: window.scrollY || document.documentElement.scrollTop
-    };
-    
-    // Prevent scrolling using position: fixed trick
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${kpiScrollPositionRef.current.y}px`;
-    document.body.style.left = `-${kpiScrollPositionRef.current.x}px`;
-    document.body.style.width = '100%';
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-    document.body.style.overscrollBehavior = 'none';
-    document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.touchAction = 'none';
-    document.documentElement.style.overscrollBehavior = 'none';
-    
-    // Prevent scroll events
-    const preventTouchMove = (e: TouchEvent) => {
-      if (kpiIsDraggingRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    
-    const preventWheel = (e: WheelEvent) => {
-      if (kpiIsDraggingRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    
-    const preventScroll = (e: Event) => {
-      if (kpiIsDraggingRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    
-    // Lock scroll position
-    const lockScrollPosition = () => {
-      if (kpiIsDraggingRef.current) {
-        window.scrollTo(kpiScrollPositionRef.current.x, kpiScrollPositionRef.current.y);
-        document.documentElement.scrollTop = kpiScrollPositionRef.current.y;
-        document.documentElement.scrollLeft = kpiScrollPositionRef.current.x;
-        document.body.scrollTop = kpiScrollPositionRef.current.y;
-        document.body.scrollLeft = kpiScrollPositionRef.current.x;
-        kpiScrollLockAnimationFrameRef.current = requestAnimationFrame(lockScrollPosition);
-      }
-    };
-    
-    kpiScrollLockAnimationFrameRef.current = requestAnimationFrame(lockScrollPosition);
-    
-    window.addEventListener('touchmove', preventTouchMove, { passive: false, capture: true });
-    window.addEventListener('wheel', preventWheel, { passive: false, capture: true });
-    window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
-    document.addEventListener('touchmove', preventTouchMove, { passive: false, capture: true });
-    document.addEventListener('wheel', preventWheel, { passive: false, capture: true });
-    document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
-    
-    // Store cleanup function
-    (window as any).__kpiDragScrollPreventCleanup = () => {
-      if (kpiScrollLockAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(kpiScrollLockAnimationFrameRef.current);
-        kpiScrollLockAnimationFrameRef.current = null;
-      }
-      window.removeEventListener('touchmove', preventTouchMove, { capture: true } as any);
-      window.removeEventListener('wheel', preventWheel, { capture: true } as any);
-      window.removeEventListener('scroll', preventScroll, { capture: true } as any);
-      document.removeEventListener('touchmove', preventTouchMove, { capture: true } as any);
-      document.removeEventListener('wheel', preventWheel, { capture: true } as any);
-      document.removeEventListener('scroll', preventScroll, { capture: true } as any);
-    };
-  };
-
-  const handleKpiDragEnd = (event: DragEndEvent) => {
-    kpiIsDraggingRef.current = false;
-    
-    // Clean up event listeners
-    if ((window as any).__kpiDragScrollPreventCleanup) {
-      (window as any).__kpiDragScrollPreventCleanup();
-      delete (window as any).__kpiDragScrollPreventCleanup;
-    }
-    
-    // Restore scroll behavior
-    const scrollY = kpiScrollPositionRef.current.y;
-    const scrollX = kpiScrollPositionRef.current.x;
-    
-    document.body.style.position = kpiOriginalPositionRef.current;
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.width = '';
-    document.body.style.overflow = kpiOriginalOverflowRef.current;
-    document.body.style.touchAction = kpiOriginalTouchActionRef.current;
-    document.body.style.overscrollBehavior = '';
-    document.documentElement.style.overflow = '';
-    document.documentElement.style.touchAction = '';
-    document.documentElement.style.overscrollBehavior = '';
-    
-    // Restore scroll position
-    window.scrollTo(scrollX, scrollY);
-    
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    
-    const oldIndex = kpiOrder.indexOf(String(active.id));
-    const newIndex = kpiOrder.indexOf(String(over.id));
-    
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(kpiOrder, oldIndex, newIndex);
-      setKpiOrder(newOrder);
-      saveKpiOrder(newOrder);
-    }
-  };
-
-  // Sortable KPI Card Component - Memoized to prevent unnecessary re-renders
-  const SortableKpiCard = React.memo(({ card }: { card: KpiCard }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: card.key });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={{ ...style, touchAction: 'none' }}
-        className="h-full min-h-[80px]"
-      >
-        <motion.div
-          className={`relative overflow-hidden rounded-xl border bg-gradient-to-br from-card/95 to-card/80 backdrop-blur-sm shadow-md hover:shadow-lg border-border/60 workspace-kpi-card group transition-all duration-300 hover:-translate-y-0.5 cursor-grab active:cursor-grabbing h-full ${isDragging ? 'shadow-xl scale-[1.02] z-50' : ''}`}
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          whileHover={isDragging ? {} : { scale: 1.02 }}
-          onClick={(e) => {
-            if (isDragging) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-        >
-          {/* Drag handle */}
-          <div
-            {...listeners}
-            {...attributes}
-            className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-60 transition-opacity cursor-grab active:cursor-grabbing p-1.5 rounded hover:bg-background/50"
-            title="Drag to reorder"
-          >
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </div>
-
-          {/* Animated gradient top bar */}
-          <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass} animate-gradient-x`} />
-          
-          {/* Subtle background gradient overlay */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${card.barClass} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-          
-          <div className="flex items-center gap-3 px-4 py-3 relative z-10">
-            <div 
-              className={`flex items-center justify-center flex-shrink-0 rounded-xl p-2.5 border-2 ${card.badgeClass} workspace-kpi-icon transition-transform duration-300`}
-            >
-              {card.icon}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
-                {card.label}
-              </div>
-              <div className="text-2xl font-bold leading-tight text-foreground truncate">
-                {card.value}
-              </div>
-              {card.helperText ? (
-                <div className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                  {card.helperText}
-                </div>
-              ) : null}
-            </div>
-            {card.sparkline ? (
-              <div className="flex-shrink-0 w-24 sm:w-28 opacity-80 group-hover:opacity-100 transition-opacity">
-                {card.sparkline}
-              </div>
-            ) : null}
-          </div>
-        </motion.div>
-      </div>
-    );
-  }, (prevProps, nextProps) => {
-    // Custom comparison - only re-render if meaningful props changed
-    return (
-      prevProps.card.key === nextProps.card.key &&
-      prevProps.card.label === nextProps.card.label &&
-      prevProps.card.value === nextProps.card.value &&
-      prevProps.card.helperText === nextProps.card.helperText
-    );
-  });
+  ];
 
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex items-start gap-3 -mt-1 mb-3">
         {showHeaderKpis && (
           <div className="flex-1 min-w-0">
-            <DndContext
-              sensors={kpiSensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleKpiDragStart}
-              onDragEnd={handleKpiDragEnd}
-            >
-              <SortableContext items={kpiSortableIds} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3 items-stretch w-full">
-                  {kpiCards.map((card) => (
-                    <SortableKpiCard key={card.key} card={card} />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              {kpiCards.map((card) => (
+                <WorkspaceKpiCard
+                  key={card.key}
+                  label={card.label}
+                  value={card.value}
+                  icon={card.icon}
+                  accent={card.accent}
+                  helperText={card.helperText}
+                  right={card.sparkline}
+                />
+              ))}
+            </div>
           </div>
         )}
 

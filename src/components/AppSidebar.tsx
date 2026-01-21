@@ -37,7 +37,7 @@ import {
   CollapsibleTrigger,
   useCollapsible,
 } from '@/components/animate-ui/primitives/radix/collapsible';
-import AssistantWidget from './AssistantWidget';
+import AssistantWidget from '@/features/ai-chat/AssistantWidget';
 import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
@@ -543,15 +543,6 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     return Array.from(map.values());
   }, [displayWorkspaces]);
 
-  // Debug logging for workspaces state changes (only in development)
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('AppSidebar: Workspaces updated:', {
-        count: uniqueWorkspaces?.length || 0,
-        names: uniqueWorkspaces?.map((w: Workspace) => w.name) || []
-      });
-    }
-  }, [uniqueWorkspaces]);
 
   // Note: clearError action not available in generic slices
 

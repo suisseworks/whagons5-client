@@ -2,8 +2,12 @@
  * Hook for handling workspace changes
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+
+export interface UseWorkspaceChangeReturn {
+  error: string | null;
+}
 
 export function useWorkspaceChange(opts: {
   workspaceId: string;
@@ -11,12 +15,16 @@ export function useWorkspaceChange(opts: {
   gridRef: React.RefObject<any>;
   refreshGrid: () => void;
   exitEditMode: (api?: any) => void;
-}) {
+}): UseWorkspaceChangeReturn {
   const { workspaceId, modulesLoaded, gridRef, refreshGrid, exitEditMode } = opts;
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAndRefresh = async () => {
       if (!modulesLoaded) return;
+      
+      // Clear any previous errors
+      setError(null);
       
       // Exit edit mode when workspace changes
       exitEditMode(gridRef.current?.api);
@@ -37,17 +45,24 @@ export function useWorkspaceChange(opts: {
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const taskCount = countResp?.rowCount ?? 0;
         
-        console.log(`[WorkspaceTable] Workspace changed to ${workspaceId}, found ${taskCount} tasks in cache`);
-        
         // If no tasks found and we're viewing a specific workspace (not 'all'), 
         // try fetching from API to ensure cache is up to date
         if (taskCount === 0 && workspaceId !== 'all' && workspaceId !== 'shared') {
-          console.log(`[WorkspaceTable] No tasks found for workspace ${workspaceId}, fetching from API...`);
           try {
             await TasksCache.fetchTasks();
-            console.log(`[WorkspaceTable] Fetch completed, refreshing grid...`);
-          } catch (fetchError) {
-            console.warn(`[WorkspaceTable] Failed to fetch tasks from API:`, fetchError);
+          } catch (fetchError: any) {
+            const errorMessage = `[useWorkspaceChange] Failed to fetch tasks for workspace ${workspaceId}`;
+            const errorDetails = fetchError?.message || fetchError?.toString() || 'Unknown error';
+            
+            console.error(errorMessage, {
+              workspaceId,
+              error: errorDetails,
+              stack: fetchError?.stack,
+              response: fetchError?.response?.data,
+            });
+            
+            setError(errorMessage);
+            // Cache will be updated on next validation
           }
         }
         
@@ -55,8 +70,19 @@ export function useWorkspaceChange(opts: {
         if (gridRef.current?.api) {
           refreshGrid();
         }
-      } catch (error) {
-        console.error(`[WorkspaceTable] Error checking workspace tasks:`, error);
+      } catch (error: any) {
+        const errorMessage = `[useWorkspaceChange] Error during workspace change check for workspace ${workspaceId}`;
+        const errorDetails = error?.message || error?.toString() || 'Unknown error';
+        
+        console.error(errorMessage, {
+          workspaceId,
+          error: errorDetails,
+          stack: error?.stack,
+          response: error?.response?.data,
+        });
+        
+        setError(errorMessage);
+        
         // Still try to refresh grid even if check failed
         if (gridRef.current?.api) {
           refreshGrid();
@@ -66,4 +92,6 @@ export function useWorkspaceChange(opts: {
     
     checkAndRefresh();
   }, [workspaceId, refreshGrid, modulesLoaded, exitEditMode, gridRef]);
+
+  return { error };
 }

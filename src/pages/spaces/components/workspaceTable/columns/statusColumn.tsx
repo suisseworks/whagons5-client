@@ -4,6 +4,7 @@
 
 import StatusCell from '@/pages/spaces/components/StatusCell';
 import { ColumnBuilderOptions } from './types';
+import { computeApprovalStatusForTask } from '../utils/approvalStatus';
 
 export function createStatusColumn(opts: ColumnBuilderOptions) {
   const {
@@ -62,9 +63,14 @@ export function createStatusColumn(opts: ColumnBuilderOptions) {
       const meta: any = statusMap[p.value as number];
       if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
       const approvalRequired = !!row.approval_id;
-      const normalizedApprovalStatus = String(row.approval_status || '').toLowerCase().trim();
-      const approvalPending = approvalRequired && normalizedApprovalStatus === 'pending';
-      const approvalRejected = approvalRequired && normalizedApprovalStatus === 'rejected';
+      const derived = computeApprovalStatusForTask({
+        taskId: Number(row?.id),
+        approvalId: row?.approval_id,
+        approval: row?.approval_id ? (opts as any).approvalMap?.[Number(row.approval_id)] : null,
+        taskApprovalInstances: (opts as any).taskApprovalInstances,
+      });
+      const approvalPending = approvalRequired && derived === 'pending';
+      const approvalRejected = approvalRequired && derived === 'rejected';
       const allowedNext = getAllowedNextStatuses(row);
       const node = (approvalPending || approvalRejected) ? (
         <div

@@ -2,9 +2,11 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+import fs from 'fs';
 import { visualizer } from 'rollup-plugin-visualizer';
 import JavaScriptObfuscator from 'javascript-obfuscator';
-import { VitePWA } from 'vite-plugin-pwa';
+// import { VitePWA } from 'vite-plugin-pwa';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vitejs.dev/config/
 // Custom selective obfuscation plugin: only obfuscate chunks that include files under src/store/indexedDB
@@ -29,9 +31,28 @@ function cacheObfuscator(options: any) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const isDevFlag = env.VITE_DEVELOPMENT === 'true';
+  const enableHttps = env.VITE_ENABLE_HTTPS === 'true';
+
+  // Check if mkcert certificates exist
+  const certPath = path.resolve(__dirname, 'localhost+3.pem');
+  const keyPath = path.resolve(__dirname, 'localhost+3-key.pem');
+  const hasMkcertCerts = fs.existsSync(certPath) && fs.existsSync(keyPath);
+  const shouldUseHttps = enableHttps && hasMkcertCerts;
 
   return {
+    server: {
+      host: true,  // Listen on all addresses (allows access via IP)
+      // Use mkcert certificates if HTTPS is explicitly enabled and certificates are available
+      ...(shouldUseHttps ? {
+        https: {
+          key: fs.readFileSync(keyPath),
+          cert: fs.readFileSync(certPath),
+        }
+      } : {})
+    },
     plugins: [
+      // Only use basicSsl if HTTPS is enabled, mkcert certs don't exist
+      enableHttps && !hasMkcertCerts && basicSsl(),
       react(), 
       tailwindcss(),
       visualizer({
@@ -102,10 +123,21 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      dedupe: ['firebase', '@firebase/app', '@firebase/messaging', '@firebase/auth', '@firebase/component'],
     },
     optimizeDeps: {
       // Exclude FontAwesome from pre-bundling to avoid circular dependency issues
       exclude: ['@fortawesome/pro-regular-svg-icons', '@fortawesome/fontawesome-common-types'],
+      // Explicitly include firebase and all @firebase packages to ensure proper resolution
+      include: [
+        'firebase/app',
+        'firebase/messaging',
+        'firebase/auth',
+        '@firebase/app',
+        '@firebase/messaging',
+        '@firebase/auth',
+        '@firebase/component',
+      ],
     },
     build: {
       // Enable build caching for faster rebuilds
@@ -117,6 +149,11 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            // Put all firebase packages in a single chunk to avoid "Service not available" issues
+            if (id.includes('node_modules/firebase/') || id.includes('node_modules/@firebase/')) {
+              return 'firebase-bundle';
+            }
+
             // Split cache/IndexedDB code into its own chunk
             if (id.includes('/src/store/indexedDB/')) return 'cache-sec';
 

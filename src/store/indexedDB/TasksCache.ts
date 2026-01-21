@@ -596,14 +596,7 @@ export class TasksCache {
             return (task as any).__h as string;
         }
 
-        // Match backend canonicalization exactly
-        const normalizedUserIds = Array.isArray((task as any).user_ids) && (task as any).user_ids.length
-            ? `[${[...(task as any).user_ids]
-                .map((n: any) => Number(n))
-                .filter((n: number) => Number.isFinite(n))
-                .sort((a: number, b: number) => a - b)
-                .join(', ')}]` // note the space after comma to match jsonb::text
-            : '';
+        // Match backend canonicalization exactly (must mirror wh_tasks hash trigger SQL)
 
         const row = [
             task.id,
@@ -617,10 +610,6 @@ export class TasksCache {
             (task as any).status_id,
             (task as any).priority_id,
             (task as any).approval_id || 0,
-            (task as any).approval_status || '',
-            this.toUtcEpochMs((task as any).approval_triggered_at),
-            this.toUtcEpochMs((task as any).approval_completed_at),
-            normalizedUserIds,
             // Timestamps normalized to UTC epoch ms (empty string when falsy)
             this.toUtcEpochMs((task as any).start_date),
             this.toUtcEpochMs((task as any).due_date),

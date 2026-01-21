@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 export function useApprovalRefresh(gridRef: React.RefObject<any>, refreshGrid: () => void) {
   useEffect(() => {
     const handler = () => {
-      // Also refresh tasks so approval_status reflects latest decision
+      // Refresh grid so pivot-driven approval instances reflect latest decision
       refreshGrid();
       try { gridRef.current?.api?.refreshCells({ force: true }); } catch {}
       try { gridRef.current?.api?.refreshInfiniteCache(); } catch {}

@@ -145,9 +145,8 @@ export function useTaskSubmit(params: any) {
       const errorMessage = e?.message || e?.toString() || 'Failed to create task';
       const status = e?.response?.status || e?.status;
       
-      if (status === 403 || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
-        toast.error(t('errors.noPermissionCreateTask', 'You do not have permission to create tasks in this category.'), { duration: 5000 });
-      } else {
+      // 403 errors are now handled by API interceptor, only show other errors
+      if (status !== 403) {
         toast.error(errorMessage, { duration: 5000 });
       }
     } finally {

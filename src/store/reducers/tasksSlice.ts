@@ -74,7 +74,12 @@ export const updateTaskAsync = createAsyncThunk(
             return updatedTask;
         } catch (error: any) {
             console.error('Failed to update task:', error);
-            return rejectWithValue(error.response?.data?.message || 'Failed to update task');
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update task';
+            // Preserve status code for permission checking (prevents duplicate toast for 403 errors)
+            const errorWithStatus = new Error(errorMessage) as any;
+            errorWithStatus.response = error.response;
+            errorWithStatus.status = error.response?.status;
+            return rejectWithValue(errorWithStatus);
         }
     }
 );
@@ -92,12 +97,16 @@ export const removeTaskAsync = createAsyncThunk(
             
             return taskId;
         } catch (error: any) {
-            console.error('Failed to remove task:', error);
+            const status = error.response?.status;
+            // Only log non-403 errors (403 errors are expected permission denials)
+            if (status !== 403) {
+                console.error('Failed to remove task:', error);
+            }
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to remove task';
             // Preserve status code for permission checking
             const errorWithStatus = new Error(errorMessage) as any;
             errorWithStatus.response = error.response;
-            errorWithStatus.status = error.response?.status;
+            errorWithStatus.status = status;
             return rejectWithValue(errorWithStatus);
         }
     }

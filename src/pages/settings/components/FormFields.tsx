@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -287,8 +287,8 @@ export function SelectField({
 }: SelectFieldProps) {
   const isControlled = value !== undefined && onChange !== undefined;
   const selectProps = isControlled
-    ? { value: String(value ?? ""), onValueChange: onChange }
-    : { defaultValue: String(defaultValue ?? "") };
+    ? { value: value != null ? String(value) : undefined, onValueChange: onChange }
+    : { ...(defaultValue != null ? { defaultValue: String(defaultValue) } : {}) };
 
   // Handle multi-select case
   if (multiple) {
@@ -337,10 +337,35 @@ export function SelectField({
       })
     : options;
 
+  // Track selected value for form submission
+  const [internalValue, setInternalValue] = useState<string | undefined>(
+    isControlled ? (value != null ? String(value) : undefined) : (defaultValue != null ? String(defaultValue) : undefined)
+  );
+
+  // Sync internal value with controlled value changes
+  useEffect(() => {
+    if (isControlled && value != null) {
+      setInternalValue(String(value));
+    } else if (!isControlled && defaultValue != null) {
+      setInternalValue(String(defaultValue));
+    }
+  }, [value, defaultValue, isControlled]);
+
+  const handleValueChange = (newValue: string) => {
+    setInternalValue(newValue);
+    if (onChange) {
+      onChange(newValue);
+    }
+  };
+
+  const finalSelectProps = isControlled
+    ? { value: internalValue, onValueChange: handleValueChange }
+    : { ...(internalValue != null ? { defaultValue: internalValue } : {}), onValueChange: handleValueChange };
+
   return (
     <FormField id={id} label={label} required={required} className={className}>
-      <Select {...selectProps}>
-        <SelectTrigger id={id} name={name} aria-required={required} className="w-full">
+      <Select {...finalSelectProps}>
+        <SelectTrigger id={id} aria-required={required} className="w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -356,6 +381,7 @@ export function SelectField({
           )}
           {filteredOptions.map((option) => {
             const val = String(option.value);
+            if (val === '') return null; // Skip empty string values - Radix UI doesn't allow them
             return (
               <SelectItem key={`${id}-${val}`} value={val} disabled={option.disabled}>
                 <div className="flex items-center gap-2">
@@ -372,6 +398,7 @@ export function SelectField({
           })}
         </SelectContent>
       </Select>
+      {name && <input type="hidden" name={name} value={internalValue || ''} />}
     </FormField>
   );
 }

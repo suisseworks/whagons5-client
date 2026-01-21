@@ -85,9 +85,6 @@ export interface Task {
     status_id: number;
     priority_id: number;
     approval_id: number | null;
-    approval_status: 'pending' | 'approved' | 'rejected' | 'cancelled' | null;
-    approval_triggered_at: string | null;
-    approval_completed_at: string | null;
     start_date: string | null;
     due_date: string | null;
     expected_duration: number;

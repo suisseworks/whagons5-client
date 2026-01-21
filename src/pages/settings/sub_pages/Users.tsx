@@ -16,7 +16,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
@@ -459,7 +459,6 @@ function Users() {
         headerName: columnLabels.actions,
         width: 220,
         cellRenderer: createActionsCellRenderer({
-          onEdit: handleEdit,
           customActions: [
             {
               icon: faUsers,
@@ -484,7 +483,11 @@ function Users() {
     const copyText = tu('copyButton.copy', 'Copy');
     const copiedText = tu('copyButton.copied', 'Copied');
 
-    const handleCopy = () => {
+    const handleCopy = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Radix/AG Grid can listen above React; stop the native event too
+      (e.nativeEvent as any)?.stopImmediatePropagation?.();
       navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 4000);
@@ -495,6 +498,19 @@ function Users() {
         type="button"
         variant="outline"
         size="sm"
+        data-grid-stop-row-click="true"
+        onPointerDown={(e) => {
+          // Prevent AG Grid from treating this as a row click (which would open Edit)
+          e.preventDefault();
+          e.stopPropagation();
+          // Radix/AG Grid can listen above React; stop the native event too
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
         onClick={handleCopy}
         className="min-w-[80px]"
       >
@@ -630,8 +646,21 @@ function Users() {
               type="text"
               readOnly
               value={invitationLink}
+              data-grid-stop-row-click="true"
               className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
-              onClick={(e) => (e.target as HTMLInputElement).select()}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                (e.target as HTMLInputElement).select();
+              }}
             />
             <CopyButton text={invitationLink} />
           </div>
@@ -1555,49 +1584,43 @@ function Users() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingUser}
-        contentClassName="max-w-[85vw] sm:max-w-5xl"
+        contentClassName="max-w-2xl"
         footerActions={
           editingUser ? (
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={() => {
                 setIsEditDialogOpen(false);
                 handleDelete(editingUser);
               }}
               disabled={isSubmitting}
+              title={tu('dialogs.deleteUser.title', 'Delete User')}
+              aria-label={tu('dialogs.deleteUser.title', 'Delete User')}
             >
-              <Trash className="h-4 w-4 mr-2" />
-              {tu('dialogs.deleteUser.title', 'Delete User')}
+              <Trash className="h-4 w-4" />
             </Button>
           ) : null
         }
       >
         {editingUser && (
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 gap-1 h-auto p-1 bg-muted/50 rounded-lg mb-6">
-              <TabsTrigger 
-                value="basic" 
-                className="px-4 py-3 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-              >
-                {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="professional" 
-                className="px-4 py-3 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-              >
-                {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="permissions" 
-                className="px-4 py-3 text-sm font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-              >
-                {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="basic" className="mt-0 space-y-6 min-h-[300px] pt-2">
-              <div className="space-y-5">
+            <div className="flex justify-center w-full">
+              <TabsList className="w-fit">
+                <TabsTrigger value="basic">
+                  {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
+                </TabsTrigger>
+                <TabsTrigger value="professional">
+                  {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
+                </TabsTrigger>
+                <TabsTrigger value="permissions">
+                  {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="basic" className="mt-4 min-h-[200px]">
+              <div className="grid gap-4">
                 <TextField
                   id="edit-name"
                   label={tu('dialogs.editUser.fields.name', 'Name')}
@@ -1665,35 +1688,35 @@ function Users() {
             </TabsContent>
             <TabsContent value="permissions" className="mt-4 min-h-[200px]">
               <div className="grid gap-4">
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label className="text-right pt-2">
-                    {tu('dialogs.editUser.fields.globalRoles', 'Roles Globales')}
-                    <span className="text-muted-foreground text-xs font-normal ml-1">(Opcional)</span>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    {tu('dialogs.editUser.fields.globalRoles', 'Global Roles')}
+                    <span className="text-muted-foreground text-xs font-normal ml-1">
+                      ({tu('dialogs.editUser.fields.optional', 'Optional')})
+                    </span>
                   </Label>
-                  <div className="col-span-3">
-                    <MultiSelect
-                      options={roles.length > 0
-                        ? roles
-                            .filter((role: Role) => role.scope === 'GLOBAL')
-                            .map((role: Role) => ({
-                              value: role.name,
-                              label: role.name
-                            }))
-                        : []}
-                      onValueChange={setSelectedGlobalRoles}
-                      defaultValue={selectedGlobalRoles}
-                      placeholder={
-                        roles.length === 0 || roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
-                          ? tu('multiSelect.noGlobalRoles', 'No global roles available')
-                          : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
-                      }
-                      maxCount={10}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {tu('dialogs.editUser.fields.globalRolesHelp', 'Los roles globales son opcionales. Puedes dejar este campo vacío si no necesitas asignar roles globales al usuario.')}
-                    </p>
-                  </div>
+                  <MultiSelect
+                    options={roles.length > 0
+                      ? roles
+                          .filter((role: Role) => role.scope === 'GLOBAL')
+                          .map((role: Role) => ({
+                            value: role.name,
+                            label: role.name
+                          }))
+                      : []}
+                    onValueChange={setSelectedGlobalRoles}
+                    defaultValue={selectedGlobalRoles}
+                    placeholder={
+                      roles.length === 0 || roles.filter((r: Role) => r.scope === 'GLOBAL').length === 0
+                        ? tu('multiSelect.noGlobalRoles', 'No global roles available')
+                        : tu('multiSelect.selectGlobalRolesOptional', 'Select global roles (optional)...')
+                    }
+                    maxCount={10}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tu('dialogs.editUser.fields.globalRolesHelp', 'Global roles are optional. You can leave this field empty if you don\'t need to assign global roles to the user.')}
+                  </p>
                 </div>
               </div>
             </TabsContent>

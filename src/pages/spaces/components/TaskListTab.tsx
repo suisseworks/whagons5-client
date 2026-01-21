@@ -179,14 +179,11 @@ export default function TaskListTab({
         toast.dismiss(successToastId);
       }
       
-      console.error("Failed to delete task", e);
-      const errorMessage = e?.message || e?.response?.data?.message || e?.toString() || "Failed to delete task";
       const status = e?.response?.status || e?.status;
-      
-      // Check if it's a permission error (403)
-      if (status === 403 || errorMessage.includes("permission") || errorMessage.includes("unauthorized")) {
-        toast.error(t('errors.noPermissionDeleteTask', "You do not have permission to delete this task."), { duration: 5000 });
-      } else {
+      // Only log and show errors for non-403 errors (403 errors are handled by API interceptor)
+      if (status !== 403) {
+        console.error("Failed to delete task", e);
+        const errorMessage = e?.message || e?.response?.data?.message || e?.toString() || "Failed to delete task";
         setActionError(errorMessage);
         toast.error(errorMessage, { duration: 5000 });
       }

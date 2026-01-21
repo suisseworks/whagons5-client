@@ -2,7 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { ColDef } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faStopwatch, faPlus, faCircleQuestion } from "@fortawesome/free-solid-svg-icons";
+import { faStopwatch, faPlus, faCircleQuestion, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,10 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer
+  createActionsCellRenderer,
+  SelectField,
+  CheckboxField,
+  TextField
 } from "../components";
 import { AppDispatch, RootState } from "@/store/store";
 import { genericActions } from "@/store/genericSlices";
@@ -264,7 +267,7 @@ function Slas() {
       field: "actions",
       headerName: "Actions",
       width: 140,
-      cellRenderer: createActionsCellRenderer({ onEdit: handleEdit, onDelete: handleDelete }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,
@@ -311,7 +314,8 @@ function Slas() {
       color,
       enabled,
       response_time: responseNum,
-      resolution_time: resolutionNum
+      resolution_time: resolutionNum,
+      sla_policy_id: form.get('sla_policy_id') ? Number(form.get('sla_policy_id')) : null
     } as any;
     await createItem(payload as any);
   };
@@ -637,30 +641,44 @@ function Slas() {
         error={formError}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">Name *</Label>
-            <input id="name" name="name" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">Description</Label>
-            <input id="description" name="description" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="color" className="text-right">Color</Label>
-            <input id="color" name="color" type="color" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="enabled" className="text-right">Enabled</Label>
-            <input id="enabled" name="enabled" type="checkbox" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="response_time" className="text-right">Response (min) *</Label>
-            <input id="response_time" name="response_time" type="number" min="1" required className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" placeholder="e.g. 30" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="resolution_time" className="text-right">Resolution (min) *</Label>
-            <input id="resolution_time" name="resolution_time" type="number" min="1" required className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" placeholder="e.g. 240" />
-          </div>
+          <TextField
+            id="name"
+            label="Name"
+            name="name"
+            required
+          />
+          <TextField
+            id="description"
+            label="Description"
+            name="description"
+          />
+          <TextField
+            id="color"
+            label="Color"
+            name="color"
+            type="color"
+          />
+          <CheckboxField
+            id="enabled"
+            label="Enabled"
+            name="enabled"
+          />
+          <TextField
+            id="response_time"
+            label="Response (min)"
+            name="response_time"
+            type="number"
+            required
+            placeholder="e.g. 30"
+          />
+          <TextField
+            id="resolution_time"
+            label="Resolution (min)"
+            name="resolution_time"
+            type="number"
+            required
+            placeholder="e.g. 240"
+          />
         </div>
       </SettingsDialog>
 
@@ -673,42 +691,75 @@ function Slas() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={!editingItem}
+        footerActions={
+          editingItem ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingItem);
+              }}
+              disabled={isSubmitting}
+              title="Delete SLA"
+              aria-label="Delete SLA"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          ) : null
+        }
       >
         {editingItem && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">Name *</Label>
-              <input id="edit-name" name="name" defaultValue={editingItem.name} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">Description</Label>
-              <input id="edit-description" name="description" defaultValue={editingItem.description ?? undefined} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-color" className="text-right">Color</Label>
-              <input id="edit-color" name="color" type="color" defaultValue={editingItem.color ?? '#000000'} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-enabled" className="text-right">Enabled</Label>
-              <input id="edit-enabled" name="enabled" type="checkbox" defaultChecked={!!editingItem.enabled} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-response_time" className="text-right">Response (min)</Label>
-              <input id="edit-response_time" name="response_time" type="number" min="1" defaultValue={editingItem.response_time ?? undefined} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-resolution_time" className="text-right">Resolution (min)</Label>
-              <input id="edit-resolution_time" name="resolution_time" type="number" min="1" defaultValue={editingItem.resolution_time ?? undefined} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-sla_policy_id" className="text-right">Policy</Label>
-              <select id="edit-sla_policy_id" name="sla_policy_id" defaultValue={editingItem.sla_policy_id ?? ''} className="col-span-3 px-2 py-2 border border-input bg-white text-black dark:bg-neutral-800 dark:text-white rounded-md text-sm">
-                <option value="">None</option>
-                {policies.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            <TextField
+              id="edit-name"
+              label="Name"
+              name="name"
+              defaultValue={editingItem.name}
+              required
+            />
+            <TextField
+              id="edit-description"
+              label="Description"
+              name="description"
+              defaultValue={editingItem.description ?? ''}
+            />
+            <TextField
+              id="edit-color"
+              label="Color"
+              name="color"
+              type="color"
+              defaultValue={editingItem.color ?? '#000000'}
+            />
+            <CheckboxField
+              id="edit-enabled"
+              label="Enabled"
+              name="enabled"
+              defaultChecked={!!editingItem.enabled}
+            />
+            <TextField
+              id="edit-response_time"
+              label="Response (min)"
+              name="response_time"
+              type="number"
+              defaultValue={editingItem.response_time ?? ''}
+            />
+            <TextField
+              id="edit-resolution_time"
+              label="Resolution (min)"
+              name="resolution_time"
+              type="number"
+              defaultValue={editingItem.resolution_time ?? ''}
+            />
+            <SelectField
+              id="edit-sla_policy_id"
+              label="Policy"
+              name="sla_policy_id"
+              defaultValue={editingItem.sla_policy_id ? String(editingItem.sla_policy_id) : undefined}
+              placeholder="None"
+              options={policies.map(p => ({ value: p.id, label: p.name }))}
+            />
           </div>
         )}
       </SettingsDialog>
@@ -739,22 +790,30 @@ function Slas() {
             <Label htmlFor="time" className="text-right">Time (min) *</Label>
             <input id="time" name="time" type="number" min="1" required className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" placeholder="e.g. 30" />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="type" className="text-right">Type *</Label>
-            <select id="type" name="type" className="col-span-3 px-3 py-2 border border-input bg-white text-black dark:bg-neutral-800 dark:text-white rounded-md text-sm" defaultValue="response">
-              <option value="response">response</option>
-              <option value="resolution">resolution</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="notify_to" className="text-right">Notify To *</Label>
-            <select id="notify_to" name="notify_to" className="col-span-3 px-3 py-2 border border-input bg-white text-black dark:bg-neutral-800 dark:text-white rounded-md text-sm" defaultValue="RESPONSIBLE">
-              <option value="RESPONSIBLE">RESPONSIBLE</option>
-              <option value="CREATED_BY">CREATED_BY</option>
-              <option value="MANAGER">MANAGER</option>
-              <option value="TEAM">TEAM</option>
-            </select>
-          </div>
+          <SelectField
+            id="type"
+            label="Type"
+            name="type"
+            defaultValue="response"
+            options={[
+              { value: 'response', label: 'response' },
+              { value: 'resolution', label: 'resolution' }
+            ]}
+            required
+          />
+          <SelectField
+            id="notify_to"
+            label="Notify To"
+            name="notify_to"
+            defaultValue="RESPONSIBLE"
+            options={[
+              { value: 'RESPONSIBLE', label: 'RESPONSIBLE' },
+              { value: 'CREATED_BY', label: 'CREATED_BY' },
+              { value: 'MANAGER', label: 'MANAGER' },
+              { value: 'TEAM', label: 'TEAM' }
+            ]}
+            required
+          />
         </div>
       </SettingsDialog>
 
@@ -768,29 +827,59 @@ function Slas() {
         isSubmitting={alertsSubmitting}
         error={alertsFormError}
         submitDisabled={!editingAlert}
+        footerActions={
+          editingAlert ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={() => {
+                setIsEditAlertOpen(false);
+                handleDeleteAlert(editingAlert);
+              }}
+              disabled={alertsSubmitting}
+              title="Delete SLA Alert"
+              aria-label="Delete SLA Alert"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          ) : null
+        }
       >
         {editingAlert && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-time" className="text-right">Time (min) *</Label>
-              <input id="edit-time" name="time" type="number" min="1" defaultValue={(editingAlert as any).time} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-type" className="text-right">Type *</Label>
-              <select id="edit-type" name="type" className="col-span-3 px-3 py-2 border border-input bg-white text-black dark:bg-neutral-800 dark:text-white rounded-md text-sm" defaultValue={(editingAlert as any).type}>
-                <option value="response">response</option>
-                <option value="resolution">resolution</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-notify_to" className="text-right">Notify To *</Label>
-              <select id="edit-notify_to" name="notify_to" className="col-span-3 px-3 py-2 border border-input bg-white text-black dark:bg-neutral-800 dark:text-white rounded-md text-sm" defaultValue={(editingAlert as any).notify_to}>
-                <option value="RESPONSIBLE">RESPONSIBLE</option>
-                <option value="CREATED_BY">CREATED_BY</option>
-                <option value="MANAGER">MANAGER</option>
-                <option value="TEAM">TEAM</option>
-              </select>
-            </div>
+            <TextField
+              id="edit-time"
+              label="Time (min)"
+              name="time"
+              type="number"
+              defaultValue={(editingAlert as any).time}
+              required
+            />
+            <SelectField
+              id="edit-type"
+              label="Type"
+              name="type"
+              defaultValue={(editingAlert as any).type}
+              options={[
+                { value: 'response', label: 'response' },
+                { value: 'resolution', label: 'resolution' }
+              ]}
+              required
+            />
+            <SelectField
+              id="edit-notify_to"
+              label="Notify To"
+              name="notify_to"
+              defaultValue={(editingAlert as any).notify_to}
+              options={[
+                { value: 'RESPONSIBLE', label: 'RESPONSIBLE' },
+                { value: 'CREATED_BY', label: 'CREATED_BY' },
+                { value: 'MANAGER', label: 'MANAGER' },
+                { value: 'TEAM', label: 'TEAM' }
+              ]}
+              required
+            />
           </div>
         )}
       </SettingsDialog>
@@ -817,18 +906,22 @@ function Slas() {
         error={policiesFormError}
       >
         <div className="grid gap-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="pol-name" className="text-right">Name *</Label>
-            <input id="pol-name" name="name" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="pol-description" className="text-right">Description</Label>
-            <input id="pol-description" name="description" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="pol-active" className="text-right">Active</Label>
-            <input id="pol-active" name="active" type="checkbox" className="col-span-3" />
-          </div>
+          <TextField
+            id="pol-name"
+            label="Name"
+            name="name"
+            required
+          />
+          <TextField
+            id="pol-description"
+            label="Description"
+            name="description"
+          />
+          <CheckboxField
+            id="pol-active"
+            label="Active"
+            name="active"
+          />
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Trigger</Label>
             <div className="col-span-3">
@@ -879,14 +972,16 @@ function Slas() {
                 <Label htmlFor="pol-trigger_value_number" className="text-right">Value (number)</Label>
                 <input id="pol-trigger_value_number" name="trigger_value_number" type="number" className="col-span-3 px-3 py-2 border rounded-md" />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="pol-trigger_value_boolean" className="text-right">Value (boolean)</Label>
-                <select id="pol-trigger_value_boolean" name="trigger_value_boolean" className="col-span-3 px-2 py-2 border rounded-md">
-                  <option value="">-</option>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
-              </div>
+              <SelectField
+                id="pol-trigger_value_boolean"
+                label="Value (boolean)"
+                name="trigger_value_boolean"
+                placeholder="-"
+                options={[
+                  { value: 'true', label: 'true' },
+                  { value: 'false', label: 'false' }
+                ]}
+              />
             </>
           )}
           <div className="grid grid-cols-4 items-center gap-4">
@@ -906,21 +1001,46 @@ function Slas() {
         isSubmitting={policiesSubmitting}
         error={policiesFormError}
         submitDisabled={!editingPolicy}
+        footerActions={
+          editingPolicy ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={() => {
+                setIsEditPolicyOpen(false);
+                handleDeletePolicy(editingPolicy);
+              }}
+              disabled={policiesSubmitting}
+              title="Delete SLA Policy"
+              aria-label="Delete SLA Policy"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          ) : null
+        }
       >
         {editingPolicy && (
           <div className="grid gap-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="pol-edit-name" className="text-right">Name *</Label>
-              <input id="pol-edit-name" name="name" defaultValue={(editingPolicy as any).name} className="col-span-3 px-3 py-2 border rounded-md" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="pol-edit-description" className="text-right">Description</Label>
-              <input id="pol-edit-description" name="description" defaultValue={(editingPolicy as any).description ?? ''} className="col-span-3 px-3 py-2 border rounded-md" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="pol-edit-active" className="text-right">Active</Label>
-              <input id="pol-edit-active" name="active" type="checkbox" defaultChecked={!!(editingPolicy as any).active} />
-            </div>
+            <TextField
+              id="pol-edit-name"
+              label="Name"
+              name="name"
+              defaultValue={(editingPolicy as any).name}
+              required
+            />
+            <TextField
+              id="pol-edit-description"
+              label="Description"
+              name="description"
+              defaultValue={(editingPolicy as any).description ?? ''}
+            />
+            <CheckboxField
+              id="pol-edit-active"
+              label="Active"
+              name="active"
+              defaultChecked={!!(editingPolicy as any).active}
+            />
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Trigger</Label>
               <div className="col-span-3">
@@ -971,14 +1091,17 @@ function Slas() {
                   <Label htmlFor="pol-edit-trigger_value_number" className="text-right">Value (number)</Label>
                   <input id="pol-edit-trigger_value_number" name="trigger_value_number" type="number" defaultValue={(editingPolicy as any).trigger_value_number ?? ''} className="col-span-3 px-3 py-2 border rounded-md" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="pol-edit-trigger_value_boolean" className="text-right">Value (boolean)</Label>
-                  <select id="pol-edit-trigger_value_boolean" name="trigger_value_boolean" defaultValue={String((editingPolicy as any).trigger_value_boolean ?? '')} className="col-span-3 px-2 py-2 border rounded-md">
-                    <option value="">-</option>
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
-                </div>
+                <SelectField
+                  id="pol-edit-trigger_value_boolean"
+                  label="Value (boolean)"
+                  name="trigger_value_boolean"
+                  defaultValue={(editingPolicy as any).trigger_value_boolean != null ? String((editingPolicy as any).trigger_value_boolean) : undefined}
+                  placeholder="-"
+                  options={[
+                    { value: 'true', label: 'true' },
+                    { value: 'false', label: 'false' }
+                  ]}
+                />
               </>
             )}
             <div className="grid grid-cols-4 items-center gap-4">

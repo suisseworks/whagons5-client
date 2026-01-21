@@ -54,7 +54,10 @@ export function ActionsCellRenderer({
   const rightActions = hasExplicitActions ? [] : defaultActions;
 
   const handleAction = (action: ActionButton, e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    // Radix/AG Grid can listen above React; stop the native event too
+    (e.nativeEvent as any)?.stopImmediatePropagation?.();
     action.onClick(data);
   };
 
@@ -67,6 +70,19 @@ export function ActionsCellRenderer({
         key={`${keyPrefix}${key}`}
         size="sm"
         variant={action.variant || "outline"}
+        data-grid-stop-row-click="true"
+        onPointerDown={(e) => {
+          // Prevent AG Grid from treating this as a row click (which would open Edit)
+          e.preventDefault();
+          e.stopPropagation();
+          // Radix/AG Grid can listen above React; stop the native event too
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
         onClick={(e) => handleAction(action, e)}
         className={computedClassName}
         disabled={action.disabled ? action.disabled(data) : false}

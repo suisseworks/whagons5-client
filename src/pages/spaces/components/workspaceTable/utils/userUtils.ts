@@ -53,6 +53,43 @@ export const getUsersFromIds = (userIds: any, userMap: Record<number, User>): Us
     .filter((user): user is User => user != null) as User[];
 };
 
+/**
+ * Get assigned user IDs for a task from the taskUsers table
+ * @param taskId - The task ID to look up
+ * @param taskUsers - Array of taskUser records from Redux store
+ * @returns Array of user IDs assigned to the task
+ */
+export const getAssignedUserIdsFromTaskUsers = (
+  taskId: number | string | null | undefined,
+  taskUsers: any[]
+): number[] => {
+  if (!taskId || !Array.isArray(taskUsers)) return [];
+  
+  const taskIdNum = Number(taskId);
+  if (!Number.isFinite(taskIdNum)) return [];
+
+  return taskUsers
+    .filter((tu: any) => Number(tu.task_id) === taskIdNum)
+    .map((tu: any) => Number(tu.user_id))
+    .filter((id: number) => Number.isFinite(id));
+};
+
+/**
+ * Get assigned users for a task from the taskUsers table
+ * @param taskId - The task ID to look up
+ * @param taskUsers - Array of taskUser records from Redux store
+ * @param userMap - Map of user ID to User object
+ * @returns Array of User objects assigned to the task
+ */
+export const getAssignedUsersFromTaskUsers = (
+  taskId: number | string | null | undefined,
+  taskUsers: any[],
+  userMap: Record<number, User>
+): User[] => {
+  const userIds = getAssignedUserIdsFromTaskUsers(taskId, taskUsers);
+  return getUsersFromIds(userIds, userMap);
+};
+
 function formatDateWithPrefix(d: string | null, prefix: string, overdue = 'overdue', none = `No ${prefix.toLowerCase()}`): string {
   if (!d) return none;
   const date = dayjs(d);

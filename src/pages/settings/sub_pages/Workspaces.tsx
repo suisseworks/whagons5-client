@@ -15,7 +15,6 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer,
   TextField,
   SelectField,
   CheckboxField
@@ -526,17 +525,25 @@ function Workspaces() {
               variant="ghost"
               size="icon"
               className="h-8 w-8 hover:bg-accent transition-colors cursor-pointer"
-              onClick={(e) => {
+              data-grid-stop-row-click="true"
+              onPointerDown={(e) => {
+                // Prevent AG Grid from treating this as a row click (which would open Edit)
                 e.preventDefault();
                 e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
-                console.log('Button clicked for workspace:', workspaceId);
-                handleToggleWorkspaceVisibility(workspaceId, e);
+                // Radix/AG Grid can listen above React; stop the native event too
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
               }}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                console.log('Button clicked for workspace:', workspaceId);
+                handleToggleWorkspaceVisibility(workspaceId, e);
               }}
               disabled={!user}
               title={isHidden ? tw('grid.actions.show', 'Show workspace') : tw('grid.actions.hide', 'Hide workspace')}
@@ -560,9 +567,7 @@ function Workspaces() {
       field: 'actions',
       headerName: tw('grid.columns.actions', 'Actions'),
       width: 100,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,
@@ -1201,11 +1206,13 @@ function Workspaces() {
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={handleDeleteFromEdit}
               disabled={isSubmitting}
+              title={tw('dialogs.delete.title', 'Delete Workspace')}
+              aria-label={tw('dialogs.delete.title', 'Delete Workspace')}
             >
-              <FontAwesomeIcon icon={faTrash} className="mr-2" />
-              {tw('dialogs.delete.title', 'Delete Workspace')}
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
           ) : undefined
         }

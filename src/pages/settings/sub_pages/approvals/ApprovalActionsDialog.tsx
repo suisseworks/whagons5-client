@@ -25,8 +25,8 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
   // Load actions when approval changes
   useEffect(() => {
     if (approval) {
-      setApprovedActions(approval.on_approved_actions || []);
-      setRejectedActions(approval.on_rejected_actions || []);
+      setApprovedActions((approval as any).on_approved_actions || []);
+      setRejectedActions((approval as any).on_rejected_actions || []);
     } else {
       setApprovedActions([]);
       setRejectedActions([]);
@@ -70,7 +70,7 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-visible flex flex-col">
         <DialogHeader className="space-y-3 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20">
@@ -114,7 +114,7 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
             Cancel
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={() => handleSave()}
             disabled={isSaving}
             className="min-w-32"
           >

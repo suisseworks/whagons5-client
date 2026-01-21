@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpWideShort, faPlus, faChartBar, faGlobe, faTags } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUpWideShort, faPlus, faChartBar, faGlobe, faTags, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
@@ -145,10 +145,7 @@ function Priorities() {
       headerName: "Actions",
       width: 100, // Fixed compact width for icons only
       suppressSizeToFit: true, // Lock size, no auto-expansion
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
-        onDelete: handleDelete
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,
@@ -199,10 +196,7 @@ function Priorities() {
       headerName: "Actions",
       width: 100, // Fixed compact width for icons only
       suppressSizeToFit: true, // Lock size, no auto-expansion
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit,
-        onDelete: handleDelete
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,
@@ -584,6 +578,24 @@ function Priorities() {
         isSubmitting={isSubmitting}
         error={formError}
         submitDisabled={isSubmitting || !editingItem}
+        footerActions={
+          editingItem ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                handleDelete(editingItem);
+              }}
+              disabled={isSubmitting}
+              title="Delete Priority"
+              aria-label="Delete Priority"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          ) : null
+        }
       >
         {editingItem && (
           <div className="grid gap-4">
