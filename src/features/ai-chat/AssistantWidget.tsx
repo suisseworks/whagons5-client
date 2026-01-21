@@ -668,7 +668,16 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    const conversationsWithMessages = conversations.filter(conv => conv.messageCount > 0);
+                    // Deduplicate conversations by ID, keeping most recent
+                    const uniqueConversations = Array.from(
+                      new Map(conversations.map(c => [c.id, c])).values()
+                    );
+                    
+                    // Filter to conversations with messages, or include current conversation
+                    const conversationsWithMessages = uniqueConversations.filter(
+                      conv => conv.messageCount > 0 || conv.id === conversationId
+                    );
+                    
                     return conversationsWithMessages.length === 0 ? (
                       <SelectItem value={conversationId} disabled>
                         <span className="text-sm text-muted-foreground">No previous conversations</span>
