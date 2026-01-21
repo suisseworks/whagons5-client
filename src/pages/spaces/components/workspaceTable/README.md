@@ -206,7 +206,7 @@ All files are under 500 lines:
 ## Usage
 
 ```typescript
-import { buildWorkspaceColumns } from './workspaceTable/columns';
+import { buildWorkspaceColumns } from './workspaceTable/columns/index';
 import { useStatusIcons, useGridRefresh, ... } from './workspaceTable/hooks';
 import { loadAgGridModules, ... } from './workspaceTable/grid';
 import { getUserDisplayName, ... } from './workspaceTable/utils';

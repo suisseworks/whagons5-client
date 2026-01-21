@@ -74,7 +74,7 @@ export function createNameColumn(opts: ColumnBuilderOptions, latestNoteByTaskId:
           {/* Name row with category icon */}
           <div className="flex items-center gap-2.5 min-w-0">
             <IconBadge iconClass={cat?.icon} color={cat?.color} />
-            <div className="font-medium text-[14px] leading-[1.4] cursor-default text-foreground min-w-0 flex-1 truncate">{name}</div>
+            <div className="font-semibold text-[15px] leading-[1.4] cursor-default text-foreground min-w-0 flex-1 truncate tracking-[0.01em]">{name}</div>
           </div>
           {/* Tags row - separate line below name for better visual separation */}
           {(taskTagsData && taskTagsData.length > 0) && (
@@ -107,7 +107,7 @@ export function createNameColumn(opts: ColumnBuilderOptions, latestNoteByTaskId:
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div
-                    className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-muted-foreground"
+                    className="wh-task-desc mt-0.5 pl-[34px] text-[12px] leading-relaxed text-muted-foreground/75"
                     style={{
                       whiteSpace: 'normal',
                       display: '-webkit-box',
@@ -115,6 +115,7 @@ export function createNameColumn(opts: ColumnBuilderOptions, latestNoteByTaskId:
                       WebkitBoxOrient: 'vertical' as any,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
+                      opacity: 0.7,
                     }}
                   >
                     {description}

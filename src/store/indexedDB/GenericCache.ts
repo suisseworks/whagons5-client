@@ -620,6 +620,12 @@ export class GenericCache {
 		if (this.hashFields && this.hashFields.length > 0) {
 			const parts = this.hashFields.map((field) => {
 				const value = row?.[field as any];
+				// Nullable foreign keys: backend triggers almost always use COALESCE(x,0) for *_id fields.
+				// If we hash null/undefined as empty string here, global hashes will *never* match for rows
+				// with optional FKs (e.g., parent_id).
+				if (typeof field === 'string' && field.endsWith('_id') && (value === null || value === undefined)) {
+					return '0';
+				}
 				// Normalize timestamps for fields ending with _at or _date to epoch ms (UTC)
 				if (typeof field === 'string' && (field.endsWith('_at') || field.endsWith('_date'))) {
 					if (!value) return '';

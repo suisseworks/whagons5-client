@@ -47,7 +47,7 @@ const genericSliceConfigs = [
     { name: 'slas', table: 'wh_slas', endpoint: '/slas', store: 'slas', hashFields: ['id','name', 'description', 'color', 'enabled', 'response_time','resolution_time','sla_policy_id','updated_at'] },
     { name: 'slaPolicies', table: 'wh_sla_policies', endpoint: '/sla-policies', store: 'sla_policies', hashFields: ['id','name','description','active','trigger_type','trigger_status_id','trigger_field_id','trigger_operator','trigger_value_text','trigger_value_number','trigger_value_boolean','grace_seconds','updated_at'] },
     { name: 'slaAlerts', table: 'wh_sla_alerts', endpoint: '/sla-alerts', store: 'sla_alerts', hashFields: ['id','sla_id','time','type','notify_to','updated_at'] },
-    { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','description','approval_type','require_all','minimum_approvals','trigger_type','trigger_conditions','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','order_index','is_active','updated_at'] },
+    { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','description','approval_type','require_all','minimum_approvals','trigger_type','trigger_conditions','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','order_index','is_active','on_approved_actions','on_rejected_actions','trigger_status_id','updated_at'] },
     { name: 'approvalApprovers', table: 'wh_approval_approvers', endpoint: '/approval-approvers', store: 'approval_approvers', hashFields: ['id','approval_id','approver_type','approver_id','scope','scope_id','required','order_index','created_by','updated_at'] },
     { name: 'taskApprovalInstances', table: 'wh_task_approval_instances', endpoint: '/task-approval-instances', store: 'task_approval_instances', hashFields: ['id','task_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
     
@@ -89,7 +89,7 @@ const genericSliceConfigs = [
     // Job Positions
     { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
 
-    // Compliance Module
+    // Compliance Module (hashFields match backend triggers exactly)
     { name: 'complianceStandards', table: 'wh_compliance_standards', endpoint: '/compliance-standards', store: 'compliance_standards', hashFields: ['id','name','code','version','description','authority','active','created_by','updated_at'] },
     { name: 'complianceRequirements', table: 'wh_compliance_requirements', endpoint: '/compliance-requirements', store: 'compliance_requirements', hashFields: ['id','standard_id','clause_number','title','description','implementation_guidance','mandatory','parent_id','updated_at'] },
     { name: 'complianceMappings', table: 'wh_compliance_mappings', endpoint: '/compliance-mappings', store: 'compliance_mappings', hashFields: ['id','requirement_id','mapped_entity_type','mapped_entity_id','justification','created_by','updated_at'] },

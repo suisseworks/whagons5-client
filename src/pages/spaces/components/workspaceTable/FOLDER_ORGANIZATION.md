@@ -88,7 +88,7 @@ Column definitions (already organized).
 
 **Files**: See columns/README.md
 
-**Import**: `import { buildWorkspaceColumns } from './workspaceTable/columns'`
+**Import**: `import { buildWorkspaceColumns } from './workspaceTable/columns/index'`
 
 ## Benefits of This Organization
 

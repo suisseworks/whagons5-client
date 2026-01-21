@@ -6,31 +6,27 @@ type Accent = "indigo" | "amber" | "emerald" | "purple";
 
 const accentClasses: Record<
   Accent,
-  { bar: string; icon: string; iconBg: string; glow: string }
+  { bar: string; icon: string; glow: string }
 > = {
   indigo: {
-    bar: "from-indigo-400/60 via-indigo-300/30 to-indigo-400/60",
+    bar: "bg-indigo-500/35",
     icon: "text-indigo-600",
-    iconBg: "bg-indigo-500/10 ring-indigo-500/15",
-    glow: "group-hover:shadow-indigo-500/10",
+    glow: "group-hover:shadow-indigo-500/5",
   },
   amber: {
-    bar: "from-amber-400/60 via-amber-300/30 to-amber-400/60",
+    bar: "bg-amber-500/35",
     icon: "text-amber-600",
-    iconBg: "bg-amber-500/10 ring-amber-500/15",
-    glow: "group-hover:shadow-amber-500/10",
+    glow: "group-hover:shadow-amber-500/5",
   },
   emerald: {
-    bar: "from-emerald-400/60 via-emerald-300/30 to-emerald-400/60",
+    bar: "bg-emerald-500/35",
     icon: "text-emerald-600",
-    iconBg: "bg-emerald-500/10 ring-emerald-500/15",
-    glow: "group-hover:shadow-emerald-500/10",
+    glow: "group-hover:shadow-emerald-500/5",
   },
   purple: {
-    bar: "from-purple-400/60 via-purple-300/30 to-purple-400/60",
+    bar: "bg-purple-500/35",
     icon: "text-purple-600",
-    iconBg: "bg-purple-500/10 ring-purple-500/15",
-    glow: "group-hover:shadow-purple-500/10",
+    glow: "group-hover:shadow-purple-500/5",
   },
 };
 
@@ -59,8 +55,8 @@ export function WorkspaceKpiCard({
     <motion.div
       className={cn(
         "workspace-kpi-card group relative overflow-hidden rounded-xl border",
-        "bg-gradient-to-br from-card/95 to-card/80 backdrop-blur-sm",
-        "shadow-sm hover:shadow-md transition-all duration-300",
+        "bg-card/95",
+        "shadow-sm hover:shadow-md transition-all duration-200",
         "border-border/60 hover:-translate-y-0.5",
         a.glow,
         onClick && "cursor-pointer"
@@ -80,27 +76,13 @@ export function WorkspaceKpiCard({
       {/* Accent bar */}
       <div
         className={cn(
-          "absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r animate-gradient-x opacity-70",
-          a.bar
-        )}
-      />
-
-      {/* Soft wash */}
-      <div
-        className={cn(
-          "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-[0.035] transition-opacity duration-300",
+          "absolute inset-x-0 top-0 h-0.5",
           a.bar
         )}
       />
 
       <div className="relative z-10 flex items-start gap-3 px-4 py-3">
-        <div
-          className={cn(
-            "workspace-kpi-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-            "ring-1",
-            a.iconBg
-          )}
-        >
+        <div className="workspace-kpi-icon flex h-9 w-9 shrink-0 items-center justify-center">
           <span className={cn("kpi-icon-inner", a.icon)}>{icon}</span>
         </div>
 
@@ -108,7 +90,7 @@ export function WorkspaceKpiCard({
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
             {label}
           </div>
-          <div className="text-2xl font-bold leading-tight text-foreground truncate">
+          <div className="text-[26px] font-semibold leading-tight text-foreground truncate">
             {value}
           </div>
           {helperText ? (

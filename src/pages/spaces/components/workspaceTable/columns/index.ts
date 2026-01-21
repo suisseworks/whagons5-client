@@ -49,15 +49,31 @@ export function buildWorkspaceColumns(opts: ColumnBuilderOptions) {
     return existing;
   };
 
-  // Build all columns
+  // Build all columns in the correct order
+  // Order: id, name, config, notes, status, priority, owner, due_date, location, last_modified, tag_ids (hidden), custom_fields
+  const baseCols = createBaseColumns(opts);
+  
+  // Extract individual columns from baseColumns array
+  const idCol = baseCols.find((c: any) => c.field === 'id');
+  const notesCol = baseCols.find((c: any) => c.colId === 'notes');
+  const dueDateCol = baseCols.find((c: any) => c.field === 'due_date');
+  const locationCol = baseCols.find((c: any) => c.field === 'spot_id');
+  const lastModifiedCol = baseCols.find((c: any) => c.colId === 'created_at' || c.field === 'updated_at');
+  const tagFilterCol = baseCols.find((c: any) => c.field === 'tag_ids');
+  
   const cols: any[] = [
-    ...createBaseColumns(opts),
+    idCol,
     createNameColumn(opts, latestNoteByTaskId),
     createConfigColumn(opts),
+    notesCol,
     createStatusColumn(opts),
     createPriorityColumn(opts),
     createOwnerColumn(opts),
-  ];
+    dueDateCol,
+    locationCol,
+    lastModifiedCol,
+    tagFilterCol,
+  ].filter(Boolean); // Remove any undefined columns
 
   // Add custom field columns
   const customFieldCols = createCustomFieldColumns(opts);

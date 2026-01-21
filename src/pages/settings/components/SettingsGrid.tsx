@@ -127,6 +127,12 @@ export function SettingsGrid<T = any>({
           }
         }}
         onRowClicked={(event: any) => {
+          // Allow inner interactive elements to opt out of row click handling
+          // (e.g. buttons inside cells that should not trigger edit/open).
+          const target = event?.event?.target as HTMLElement | null | undefined;
+          if (target?.closest?.('[data-grid-stop-row-click="true"]')) {
+            return;
+          }
           if (onRowClicked && event?.data) {
             onRowClicked(event.data as T);
           } else if (onRowDoubleClicked && event?.data) {
