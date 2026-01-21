@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { ContentItem, ImageData, PdfData } from "../models";
 import WaveIcon from "./WaveIcon";
 import { api } from "@/store/api/internalApi";
+import { MicOff } from "lucide-react";
 
 interface ChatInputProps {
   onSubmit: (content: string | ContentItem[]) => void;
   gettingResponse: boolean;
   setIsListening?: (isListening: boolean) => void;
+  isListening?: boolean;
+  voiceLevel?: number; // 0..1 (smoothed)
   handleStopRequest: () => void;
   conversationId: string;
 }
@@ -18,6 +21,151 @@ const isImageData = (content: any): content is ImageData => {
 const isPdfData = (content: any): content is PdfData => {
   return typeof content === "object" && content !== null && "kind" in content && content.kind === "pdf-file";
 };
+
+function VoiceVisualizer({ level }: { level: number }) {
+  const lvl = Math.max(0, Math.min(1, Number.isFinite(level) ? level : 0));
+  const bars = 25; // odd number so we have a true center bar
+  const center = (bars - 1) / 2;
+  const maxD = center;
+
+  return (
+    <div
+      className="relative w-full h-7 rounded-xl bg-muted/40 border border-border/40 overflow-hidden"
+      style={{ ["--wh-lvl" as any]: lvl }}
+      aria-hidden="true"
+    >
+      {/* Center glow beam + ripples */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="wh-voice-beam" />
+        <div className="wh-voice-ripple wh-voice-ripple-1" />
+        <div className="wh-voice-ripple wh-voice-ripple-2" />
+      </div>
+
+      {/* Bars (propagate from center via staggered delay) */}
+      <div className="relative h-full flex items-center justify-center gap-[3px] px-3">
+        {Array.from({ length: bars }).map((_, i) => {
+          const d = Math.abs(i - center);
+          const falloff = 1 - (d / maxD) * 0.45; // center tallest, edges shorter
+          return (
+            <span
+              key={i}
+              className="wh-voice-bar"
+              style={{
+                ["--wh-d" as any]: d,
+                ["--wh-f" as any]: falloff,
+              }}
+            />
+          );
+        })}
+      </div>
+
+      <style>{`
+        .wh-voice-bar {
+          width: 3px;
+          height: 18px;
+          border-radius: 9999px;
+          background: linear-gradient(
+            180deg,
+            rgba(0, 212, 170, 0.95) 0%,
+            rgba(0, 180, 216, 0.95) 55%,
+            rgba(0, 120, 212, 0.95) 100%
+          );
+          opacity: calc(0.30 + var(--wh-lvl) * 0.70);
+          transform-origin: center;
+          filter: drop-shadow(0 0 calc(6px * var(--wh-lvl)) rgba(0, 180, 216, 0.6));
+          animation: wh-voice-bar 920ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+          animation-delay: calc(var(--wh-d) * 26ms);
+        }
+
+        /* A “burst” that travels outward (via delay), scaled by voice level */
+        @keyframes wh-voice-bar {
+          0% {
+            transform: scaleY(calc((0.22 + var(--wh-lvl) * 0.25) * var(--wh-f)));
+          }
+          38% {
+            transform: scaleY(calc((0.55 + var(--wh-lvl) * 1.55) * var(--wh-f)));
+          }
+          100% {
+            transform: scaleY(calc((0.22 + var(--wh-lvl) * 0.25) * var(--wh-f)));
+          }
+        }
+
+        .wh-voice-beam {
+          width: min(78%, 520px);
+          height: 2px;
+          border-radius: 9999px;
+          background: radial-gradient(
+            closest-side,
+            rgba(0, 212, 170, calc(0.10 + var(--wh-lvl) * 0.22)),
+            rgba(0, 180, 216, calc(0.12 + var(--wh-lvl) * 0.28)),
+            rgba(0, 120, 212, 0)
+          );
+          filter: blur(0.3px);
+          animation: wh-voice-beam 980ms ease-in-out infinite;
+        }
+
+        @keyframes wh-voice-beam {
+          0%, 100% {
+            transform: scaleX(0.85);
+            opacity: calc(0.55 + var(--wh-lvl) * 0.45);
+          }
+          50% {
+            transform: scaleX(1);
+            opacity: 1;
+          }
+        }
+
+        .wh-voice-ripple {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          border-radius: 9999px;
+          transform: translate(-50%, -50%) scale(0.2);
+          opacity: 0;
+          border: 1px solid rgba(0, 180, 216, 0.55);
+          box-shadow: 0 0 16px rgba(0, 180, 216, 0.18);
+          animation: wh-voice-ripple 1200ms ease-out infinite;
+          pointer-events: none;
+        }
+
+        .wh-voice-ripple-1 {
+          width: 34px;
+          height: 34px;
+          animation-delay: 0ms;
+        }
+
+        .wh-voice-ripple-2 {
+          width: 52px;
+          height: 52px;
+          animation-delay: 600ms;
+          border-color: rgba(0, 212, 170, 0.45);
+        }
+
+        @keyframes wh-voice-ripple {
+          0% {
+            transform: translate(-50%, -50%) scale(0.22);
+            opacity: calc(0.10 + var(--wh-lvl) * 0.45);
+          }
+          65% {
+            opacity: 0;
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(1.9);
+            opacity: 0;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .wh-voice-bar,
+          .wh-voice-beam,
+          .wh-voice-ripple {
+            animation: none !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) => {
   const [content, setContent] = useState<ContentItem[]>([]);
@@ -207,10 +355,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
         if (textInputRef.current) {
           textInputRef.current.style.height = '56px';
         }
-        // Refocus the textarea after submission
-        setTimeout(() => {
-          textInputRef.current?.focus();
-        }, 0);
+        // Refocus the textarea after submission and clearing
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            textInputRef.current?.focus();
+          }, 10);
+        });
       } else if (currentContent.length > 0) {
         const validContent = currentContent.filter(item => {
           if ((isImageData(item.content) || isPdfData(item.content)) && item.content.serverUrl && !item.content.isUploading) {
@@ -238,10 +388,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
         if (textInputRef.current) {
           textInputRef.current.style.height = '56px';
         }
-        // Refocus the textarea after submission
-        setTimeout(() => {
-          textInputRef.current?.focus();
-        }, 0);
+        // Refocus the textarea after submission and clearing
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            textInputRef.current?.focus();
+          }, 10);
+        });
       }
     }
   };
@@ -349,6 +501,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               className="hidden"
             />
 
+            {props.isListening && (
+              <div className="w-full px-2 pb-1">
+                <VoiceVisualizer level={props.voiceLevel ?? 0} />
+              </div>
+            )}
+
             <textarea
               ref={setTextareaRef}
               rows={1}
@@ -365,7 +523,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               placeholder="Type your message here..."
               autoComplete="off"
               spellCheck={false}
-              disabled={isUploading() || props.gettingResponse}
+              disabled={isUploading() || props.isListening}
             />
 
             <div className="flex items-center justify-between pt-1 pb-3">
@@ -384,29 +542,57 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               </div>
               <div className="flex items-center">
                 {props.gettingResponse ? (
-                  <button
-                    type="button"
-                    title="Stop response"
-                    className="rounded-xl w-11 h-11 bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors"
-                    onClick={props.handleStopRequest}
-                    aria-label="Stop response"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
+                  props.isListening ? (
+                    // Voice combo mode: one button stops both chat + mic.
+                    <button
+                      type="button"
+                      title="Stop voice chat"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => {
+                        try { props.handleStopRequest(); } catch {}
+                        try { props.setIsListening?.(false); } catch {}
+                      }}
+                      disabled={isUploading()}
+                      aria-label="Stop voice chat"
                     >
-                      <rect x="6" y="6" width="12" height="12" />
-                    </svg>
-                  </button>
+                      <MicOff className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      title="Stop response"
+                      className="rounded-xl w-11 h-11 bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors"
+                      onClick={props.handleStopRequest}
+                      aria-label="Stop response"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <rect x="6" y="6" width="12" height="12" />
+                      </svg>
+                    </button>
+                  )
                 ) : (
-                  textInput.trim() === "" && content.length === 0 ? (
+                  props.isListening ? (
+                    <button
+                      type="button"
+                      title="Stop listening"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => props.setIsListening?.(false)}
+                      disabled={isUploading()}
+                      aria-label="Stop voice input"
+                    >
+                      <MicOff className="w-5 h-5" />
+                    </button>
+                  ) : textInput.trim() === "" && content.length === 0 ? (
                     <button
                       type="button"
                       title="Start listening"
-                      className="rounded-xl w-11 h-11 bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center transition-colors"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => props.setIsListening?.(true)}
                       disabled={isUploading()}
                       aria-label="Start voice input"
@@ -416,7 +602,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
                   ) : (
                     <button
                       type="button"
-                      className="rounded-xl w-11 h-11 bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center transition-colors"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={handleSubmit}
                       aria-label="Send message"
                     >

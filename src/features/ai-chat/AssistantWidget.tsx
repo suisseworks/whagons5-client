@@ -17,6 +17,8 @@ import { getEnvVariables } from "@/lib/getEnvVariables";
 import { processFrontendTool, isFrontendTool } from "./utils/frontend_tools";
 import { handleFrontendToolPromptMessage } from "./utils/frontend_tool_prompts";
 import { getPreferredModel } from "./config";
+import { StreamingTtsPlayer } from "./utils/StreamingTtsPlayer";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { 
   getConversations, 
   saveMessages, 
@@ -24,6 +26,7 @@ import {
   createConversation,
   type Conversation 
 } from "./utils/conversationStorage";
+import { useSpeechToText } from "./hooks/useSpeechToText";
 import "./styles.css";
 
 const { VITE_API_URL, VITE_CHAT_URL } = getEnvVariables();
@@ -126,7 +129,6 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const [open, setOpen] = useState(false);
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [conversationId, setConversationId] = useState<string>(() => {
     // Try to get the last used conversation, or create a new one
     const conversations = getConversations();
@@ -140,6 +142,18 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const previousConversationIdRef = useRef<string>(conversationId);
+  const ttsPlayerRef = useRef<StreamingTtsPlayer | null>(null);
+  const expectingTtsRef = useRef<boolean>(false);
+  const ttsCloseTimerRef = useRef<number | null>(null);
+  const lastTtsChunkAtRef = useRef<number>(0);
+
+  // Prime AudioContext on a real user gesture to avoid autoplay restrictions blocking TTS playback.
+  const primeTtsAudio = useCallback(() => {
+    try {
+      if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
+      void ttsPlayerRef.current.ensureStarted();
+    } catch {}
+  }, []);
 
   const memoizedMessages = useMemo(() => messages, [messages]);
   
@@ -199,6 +213,29 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     } catch {}
   }, []);
 
+  type SubmitOptions = { inputMode?: "text" | "voice" };
+
+  // Create a ref for handleSubmit so it can be used in the hook before it's defined
+  const handleSubmitRef = useRef<(content: string | ContentItem[], opts?: SubmitOptions) => Promise<void>>();
+  
+  // Speech-to-text hook (uses ref for callback so handleSubmit can be defined later)
+  const handleTranscript = useCallback((text: string) => {
+    // Use the ref to call handleSubmit when it's available
+    if (handleSubmitRef.current) {
+      handleSubmitRef.current(text, { inputMode: "voice" });
+    }
+  }, []);
+  
+  const { language } = useLanguage();
+  const appLanguageCode = useMemo(() => (language || "en").toLowerCase().startsWith("es") ? "es" : "en", [language]);
+
+  const { isListening, startListening, stopListening, voiceLevel } = useSpeechToText({
+    conversationId,
+    gettingResponse,
+    onTranscript: handleTranscript,
+    languageCode: appLanguageCode,
+  });
+
   // Save messages when they change
   useEffect(() => {
     if (messages.length > 0 && conversationId) {
@@ -243,8 +280,26 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         try { unsubscribeWSRef.current(); } catch {}
         unsubscribeWSRef.current = null;
       }
+      try { ttsPlayerRef.current?.stop(); } catch {}
+      try {
+        if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+        ttsCloseTimerRef.current = null;
+      } catch {}
     };
   }, []);
+
+  // Stop mic streaming if widget is closed.
+  useEffect(() => {
+    if (!open) {
+      stopListening();
+      try { ttsPlayerRef.current?.stop(); } catch {}
+      expectingTtsRef.current = false;
+      try {
+        if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+        ttsCloseTimerRef.current = null;
+      } catch {}
+    }
+  }, [open, stopListening]);
 
   useEffect(() => {
     if (open) {
@@ -252,7 +307,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
   }, [open, scrollToBottom]);
 
-  const handleSubmit = async (content: string | ContentItem[]) => {
+  const handleSubmit = async (content: string | ContentItem[], opts?: SubmitOptions) => {
     if (gettingResponse) return;
     setGettingResponse(true);
 
@@ -319,11 +374,78 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         return; // Don't process as chat message
       }
 
+      // ElevenLabs TTS audio stream (voice mode)
+      if (data.type === "tts_audio_chunk") {
+        const audioB64 = typeof data.audio === "string" ? data.audio : "";
+        if (audioB64) {
+          lastTtsChunkAtRef.current = Date.now();
+          // Helpful for debugging “no audio” issues.
+          // eslint-disable-next-line no-console
+          console.debug("[TTS] audio chunk received:", audioB64.length);
+          if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
+          ttsPlayerRef.current.enqueueBase64Mp3(audioB64);
+
+          // While audio is actively streaming, keep the WS open. We'll close after a period of silence.
+          if (expectingTtsRef.current) {
+            try {
+              if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+              ttsCloseTimerRef.current = window.setTimeout(() => {
+                const msSinceLastChunk = Date.now() - (lastTtsChunkAtRef.current || 0);
+                if (msSinceLastChunk < 12000) return;
+                if (unsubscribeWSRef.current) {
+                  try { unsubscribeWSRef.current(); } catch {}
+                  unsubscribeWSRef.current = null;
+                }
+                ttsCloseTimerRef.current = null;
+              }, 14000);
+            } catch {}
+          }
+        }
+        return;
+      }
+      if (data.type === "tts_context_final") {
+        expectingTtsRef.current = false;
+        try {
+          if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+          ttsCloseTimerRef.current = null;
+        } catch {}
+
+        // If we were holding the socket open for trailing audio, close now.
+        if (unsubscribeWSRef.current) {
+          try { unsubscribeWSRef.current(); } catch {}
+          unsubscribeWSRef.current = null;
+        }
+        return;
+      }
+      if (data.type === "tts_error") {
+        console.error("[TTS] error:", data.error || data.message);
+        return;
+      }
+
       if (data.type === "done" || data.type === "stopped" || data.type === "error") {
         setGettingResponse(false);
         if (data.type === "error") {
           console.error("WebSocket error:", data.error || data.message);
         }
+
+        // For voice mode, keep the socket open briefly to receive trailing TTS audio chunks.
+        // This prevents cutting audio while still clearing the loading indicator immediately.
+        if (expectingTtsRef.current) {
+          try {
+            if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+            ttsCloseTimerRef.current = window.setTimeout(() => {
+              expectingTtsRef.current = false;
+              if (unsubscribeWSRef.current) {
+                try { unsubscribeWSRef.current(); } catch {}
+                unsubscribeWSRef.current = null;
+              }
+              ttsCloseTimerRef.current = null;
+            }, 20000);
+          } catch {}
+          return;
+        }
+
+        try { ttsPlayerRef.current?.stop(); } catch {}
         if (unsubscribeWSRef.current) {
           try { unsubscribeWSRef.current(); } catch {}
           unsubscribeWSRef.current = null;
@@ -365,7 +487,6 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           );
           
           if (toolCallIndex !== -1) {
-            const oldId = (currentMessageState[toolCallIndex].content as any).tool_call_id;
             const updatedToolCall = { ...currentMessageState[toolCallIndex] };
             (updatedToolCall.content as any).tool_call_id = data.function_id;
             currentMessageState[toolCallIndex] = updatedToolCall;
@@ -513,14 +634,20 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         throw new Error(`WebSocket connection timeout. State: ${wsState}`);
       }
 
-      const messagePayload = {
+      // Use app language (from LanguageProvider) so voice/text chat matches the UI language toggle.
+      const messagePayload: any = {
         message: {
           role: "user",
           content: {
             parts: parts
           }
-        }
+        },
+        language_code: appLanguageCode
       };
+      if (opts?.inputMode) {
+        messagePayload.input_mode = opts.inputMode;
+      }
+      expectingTtsRef.current = opts?.inputMode === "voice";
       
       const sent = wsManager.send(conversationId, messagePayload);
       
@@ -554,11 +681,17 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
   };
 
+  // Update the ref when handleSubmit is defined
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
+
   const handleStopRequest = async () => {
     abortControllerRef.current = true;
     setGettingResponse(false);
     
     try {
+      try { ttsPlayerRef.current?.stop(); } catch {}
       wsManager.close(conversationId);
       console.log('[WS] Stopped chat by closing WebSocket connection');
     } catch (e) {
@@ -595,11 +728,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           handleNewConversation();
         }
         setOpen(true);
+        primeTtsAudio();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, handleNewConversation]);
+  }, [open, handleNewConversation, primeTtsAudio]);
 
   useEffect(() => {
     // Track when sheet closes
@@ -643,6 +777,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       handleNewConversation();
     }
     setOpen(true);
+    primeTtsAudio();
   };
 
   return (
@@ -653,7 +788,11 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         floating && <FloatingButton onClick={handleOpenSheet} />
       )}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="max-w-full sm:max-w-2xl p-0 gap-0 flex flex-col h-full">
+        <SheetContent
+          side="right"
+          className="max-w-full sm:max-w-2xl p-0 gap-0 flex flex-col h-full"
+          onPointerDown={primeTtsAudio}
+        >
           <div className="flex w-full h-full flex-col justify-between z-5 bg-background rounded-lg">
             {/* Conversation Selector Dropdown */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
@@ -714,7 +853,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 </div>
               ) : (
                 <div className="w-full h-full flex flex-col flex-1">
-                  {loading ? (
+                  {false ? (
                     <div className="w-full h-full flex flex-col gap-6 p-4 md:max-w-[900px] mx-auto">
                       {[...Array(5)].map((_, index) => (
                         <div
@@ -812,7 +951,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 ref={textareaRef}
                 onSubmit={handleSubmit}
                 gettingResponse={gettingResponse}
-                setIsListening={() => {}}
+                setIsListening={(v) => {
+                  if (v) startListening();
+                  else stopListening();
+                }}
+                isListening={isListening}
+                voiceLevel={voiceLevel}
                 handleStopRequest={handleStopRequest}
                 conversationId={conversationId}
               />
