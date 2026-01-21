@@ -34,6 +34,7 @@ export function useSpeechToText({
   const [voiceLevel, setVoiceLevel] = useState<number>(0); // 0..1 (smoothed)
   const voiceLevelRef = useRef<number>(0);
   const lastLevelUpdateRef = useRef<number>(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   
   // Store callback in ref so it can be updated without recreating the hook
   const onTranscriptRef = useRef(onTranscript);
@@ -44,6 +45,7 @@ export function useSpeechToText({
   const sttAudioCtxRef = useRef<AudioContext | null>(null);
   const sttProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const sttSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const sttMediaRecorderRef = useRef<MediaRecorder | null>(null);
   
   // Transcript queue management
   const pendingTranscriptQueueRef = useRef<string[]>([]);
@@ -75,12 +77,21 @@ export function useSpeechToText({
     isListeningRef.current = false;
     setVoiceLevel(0);
     voiceLevelRef.current = 0;
+    setMediaRecorder(null);
 
     const ws = sttWsRef.current;
     sttWsRef.current = null;
     try {
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         ws.close(1000, "stop listening");
+      }
+    } catch {}
+
+    const mr = sttMediaRecorderRef.current;
+    sttMediaRecorderRef.current = null;
+    try {
+      if (mr && mr.state !== "inactive") {
+        mr.stop();
       }
     } catch {}
 
@@ -191,6 +202,24 @@ export function useSpeechToText({
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           sttStreamRef.current = stream;
 
+          // Create a MediaRecorder purely for visualization. (We don't persist audio blobs.)
+          try {
+            if (typeof MediaRecorder !== "undefined") {
+              const mr = new MediaRecorder(stream);
+              mr.ondataavailable = () => {};
+              mr.onerror = () => {};
+              // Many visualizers expect `state === 'recording'` even if we don't consume data.
+              // Use a timeslice to avoid unbounded buffering.
+              try { mr.start(500); } catch {}
+              sttMediaRecorderRef.current = mr;
+              setMediaRecorder(mr);
+            }
+          } catch (e) {
+            console.debug("[STT] MediaRecorder unavailable for visualizer:", e);
+            sttMediaRecorderRef.current = null;
+            setMediaRecorder(null);
+          }
+
           const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
           sttAudioCtxRef.current = audioCtx;
 
@@ -293,6 +322,7 @@ export function useSpeechToText({
     startListening,
     stopListening,
     voiceLevel,
+    mediaRecorder,
   };
 }
 

@@ -19,6 +19,9 @@ import { handleFrontendToolPromptMessage } from "./utils/frontend_tool_prompts";
 import { getPreferredModel } from "./config";
 import { StreamingTtsPlayer } from "./utils/StreamingTtsPlayer";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useAuthUser } from "@/providers/AuthProvider";
+import { useSelector, shallowEqual } from "react-redux";
+import type { RootState } from "@/store/store";
 import { 
   getConversations, 
   saveMessages, 
@@ -122,10 +125,69 @@ export interface AssistantWidgetProps {
   renderTrigger?: (open: () => void) => React.ReactNode;
 }
 
+type PromptUserContext = {
+  user?: { id?: number; name?: string; email?: string };
+  teams?: Array<{ id: number; name: string }>;
+  workspaces?: Array<{ id: number; name: string }>;
+};
+
 const wsManager = createWSManager(CHAT_HOST);
 
 export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = true, renderTrigger }) => {
   const navigate = useNavigate();
+  const authedUser = useAuthUser();
+
+  // Pull from generic slices (populated during AuthProvider hydration).
+  const teams = useSelector(
+    (state: RootState) => (((state as any)?.teams?.value ?? []) as Array<{ id: number; name: string }>),
+    shallowEqual
+  );
+  const workspaces = useSelector(
+    (state: RootState) => (((state as any)?.workspaces?.value ?? []) as Array<{ id: number; name: string }>),
+    shallowEqual
+  );
+  const userTeams = useSelector(
+    (state: RootState) => (((state as any)?.userTeams?.value ?? []) as Array<{ user_id?: number; team_id?: number }>),
+    shallowEqual
+  );
+
+  const userContext = useMemo<PromptUserContext | undefined>(() => {
+    if (!authedUser) return undefined;
+
+    const uid = Number((authedUser as any)?.id);
+    const name = String((authedUser as any)?.name || "");
+    const email = String((authedUser as any)?.email || "");
+
+    const teamIdSet = new Set<number>();
+    for (const ut of userTeams || []) {
+      if (Number((ut as any)?.user_id) === uid) {
+        const tid = Number((ut as any)?.team_id);
+        if (Number.isFinite(tid)) teamIdSet.add(tid);
+      }
+    }
+
+    const myTeams = (teams || [])
+      .filter((t) => teamIdSet.has(Number((t as any)?.id)))
+      .map((t) => ({ id: Number((t as any)?.id), name: String((t as any)?.name || "") }))
+      .filter((t) => Number.isFinite(t.id) && t.name)
+      .slice(0, 200);
+
+    const visibleWorkspaces = (workspaces || [])
+      .map((w) => ({ id: Number((w as any)?.id), name: String((w as any)?.name || "") }))
+      .filter((w) => Number.isFinite(w.id) && w.name)
+      .slice(0, 200);
+
+    return {
+      user: {
+        id: Number.isFinite(uid) ? uid : undefined,
+        name,
+        email,
+      },
+      teams: myTeams,
+      workspaces: visibleWorkspaces,
+    };
+  }, [authedUser, teams, workspaces, userTeams]);
+
   const [open, setOpen] = useState(false);
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -261,7 +323,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const { language } = useLanguage();
   const appLanguageCode = useMemo(() => (language || "en").toLowerCase().startsWith("es") ? "es" : "en", [language]);
 
-  const { isListening, startListening, stopListening, voiceLevel } = useSpeechToText({
+  const { isListening, startListening, stopListening, voiceLevel, mediaRecorder } = useSpeechToText({
     conversationId,
     gettingResponse,
     onTranscript: handleTranscript,
@@ -700,8 +762,11 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
             parts: parts
           }
         },
-        language_code: appLanguageCode
+        language_code: appLanguageCode,
       };
+      if (userContext) {
+        messagePayload.user_context = userContext;
+      }
       if (opts?.inputMode) {
         messagePayload.input_mode = opts.inputMode;
       }
@@ -1019,6 +1084,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 }}
                 isListening={isListening}
                 voiceLevel={voiceLevel}
+                mediaRecorder={mediaRecorder}
                 handleStopRequest={handleStopRequest}
                 conversationId={conversationId}
               />

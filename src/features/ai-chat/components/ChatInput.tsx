@@ -3,6 +3,7 @@ import { ContentItem, ImageData, PdfData } from "../models";
 import WaveIcon from "./WaveIcon";
 import { api } from "@/store/api/internalApi";
 import { MicOff } from "lucide-react";
+import { LiveAudioVisualizer } from "react-audio-visualize";
 
 interface ChatInputProps {
   onSubmit: (content: string | ContentItem[]) => void;
@@ -10,6 +11,7 @@ interface ChatInputProps {
   setIsListening?: (isListening: boolean) => void;
   isListening?: boolean;
   voiceLevel?: number; // 0..1 (smoothed)
+  mediaRecorder?: MediaRecorder | null;
   handleStopRequest: () => void;
   conversationId: string;
 }
@@ -22,151 +24,6 @@ const isPdfData = (content: any): content is PdfData => {
   return typeof content === "object" && content !== null && "kind" in content && content.kind === "pdf-file";
 };
 
-function VoiceVisualizer({ level }: { level: number }) {
-  const lvl = Math.max(0, Math.min(1, Number.isFinite(level) ? level : 0));
-  const bars = 25; // odd number so we have a true center bar
-  const center = (bars - 1) / 2;
-  const maxD = center;
-
-  return (
-    <div
-      className="relative w-full h-7 rounded-xl bg-muted/40 border border-border/40 overflow-hidden"
-      style={{ ["--wh-lvl" as any]: lvl }}
-      aria-hidden="true"
-    >
-      {/* Center glow beam + ripples */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="wh-voice-beam" />
-        <div className="wh-voice-ripple wh-voice-ripple-1" />
-        <div className="wh-voice-ripple wh-voice-ripple-2" />
-      </div>
-
-      {/* Bars (propagate from center via staggered delay) */}
-      <div className="relative h-full flex items-center justify-center gap-[3px] px-3">
-        {Array.from({ length: bars }).map((_, i) => {
-          const d = Math.abs(i - center);
-          const falloff = 1 - (d / maxD) * 0.45; // center tallest, edges shorter
-          return (
-            <span
-              key={i}
-              className="wh-voice-bar"
-              style={{
-                ["--wh-d" as any]: d,
-                ["--wh-f" as any]: falloff,
-              }}
-            />
-          );
-        })}
-      </div>
-
-      <style>{`
-        .wh-voice-bar {
-          width: 3px;
-          height: 18px;
-          border-radius: 9999px;
-          background: linear-gradient(
-            180deg,
-            rgba(0, 212, 170, 0.95) 0%,
-            rgba(0, 180, 216, 0.95) 55%,
-            rgba(0, 120, 212, 0.95) 100%
-          );
-          opacity: calc(0.30 + var(--wh-lvl) * 0.70);
-          transform-origin: center;
-          filter: drop-shadow(0 0 calc(6px * var(--wh-lvl)) rgba(0, 180, 216, 0.6));
-          animation: wh-voice-bar 920ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
-          animation-delay: calc(var(--wh-d) * 26ms);
-        }
-
-        /* A “burst” that travels outward (via delay), scaled by voice level */
-        @keyframes wh-voice-bar {
-          0% {
-            transform: scaleY(calc((0.22 + var(--wh-lvl) * 0.25) * var(--wh-f)));
-          }
-          38% {
-            transform: scaleY(calc((0.55 + var(--wh-lvl) * 1.55) * var(--wh-f)));
-          }
-          100% {
-            transform: scaleY(calc((0.22 + var(--wh-lvl) * 0.25) * var(--wh-f)));
-          }
-        }
-
-        .wh-voice-beam {
-          width: min(78%, 520px);
-          height: 2px;
-          border-radius: 9999px;
-          background: radial-gradient(
-            closest-side,
-            rgba(0, 212, 170, calc(0.10 + var(--wh-lvl) * 0.22)),
-            rgba(0, 180, 216, calc(0.12 + var(--wh-lvl) * 0.28)),
-            rgba(0, 120, 212, 0)
-          );
-          filter: blur(0.3px);
-          animation: wh-voice-beam 980ms ease-in-out infinite;
-        }
-
-        @keyframes wh-voice-beam {
-          0%, 100% {
-            transform: scaleX(0.85);
-            opacity: calc(0.55 + var(--wh-lvl) * 0.45);
-          }
-          50% {
-            transform: scaleX(1);
-            opacity: 1;
-          }
-        }
-
-        .wh-voice-ripple {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          border-radius: 9999px;
-          transform: translate(-50%, -50%) scale(0.2);
-          opacity: 0;
-          border: 1px solid rgba(0, 180, 216, 0.55);
-          box-shadow: 0 0 16px rgba(0, 180, 216, 0.18);
-          animation: wh-voice-ripple 1200ms ease-out infinite;
-          pointer-events: none;
-        }
-
-        .wh-voice-ripple-1 {
-          width: 34px;
-          height: 34px;
-          animation-delay: 0ms;
-        }
-
-        .wh-voice-ripple-2 {
-          width: 52px;
-          height: 52px;
-          animation-delay: 600ms;
-          border-color: rgba(0, 212, 170, 0.45);
-        }
-
-        @keyframes wh-voice-ripple {
-          0% {
-            transform: translate(-50%, -50%) scale(0.22);
-            opacity: calc(0.10 + var(--wh-lvl) * 0.45);
-          }
-          65% {
-            opacity: 0;
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(1.9);
-            opacity: 0;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .wh-voice-bar,
-          .wh-voice-beam,
-          .wh-voice-ripple {
-            animation: none !important;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) => {
   const [content, setContent] = useState<ContentItem[]>([]);
   const [textInput, setTextInput] = useState("");
@@ -174,6 +31,8 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
   const [pendingUploads, setPendingUploads] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const visualizerWrapRef = useRef<HTMLDivElement | null>(null);
+  const [visualizerWidth, setVisualizerWidth] = useState<number>(320);
   
   // Ref callback to handle both forwarded ref and internal ref
   const setTextareaRef = (element: HTMLTextAreaElement | null) => {
@@ -413,6 +272,23 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
     setContent(prev => prev.filter((_, i) => i !== index));
   };
 
+  useEffect(() => {
+    const el = visualizerWrapRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const next = Math.max(220, Math.min(700, Math.floor(el.clientWidth || 320)));
+      setVisualizerWidth(next);
+    };
+
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => {
+      try { ro.disconnect(); } catch {}
+    };
+  }, []);
+
   return (
     <div className="flex flex-col gap-2">
       <div
@@ -501,12 +377,6 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               className="hidden"
             />
 
-            {props.isListening && (
-              <div className="w-full px-2 pb-1">
-                <VoiceVisualizer level={props.voiceLevel ?? 0} />
-              </div>
-            )}
-
             <textarea
               ref={setTextareaRef}
               rows={1}
@@ -525,6 +395,29 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               spellCheck={false}
               disabled={isUploading() || props.isListening}
             />
+
+            {props.isListening && props.mediaRecorder && (
+              <div className="w-full px-2 pb-1 -mt-1">
+                <div className="w-full" ref={visualizerWrapRef}>
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border/50 bg-muted/15">
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,120,212,0.10),rgba(0,180,216,0.08),rgba(0,212,170,0.10))]" />
+                    <div className="relative px-2 py-1">
+                      <LiveAudioVisualizer
+                        mediaRecorder={props.mediaRecorder}
+                        width={visualizerWidth}
+                        height={38}
+                        barWidth={2}
+                        gap={1}
+                        fftSize={512}
+                        smoothingTimeConstant={0.8}
+                        barColor="rgb(0, 180, 216)"
+                        backgroundColor="transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-1 pb-3">
               <div className="flex items-center gap-2">
