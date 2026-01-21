@@ -19,8 +19,39 @@ export function getConversations(): Conversation[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
     const conversations = JSON.parse(stored) as Conversation[];
+    
+    // Deduplicate by ID, keeping the most recent version
+    const conversationMap = new Map<string, Conversation>();
+    for (const conv of conversations) {
+      const existing = conversationMap.get(conv.id);
+      if (!existing || new Date(conv.updatedAt).getTime() > new Date(existing.updatedAt).getTime()) {
+        conversationMap.set(conv.id, conv);
+      }
+    }
+    
+    // Update messageCount from actual stored messages and save if changed
+    const deduplicated = Array.from(conversationMap.values());
+    let needsSave = false;
+    for (const conv of deduplicated) {
+      const messages = loadMessages(conv.id);
+      const actualCount = messages.length;
+      if (conv.messageCount !== actualCount) {
+        conv.messageCount = actualCount;
+        needsSave = true;
+      }
+    }
+    
+    // Save updated counts if they changed
+    if (needsSave) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(deduplicated));
+      } catch (e) {
+        console.error("Failed to save updated message counts:", e);
+      }
+    }
+    
     // Sort by updatedAt descending (most recent first)
-    return conversations.sort((a, b) => 
+    return deduplicated.sort((a, b) => 
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   } catch (error) {
@@ -34,16 +65,28 @@ export function getConversations(): Conversation[] {
  */
 export function saveConversation(conversation: Conversation): void {
   try {
-    const conversations = getConversations();
+    // Get conversations directly from storage to avoid recursion
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const conversations: Conversation[] = stored ? JSON.parse(stored) : [];
+    
     const existingIndex = conversations.findIndex(c => c.id === conversation.id);
     
     if (existingIndex >= 0) {
-      conversations[existingIndex] = conversation;
+      // Merge with existing, keeping the earlier createdAt
+      conversations[existingIndex] = {
+        ...conversation,
+        createdAt: conversations[existingIndex].createdAt,
+      };
     } else {
       conversations.push(conversation);
     }
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    // Deduplicate before saving
+    const uniqueConversations = Array.from(
+      new Map(conversations.map(c => [c.id, c])).values()
+    );
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueConversations));
   } catch (error) {
     console.error("Failed to save conversation:", error);
   }
@@ -133,6 +176,21 @@ export function getConversation(conversationId: string): Conversation | null {
  * Create a new conversation
  */
 export function createConversation(id: string, title: string = "New conversation"): Conversation {
+  // Check if conversation already exists
+  const existing = getConversation(id);
+  if (existing) {
+    // Update title if provided and different
+    if (title !== "New conversation" && title !== existing.title) {
+      saveConversation({
+        ...existing,
+        title,
+        updatedAt: new Date().toISOString(),
+      });
+      return getConversation(id)!;
+    }
+    return existing;
+  }
+  
   const now = new Date().toISOString();
   const conversation: Conversation = {
     id,
