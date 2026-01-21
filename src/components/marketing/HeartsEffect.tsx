@@ -132,7 +132,7 @@ export default function HeartsEffect({ onClose }: HeartsEffectProps) {
             className="text-center"
           >
             <div className="font-semibold text-sm">Hearts</div>
-            <div className="text-xs font-medium opacity-90">(Ctrl+Shift+E)</div>
+            <div className="text-xs font-medium opacity-90">(Ctrl+E)</div>
           </button>
         </div>
       )}

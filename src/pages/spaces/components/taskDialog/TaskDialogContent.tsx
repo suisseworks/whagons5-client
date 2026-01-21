@@ -321,16 +321,7 @@ export default function TaskDialogContent({
             // Check if celebration is enabled for this status
             const celebrationEnabled = (newStatusMeta as any).celebration_enabled !== false; // Default to true if not set
             
-            console.log('[Confetti Debug] TaskDialog status update:', {
-              statusId: updates.status_id,
-              statusName: newStatusMeta.name,
-              action,
-              isDoneStatus,
-              celebrationEnabled
-            });
-            
             if (isDoneStatus && celebrationEnabled) {
-              console.log('[Confetti Debug] Triggering confetti animation from TaskDialog');
               // Get category celebration effect if available
               const taskCategory = data.categories.find(cat => cat.id === (task?.category_id || categoryId));
               const categoryCelebrationEffect = taskCategory?.celebration_effect;

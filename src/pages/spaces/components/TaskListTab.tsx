@@ -179,12 +179,11 @@ export default function TaskListTab({
         toast.dismiss(successToastId);
       }
       
-      console.error("Failed to delete task", e);
-      const errorMessage = e?.message || e?.response?.data?.message || e?.toString() || "Failed to delete task";
       const status = e?.response?.status || e?.status;
-      
-      // 403 errors are now handled by API interceptor, only show other errors
+      // Only log and show errors for non-403 errors (403 errors are handled by API interceptor)
       if (status !== 403) {
+        console.error("Failed to delete task", e);
+        const errorMessage = e?.message || e?.response?.data?.message || e?.toString() || "Failed to delete task";
         setActionError(errorMessage);
         toast.error(errorMessage, { duration: 5000 });
       }

@@ -82,17 +82,7 @@ export function useStatusChange(
         const newStatusMeta = statusMap?.[Number(toStatusId)];
         const celebrationEnabled = newStatusMeta?.celebration_enabled !== false; // Default to true if not set
         
-        console.log('[Confetti Debug] Status change:', {
-          toStatusId,
-          statusName: newStatusMeta?.name,
-          action: newStatusMeta?.action,
-          isDoneStatus,
-          celebrationEnabled,
-          doneStatusId: getDoneStatusId?.()
-        });
-        
         if (isDoneStatus && celebrationEnabled) {
-          console.log('[Confetti Debug] Triggering confetti animation');
           // Get category celebration effect if available
           const taskCategory = categories?.find(cat => cat.id === task?.category_id);
           const categoryCelebrationEffect = taskCategory?.celebration_effect;

@@ -1117,7 +1117,10 @@ export class DB {
   }
 
   public static async clear(storeName: string): Promise<void> {
-    console.warn(`[DB] Clearing IndexedDB store: ${storeName}`, new Error().stack);
+    // Debug logging (can be enabled via localStorage.getItem('wh-debug-db') === 'true')
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('wh-debug-db') === 'true') {
+      console.log(`[DB] Clearing IndexedDB store: ${storeName}`);
+    }
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {

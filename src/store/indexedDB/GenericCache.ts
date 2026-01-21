@@ -620,6 +620,12 @@ export class GenericCache {
 		if (this.hashFields && this.hashFields.length > 0) {
 			const parts = this.hashFields.map((field) => {
 				const value = row?.[field as any];
+				// Nullable numeric fields: some backend triggers use COALESCE(x,0) even when the field
+				// does NOT end with _id (e.g., approvals.minimum_approvals). Without mirroring this,
+				// global hashes will never match for rows where the value is null.
+				if (value === null || value === undefined) {
+					if (field === 'minimum_approvals') return '0';
+				}
 				// Nullable foreign keys: backend triggers almost always use COALESCE(x,0) for *_id fields.
 				// If we hash null/undefined as empty string here, global hashes will *never* match for rows
 				// with optional FKs (e.g., parent_id).

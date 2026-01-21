@@ -321,7 +321,11 @@ export const Workspace = () => {
           await dispatch(removeTaskAsync(taskId)).unwrap();
           return { taskId, ok: true as const };
         } catch (error: any) {
-          console.error(`Failed to delete task ${taskId}:`, error);
+          const status = error?.response?.status || error?.status;
+          // Only log non-403 errors (403 errors are handled by API interceptor)
+          if (status !== 403) {
+            console.error(`Failed to delete task ${taskId}:`, error);
+          }
           return { taskId, ok: false as const, error };
         }
       })
@@ -329,6 +333,11 @@ export const Workspace = () => {
 
     const succeeded = results.filter((r) => r.ok);
     const failed = results.filter((r) => !r.ok);
+    // Filter out 403 errors (already handled by API interceptor)
+    const failedNon403 = failed.filter((r) => {
+      const status = r.error?.response?.status || r.error?.status;
+      return status !== 403;
+    });
     
     if (succeeded.length > 0) {
       toast.success(
@@ -339,9 +348,10 @@ export const Workspace = () => {
       );
     }
     
-    if (failed.length > 0) {
+    // Only show toast for non-403 errors (403 errors already shown by API interceptor)
+    if (failedNon403.length > 0) {
       toast.error(
-        `Failed to delete ${failed.length} task${failed.length > 1 ? 's' : ''}`,
+        `Failed to delete ${failedNon403.length} task${failedNon403.length > 1 ? 's' : ''}`,
         { duration: 5000 }
       );
     }
