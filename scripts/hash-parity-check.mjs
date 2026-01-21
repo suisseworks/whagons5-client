@@ -216,6 +216,8 @@ function serializeTeam(t) {
 function serializeWorkspace(w, options = {}) {
   const jsonStyle = options.jsonStyle || (VARIANT === 'pg' ? 'pg' : 'json');
   const teamsText = w.teams == null ? '' : (jsonStyle === 'pg' ? pgJsonText(w.teams) : JSON.stringify(w.teams));
+  const viewModesText = w.view_modes == null ? '' : (jsonStyle === 'pg' ? pgJsonText(w.view_modes) : JSON.stringify(w.view_modes));
+  const allowAdHocText = w.allow_ad_hoc_tasks == null ? '' : (w.allow_ad_hoc_tasks ? 'true' : 'false');
   const spotsText = w.spots == null ? '' : (jsonStyle === 'pg' ? pgJsonText(w.spots) : JSON.stringify(w.spots));
   return [
     w.id,
@@ -224,6 +226,8 @@ function serializeWorkspace(w, options = {}) {
     w.color || '',
     w.icon || '',
     teamsText,
+    viewModesText,
+    allowAdHocText,
     w.type || '',
     w.category_id || 0,
     spotsText,

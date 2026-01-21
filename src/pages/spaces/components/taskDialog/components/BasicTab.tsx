@@ -1,4 +1,5 @@
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
@@ -12,8 +13,13 @@ export function BasicTab(props: any) {
   const { t } = useLanguage();
   const {
     mode,
+    name,
+    setName,
     workspaceTemplates,
+    workspaceCategories,
     categories,
+    categoryId,
+    setCategoryId,
     templateId,
     setTemplateId,
     currentWorkspace,
@@ -38,15 +44,82 @@ export function BasicTab(props: any) {
     setPriorityId,
   } = props;
 
+  const isAdHoc = currentWorkspace?.allow_ad_hoc_tasks === true;
+  const isProjectWorkspace = currentWorkspace?.type === 'PROJECT';
+
   return (
     <div className="space-y-4">
-      {/* Template Selection */}
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="template" className="text-sm font-medium font-[500] text-foreground">
-          {t('taskDialog.template', 'Template')}
-        </Label>
-        {mode === 'create-all' ? (
-          workspaceTemplates.length === 0 ? (
+      {/* Name - Only show for adhoc workspaces */}
+      {isAdHoc && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="task-name" className="text-sm font-medium font-[500] text-foreground">
+            {t('taskDialog.name', 'Name')}
+          </Label>
+          <Input
+            id="task-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('taskDialog.namePlaceholder', 'Enter task name...')}
+            className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background"
+          />
+        </div>
+      )}
+
+      {/* Category Selection (PROJECT workspaces - adhoc only) */}
+      {mode !== 'create-all' && isProjectWorkspace && isAdHoc ? (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="category" className="text-sm font-medium font-[500] text-foreground">
+            {t('taskDialog.category', 'Category')}
+          </Label>
+          {workspaceCategories?.length ? (
+            <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
+              <Combobox
+                options={workspaceCategories.map((c: any) => ({
+                  value: String(c.id),
+                  label: c.name,
+                }))}
+                value={categoryId ? String(categoryId) : undefined}
+                onValueChange={(v) => {
+                  if (!v) return;
+                  const newCategoryId = parseInt(v, 10);
+                  setCategoryId(newCategoryId);
+                  setTemplateId(null);
+                }}
+                placeholder={t('taskDialog.selectCategory', 'Select category')}
+                searchPlaceholder={t('taskDialog.searchCategories', 'Search categories...')}
+                emptyText={t('taskDialog.noCategoriesFound', 'No categories found.')}
+                className="w-full"
+              />
+            </div>
+          ) : (
+            <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
+              <Combobox
+                options={[]}
+                value={undefined}
+                onValueChange={() => {}}
+                placeholder={t('taskDialog.noCategoriesConfigured', 'No categories configured')}
+                searchPlaceholder={t('taskDialog.searchCategories', 'Search categories...')}
+                emptyText={t('taskDialog.noCategoriesConfigured', 'No categories configured')}
+                className="w-full"
+              />
+            </div>
+          )}
+          {!workspaceCategories?.length && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {t(
+                'taskDialog.noAllowedCategoriesHint',
+                'This workspace has no allowed categories configured. Configure allowed categories in Workspace settings.'
+              )}
+            </p>
+          )}
+        </div>
+      ) : (
+        /* Template Selection (DEFAULT workspaces / PROJECT non-adhoc / create-all mode) */
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="template" className="text-sm font-medium font-[500] text-foreground">
+            {t('taskDialog.template', 'Template')}
+          </Label>
+          {workspaceTemplates.length === 0 ? (
             <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
               <Combobox
                 options={[]}
@@ -82,68 +155,16 @@ export function BasicTab(props: any) {
                 className="w-full"
               />
             </div>
-          )
-        ) : (
-          !currentWorkspace || currentWorkspace.type !== "DEFAULT" ? (
-            <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
-              <Combobox
-                options={[]}
-                value={undefined}
-                onValueChange={() => {}}
-                placeholder={t('taskDialog.templatesOnlyDefault', 'Templates only available for default workspaces')}
-                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
-                emptyText={t('taskDialog.noTemplatesAvailable', 'No templates available')}
-                className="w-full"
-              />
-            </div>
-          ) : workspaceTemplates.length === 0 ? (
-            <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
-              <Combobox
-                options={[]}
-                value={undefined}
-                onValueChange={() => {}}
-                placeholder={t('taskDialog.noTemplatesAvailable', 'No templates available')}
-                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
-                emptyText={t('taskDialog.noTemplatesAvailable', 'No templates available')}
-                className="w-full"
-              />
-            </div>
-          ) : (
-            <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
-              <Combobox
-                options={workspaceTemplates.map((t: any) => {
-                  const category = categories.find((c: any) => c.id === t.category_id);
-                  return {
-                    value: String(t.id),
-                    label: t.name,
-                    description: category ? category.name : undefined,
-                  };
-                })}
-                value={templateId ? String(templateId) : undefined}
-                onValueChange={(v) => {
-                  if (v) {
-                    setTemplateId(parseInt(v, 10));
-                  }
-                }}
-                placeholder={t('taskDialog.selectTemplate', 'Select template')}
-                searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
-                emptyText={t('taskDialog.noTemplatesFound', 'No templates found.')}
-                className="w-full"
-              />
-            </div>
-          )
-        )}
-        {!workspaceTemplates.length && (
-          <p className="text-xs text-muted-foreground mt-1">
-            {mode === 'create-all'
-              ? 'No templates available. Enable or create templates in default workspaces first.'
-              : !currentWorkspace || currentWorkspace.type !== "DEFAULT"
-              ? 'Templates are only available for default workspaces.'
-              : 'No templates available in this workspace. Enable or create templates first.'
-            }
-          </p>
-        )}
-      </div>
+          )}
+          {!workspaceTemplates.length && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {mode === 'create-all'
+                ? 'No templates available. Enable or create templates in default workspaces first.'
+                : 'No templates available in this workspace. Enable or create templates first.'}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Approval Info */}
       {(mode === 'create' || mode === 'create-all' || mode === 'edit') && selectedApprovalId && (

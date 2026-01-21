@@ -196,6 +196,7 @@ function Categories() {
     deleteItem,
     isSubmitting,
     formError,
+    setFormError,
     isCreateDialogOpen,
     setIsCreateDialogOpen,
     isEditDialogOpen,
@@ -558,46 +559,67 @@ function Categories() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!createFormData.team_id) {
-      throw new Error(tc('validation.teamRequired', 'Please select a team for this category.'));
-    }
-    if (!createFormData.status_transition_group_id) {
-      if (statusTransitionGroups.length === 0) {
-        throw new Error(tc('validation.transitionGroupNotAvailable', 'No status transition groups are available. Please create a status transition group first.'));
+    try {
+      // Clear any previous errors
+      setFormError(null);
+
+      if (!createFormData.team_id) {
+        const errorMessage = tc('validation.teamRequired', 'Please select a team for this category.');
+        setFormError(errorMessage);
+        return;
       }
-      throw new Error(tc('validation.transitionGroupRequired', 'Please select a transition group for this category.'));
+      
+      // Determine status_transition_group_id - use selected one or default
+      let statusTransitionGroupId: number;
+      if (!createFormData.status_transition_group_id) {
+        if (statusTransitionGroups.length === 0) {
+          const errorMessage = tc('validation.transitionGroupNotAvailable', 'No status transition groups are available. Please create a status transition group first.');
+          setFormError(errorMessage);
+          return;
+        }
+        // Find default group or use first available
+        const defaultGroup = statusTransitionGroups.find((g: StatusTransitionGroup) => g.is_default);
+        statusTransitionGroupId = defaultGroup ? defaultGroup.id : statusTransitionGroups[0].id;
+      } else {
+        statusTransitionGroupId = parseInt(createFormData.status_transition_group_id);
+      }
+
+      const categoryData = {
+        name: createFormData.name,
+        description: createFormData.description,
+        color: createFormData.color,
+        icon: createFormData.icon,
+        enabled: createFormData.enabled,
+        team_id: parseInt(createFormData.team_id),
+        workspace_id: createFormData.workspace_id ? parseInt(createFormData.workspace_id) : 1,
+        sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
+        approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
+        status_transition_group_id: statusTransitionGroupId,
+        celebration_effect: createFormData.celebration_effect || null,
+        deleted_at: null
+      };
+      await createItem(categoryData);
+
+      // Reset form after successful creation
+      setCreateFormData({
+        name: '',
+        description: '',
+        color: '#4ECDC4',
+        icon: 'fas fa-tags',
+        enabled: true,
+        team_id: '',
+        workspace_id: '',
+        sla_id: '',
+        approval_id: '',
+        status_transition_group_id: '',
+        celebration_effect: ''
+      });
+    } catch (err: any) {
+      // Errors from createItem are already handled by useSettingsState
+      // This catch is for any unexpected errors
+      const errorMessage = err?.message || tc('validation.genericError', 'An error occurred while creating the category.');
+      setFormError(errorMessage);
     }
-
-    const categoryData = {
-      name: createFormData.name,
-      description: createFormData.description,
-      color: createFormData.color,
-      icon: createFormData.icon,
-      enabled: createFormData.enabled,
-      team_id: parseInt(createFormData.team_id),
-      workspace_id: createFormData.workspace_id ? parseInt(createFormData.workspace_id) : 1,
-      sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
-      approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
-      status_transition_group_id: parseInt(createFormData.status_transition_group_id),
-      celebration_effect: createFormData.celebration_effect || null,
-      deleted_at: null
-    };
-    await createItem(categoryData);
-
-    // Reset form after successful creation
-    setCreateFormData({
-      name: '',
-      description: '',
-      color: '#4ECDC4',
-      icon: 'fas fa-tags',
-      enabled: true,
-      team_id: '',
-      workspace_id: '',
-      sla_id: '',
-      approval_id: '',
-      status_transition_group_id: '',
-      celebration_effect: ''
-    });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -1384,8 +1406,16 @@ function Categories() {
                 .replace('{count}', String(taskCount))
                 .replace('{plural}', taskCount !== 1 ? 's' : '');
             } else {
-              return tc('dialogs.delete.confirm', 'Are you sure you want to delete the category "{name}"? This action cannot be undone.')
+              const hasWorkspace = deletingCategory.workspace_id;
+              const baseMessage = tc('dialogs.delete.confirm', 'Are you sure you want to delete the category "{name}"? This action cannot be undone.')
                 .replace('{name}', deletingCategory.name);
+              
+              if (hasWorkspace) {
+                const workspaceWarning = tc('dialogs.delete.workspaceWarning', ' Note: The associated workspace will also be deleted.');
+                return baseMessage + workspaceWarning;
+              }
+              
+              return baseMessage;
             }
           })() : undefined
         }

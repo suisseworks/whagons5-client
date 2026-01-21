@@ -13,7 +13,7 @@ interface TimeHeaderProps {
   endDate: Date;
 }
 
-const formatHour = timeFormat("%H:%M");
+const formatHour = timeFormat("%I %p"); // 12-hour format with AM/PM
 const formatDay = timeFormat("%a %d");
 const formatWeek = timeFormat("%b %d");
 const formatMonth = timeFormat("%B %Y");
@@ -36,8 +36,11 @@ export default function TimeHeader({
     const width = scale.range()[1];
     const ticks = getTicks(preset, startDate, endDate);
 
+    // Create main group with offset to prevent clipping of first label
+    const mainGroup = svg.append("g").attr("transform", "translate(40, 0)");
+
     // Draw major ticks
-    const majorTicks = svg
+    const majorTicks = mainGroup
       .append("g")
       .attr("class", "major-ticks");
 
@@ -55,7 +58,7 @@ export default function TimeHeader({
       .attr("opacity", 0.2);
 
     // Draw minor ticks
-    const minorTicks = svg
+    const minorTicks = mainGroup
       .append("g")
       .attr("class", "minor-ticks");
 
@@ -73,7 +76,7 @@ export default function TimeHeader({
       .attr("opacity", 0.1);
 
     // Draw labels
-    const labels = svg
+    const labels = mainGroup
       .append("g")
       .attr("class", "time-labels");
 
@@ -92,13 +95,15 @@ export default function TimeHeader({
   }, [scale, height, preset, startDate, endDate]);
 
   return (
-    <svg
-      ref={svgRef}
-      width={scale.range()[1]}
-      height={height}
-      className="time-header"
-      style={{ display: "block" }}
-    />
+    <div>
+      <svg
+        ref={svgRef}
+        width={scale.range()[1] + 80}
+        height={height}
+        className="time-header"
+        style={{ display: "block" }}
+      />
+    </div>
   );
 }
 
@@ -108,18 +113,22 @@ function getTicks(preset: ViewPreset, startDate: Date, endDate: Date) {
 
   switch (preset) {
     case "hourAndDay":
-      majorInterval = timeDay;
+      // For day view, show hours as major ticks
+      majorInterval = timeHour.every(1);
       minorInterval = timeHour.every(1);
       break;
     case "dayAndWeek":
+      // For week view, show days
       majorInterval = timeDay;
       minorInterval = timeDay;
       break;
     case "weekAndMonth":
+      // For month view, show weeks
       majorInterval = timeWeek;
       minorInterval = timeDay;
       break;
     case "monthAndYear":
+      // For year view, show months
       majorInterval = timeMonth;
       minorInterval = timeWeek;
       break;

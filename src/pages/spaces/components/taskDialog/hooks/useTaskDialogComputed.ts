@@ -49,8 +49,17 @@ export function useTaskDialogComputed(params: any) {
 
   const workspaceCategories = useMemo(() => {
     if (!workspaceId) return [];
+    // PROJECT workspaces use an explicit allowed list (may include categories from other workspaces)
+    if (currentWorkspaceData?.type === 'PROJECT') {
+      const allowed = Array.isArray((currentWorkspaceData as any)?.allowed_category_ids)
+        ? (currentWorkspaceData as any).allowed_category_ids
+        : [];
+      const allowedSet = new Set(allowed.map((id: any) => Number(id)));
+      return categories.filter((c: any) => allowedSet.has(Number(c?.id)));
+    }
+    // DEFAULT workspaces show their own categories by workspace_id
     return categories.filter((c: any) => c.workspace_id === workspaceId);
-  }, [categories, workspaceId]);
+  }, [categories, workspaceId, currentWorkspaceData]);
 
   const categoryPriorityIdsForCategory = useMemo(() => {
     const ids = new Set<number>();
@@ -126,24 +135,45 @@ export function useTaskDialogComputed(params: any) {
         console.log('[useTaskDialogComputed] No currentWorkspaceData');
         return [];
       }
-      if (currentWorkspaceData.type !== "DEFAULT") {
-        console.log('[useTaskDialogComputed] Workspace is not DEFAULT type:', currentWorkspaceData.type);
+      
+      if (currentWorkspaceData.type === "DEFAULT") {
+        // DEFAULT workspaces: show templates from categories in this workspace
+        filtered = templates.filter((template: any) => {
+          if (template?.enabled === false) return false;
+          const cat = categories.find((c: any) => c.id === template.category_id);
+          const match = cat && cat.workspace_id === currentWorkspaceData.id;
+          console.log('[useTaskDialogComputed] Template:', template.name, {
+            categoryId: template.category_id,
+            categoryName: cat?.name,
+            categoryWorkspaceId: cat?.workspace_id,
+            currentWorkspaceId: currentWorkspaceData.id,
+            match
+          });
+          return match;
+        });
+      } else if (currentWorkspaceData.type === "PROJECT") {
+        // PROJECT workspaces: show templates from allowed categories
+        const allowedCategoryIds = Array.isArray((currentWorkspaceData as any)?.allowed_category_ids)
+          ? (currentWorkspaceData as any).allowed_category_ids.map((id: any) => Number(id))
+          : [];
+        const allowedCategorySet = new Set(allowedCategoryIds);
+        
+        filtered = templates.filter((template: any) => {
+          if (template?.enabled === false) return false;
+          const cat = categories.find((c: any) => c.id === template.category_id);
+          if (!cat) return false;
+          return allowedCategorySet.has(Number(cat.id));
+        });
+        
+        console.log('[useTaskDialogComputed] PROJECT workspace templates:', {
+          allowedCategoryIds,
+          filteredCount: filtered.length,
+          templateNames: filtered.map((t: any) => t.name)
+        });
+      } else {
+        console.log('[useTaskDialogComputed] Unknown workspace type:', currentWorkspaceData.type);
         return [];
       }
-      
-      filtered = templates.filter((template: any) => {
-        if (template?.enabled === false) return false;
-        const cat = categories.find((c: any) => c.id === template.category_id);
-        const match = cat && cat.workspace_id === currentWorkspaceData.id;
-        console.log('[useTaskDialogComputed] Template:', template.name, {
-          categoryId: template.category_id,
-          categoryName: cat?.name,
-          categoryWorkspaceId: cat?.workspace_id,
-          currentWorkspaceId: currentWorkspaceData.id,
-          match
-        });
-        return match;
-      });
     }
 
     const finalFiltered = filtered.filter((template: any) => {

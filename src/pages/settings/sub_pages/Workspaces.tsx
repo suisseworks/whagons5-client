@@ -17,7 +17,8 @@ import {
   useSettingsState,
   createActionsCellRenderer,
   TextField,
-  SelectField
+  SelectField,
+  CheckboxField
 } from "../components";
 import { MultiSelect } from "@/components/ui/multi-select";
 import ReactECharts from 'echarts-for-react';
@@ -276,7 +277,9 @@ function Workspaces() {
     icon: 'fas fa-folder',
     type: 'project',
     teams: [] as string[],
-    category_id: null as number | null
+    category_id: null as number | null,
+    allow_ad_hoc_tasks: false,
+    allowed_category_ids: [] as string[],
   });
 
   const [editFormData, setEditFormData] = useState({
@@ -286,7 +289,9 @@ function Workspaces() {
     icon: 'fas fa-folder',
     type: 'project',
     teams: [] as string[],
-    category_id: null as number | null
+    category_id: null as number | null,
+    allow_ad_hoc_tasks: false,
+    allowed_category_ids: [] as string[],
   });
 
   useEffect(() => {
@@ -303,7 +308,11 @@ function Workspaces() {
         icon: editingWorkspace.icon || 'fas fa-folder',
         type: (editingWorkspace as any).type === 'DEFAULT' ? 'DEFAULT' : 'project',
         teams: workspaceTeams,
-        category_id: editingWorkspace.category_id || null
+        category_id: editingWorkspace.category_id || null,
+        allow_ad_hoc_tasks: !!(editingWorkspace as any).allow_ad_hoc_tasks,
+        allowed_category_ids: Array.isArray((editingWorkspace as any).allowed_category_ids)
+          ? (editingWorkspace as any).allowed_category_ids.map((id: number) => String(id))
+          : [],
       });
     }
   }, [isEditDialogOpen, editingWorkspace]);
@@ -575,6 +584,10 @@ function Workspaces() {
     if (!createFormData.teams || createFormData.teams.length === 0) {
       throw new Error(tw('validation.teamsRequired', 'Please select at least one team'));
     }
+    // PROJECT workspaces require at least one allowed category
+    if (!createFormData.allowed_category_ids || createFormData.allowed_category_ids.length === 0) {
+      throw new Error(tw('validation.categoriesRequired', 'Please select at least one allowed category'));
+    }
 
     // User-created workspaces are always PROJECT type
     const workspaceData: any = {
@@ -584,7 +597,9 @@ function Workspaces() {
       icon: createFormData.icon,
       type: 'PROJECT', // Always PROJECT for user-created workspaces
       teams: createFormData.teams.map(teamId => parseInt(teamId, 10)), // Convert string IDs to integers
-      category_id: createFormData.category_id || null
+      category_id: createFormData.category_id || null,
+      allow_ad_hoc_tasks: !!createFormData.allow_ad_hoc_tasks,
+      allowed_category_ids: createFormData.allowed_category_ids.map((id) => parseInt(id, 10)).filter((n) => Number.isFinite(n)),
     };
 
     await createItem(workspaceData);
@@ -596,7 +611,9 @@ function Workspaces() {
       icon: 'fas fa-folder',
       type: 'project',
       teams: [],
-      category_id: null
+      category_id: null,
+      allow_ad_hoc_tasks: false,
+      allowed_category_ids: [],
     });
   };
 
@@ -619,13 +636,17 @@ function Workspaces() {
     if (!isDefaultWorkspace && editFormData.teams && editFormData.teams.length === 0) {
       throw new Error(tw('validation.teamsRequired', 'Please select at least one team'));
     }
+    if (!isDefaultWorkspace && (!editFormData.allowed_category_ids || editFormData.allowed_category_ids.length === 0)) {
+      throw new Error(tw('validation.categoriesRequired', 'Please select at least one allowed category'));
+    }
 
     const updates: any = {
       name: name.trim(),
       description: (formData.get('description') as string) || null,
       color: editFormData.color,
       icon: editFormData.icon,
-      category_id: editFormData.category_id
+      category_id: editFormData.category_id,
+      allow_ad_hoc_tasks: !!editFormData.allow_ad_hoc_tasks,
     };
 
     // Only update type and teams for PROJECT workspaces
@@ -634,6 +655,7 @@ function Workspaces() {
       if (editFormData.teams && editFormData.teams.length > 0) {
         updates.teams = editFormData.teams.map(teamId => parseInt(teamId, 10));
       }
+      updates.allowed_category_ids = editFormData.allowed_category_ids.map((id) => parseInt(id, 10)).filter((n) => Number.isFinite(n));
     }
 
     await updateItem(editingWorkspace.id, updates);
@@ -1045,7 +1067,9 @@ function Workspaces() {
               icon: 'fas fa-folder',
               type: 'project',
               teams: [],
-              category_id: null
+              category_id: null,
+              allow_ad_hoc_tasks: false,
+              allowed_category_ids: [],
             });
           }
         }}
@@ -1055,7 +1079,11 @@ function Workspaces() {
         onSubmit={handleCreateSubmit}
         isSubmitting={isSubmitting}
         error={formError}
-        submitDisabled={isSubmitting}
+        submitDisabled={
+          isSubmitting ||
+          !createFormData.teams?.length ||
+          !createFormData.allowed_category_ids?.length
+        }
       >
         <div className="grid gap-4">
           <TextField
@@ -1099,23 +1127,41 @@ function Workspaces() {
               {tw('dialogs.create.fields.teamsHint', 'Select at least one team for this workspace')}
             </p>
           </div>
-          <SelectField
-            id="category"
-            label={tw('dialogs.create.fields.category', 'Category')}
-            value={createFormData.category_id ? createFormData.category_id.toString() : 'none'}
-            onChange={(value) => {
-              const categoryId = value && value !== 'none' && value !== '' ? parseInt(value, 10) : null;
-              setCreateFormData(prev => ({ ...prev, category_id: categoryId }));
-            }}
-            options={[
-              { value: 'none', label: tw('dialogs.create.fields.noCategory', 'No category') },
-              ...categories
-                .filter((cat: Category) => !cat.workspace_id) // Only show categories without workspaces
-                .map((cat: Category) => ({
-                  value: cat.id.toString(),
+          <div className="space-y-2">
+            <Label htmlFor="create-allowed-categories" className="text-sm font-medium">
+              {tw('dialogs.create.fields.allowedCategories', 'Allowed categories')} <span className="text-red-500">*</span>
+            </Label>
+            <MultiSelect
+              options={(categories as Category[])
+                .filter((cat: any) => createFormData.teams.includes(String(cat.team_id)))
+                .map((cat: any) => ({
+                  value: String(cat.id),
                   label: cat.name
-                }))
-            ]}
+                }))}
+              onValueChange={(value) => setCreateFormData(prev => ({ ...prev, allowed_category_ids: value }))}
+              defaultValue={createFormData.allowed_category_ids}
+              placeholder={
+                !createFormData.teams?.length
+                  ? tw('dialogs.create.fields.selectTeamsFirst', 'Select teams first...')
+                  : tw('dialogs.create.fields.selectAllowedCategories', 'Select allowed categories...')
+              }
+              maxCount={10}
+              className="w-full"
+              disabled={!createFormData.teams?.length}
+            />
+            <p className="text-xs text-muted-foreground">
+              {tw('dialogs.create.fields.allowedCategoriesHint', 'Select at least one category to be able to create tasks in this workspace.')}
+            </p>
+          </div>
+          <CheckboxField
+            id="allow-ad-hoc-tasks"
+            label={tw('dialogs.create.fields.allowAdHoc', 'Allow ad hoc tasks')}
+            checked={!!createFormData.allow_ad_hoc_tasks}
+            onChange={(checked) => setCreateFormData(prev => ({ ...prev, allow_ad_hoc_tasks: checked }))}
+            description={tw(
+              'dialogs.create.fields.allowAdHocDesc',
+              'When enabled, tasks can be created directly from workspace categories (no template required).'
+            )}
           />
         </div>
       </SettingsDialog>
@@ -1133,7 +1179,9 @@ function Workspaces() {
               icon: 'fas fa-folder',
               type: 'project',
               teams: [],
-              category_id: null
+              category_id: null,
+              allow_ad_hoc_tasks: false,
+              allowed_category_ids: [],
             });
           }
         }}
@@ -1143,7 +1191,11 @@ function Workspaces() {
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
         error={formError}
-        submitDisabled={isSubmitting || !editingWorkspace}
+        submitDisabled={
+          isSubmitting ||
+          !editingWorkspace ||
+          (((editingWorkspace as any)?.type || 'PROJECT') !== 'DEFAULT' && !editFormData.allowed_category_ids?.length)
+        }
         footerActions={
           editingWorkspace ? (
             <Button
@@ -1218,23 +1270,41 @@ function Workspaces() {
                           {tw('dialogs.edit.fields.teamsHint', 'Select at least one team for this workspace')}
                         </p>
                       </div>
-                      <SelectField
-                        id="edit-category"
-                        label={tw('dialogs.edit.fields.category', 'Category')}
-                        value={editFormData.category_id ? editFormData.category_id.toString() : 'none'}
-                        onChange={(value) => {
-                          const categoryId = value && value !== 'none' && value !== '' ? parseInt(value, 10) : null;
-                          setEditFormData(prev => ({ ...prev, category_id: categoryId }));
-                        }}
-                        options={[
-                          { value: 'none', label: tw('dialogs.edit.fields.noCategory', 'No category') },
-                          ...categories
-                            .filter((cat: Category) => !cat.workspace_id || cat.workspace_id === editingWorkspace.id)
-                            .map((cat: Category) => ({
-                              value: cat.id.toString(),
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-allowed-categories" className="text-sm font-medium">
+                          {tw('dialogs.edit.fields.allowedCategories', 'Allowed categories')} <span className="text-red-500">*</span>
+                        </Label>
+                        <MultiSelect
+                          options={(categories as Category[])
+                            .filter((cat: any) => editFormData.teams.includes(String(cat.team_id)))
+                            .map((cat: any) => ({
+                              value: String(cat.id),
                               label: cat.name
-                            }))
-                        ]}
+                            }))}
+                          onValueChange={(value) => setEditFormData(prev => ({ ...prev, allowed_category_ids: value }))}
+                          defaultValue={editFormData.allowed_category_ids}
+                          placeholder={
+                            !editFormData.teams?.length
+                              ? tw('dialogs.edit.fields.selectTeamsFirst', 'Select teams first...')
+                              : tw('dialogs.edit.fields.selectAllowedCategories', 'Select allowed categories...')
+                          }
+                          maxCount={10}
+                          className="w-full"
+                          disabled={!editFormData.teams?.length}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {tw('dialogs.edit.fields.allowedCategoriesHint', 'Select at least one category to be able to create tasks in this workspace.')}
+                        </p>
+                      </div>
+                      <CheckboxField
+                        id="edit-allow-ad-hoc-tasks"
+                        label={tw('dialogs.edit.fields.allowAdHoc', 'Allow ad hoc tasks')}
+                        checked={!!editFormData.allow_ad_hoc_tasks}
+                        onChange={(checked) => setEditFormData(prev => ({ ...prev, allow_ad_hoc_tasks: checked }))}
+                        description={tw(
+                          'dialogs.edit.fields.allowAdHocDesc',
+                          'When enabled, tasks can be created directly from workspace categories (no template required).'
+                        )}
                       />
                     </>
                   )}

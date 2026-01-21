@@ -65,6 +65,19 @@ export default function TimelineCanvas({
     // Clear previous content
     g.selectAll("*").remove();
 
+    // Apply transform to offset content and prevent clipping
+    g.attr("transform", "translate(40, 0)");
+
+    // Add clickable background
+    g.append("rect")
+      .attr("class", "timeline-background")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", width)
+      .attr("height", height)
+      .attr("fill", "transparent")
+      .style("cursor", "pointer");
+
     // Draw grid lines
     const gridLines = g.append("g").attr("class", "grid-lines");
 
@@ -122,6 +135,10 @@ export default function TimelineCanvas({
     // Setup zoom behavior
     const zoom = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 4])
+      .filter((event) => {
+        // Allow zoom with wheel/pinch, but not with clicks (we need clicks for creating events)
+        return !event.button && event.type !== 'click';
+      })
       .on("zoom", (event) => {
         const transform = event.transform;
         g.attr("transform", transform.toString());
@@ -133,38 +150,57 @@ export default function TimelineCanvas({
 
     svg.call(zoom);
 
-    // Reset zoom on double click (but not on event bars)
-    svg.on("dblclick.zoom", (event) => {
-      // Only reset if clicking on background, not on an event
-      if ((event.target as SVGElement).tagName !== "rect") {
-        svg.transition()
-          .duration(750)
-          .call(zoom.transform, zoomIdentity);
-      }
-    });
+    // Disable double-click zoom reset (interferes with event creation)
+    svg.on("dblclick.zoom", null);
 
-    // Handle click on empty space to create new event
+    // Handle double-click on empty space to create new event
     if (onEmptySpaceClick) {
-      g.on("click", function(event: MouseEvent) {
-        const target = event.target as SVGElement;
-        // Only trigger if clicking on background (grid lines, grid-lines group, or the main group)
-        // Don't trigger if clicking on event bars (rect elements that are not grid lines)
-        const isGridLine = target.tagName === "line";
-        const isGridLinesGroup = target.classList.contains("grid-lines") || 
-                                 target.closest(".grid-lines") !== null;
-        const isMainGroup = target === g.node();
-        const isEventBar = target.closest(".events-group") !== null && 
-                          target.tagName === "rect" && 
-                          !target.closest(".grid-lines");
+      let clickTimeout: NodeJS.Timeout | null = null;
+      
+      svg.on("dblclick", function(event: MouseEvent) {
+        event.preventDefault();
+        event.stopPropagation();
         
-        if ((isGridLine || isGridLinesGroup || isMainGroup) && !isEventBar) {
-          const [x, y] = pointer(event, g.node() as SVGGElement);
-          const clickedDate = scale.invert(x);
-          const resourceIndex = Math.floor(y / rowHeight);
-          
-          if (resourceIndex >= 0 && resourceIndex < resources.length) {
-            onEmptySpaceClick(clickedDate, resourceIndex);
-          }
+        const target = event.target as SVGElement;
+        
+        // Don't trigger if clicking on event bars
+        const isEventBar = target.closest(".event-group-") !== null || 
+                          target.classList.contains("event-group-");
+        
+        if (isEventBar) {
+          return; // Let event handlers deal with it
+        }
+        
+        // Clear any pending single-click timeout
+        if (clickTimeout) {
+          clearTimeout(clickTimeout);
+          clickTimeout = null;
+        }
+        
+        // Get click position relative to the transformed group
+        const [x, y] = pointer(event, g.node() as SVGGElement);
+        // Account for the 40px transform offset when inverting the scale
+        const adjustedX = Math.max(0, x); // Ensure non-negative
+        const clickedDate = scale.invert(adjustedX);
+        const resourceIndex = Math.floor(y / rowHeight);
+        
+        console.log('[Scheduler] Double-click detected:', {
+          x,
+          adjustedX,
+          y,
+          clickedDate: clickedDate.toString(),
+          resourceIndex,
+          totalResources: resources.length,
+          hasCallback: !!onEmptySpaceClick,
+          resourcesArray: resources.map(r => r.id),
+        });
+        
+        // Always call the callback if it exists - let the parent component validate
+        if (onEmptySpaceClick) {
+          console.log('[Scheduler] Calling onEmptySpaceClick with:', { clickedDate, resourceIndex });
+          onEmptySpaceClick(clickedDate, resourceIndex);
+        } else {
+          console.warn('[Scheduler] onEmptySpaceClick callback not provided');
         }
       });
     }
@@ -311,17 +347,19 @@ export default function TimelineCanvas({
   }, [events, resources, scale, rowHeight, onEventSelect, onEventDoubleClick, createDragBehavior, createResizeBehavior, onEventMove, onEventResize]);
 
   return (
-    <svg
-      ref={svgRef}
-      width={width}
-      height={height}
-      className="timeline-canvas"
-      style={{ display: "block", cursor: "grab" }}
-    >
-      <g ref={gRef} className="timeline-content">
-        <g ref={eventsGroupRef} className="events-group" />
-      </g>
-    </svg>
+    <div>
+      <svg
+        ref={svgRef}
+        width={width + 80}
+        height={height}
+        className="timeline-canvas"
+        style={{ display: "block", cursor: "grab" }}
+      >
+        <g ref={gRef} className="timeline-content">
+          <g ref={eventsGroupRef} className="events-group" />
+        </g>
+      </svg>
+    </div>
   );
 }
 

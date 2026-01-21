@@ -17,6 +17,7 @@ export function useFormInitialization(params: any) {
     setSpotId,
     setStatusId,
     setTemplateId,
+    setStartDate,
     setDueDate,
     setSelectedUserIds,
     setSlaId,
@@ -48,6 +49,7 @@ export function useFormInitialization(params: any) {
       setSpotId(task.spot_id ? Number(task.spot_id) : null);
       setStatusId(task.status_id ? Number(task.status_id) : null);
       setTemplateId(task.template_id ? Number(task.template_id) : null);
+      setStartDate(task.start_date ? new Date(task.start_date).toISOString().split('T')[0] : '');
       setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
       setSelectedUserIds(Array.isArray(task.user_ids) ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n)) : []);
       setSlaId(task.sla_id ? Number(task.sla_id) : null);
@@ -62,8 +64,12 @@ export function useFormInitialization(params: any) {
     } else if (mode === 'create') {
       setDescription('');
       setSpotId(null);
-      setSelectedUserIds([]);
-      setDueDate('');
+      // Use initial values from task prop if provided (e.g., from scheduler)
+      setStartDate(task?.start_date ? new Date(task.start_date).toISOString().split('T')[0] : '');
+      setSelectedUserIds(task?.user_ids && Array.isArray(task.user_ids) 
+        ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n))
+        : []);
+      setDueDate(task?.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
       setIsSubmitting(false);
       setSlaId(null);
       setApprovalId(null);
@@ -86,8 +92,11 @@ export function useFormInitialization(params: any) {
         } else if (firstTemplate.default_spot_id) {
           setSpotId(firstTemplate.default_spot_id);
         }
-        const defaultsUsers = normalizeDefaultUserIds(firstTemplate.default_user_ids);
-        setSelectedUserIds(defaultsUsers);
+        // Only use template default users if no initial users provided
+        if (!task?.user_ids || !Array.isArray(task.user_ids) || task.user_ids.length === 0) {
+          const defaultsUsers = normalizeDefaultUserIds(firstTemplate.default_user_ids);
+          setSelectedUserIds(defaultsUsers);
+        }
       } else {
         setTemplateId(null);
         setName('');

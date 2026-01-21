@@ -239,6 +239,7 @@ export default function TaskDialogContent({
     setSpotId: formState.setSpotId,
     setStatusId: formState.setStatusId,
     setTemplateId: formState.setTemplateId,
+    setStartDate: formState.setStartDate,
     setDueDate: formState.setDueDate,
     setSelectedUserIds: formState.setSelectedUserIds,
     setSlaId: formState.setSlaId,
@@ -295,6 +296,7 @@ export default function TaskDialogContent({
           template_id: templateId,
           sla_id: formState.slaId,
           approval_id: formState.approvalId,
+          start_date: formState.startDate || null,
           due_date: formState.dueDate || null,
           user_ids:
             Array.isArray(formState.selectedUserIds) && formState.selectedUserIds.length > 0
@@ -360,7 +362,7 @@ export default function TaskDialogContent({
           priority_id: priorityId ?? 0,
           sla_id: formState.slaId,
           approval_id: formState.approvalId,
-          start_date: null,
+          start_date: formState.startDate || null,
           due_date: formState.dueDate || null,
           expected_duration: Number.isFinite(computed.selectedTemplate?.expected_duration)
             ? computed.selectedTemplate.expected_duration
@@ -568,7 +570,12 @@ export default function TaskDialogContent({
                 {...{
                   mode,
                   workspaceTemplates: computed.workspaceTemplates,
+                  workspaceCategories: computed.workspaceCategories,
                   categories: data.categories,
+                  categoryId,
+                  setCategoryId: formState.setCategoryId,
+                  name: formState.name,
+                  setName: formState.setName,
                   templateId,
                   setTemplateId: formState.setTemplateId,
                   currentWorkspace: computed.currentWorkspace,
@@ -618,6 +625,8 @@ export default function TaskDialogContent({
                 approvals={data.approvals}
                 approvalId={formState.approvalId}
                 setApprovalId={formState.setApprovalId}
+                startDate={formState.startDate}
+                setStartDate={formState.setStartDate}
                 dueDate={formState.dueDate}
                 setDueDate={formState.setDueDate}
               />

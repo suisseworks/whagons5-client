@@ -5,6 +5,8 @@ export interface Workspace {
     color: string;
     description: string | null;
     teams: [] | null;
+    allow_ad_hoc_tasks?: boolean;
+    allowed_category_ids?: number[];
     type: string;
     category_id: number | null;
     spots: [] | null;

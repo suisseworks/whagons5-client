@@ -427,6 +427,7 @@ export const enTranslations: Record<string, string> = {
   "settings.categories.dialogs.delete.title": "Delete Category",
   "settings.categories.dialogs.delete.restricted": "This category cannot be deleted because it contains {count} task{plural}. Please reassign or delete all tasks in this category first.",
   "settings.categories.dialogs.delete.confirm": "Are you sure you want to delete the category \"{name}\"? This action cannot be undone.",
+  "settings.categories.dialogs.delete.workspaceWarning": " Note: The associated workspace will also be deleted.",
   "settings.categories.dialogs.delete.button": "Delete",
   "settings.categories.fields.name": "Name",
   "settings.categories.fields.description": "Description",

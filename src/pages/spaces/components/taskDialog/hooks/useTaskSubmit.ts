@@ -103,7 +103,7 @@ export function useTaskSubmit(params: any) {
           priority_id: priorityId ?? 0,
           sla_id: slaId,
           approval_id: approvalId,
-          start_date: null,
+          start_date: null, // Will be set from formState.startDate in TaskDialogContent
           due_date: dueDate || null,
           expected_duration: (() => {
             const v = selectedTemplate?.expected_duration ?? selectedTemplate?.default_duration ?? 0;

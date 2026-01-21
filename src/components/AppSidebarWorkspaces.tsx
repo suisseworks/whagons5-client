@@ -37,7 +37,6 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ColorPicker, ColorPickerAlpha, ColorPickerFormat, ColorPickerHue, ColorPickerSelection, ColorPickerEyeDropper } from '@/components/ui/shadcn-io/color-picker';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -398,17 +397,18 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const [workspaceColor, setWorkspaceColor] = useState('#3b82f6');
   const [workspaceType, setWorkspaceType] = useState('project');
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('none');
+  const [allowedCategoryIds, setAllowedCategoryIds] = useState<string[]>([]);
 
   // Get teams and categories from Redux store
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
   const { value: categories } = useSelector((state: RootState) => state.categories) as { value: Category[] };
   
-  // Filter categories that don't already have a workspace (DEFAULT workspaces are 1:1 with categories)
-  // Only show categories that don't have a workspace_id for optional association
+  // Allowed categories must be explicitly selected (filtered by selected teams)
   const availableCategories = useMemo(() => {
-    return categories.filter((cat: Category) => !cat.workspace_id);
-  }, [categories]);
+    if (!selectedTeams.length) return [];
+    const teamSet = new Set(selectedTeams.map((id) => String(id)));
+    return categories.filter((cat: any) => teamSet.has(String(cat.team_id)));
+  }, [categories, selectedTeams]);
 
   const [orderKey, setOrderKey] = useState(0);
   // Keep previous workspaces to prevent disappearing during transitions
@@ -504,6 +504,10 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       alert(t('sidebar.pleaseSelectAtLeastOneTeam', 'Please select at least one team.'));
       return;
     }
+    if (!allowedCategoryIds || allowedCategoryIds.length === 0) {
+      alert(t('sidebar.pleaseSelectAtLeastOneCategory', 'Please select at least one allowed category.'));
+      return;
+    }
 
     // User-created workspaces are always PROJECT type
     // DEFAULT workspaces are only created automatically with categories
@@ -513,13 +517,9 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       color: workspaceColor,
       icon: 'fas fa-folder',
       type: 'PROJECT',
-      teams: selectedTeams.map(teamId => parseInt(teamId, 10)) // Convert string IDs to integers
+      teams: selectedTeams.map(teamId => parseInt(teamId, 10)), // Convert string IDs to integers
+      allowed_category_ids: allowedCategoryIds.map((id) => parseInt(id, 10)).filter((n) => Number.isFinite(n)),
     };
-
-    // Add category_id if one was selected (optional for PROJECT workspaces)
-    if (selectedCategoryId && selectedCategoryId !== 'none') {
-      workspaceData.category_id = parseInt(selectedCategoryId, 10);
-    }
 
     try {
       await dispatch((genericActions.workspaces.addAsync as any)(workspaceData)).unwrap();
@@ -530,7 +530,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       setWorkspaceColor('#3b82f6');
       setWorkspaceType('project');
       setSelectedTeams([]);
-      setSelectedCategoryId('none');
+      setAllowedCategoryIds([]);
       setIsModalOpen(false);
     } catch (error: any) {
       console.error('Error creating workspace:', error);
@@ -676,7 +676,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
           setWorkspaceColor('#3b82f6');
           setWorkspaceType('project');
           setSelectedTeams([]);
-          setSelectedCategoryId('none');
+          setAllowedCategoryIds([]);
         }
       }}>
         <DialogContent className="sm:max-w-[425px]">
@@ -777,25 +777,28 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="workspace-category" className="text-right">
-                {t('sidebar.workspaceCategory', 'Category')}
+              <Label htmlFor="workspace-allowed-categories" className="text-right">
+                {t('sidebar.allowedCategories', 'Allowed categories')} <span className="text-red-500">*</span>
               </Label>
               <div className="col-span-3">
-                <Select value={selectedCategoryId || 'none'} onValueChange={setSelectedCategoryId}>
-                  <SelectTrigger id="workspace-category">
-                    <SelectValue placeholder={t('sidebar.selectCategoryOptional', 'Select category (optional)')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t('sidebar.noCategory', 'No category')}</SelectItem>
-                    {availableCategories.map((category: Category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={availableCategories.map((category: Category) => ({
+                    value: category.id.toString(),
+                    label: category.name
+                  }))}
+                  onValueChange={setAllowedCategoryIds}
+                  defaultValue={allowedCategoryIds}
+                  placeholder={
+                    !selectedTeams.length
+                      ? t('sidebar.selectTeamsFirst', 'Select teams first...')
+                      : t('sidebar.selectAllowedCategories', 'Select allowed categories...')
+                  }
+                  maxCount={10}
+                  className="w-full"
+                  disabled={!selectedTeams.length}
+                />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {t('sidebar.workspaceCategoryHint', 'Optionally associate this workspace with a category')}
+                  {t('sidebar.allowedCategoriesHint', 'Select at least one category to be able to create tasks in this workspace.')}
                 </p>
               </div>
             </div>

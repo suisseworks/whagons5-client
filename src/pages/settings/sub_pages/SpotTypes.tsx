@@ -1,5 +1,4 @@
-import { useMemo, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useMemo } from "react";
 import { ColDef } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLayerGroup, faPlus } from "@fortawesome/free-solid-svg-icons";
@@ -15,13 +14,10 @@ import {
   createActionsCellRenderer,
   ColorIndicatorCellRenderer
 } from "../components";
-import { AppDispatch } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
 
-type SpotType = { id: number; name: string; description?: string | null; color?: string | null };
+type SpotType = { id: number; name: string; color?: string | null };
 
 function SpotTypes() {
-  const dispatch = useDispatch<AppDispatch>();
   const {
     items,
     filteredItems,
@@ -35,6 +31,7 @@ function SpotTypes() {
     // deleteItem,
     isSubmitting,
     formError,
+    setFormError,
     isCreateDialogOpen,
     setIsCreateDialogOpen,
     isEditDialogOpen,
@@ -47,11 +44,8 @@ function SpotTypes() {
     handleCloseDeleteDialog
   } = useSettingsState<SpotType>({
     entityName: 'spotTypes',
-    searchFields: ['name', 'description']
+    searchFields: ['name']
   });
-
-  // Fast hydration (IndexedDB -> Redux) then background network refresh
-  // Remove the single useEffect for spotTypes loading.
 
   const SpotTypeNameCellRenderer = (params: any) => {
     const name = params.data?.name as string;
@@ -63,7 +57,6 @@ function SpotTypes() {
 
   const colDefs = useMemo<ColDef[]>(() => [
     { field: 'name', headerName: 'Name', flex: 2, minWidth: 180, cellRenderer: SpotTypeNameCellRenderer },
-    { field: 'description', headerName: 'Description', flex: 3, minWidth: 220 },
     {
       field: 'actions', headerName: 'Actions', width: 120,
       cellRenderer: createActionsCellRenderer({ onEdit: handleEdit, onDelete: handleDelete }),
@@ -75,10 +68,15 @@ function SpotTypes() {
     e.preventDefault();
     const form = new FormData(e.target as HTMLFormElement);
     const payload = {
-      name: String(form.get('name') || ''),
-      description: String(form.get('description') || '') || null,
+      name: String(form.get('name') || '').trim(),
       color: String(form.get('color') || '#10b981')
     } as any;
+    
+    if (!payload.name) {
+      setFormError('Name is required');
+      return;
+    }
+    
     await createItem(payload);
   };
 
@@ -87,10 +85,15 @@ function SpotTypes() {
     if (!editingItem) return;
     const form = new FormData(e.target as HTMLFormElement);
     const updates = {
-      name: String(form.get('name') || ''),
-      description: String(form.get('description') || '') || null,
+      name: String(form.get('name') || '').trim(),
       color: String(form.get('color') || (editingItem as any).color || '#10b981')
     } as any;
+    
+    if (!updates.name) {
+      setFormError('Name is required');
+      return;
+    }
+    
     await updateItem((editingItem as any).id, updates);
   };
 
@@ -104,7 +107,6 @@ function SpotTypes() {
       search={{ placeholder: 'Search spot types...', value: searchQuery, onChange: (v: string) => { setSearchQuery(v); handleSearch(v); } }}
       loading={{ isLoading: loading, message: 'Loading spot types...' }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
-      statistics={{ title: 'Spot Types', description: 'Overview', items: [{ label: 'Total Types', value: items.length }] }}
       headerActions={
         <Button 
           size="default"
@@ -116,12 +118,14 @@ function SpotTypes() {
         </Button>
       }
     >
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: '400px' }}>
         <SettingsGrid
-          rowData={filteredItems}
+          rowData={filteredItems || []}
           columnDefs={colDefs}
           noRowsMessage="No spot types found"
           onRowDoubleClicked={handleEdit}
+          className="flex-1 min-h-0 w-full"
+          height="100%"
         />
       </div>
 
@@ -138,10 +142,6 @@ function SpotTypes() {
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name *</Label>
             <Input id="name" name="name" className="col-span-3" required />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">Description</Label>
-            <Input id="description" name="description" className="col-span-3" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="color" className="text-right">Color</Label>
@@ -165,10 +165,6 @@ function SpotTypes() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-name" className="text-right">Name *</Label>
               <Input id="edit-name" name="name" defaultValue={(editingItem as any).name} className="col-span-3" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">Description</Label>
-              <Input id="edit-description" name="description" defaultValue={(editingItem as any).description || ''} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-color" className="text-right">Color</Label>

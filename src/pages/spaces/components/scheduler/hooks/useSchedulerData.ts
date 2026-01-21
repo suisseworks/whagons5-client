@@ -78,6 +78,12 @@ export function useSchedulerData(workspaceId: string | undefined) {
       .filter((user) => assignedUserIds.has(user.id) || userTeams.some((ut) => ut.user_id === user.id))
       .map((user) => {
         const team = userTeamMap.get(user.id);
+        
+        // Debug: Log avatar URL
+        if (user.url_picture) {
+          console.log(`[Scheduler] User ${user.name} avatar:`, user.url_picture);
+        }
+        
         return {
           id: user.id,
           name: user.name,

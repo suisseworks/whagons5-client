@@ -442,6 +442,7 @@ export const esTranslations: Record<string, string> = {
   "settings.categories.dialogs.delete.title": "Eliminar categoría",
   "settings.categories.dialogs.delete.restricted": "Esta categoría no se puede eliminar porque contiene {count} tarea{plural}. Por favor, reasigna o elimina todas las tareas en esta categoría primero.",
   "settings.categories.dialogs.delete.confirm": "¿Estás seguro de que quieres eliminar la categoría \"{name}\"? Esta acción no se puede deshacer.",
+  "settings.categories.dialogs.delete.workspaceWarning": " Nota: El espacio de trabajo asociado también se eliminará.",
   "settings.categories.dialogs.delete.button": "Eliminar",
   "settings.categories.fields.name": "Nombre",
   "settings.categories.fields.description": "Descripción",

@@ -15,6 +15,8 @@ export default function ResourceList({
   selectedResourceIds = new Set(),
   onResourceSelect,
 }: ResourceListProps) {
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  
   const sortedResources = useMemo(() => {
     return [...resources].sort((a, b) => {
       // Sort by team, then by name
@@ -30,6 +32,10 @@ export default function ResourceList({
   const listRef = useListRef<ListImperativeAPI>();
   const containerRef = useRef<HTMLDivElement>(null);
   const [listHeight, setListHeight] = useState(600);
+  
+  const handleImageError = (resourceId: number) => {
+    setImageErrors(prev => new Set(prev).add(resourceId));
+  };
 
   useEffect(() => {
     const updateHeight = () => {
@@ -46,7 +52,11 @@ export default function ResourceList({
 
   const Row = ({ index, style }: RowComponentProps<{}>) => {
     const resource = sortedResources[index];
+    
     if (!resource) return null;
+
+    const hasImageError = imageErrors.has(resource.id);
+    const showFallback = !resource.avatar || resource.avatar === '' || hasImageError;
 
     return (
       <div
@@ -57,19 +67,20 @@ export default function ResourceList({
         onClick={() => onResourceSelect?.(resource.id)}
       >
         <div className="flex items-center gap-2">
-          {resource.avatar ? (
-            <img
-              src={resource.avatar}
-              alt={resource.name}
-              className="w-6 h-6 rounded-full"
-            />
-          ) : (
+          {showFallback ? (
             <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
               style={{ backgroundColor: resource.color || "#6366f1" }}
             >
               {resource.name.charAt(0).toUpperCase()}
             </div>
+          ) : (
+            <img
+              src={resource.avatar}
+              alt={resource.name}
+              className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+              onError={() => handleImageError(resource.id)}
+            />
           )}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium truncate">{resource.name}</div>

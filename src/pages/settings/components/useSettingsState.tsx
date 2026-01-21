@@ -65,7 +65,7 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
   
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredItems, setFilteredItems] = useState<T[]>(items);
+  const [filteredItems, setFilteredItems] = useState<T[]>(items || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   
@@ -109,12 +109,12 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     handleSearch(searchQuery);
   }, [items, searchQuery, handleSearch]);
   
-  // Ensure filteredItems is always synced with items if empty
+  // Ensure filteredItems is always synced with items
   useEffect(() => {
-    if (items.length > 0 && filteredItems.length === 0 && !searchQuery) {
-      setFilteredItems(items);
+    if (!searchQuery) {
+      setFilteredItems(items || []);
     }
-  }, [items, filteredItems.length, searchQuery]);
+  }, [items, searchQuery]);
   
   // CRUD operations
   const createItem = useCallback(async (data: Omit<T, 'id' | 'created_at' | 'updated_at'>) => {
