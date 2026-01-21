@@ -57,8 +57,8 @@ const EffectsLayer = () => {
         });
       }
 
-      // Ctrl+C - cycle through celebration effects
-      if (e.ctrlKey && e.key === 'c') {
+      // Ctrl+E - cycle through celebration effects
+      if (e.ctrlKey && e.key === 'e') {
         e.preventDefault();
         setWeatherEffect('none'); // Turn off weather effects
         setCelebrationEffect(prev => {

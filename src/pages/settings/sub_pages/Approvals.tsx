@@ -826,7 +826,25 @@ function Approvals() {
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={() => openSummary(p?.data as Approval)}
+            data-grid-stop-row-click="true"
+            onPointerDown={(e) => {
+              // Prevent AG Grid from treating this as a row click (which would open Edit)
+              e.preventDefault();
+              e.stopPropagation();
+              // Radix/AG Grid can listen above React; stop the native event too
+              (e.nativeEvent as any)?.stopImmediatePropagation?.();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              (e.nativeEvent as any)?.stopImmediatePropagation?.();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              openSummary(p?.data as Approval);
+            }}
             title={ta('actions.summary', 'Summary')}
             aria-label={ta('actions.summary', 'Summary')}
           >
@@ -874,6 +892,7 @@ function Approvals() {
         headerName: columnLabels.actions,
         width: 280,
         cellRenderer: createActionsCellRenderer({
+          // Edit is handled via row click, Delete is in edit modal
           customActions: [
             {
               icon: faUsers,
@@ -1735,11 +1754,12 @@ function Approvals() {
           <Button
             type="button"
             variant="destructive"
+            size="icon"
             onClick={openDeleteFromEdit}
             title={deleteSectionDescription}
+            aria-label={deleteDialogTitle}
           >
-            <FontAwesomeIcon icon={faTrash} className="mr-2" />
-            {deleteDialogTitle}
+            <FontAwesomeIcon icon={faTrash} />
           </Button>
         ) : undefined}
       >

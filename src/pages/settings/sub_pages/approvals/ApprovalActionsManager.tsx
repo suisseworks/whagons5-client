@@ -6,7 +6,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -257,7 +257,7 @@ export function ApprovalActionsManager({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="approved" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="w-full grid grid-cols-2">
               <TabsTrigger value="approved" className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 Approved

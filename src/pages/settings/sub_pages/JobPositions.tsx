@@ -200,9 +200,7 @@ function JobPositions() {
 			headerName: t("settings.jobPositions.grid.columns.actions", "Actions"),
 			width: 110,
 			pinned: "right",
-			cellRenderer: createActionsCellRenderer({
-				onEdit: handleEdit
-			}),
+			cellRenderer: () => null,
 			sortable: false,
 			filter: false,
 			resizable: false
@@ -492,14 +490,16 @@ function JobPositions() {
 						<Button
 							type="button"
 							variant="destructive"
+							size="icon"
 							onClick={() => {
 								setIsEditDialogOpen(false);
 								handleDelete(editingItem);
 							}}
 							disabled={isSubmitting}
+							title={t("settings.jobPositions.dialogs.edit.delete", "Delete")}
+							aria-label={t("settings.jobPositions.dialogs.edit.delete", "Delete")}
 						>
-							<FontAwesomeIcon icon={faTrash} className="mr-2" />
-							{t("settings.jobPositions.dialogs.edit.delete", "Delete")}
+							<FontAwesomeIcon icon={faTrash} />
 						</Button>
 					) : null
 				}

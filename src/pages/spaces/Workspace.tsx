@@ -38,6 +38,7 @@ import { removeTaskAsync } from '@/store/reducers/tasksSlice';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
 import toast from 'react-hot-toast';
 import type { AppDispatch } from '@/store/store';
+import { WorkspaceKpiCard } from '@/pages/spaces/components/WorkspaceKpiCard';
 
 const WORKSPACE_TAB_PATHS = {
   grid: '',
@@ -313,17 +314,30 @@ export const Workspace = () => {
     setSelectedIds([]);
     tableRef.current?.clearSelection?.();
     
-    // Delete all selected tasks
-    const deletePromises = taskIds.map(taskId => 
-      dispatch(removeTaskAsync(taskId)).unwrap().catch((error: any) => {
-        console.error(`Failed to delete task ${taskId}:`, error);
-        return { error, taskId };
+    // Delete all selected tasks (normalize results so typing stays consistent)
+    const results = await Promise.all(
+      taskIds.map(async (taskId) => {
+        try {
+          await dispatch(removeTaskAsync(taskId)).unwrap();
+          return { taskId, ok: true as const };
+        } catch (error: any) {
+          const status = error?.response?.status || error?.status;
+          // Only log non-403 errors (403 errors are handled by API interceptor)
+          if (status !== 403) {
+            console.error(`Failed to delete task ${taskId}:`, error);
+          }
+          return { taskId, ok: false as const, error };
+        }
       })
     );
-    
-    const results = await Promise.allSettled(deletePromises);
-    const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.error));
-    const succeeded = results.filter(r => r.status === 'fulfilled' && !r.value?.error);
+
+    const succeeded = results.filter((r) => r.ok);
+    const failed = results.filter((r) => !r.ok);
+    // Filter out 403 errors (already handled by API interceptor)
+    const failedNon403 = failed.filter((r) => {
+      const status = r.error?.response?.status || r.error?.status;
+      return status !== 403;
+    });
     
     if (succeeded.length > 0) {
       toast.success(
@@ -334,9 +348,10 @@ export const Workspace = () => {
       );
     }
     
-    if (failed.length > 0) {
+    // Only show toast for non-403 errors (403 errors already shown by API interceptor)
+    if (failedNon403.length > 0) {
       toast.error(
-        `Failed to delete ${failed.length} task${failed.length > 1 ? 's' : ''}`,
+        `Failed to delete ${failedNon403.length} task${failedNon403.length > 1 ? 's' : ''}`,
         { duration: 5000 }
       );
     }
@@ -815,7 +830,7 @@ export const Workspace = () => {
   const completedLast7Days = stats.trend.reduce((sum, val) => sum + val, 0);
   const trendDelta = stats.trend.length >= 2 ? stats.trend[stats.trend.length - 1] - stats.trend[stats.trend.length - 2] : 0;
 
-  const TrendSparkline = ({ data }: { data: number[] }) => {
+  const TrendSparkline = ({ data, className }: { data: number[]; className?: string }) => {
     if (!data || data.length === 0) {
       return <div className="text-xs text-muted-foreground">—</div>;
     }
@@ -831,7 +846,12 @@ export const Workspace = () => {
     const lastY = height - ((data[data.length - 1] / max) * height);
 
     return (
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-10 text-sky-600" role="img" aria-label="7 day completion trend">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={`w-full h-10 ${className || 'text-sky-600'}`}
+        role="img"
+        aria-label="7 day completion trend"
+      >
         <polyline fill="none" stroke="currentColor" strokeWidth="2.4" points={points} strokeLinecap="round" />
         <circle cx={lastX} cy={lastY} r="2.6" fill="currentColor" />
       </svg>
@@ -843,8 +863,7 @@ export const Workspace = () => {
     label: string;
     value: string;
     icon: ReactNode;
-    badgeClass: string;
-    barClass: string;
+    accent: 'indigo' | 'amber' | 'emerald' | 'purple';
     sparkline?: ReactNode;
     helperText?: string;
   };
@@ -855,24 +874,21 @@ export const Workspace = () => {
       label: t('workspace.stats.total', 'Total'),
       value: formatStatValue(stats.total),
       icon: <BarChart3 className="h-5 w-5" />,
-      badgeClass: 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20',
-      barClass: 'from-indigo-500 via-indigo-400 to-indigo-500'
+      accent: 'indigo',
     },
     {
       key: 'inProgress',
       label: t('workspace.stats.inProgress', 'In progress'),
       value: formatStatValue(stats.inProgress),
       icon: <Activity className="h-5 w-5" />,
-      badgeClass: 'bg-gradient-to-br from-amber-500 to-orange-500 text-white border-amber-600 shadow-lg shadow-amber-500/20',
-      barClass: 'from-amber-500 via-amber-400 to-amber-500'
+      accent: 'amber',
     },
     {
       key: 'completedToday',
       label: t('workspace.stats.completedToday', 'Completed today'),
       value: formatStatValue(stats.completedToday),
       icon: <Sparkles className="h-5 w-5" />,
-      badgeClass: 'bg-gradient-to-br from-emerald-500 to-green-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20',
-      barClass: 'from-emerald-500 via-emerald-400 to-emerald-500',
+      accent: 'emerald',
       helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
     },
     {
@@ -880,9 +896,8 @@ export const Workspace = () => {
       label: t('workspace.stats.sevenDayTrend', '7-day trend'),
       value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
       icon: <TrendingUp className="h-5 w-5" />,
-      badgeClass: 'bg-gradient-to-br from-purple-500 to-violet-600 text-white border-purple-600 shadow-lg shadow-purple-500/20',
-      barClass: 'from-purple-500 via-purple-400 to-purple-500',
-      sparkline: <TrendSparkline data={stats.trend} />,
+      accent: 'purple',
+      sparkline: <TrendSparkline data={stats.trend} className="text-purple-600" />,
       helperText: statsArePending 
         ? '' 
         : completedLast7Days === 0 
@@ -898,53 +913,15 @@ export const Workspace = () => {
           <div className="flex-1 min-w-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               {kpiCards.map((card) => (
-                <motion.div
+                <WorkspaceKpiCard
                   key={card.key}
-                  className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-card/95 to-card/80 backdrop-blur-sm shadow-md hover:shadow-lg border-border/60 workspace-kpi-card group transition-all duration-300 hover:-translate-y-0.5 cursor-pointer"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  whileHover={{ scale: 1.02 }}
-                >
-                  {/* Animated gradient top bar */}
-                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${card.barClass} animate-gradient-x`} />
-                  
-                  {/* Subtle background gradient overlay */}
-                  <div className={`absolute inset-0 bg-gradient-to-br ${card.barClass} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-                  
-                  <div className="flex items-center gap-3 px-4 py-3 relative z-10">
-                    <motion.div 
-                      className={`flex items-center justify-center flex-shrink-0 rounded-xl p-2.5 border-2 ${card.badgeClass} workspace-kpi-icon group-hover:scale-110 transition-transform duration-300`}
-                      whileHover={{ rotate: [0, -5, 5, -5, 0] }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      {card.icon}
-                    </motion.div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
-                        {card.label}
-                      </div>
-                      <motion.div 
-                        className="text-2xl font-bold leading-tight text-foreground truncate"
-                        initial={{ scale: 0.9 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3, delay: 0.1 }}
-                      >
-                        {card.value}
-                      </motion.div>
-                      {card.helperText ? (
-                        <div className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                          {card.helperText}
-                        </div>
-                      ) : null}
-                    </div>
-                    {card.sparkline ? (
-                      <div className="flex-shrink-0 w-24 sm:w-28 opacity-80 group-hover:opacity-100 transition-opacity">
-                        {card.sparkline}
-                      </div>
-                    ) : null}
-                  </div>
-                </motion.div>
+                  label={card.label}
+                  value={card.value}
+                  icon={card.icon}
+                  accent={card.accent}
+                  helperText={card.helperText}
+                  right={card.sparkline}
+                />
               ))}
             </div>
           </div>

@@ -9,6 +9,7 @@ import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { celebrateTaskCompletion } from '@/utils/confetti';
+import { computeApprovalStatusForTask } from '../utils/approvalStatus';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string; celebration_enabled?: boolean };
 type Category = { id: number; celebration_effect?: string | null };
@@ -16,7 +17,9 @@ type Category = { id: number; celebration_effect?: string | null };
 export function useStatusChange(
   statusMap?: Record<number, StatusMeta>, 
   getDoneStatusId?: () => number | undefined,
-  categories?: Category[]
+  categories?: Category[],
+  taskApprovalInstances?: any[],
+  approvalMap?: Record<number, any>
 ) {
   const { t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
@@ -25,9 +28,14 @@ export function useStatusChange(
     return async (task: any, toStatusId: number): Promise<boolean> => {
       if (!task || Number(task.status_id) === Number(toStatusId)) return true;
       const needsApproval = !!task?.approval_id;
-      const normalizedApprovalStatus = String(task?.approval_status || '').toLowerCase().trim();
-      const isPendingApproval = needsApproval && normalizedApprovalStatus === 'pending';
-      const isRejectedApproval = needsApproval && normalizedApprovalStatus === 'rejected';
+      const derived = computeApprovalStatusForTask({
+        taskId: Number(task?.id),
+        approvalId: task?.approval_id,
+        approval: task?.approval_id ? approvalMap?.[Number(task.approval_id)] : null,
+        taskApprovalInstances,
+      });
+      const isPendingApproval = needsApproval && derived === 'pending';
+      const isRejectedApproval = needsApproval && derived === 'rejected';
       if (isPendingApproval || isRejectedApproval) {
         try {
           window.dispatchEvent(new CustomEvent('wh:notify', {
@@ -74,17 +82,7 @@ export function useStatusChange(
         const newStatusMeta = statusMap?.[Number(toStatusId)];
         const celebrationEnabled = newStatusMeta?.celebration_enabled !== false; // Default to true if not set
         
-        console.log('[Confetti Debug] Status change:', {
-          toStatusId,
-          statusName: newStatusMeta?.name,
-          action: newStatusMeta?.action,
-          isDoneStatus,
-          celebrationEnabled,
-          doneStatusId: getDoneStatusId?.()
-        });
-        
         if (isDoneStatus && celebrationEnabled) {
-          console.log('[Confetti Debug] Triggering confetti animation');
           // Get category celebration effect if available
           const taskCategory = categories?.find(cat => cat.id === task?.category_id);
           const categoryCelebrationEffect = taskCategory?.celebration_effect;
@@ -107,5 +105,5 @@ export function useStatusChange(
         return false;
       }
     };
-  }, [dispatch, statusMap, getDoneStatusId, categories, t]);
+  }, [dispatch, statusMap, getDoneStatusId, categories, taskApprovalInstances, approvalMap, t]);
 }

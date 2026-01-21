@@ -104,13 +104,13 @@ export default function ConfettiEffect({ onClose }: ConfettiEffectProps) {
         className="w-full h-full"
       />
       {onClose && (
-        <div className="fixed bottom-4 right-4 pointer-events-auto bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg transition-colors">
+        <div className="fixed bottom-4 right-4 pointer-events-auto bg-black/90 dark:bg-white/95 backdrop-blur-md border-2 border-white/30 dark:border-black/30 text-white dark:text-black px-4 py-2 rounded-lg shadow-2xl transition-all hover:scale-105">
           <button
             onClick={onClose}
             className="text-center"
           >
-            <div className="font-medium">Confetti</div>
-            <div className="text-xs opacity-75">(Ctrl+C)</div>
+            <div className="font-semibold text-sm">Confetti</div>
+            <div className="text-xs font-medium opacity-90">(Ctrl+E)</div>
           </button>
         </div>
       )}

@@ -154,54 +154,68 @@ export function SettingsDialog({
                   <button type="submit" style={{ display: 'none' }} data-hidden-submit="true" />
                 </form>
               </div>
-              <DialogFooter className="flex-shrink-0">
-                <div className="text-sm text-destructive mb-2 text-left mr-auto">
-                  {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
+              <DialogFooter className="flex-shrink-0 !flex-col !justify-start sm:!flex-col sm:!justify-start">
+                {error && (
+                  <div className="text-sm text-destructive mb-2 text-left mr-auto w-full">
+                    {error || (typeof window !== 'undefined' && (window as any).__settings_error) || ''}
+                  </div>
+                )}
+                <div className="flex items-center justify-between w-full gap-4">
+                  <div className="flex items-center">
+                    {footerActions ? footerActions : null}
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+                      {getCancelText()}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={submitNow}
+                      variant={getSubmitVariant()}
+                      disabled={isSubmitting || submitDisabled}
+                      className={type === 'create' ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]" : type === 'edit' ? "font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-[0.98]" : ""}
+                    >
+                      {isSubmitting ? (
+                        <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                      ) : (
+                        <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
+                      )}
+                      {getDefaultSubmitText()}
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-                  {getCancelText()}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={submitNow}
-                  variant={getSubmitVariant()}
-                  disabled={isSubmitting || submitDisabled}
-                  className={type === 'create' ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]" : type === 'edit' ? "font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-[0.98]" : ""}
-                >
-                  {isSubmitting ? (
-                    <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-                  ) : (
-                    <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
-                  )}
-                  {getDefaultSubmitText()}
-                </Button>
-                {footerActions ? footerActions : null}
               </DialogFooter>
             </>
           ) : (
-            <DialogFooter className="flex-shrink-0">
+            <DialogFooter className="flex-shrink-0 !flex-col !justify-start sm:!flex-col sm:!justify-start">
               {error && (
-                <div className="text-sm text-destructive mb-2 text-left mr-auto">
+                <div className="text-sm text-destructive mb-2 text-left mr-auto w-full">
                   {error}
                 </div>
               )}
-              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-                {getCancelText()}
-              </Button>
-              <Button
-                type="button"
-                variant={getSubmitVariant()}
-                onClick={onConfirm}
-                disabled={isSubmitting || submitDisabled}
-              >
-                {isSubmitting ? (
-                  <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-                ) : (
-                  <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
-                )}
-                {getDefaultSubmitText()}
-              </Button>
-              {footerActions ? footerActions : null}
+              <div className="flex items-center justify-between w-full gap-4">
+                <div className="flex items-center">
+                  {footerActions ? footerActions : null}
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+                    {getCancelText()}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={getSubmitVariant()}
+                    onClick={onConfirm}
+                    disabled={isSubmitting || submitDisabled}
+                  >
+                    {isSubmitting ? (
+                      <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                    ) : (
+                      <FontAwesomeIcon icon={getDefaultIcon()} className="mr-2" />
+                    )}
+                    {getDefaultSubmitText()}
+                  </Button>
+                </div>
+              </div>
             </DialogFooter>
           )}
         </div>

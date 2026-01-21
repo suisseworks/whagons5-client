@@ -321,25 +321,19 @@ function Forms() {
       minWidth: 220,
       suppressSizeToFit: true,
       cellRenderer: createActionsCellRenderer({
-        onEdit: async (item: any) => {
-          await loadFormForEditing(item.id);
-          // Ensure we are on the builder tab in the URL with the editing form id
-          navigate(`/settings/forms?tab=builder&editing_form=${item.id}`, { replace: true });
-        },
-        onDelete: handleDelete,
         customActions: [
           {
             icon: faEye,
             label: 'Preview',
             variant: 'outline',
-            onClick: (item: Form) => {
-              loadFormForPreview(item.id);
-            },
-            className: 'px-3 h-8 text-xs',
-            disabled: () => false // Allow preview for all forms - will show draft if no published version exists
-          }
+            onClick: async (item: any) => {
+              await loadFormForPreview(item.id);
+              setIsPreviewOpen(true);
+            }
+          },
         ]
       }),
+      // Note: Edit is handled via row click, Delete is handled via the delete dialog
       sortable: false,
       filter: false,
       resizable: false,

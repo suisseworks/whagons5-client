@@ -27,49 +27,98 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     {
       field: 'id',
       headerName: 'ID',
-      width: 80,
+      width: 75,
       minWidth: 70,
-      maxWidth: 100,
+      maxWidth: 85,
       sortable: true,
-      filter: 'agNumberColumnFilter',
       cellClass: 'wh-id-cell',
       valueFormatter: (p: any) => (p?.value ?? ''),
-      cellStyle: { overflow: 'visible' },
+      comparator: (valueA: any, valueB: any) => {
+        // Ensure numeric sorting
+        const numA = Number(valueA);
+        const numB = Number(valueB);
+        if (!Number.isFinite(numA) && !Number.isFinite(numB)) return 0;
+        if (!Number.isFinite(numA)) return -1;
+        if (!Number.isFinite(numB)) return 1;
+        return numA - numB;
+      },
+      cellStyle: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'visible',
+        paddingRight: '4px',
+      },
+      suppressHeaderMenuButton: false,
       cellRenderer: (p: any) => {
         const id = p?.value;
         const taskId = Number(p?.data?.id);
         const hasValidId = Number.isFinite(taskId);
+        const api = p?.api;
+        const node = p?.node;
+        const isSelected = node?.isSelected?.() ?? false;
         
         if (!hasValidId) {
           return (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
-              {id ?? ''}
-            </span>
+            <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
+              <span className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
+                {id ?? ''}
+              </span>
+              <div className="flex items-center justify-center w-6 h-6">
+                <div className="w-5 h-5 rounded-full border-2 border-muted bg-background opacity-50" />
+              </div>
+            </div>
           );
         }
         
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary focus-visible:ring-offset-background focus-visible:border-primary"
-                aria-label="Task actions"
-              >
-                {id ?? ''}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
-                Log
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                  aria-label="Task actions"
+                >
+                  {id ?? ''}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
+                  Log
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Custom circular checkbox - prevents row click */}
+            <div 
+              className="flex items-center justify-center w-6 h-6 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (node) {
+                  node.setSelected(!isSelected);
+                  requestAnimationFrame(() => {
+                    api?.refreshCells?.({ rowNodes: [node], force: true });
+                  });
+                }
+              }}
+            >
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                isSelected 
+                  ? 'bg-primary border-primary' 
+                  : 'bg-background border-border hover:border-primary/50'
+              }`}>
+                {isSelected && (
+                  <div className="w-2.5 h-2.5 rounded-full bg-white dark:bg-background" />
+                )}
+              </div>
+            </div>
+          </div>
         );
       },
     },

@@ -261,16 +261,7 @@ function Statuses() {
       width: 100,
       suppressSizeToFit: true,
       pinned: 'right',
-      cellRenderer: createActionsCellRenderer({
-        customActions: [
-          {
-            icon: faEdit,
-            variant: 'outline',
-            onClick: handleEditClick,
-            className: 'p-1 h-7 w-7'
-          }
-        ]
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false
@@ -1055,15 +1046,16 @@ function Statuses() {
             <Button
               type="button"
               variant="destructive"
-              size="sm"
+              size="icon"
               onClick={() => {
                 setEditOpen(false);
                 setDeleteOpen(true);
               }}
               disabled={isUpdating}
+              title={ts("dialogs.edit.deleteButton", "Eliminar")}
+              aria-label={ts("dialogs.edit.deleteButton", "Eliminar")}
             >
-              <FontAwesomeIcon icon={faTrash} className="mr-2" />
-              {ts("dialogs.edit.deleteButton", "Eliminar")}
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
           ) : null
         }

@@ -269,9 +269,7 @@ function Spots() {
       field: 'actions',
       headerName: ts('grid.columns.actions', 'Actions'),
       width: 100,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,
@@ -841,11 +839,13 @@ function Spots() {
             <Button
               type="button"
               variant="destructive"
+              size="icon"
               onClick={handleDeleteFromEdit}
               disabled={isSubmitting}
+              title={ts('dialogs.delete.title', 'Delete Spot')}
+              aria-label={ts('dialogs.delete.title', 'Delete Spot')}
             >
-              <FontAwesomeIcon icon={faTrash} className="mr-2" />
-              {ts('dialogs.delete.title', 'Delete Spot')}
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
           ) : undefined
         }

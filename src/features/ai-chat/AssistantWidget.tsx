@@ -17,6 +17,11 @@ import { getEnvVariables } from "@/lib/getEnvVariables";
 import { processFrontendTool, isFrontendTool } from "./utils/frontend_tools";
 import { handleFrontendToolPromptMessage } from "./utils/frontend_tool_prompts";
 import { getPreferredModel } from "./config";
+import { StreamingTtsPlayer } from "./utils/StreamingTtsPlayer";
+import { useLanguage } from "@/providers/LanguageProvider";
+import { useAuthUser } from "@/providers/AuthProvider";
+import { useSelector, shallowEqual } from "react-redux";
+import type { RootState } from "@/store/store";
 import { 
   getConversations, 
   saveMessages, 
@@ -24,6 +29,7 @@ import {
   createConversation,
   type Conversation 
 } from "./utils/conversationStorage";
+import { useSpeechToText } from "./hooks/useSpeechToText";
 import "./styles.css";
 
 const { VITE_API_URL, VITE_CHAT_URL } = getEnvVariables();
@@ -119,14 +125,72 @@ export interface AssistantWidgetProps {
   renderTrigger?: (open: () => void) => React.ReactNode;
 }
 
+type PromptUserContext = {
+  user?: { id?: number; name?: string; email?: string };
+  teams?: Array<{ id: number; name: string }>;
+  workspaces?: Array<{ id: number; name: string }>;
+};
+
 const wsManager = createWSManager(CHAT_HOST);
 
 export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = true, renderTrigger }) => {
   const navigate = useNavigate();
+  const authedUser = useAuthUser();
+
+  // Pull from generic slices (populated during AuthProvider hydration).
+  const teams = useSelector(
+    (state: RootState) => (((state as any)?.teams?.value ?? []) as Array<{ id: number; name: string }>),
+    shallowEqual
+  );
+  const workspaces = useSelector(
+    (state: RootState) => (((state as any)?.workspaces?.value ?? []) as Array<{ id: number; name: string }>),
+    shallowEqual
+  );
+  const userTeams = useSelector(
+    (state: RootState) => (((state as any)?.userTeams?.value ?? []) as Array<{ user_id?: number; team_id?: number }>),
+    shallowEqual
+  );
+
+  const userContext = useMemo<PromptUserContext | undefined>(() => {
+    if (!authedUser) return undefined;
+
+    const uid = Number((authedUser as any)?.id);
+    const name = String((authedUser as any)?.name || "");
+    const email = String((authedUser as any)?.email || "");
+
+    const teamIdSet = new Set<number>();
+    for (const ut of userTeams || []) {
+      if (Number((ut as any)?.user_id) === uid) {
+        const tid = Number((ut as any)?.team_id);
+        if (Number.isFinite(tid)) teamIdSet.add(tid);
+      }
+    }
+
+    const myTeams = (teams || [])
+      .filter((t) => teamIdSet.has(Number((t as any)?.id)))
+      .map((t) => ({ id: Number((t as any)?.id), name: String((t as any)?.name || "") }))
+      .filter((t) => Number.isFinite(t.id) && t.name)
+      .slice(0, 200);
+
+    const visibleWorkspaces = (workspaces || [])
+      .map((w) => ({ id: Number((w as any)?.id), name: String((w as any)?.name || "") }))
+      .filter((w) => Number.isFinite(w.id) && w.name)
+      .slice(0, 200);
+
+    return {
+      user: {
+        id: Number.isFinite(uid) ? uid : undefined,
+        name,
+        email,
+      },
+      teams: myTeams,
+      workspaces: visibleWorkspaces,
+    };
+  }, [authedUser, teams, workspaces, userTeams]);
+
   const [open, setOpen] = useState(false);
   const [gettingResponse, setGettingResponse] = useState<boolean>(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [conversationId, setConversationId] = useState<string>(() => {
     // Try to get the last used conversation, or create a new one
     const conversations = getConversations();
@@ -137,9 +201,53 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const [showScrollToBottom, setShowScrollToBottom] = useState<boolean>(false);
   const [scrollBtnLeft, setScrollBtnLeft] = useState<number | undefined>(undefined);
   const unsubscribeWSRef = useRef<(() => void) | null>(null);
+  // Keep a single WS subscription per conversation and route events through a ref so we don't
+  // have to unsubscribe/re-subscribe (which can close the socket and cause intermittent timeouts).
+  const wsEventHandlerRef = useRef<(data: any) => void>(() => {});
+  const stableWsHandlerRef = useRef<(data: any) => void>();
+  // Only keep the message WS warm between sends for voice mode.
+  const keepWsOpenForVoiceRef = useRef<boolean>(false);
+  const wsIdleCloseTimerRef = useRef<number | null>(null);
+  if (!stableWsHandlerRef.current) {
+    stableWsHandlerRef.current = (data: any) => {
+      try {
+        wsEventHandlerRef.current?.(data);
+      } catch (e) {
+        console.error("[WS] handler error:", e);
+      }
+    };
+  }
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const previousConversationIdRef = useRef<string>(conversationId);
+  const ttsPlayerRef = useRef<StreamingTtsPlayer | null>(null);
+  const expectingTtsRef = useRef<boolean>(false);
+  const ttsCloseTimerRef = useRef<number | null>(null);
+  const lastTtsChunkAtRef = useRef<number>(0);
+
+  const scheduleWsIdleClose = useCallback((ms: number) => {
+    try {
+      if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+      wsIdleCloseTimerRef.current = window.setTimeout(() => {
+        // Only auto-close if we're still in voice-keepalive mode.
+        if (!keepWsOpenForVoiceRef.current) return;
+        if (unsubscribeWSRef.current) {
+          try { unsubscribeWSRef.current(); } catch {}
+          unsubscribeWSRef.current = null;
+        }
+        wsManager.close(conversationId);
+        wsIdleCloseTimerRef.current = null;
+      }, ms);
+    } catch {}
+  }, [conversationId]);
+
+  // Prime AudioContext on a real user gesture to avoid autoplay restrictions blocking TTS playback.
+  const primeTtsAudio = useCallback(() => {
+    try {
+      if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
+      void ttsPlayerRef.current.ensureStarted();
+    } catch {}
+  }, []);
 
   const memoizedMessages = useMemo(() => messages, [messages]);
   
@@ -199,6 +307,29 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     } catch {}
   }, []);
 
+  type SubmitOptions = { inputMode?: "text" | "voice" };
+
+  // Create a ref for handleSubmit so it can be used in the hook before it's defined
+  const handleSubmitRef = useRef<(content: string | ContentItem[], opts?: SubmitOptions) => Promise<void>>();
+  
+  // Speech-to-text hook (uses ref for callback so handleSubmit can be defined later)
+  const handleTranscript = useCallback((text: string) => {
+    // Use the ref to call handleSubmit when it's available
+    if (handleSubmitRef.current) {
+      handleSubmitRef.current(text, { inputMode: "voice" });
+    }
+  }, []);
+  
+  const { language } = useLanguage();
+  const appLanguageCode = useMemo(() => (language || "en").toLowerCase().startsWith("es") ? "es" : "en", [language]);
+
+  const { isListening, startListening, stopListening, voiceLevel, mediaRecorder } = useSpeechToText({
+    conversationId,
+    gettingResponse,
+    onTranscript: handleTranscript,
+    languageCode: appLanguageCode,
+  });
+
   // Save messages when they change
   useEffect(() => {
     if (messages.length > 0 && conversationId) {
@@ -243,8 +374,41 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         try { unsubscribeWSRef.current(); } catch {}
         unsubscribeWSRef.current = null;
       }
+      try { ttsPlayerRef.current?.stop(); } catch {}
+      try {
+        if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+        ttsCloseTimerRef.current = null;
+      } catch {}
+      try {
+        if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+        wsIdleCloseTimerRef.current = null;
+      } catch {}
     };
   }, []);
+
+  // Stop mic streaming if widget is closed.
+  useEffect(() => {
+    if (!open) {
+      stopListening();
+      try { ttsPlayerRef.current?.stop(); } catch {}
+      expectingTtsRef.current = false;
+      keepWsOpenForVoiceRef.current = false;
+      try {
+        if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+        ttsCloseTimerRef.current = null;
+      } catch {}
+      try {
+        if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+        wsIdleCloseTimerRef.current = null;
+      } catch {}
+      // Close message WS when widget closes (avoid keeping sockets around in background).
+      if (unsubscribeWSRef.current) {
+        try { unsubscribeWSRef.current(); } catch {}
+        unsubscribeWSRef.current = null;
+      }
+      wsManager.close(conversationId);
+    }
+  }, [open, stopListening]);
 
   useEffect(() => {
     if (open) {
@@ -252,9 +416,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
   }, [open, scrollToBottom]);
 
-  const handleSubmit = async (content: string | ContentItem[]) => {
+  const handleSubmit = async (content: string | ContentItem[], opts?: SubmitOptions) => {
     if (gettingResponse) return;
     setGettingResponse(true);
+
+    // Voice mode: keep the message WS warm between sends. Text mode: do not.
+    keepWsOpenForVoiceRef.current = opts?.inputMode === "voice";
 
     // Create conversation if it doesn't exist
     if (messages.length === 0) {
@@ -319,11 +486,61 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         return; // Don't process as chat message
       }
 
+      // ElevenLabs TTS audio stream (voice mode)
+      if (data.type === "tts_audio_chunk") {
+        const audioB64 = typeof data.audio === "string" ? data.audio : "";
+        if (audioB64) {
+          lastTtsChunkAtRef.current = Date.now();
+          // Helpful for debugging “no audio” issues.
+          // eslint-disable-next-line no-console
+          console.debug("[TTS] audio chunk received:", audioB64.length);
+          if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
+          ttsPlayerRef.current.enqueueBase64Mp3(audioB64);
+
+          // In voice mode, keep the WS open between turns but still auto-close after a longer idle.
+          if (keepWsOpenForVoiceRef.current) {
+            scheduleWsIdleClose(60000);
+          }
+        }
+        return;
+      }
+      if (data.type === "tts_context_final") {
+        expectingTtsRef.current = false;
+        try {
+          if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+          ttsCloseTimerRef.current = null;
+        } catch {}
+
+        // For voice mode, keep the WS open between turns.
+        if (keepWsOpenForVoiceRef.current) {
+          scheduleWsIdleClose(60000);
+        } else {
+          // Non-voice: close promptly once the streaming context ends.
+          if (unsubscribeWSRef.current) {
+            try { unsubscribeWSRef.current(); } catch {}
+            unsubscribeWSRef.current = null;
+          }
+        }
+        return;
+      }
+      if (data.type === "tts_error") {
+        console.error("[TTS] error:", data.error || data.message);
+        return;
+      }
+
       if (data.type === "done" || data.type === "stopped" || data.type === "error") {
         setGettingResponse(false);
         if (data.type === "error") {
           console.error("WebSocket error:", data.error || data.message);
         }
+
+        // Voice mode: keep WS warm between turns (still auto-close after idle).
+        if (keepWsOpenForVoiceRef.current) {
+          scheduleWsIdleClose(60000);
+          return;
+        }
+
+        try { ttsPlayerRef.current?.stop(); } catch {}
         if (unsubscribeWSRef.current) {
           try { unsubscribeWSRef.current(); } catch {}
           unsubscribeWSRef.current = null;
@@ -365,7 +582,6 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           );
           
           if (toolCallIndex !== -1) {
-            const oldId = (currentMessageState[toolCallIndex].content as any).tool_call_id;
             const updatedToolCall = { ...currentMessageState[toolCallIndex] };
             (updatedToolCall.content as any).tool_call_id = data.function_id;
             currentMessageState[toolCallIndex] = updatedToolCall;
@@ -477,23 +693,39 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       });
     };
 
+    // Ensure the stable subscription always uses the latest handler closure for this submit.
+    wsEventHandlerRef.current = handleWebSocketEvent;
+
     const ensureSubscription = () => {
-      if (unsubscribeWSRef.current) {
-        try { unsubscribeWSRef.current(); } catch {}
-        unsubscribeWSRef.current = null;
-      }
-      
-      wsManager.close(conversationId);
-      
+      // If we're already subscribed for this conversation, keep it. (The stable handler will
+      // invoke the latest closure via wsEventHandlerRef.)
+      if (unsubscribeWSRef.current) return;
+
       const selectedModel = getPreferredModel();
-      unsubscribeWSRef.current = wsManager.subscribe(conversationId, handleWebSocketEvent, selectedModel);
+      unsubscribeWSRef.current = wsManager.subscribe(
+        conversationId,
+        stableWsHandlerRef.current!,
+        selectedModel
+      );
     };
 
     try {
       abortControllerRef.current = false;
+      // If we have a pending timer that would close the WS after TTS, cancel it when starting a new send.
+      try {
+        if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
+        ttsCloseTimerRef.current = null;
+      } catch {}
+      // If we have a pending idle close (voice keepalive), cancel it when starting a new send.
+      try {
+        if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
+        wsIdleCloseTimerRef.current = null;
+      } catch {}
       ensureSubscription();
 
-      const maxWaitTime = 5000;
+      // Increased timeout for voice chat scenarios where server might be processing previous requests
+      // Also allow CONNECTING state since the connection might be establishing
+      const maxWaitTime = opts?.inputMode === "voice" ? 15000 : 10000;
       const checkInterval = 100;
       const maxAttempts = maxWaitTime / checkInterval;
       
@@ -502,6 +734,15 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         const wsState = wsManager.getState(conversationId);
         if (wsState === WebSocket.OPEN) {
           connected = true;
+          break;
+        }
+        // Don't fail if still connecting - give it more time
+        if (wsState === WebSocket.CONNECTING && i < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          continue;
+        }
+        // If closed or closing, break early
+        if (wsState === WebSocket.CLOSED || wsState === WebSocket.CLOSING) {
           break;
         }
         await new Promise(resolve => setTimeout(resolve, checkInterval));
@@ -513,14 +754,23 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         throw new Error(`WebSocket connection timeout. State: ${wsState}`);
       }
 
-      const messagePayload = {
+      // Use app language (from LanguageProvider) so voice/text chat matches the UI language toggle.
+      const messagePayload: any = {
         message: {
           role: "user",
           content: {
             parts: parts
           }
-        }
+        },
+        language_code: appLanguageCode,
       };
+      if (userContext) {
+        messagePayload.user_context = userContext;
+      }
+      if (opts?.inputMode) {
+        messagePayload.input_mode = opts.inputMode;
+      }
+      expectingTtsRef.current = opts?.inputMode === "voice";
       
       const sent = wsManager.send(conversationId, messagePayload);
       
@@ -554,11 +804,21 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
   };
 
+  // Update the ref when handleSubmit is defined
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
+
   const handleStopRequest = async () => {
     abortControllerRef.current = true;
     setGettingResponse(false);
     
     try {
+      try { ttsPlayerRef.current?.stop(); } catch {}
+      if (unsubscribeWSRef.current) {
+        try { unsubscribeWSRef.current(); } catch {}
+        unsubscribeWSRef.current = null;
+      }
       wsManager.close(conversationId);
       console.log('[WS] Stopped chat by closing WebSocket connection');
     } catch (e) {
@@ -595,11 +855,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           handleNewConversation();
         }
         setOpen(true);
+        primeTtsAudio();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, handleNewConversation]);
+  }, [open, handleNewConversation, primeTtsAudio]);
 
   useEffect(() => {
     // Track when sheet closes
@@ -643,6 +904,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       handleNewConversation();
     }
     setOpen(true);
+    primeTtsAudio();
   };
 
   return (
@@ -653,7 +915,11 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         floating && <FloatingButton onClick={handleOpenSheet} />
       )}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="max-w-full sm:max-w-2xl p-0 gap-0 flex flex-col h-full">
+        <SheetContent
+          side="right"
+          className="max-w-full sm:max-w-2xl p-0 gap-0 flex flex-col h-full"
+          onPointerDown={primeTtsAudio}
+        >
           <div className="flex w-full h-full flex-col justify-between z-5 bg-background rounded-lg">
             {/* Conversation Selector Dropdown */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
@@ -668,7 +934,16 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    const conversationsWithMessages = conversations.filter(conv => conv.messageCount > 0);
+                    // Deduplicate conversations by ID, keeping most recent
+                    const uniqueConversations = Array.from(
+                      new Map(conversations.map(c => [c.id, c])).values()
+                    );
+                    
+                    // Filter to conversations with messages, or include current conversation
+                    const conversationsWithMessages = uniqueConversations.filter(
+                      conv => conv.messageCount > 0 || conv.id === conversationId
+                    );
+                    
                     return conversationsWithMessages.length === 0 ? (
                       <SelectItem value={conversationId} disabled>
                         <span className="text-sm text-muted-foreground">No previous conversations</span>
@@ -705,7 +980,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 </div>
               ) : (
                 <div className="w-full h-full flex flex-col flex-1">
-                  {loading ? (
+                  {false ? (
                     <div className="w-full h-full flex flex-col gap-6 p-4 md:max-w-[900px] mx-auto">
                       {[...Array(5)].map((_, index) => (
                         <div
@@ -803,7 +1078,13 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 ref={textareaRef}
                 onSubmit={handleSubmit}
                 gettingResponse={gettingResponse}
-                setIsListening={() => {}}
+                setIsListening={(v) => {
+                  if (v) startListening();
+                  else stopListening();
+                }}
+                isListening={isListening}
+                voiceLevel={voiceLevel}
+                mediaRecorder={mediaRecorder}
                 handleStopRequest={handleStopRequest}
                 conversationId={conversationId}
               />

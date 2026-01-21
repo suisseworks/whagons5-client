@@ -45,7 +45,8 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
         } as React.CSSProperties}
       >
         <div className="flex h-screen w-full overflow-hidden bg-background">
-          {!isWelcome && <AppSidebar overlayOnExpand={false} />}
+          {/* Keep the sidebar animation, but avoid continuously resizing the main content (AG Grid) while expanding */}
+          {!isWelcome && <AppSidebar overlayOnExpand={true} />}
           {!isWelcome && <SidebarRail />}
           <SidebarInset className="flex flex-col">
             {!isWelcome && <Header />}

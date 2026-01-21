@@ -77,7 +77,7 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
             <FontAwesomeIcon
               icon={faLock}
               className="w-3 h-3 text-muted-foreground"
-              title={tt('grid.values.privateTemplate', 'Private template')}
+              title="Private template"
             />
           )}
         </div>
@@ -164,6 +164,9 @@ function Templates() {
 
   // Local state for form values
   const [createFormData, setCreateFormData] = useState({
+    name: '',
+    description: '',
+    instructions: '',
     category_id: '',
     priority_id: '',
     sla_id: '',
@@ -176,6 +179,9 @@ function Templates() {
   });
 
   const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: '',
+    instructions: '',
     category_id: '',
     priority_id: '',
     sla_id: '',
@@ -211,6 +217,9 @@ function Templates() {
 
       // Set form data values
       setEditFormData({
+        name: editingTemplate.name || '',
+        description: (editingTemplate as any).description || '',
+        instructions: (editingTemplate as any).instructions || '',
         category_id: categoryId?.toString() || '',
         priority_id: validPriorityId,
         sla_id: (editingTemplate as any).sla_id?.toString() || '',
@@ -600,7 +609,25 @@ function Templates() {
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
-          onClick={() => openSummary(params.data as Template)}
+          data-grid-stop-row-click="true"
+          onPointerDown={(e) => {
+            // Prevent AG Grid from treating this as a row click (which would open Edit)
+            e.preventDefault();
+            e.stopPropagation();
+            // Radix/AG Grid can listen above React; stop the native event too
+            (e.nativeEvent as any)?.stopImmediatePropagation?.();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            (e.nativeEvent as any)?.stopImmediatePropagation?.();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            (e.nativeEvent as any)?.stopImmediatePropagation?.();
+            openSummary(params.data as Template);
+          }}
           title={tt('grid.columns.summary', 'Summary')}
           aria-label={tt('grid.columns.summary', 'Summary')}
         >
@@ -738,9 +765,7 @@ function Templates() {
       field: 'actions',
       headerName: tt('grid.columns.actions', 'Actions'),
       width: 100,
-      cellRenderer: createActionsCellRenderer({
-        onEdit: handleEdit
-      }),
+      cellRenderer: () => null,
       sortable: false,
       filter: false,
       resizable: false,
@@ -754,17 +779,8 @@ function Templates() {
     setFormError(null); // Clear any previous errors
     
     try {
-      const formData = new FormData(e.target as HTMLFormElement);
-
-      // Get form values
-      const name = formData.get('name') as string;
-      const description = (formData.get('description') as string) || null;
-      const instructions = (formData.get('instructions') as string) || null;
-      const enabled = formData.get('enabled') === 'on';
-      const expectedDurationRaw = formData.get('expected_duration') as string;
-
       // Validate required fields
-      if (!name?.trim()) {
+      if (!createFormData.name?.trim()) {
         const errorMsg = tt('validation.nameRequired', 'Template name is required');
         setFormError(errorMsg);
         return;
@@ -776,8 +792,8 @@ function Templates() {
       }
 
       const templateData: any = {
-        name: name.trim(),
-        description,
+        name: createFormData.name.trim(),
+        description: createFormData.description || null,
         category_id: parseInt(createFormData.category_id),
         priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
         sla_id: createFormData.sla_id ? parseInt(createFormData.sla_id) : null,
@@ -785,9 +801,9 @@ function Templates() {
         default_spot_id: createFormData.spots_not_applicable ? null : (createFormData.default_spot_id ? parseInt(createFormData.default_spot_id) : null),
         spots_not_applicable: createFormData.spots_not_applicable,
         default_user_ids: (Array.isArray(createDefaultUserValues) && createDefaultUserValues.length > 0) ? createDefaultUserValues.map(id => Number(id)) : null,
-        instructions,
-        expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
-        enabled,
+        instructions: createFormData.instructions || null,
+        expected_duration: (() => { const n = parseInt(createFormData.expected_duration || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+        enabled: createFormData.enabled,
         is_private: createFormData.is_private
       };
 
@@ -800,6 +816,9 @@ function Templates() {
 
       // Reset form after successful creation
       setCreateFormData({
+        name: '',
+        description: '',
+        instructions: '',
         category_id: '',
         priority_id: '',
         sla_id: '',
@@ -826,17 +845,8 @@ function Templates() {
     if (!editingTemplate) return;
 
     try {
-      const formData = new FormData(e.target as HTMLFormElement);
-
-      // Get form values
-      const name = (formData.get('name') as string) ?? ((editingTemplate as any)?.name ?? '');
-      const description = ((formData.get('description') as string) ?? (editingTemplate as any)?.description ?? null) as any;
-      const instructions = ((formData.get('instructions') as string) ?? (editingTemplate as any)?.instructions ?? null) as any;
-      // enabled state handled via editFormData.enabled
-      const expectedDurationRaw = (formData.get('expected_duration') as string) ?? (((editingTemplate as any)?.expected_duration != null) ? String((editingTemplate as any).expected_duration) : '');
-
       // Validate required fields
-      if (!name?.toString()?.trim()) {
+      if (!editFormData.name?.toString()?.trim()) {
         const errorMsg = tt('validation.nameRequired', 'Template name is required');
         setFormError(errorMsg);
         return;
@@ -848,8 +858,8 @@ function Templates() {
       }
 
       const updates: any = {
-        name: name.trim(),
-        description,
+        name: editFormData.name.trim(),
+        description: editFormData.description || null,
         category_id: parseInt(editFormData.category_id),
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
         sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
@@ -857,8 +867,8 @@ function Templates() {
         default_spot_id: editFormData.spots_not_applicable ? null : (editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : null),
         spots_not_applicable: editFormData.spots_not_applicable,
         default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
-        instructions,
-        expected_duration: (() => { const n = parseInt(expectedDurationRaw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+        instructions: editFormData.instructions || null,
+        expected_duration: (() => { const n = parseInt(editFormData.expected_duration || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
         enabled: editFormData.enabled,
         is_private: editFormData.is_private
       };
@@ -882,8 +892,8 @@ function Templates() {
     if (!editingTemplate) return;
     try {
       const updates: any = {
-        name: (editingTemplate as any).name || '',
-        description: (editingTemplate as any).description ?? null,
+        name: editFormData.name || '',
+        description: editFormData.description ?? null,
         category_id: editFormData.category_id ? parseInt(editFormData.category_id) : (editingTemplate as any).category_id,
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : ((editingTemplate as any).priority_id ?? null),
         sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : ((editingTemplate as any).sla_id ?? null),
@@ -891,8 +901,8 @@ function Templates() {
         default_spot_id: editFormData.spots_not_applicable ? null : (editFormData.default_spot_id ? parseInt(editFormData.default_spot_id) : ((editingTemplate as any).default_spot_id ?? null)),
         spots_not_applicable: editFormData.spots_not_applicable,
         default_user_ids: (Array.isArray(editDefaultUserValues) && editDefaultUserValues.length > 0) ? editDefaultUserValues.map(id => Number(id)) : null,
-        instructions: (editingTemplate as any).instructions ?? null,
-        expected_duration: (() => { const raw: any = (document.getElementById('edit-expected_duration') as HTMLInputElement | null)?.value; const n = parseInt(raw || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
+        instructions: editFormData.instructions ?? null,
+        expected_duration: (() => { const n = parseInt(editFormData.expected_duration || ''); return Number.isFinite(n) && n > 0 ? n : 0; })(),
         enabled: editFormData.enabled,
         is_private: editFormData.is_private
       };
@@ -1405,6 +1415,9 @@ function Templates() {
           } else {
             // Reset form data when closing create dialog
             setCreateFormData({
+              name: '',
+              description: '',
+              instructions: '',
               category_id: '',
               priority_id: '',
               sla_id: '',
@@ -1448,13 +1461,22 @@ function Templates() {
         <div className="grid gap-4 min-h-[320px]">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">{tt('dialogs.create.fields.name', 'Name *')}</Label>
-            <Input id="name" name="name" className="col-span-3" required />
+            <Input 
+              id="name" 
+              name="name" 
+              value={createFormData.name}
+              onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="col-span-3" 
+              required 
+            />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="description" className="text-right pt-2">{tt('dialogs.create.fields.description', 'Description')}</Label>
             <textarea 
               id="description" 
               name="description" 
+              value={createFormData.description}
+              onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
               className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]" 
             />
           </div>
@@ -1588,13 +1610,37 @@ function Templates() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="expected_duration" className="text-right">{tt('dialogs.create.fields.expectedDuration', 'Expected Duration (min)')}</Label>
-                <Input id="expected_duration" name="expected_duration" type="number" min="0" step="1" placeholder={tt('dialogs.create.fields.expectedDurationPlaceholder', 'e.g. 90')} className="col-span-3" />
+                <Input 
+                  id="expected_duration" 
+                  name="expected_duration" 
+                  type="number" 
+                  min="0" 
+                  step="1" 
+                  value={createFormData.expected_duration}
+                  onChange={(e) => setCreateFormData(prev => ({ ...prev, expected_duration: e.target.value }))}
+                  placeholder={tt('dialogs.create.fields.expectedDurationPlaceholder', 'e.g. 90')} 
+                  className="col-span-3" 
+                />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="instructions" className="text-right pt-2">{tt('dialogs.create.fields.instructions', 'Instructions')}</Label>
-                <textarea id="instructions" name="instructions" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder={tt('dialogs.create.fields.instructionsPlaceholder', 'Enter detailed instructions...')} />
+                <textarea 
+                  id="instructions" 
+                  name="instructions" 
+                  value={createFormData.instructions}
+                  onChange={(e) => setCreateFormData(prev => ({ ...prev, instructions: e.target.value }))}
+                  className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" 
+                  placeholder={tt('dialogs.create.fields.instructionsPlaceholder', 'Enter detailed instructions...')} 
+                />
               </div>
-              <CheckboxField id="enabled" name="enabled" label={tt('dialogs.create.fields.status', 'Status')} defaultChecked={true} description={tt('dialogs.create.fields.enabled', 'Enabled')} />
+              <CheckboxField 
+                id="enabled" 
+                name="enabled" 
+                label={tt('dialogs.create.fields.status', 'Status')} 
+                checked={createFormData.enabled}
+                onChange={(checked) => setCreateFormData(prev => ({ ...prev, enabled: checked }))}
+                description={tt('dialogs.create.fields.enabled', 'Enabled')} 
+              />
               <CheckboxField 
                 id="is_private" 
                 label={tt('dialogs.create.fields.privateTemplate', 'Private Template')}
@@ -1620,6 +1666,9 @@ function Templates() {
           } else {
             // Reset form data when closing edit dialog
             setEditFormData({
+              name: '',
+              description: '',
+              instructions: '',
               category_id: '',
               priority_id: '',
               sla_id: '',
@@ -1648,11 +1697,13 @@ function Templates() {
         <Button
           type="button"
           variant="destructive"
+          size="icon"
           onClick={() => editingTemplate && handleDeleteTemplate(editingTemplate)}
           disabled={isSubmitting}
+          title={tt('dialogs.edit.delete', 'Delete')}
+          aria-label={tt('dialogs.edit.delete', 'Delete')}
         >
-          <FontAwesomeIcon icon={faTrash} className="mr-2" />
-          {tt('dialogs.edit.delete', 'Delete')}
+          <FontAwesomeIcon icon={faTrash} />
         </Button>
       ) : undefined}
       >
@@ -1683,7 +1734,8 @@ function Templates() {
               <Input
                 id="edit-name"
                 name="name"
-                defaultValue={editingTemplate.name}
+                value={editFormData.name}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
                 className="col-span-3"
                 required
               />
@@ -1693,7 +1745,8 @@ function Templates() {
               <textarea
                 id="edit-description"
                 name="description"
-                defaultValue={(editingTemplate as any).description || ''}
+                value={editFormData.description}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[80px]"
               />
             </div>
@@ -1890,11 +1943,27 @@ function Templates() {
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-expected_duration" className="text-right">{tt('dialogs.edit.fields.expectedDuration', 'Expected Duration (min)')}</Label>
-                  <Input id="edit-expected_duration" name="expected_duration" type="number" min="0" step="1" defaultValue={(editingTemplate as any).expected_duration != null ? String((editingTemplate as any).expected_duration) : ''} className="col-span-3" />
+                  <Input 
+                    id="edit-expected_duration" 
+                    name="expected_duration" 
+                    type="number" 
+                    min="0" 
+                    step="1" 
+                    value={editFormData.expected_duration}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, expected_duration: e.target.value }))}
+                    className="col-span-3" 
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
                   <Label htmlFor="edit-instructions" className="text-right pt-2">{tt('dialogs.edit.fields.instructions', 'Instructions')}</Label>
-                  <textarea id="edit-instructions" name="instructions" defaultValue={(editingTemplate as any).instructions || ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" placeholder={tt('dialogs.edit.fields.instructionsPlaceholder', 'Enter detailed instructions...')} />
+                  <textarea 
+                    id="edit-instructions" 
+                    name="instructions" 
+                    value={editFormData.instructions}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, instructions: e.target.value }))}
+                    className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent min-h-[120px]" 
+                    placeholder={tt('dialogs.edit.fields.instructionsPlaceholder', 'Enter detailed instructions...')} 
+                  />
                 </div>
                 <CheckboxField id="edit-enabled" label={tt('dialogs.edit.fields.enabled', 'Enabled')} checked={editFormData.enabled} onChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))} description={tt('dialogs.edit.fields.enabledDesc', 'Enable this template')} />
                 <CheckboxField 

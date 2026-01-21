@@ -2,11 +2,16 @@ import React, { useState, useEffect, useRef, forwardRef } from "react";
 import { ContentItem, ImageData, PdfData } from "../models";
 import WaveIcon from "./WaveIcon";
 import { api } from "@/store/api/internalApi";
+import { MicOff } from "lucide-react";
+import { LiveAudioVisualizer } from "react-audio-visualize";
 
 interface ChatInputProps {
   onSubmit: (content: string | ContentItem[]) => void;
   gettingResponse: boolean;
   setIsListening?: (isListening: boolean) => void;
+  isListening?: boolean;
+  voiceLevel?: number; // 0..1 (smoothed)
+  mediaRecorder?: MediaRecorder | null;
   handleStopRequest: () => void;
   conversationId: string;
 }
@@ -26,6 +31,8 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
   const [pendingUploads, setPendingUploads] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const visualizerWrapRef = useRef<HTMLDivElement | null>(null);
+  const [visualizerWidth, setVisualizerWidth] = useState<number>(320);
   
   // Ref callback to handle both forwarded ref and internal ref
   const setTextareaRef = (element: HTMLTextAreaElement | null) => {
@@ -207,10 +214,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
         if (textInputRef.current) {
           textInputRef.current.style.height = '56px';
         }
-        // Refocus the textarea after submission
-        setTimeout(() => {
-          textInputRef.current?.focus();
-        }, 0);
+        // Refocus the textarea after submission and clearing
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            textInputRef.current?.focus();
+          }, 10);
+        });
       } else if (currentContent.length > 0) {
         const validContent = currentContent.filter(item => {
           if ((isImageData(item.content) || isPdfData(item.content)) && item.content.serverUrl && !item.content.isUploading) {
@@ -238,10 +247,12 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
         if (textInputRef.current) {
           textInputRef.current.style.height = '56px';
         }
-        // Refocus the textarea after submission
-        setTimeout(() => {
-          textInputRef.current?.focus();
-        }, 0);
+        // Refocus the textarea after submission and clearing
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            textInputRef.current?.focus();
+          }, 10);
+        });
       }
     }
   };
@@ -260,6 +271,23 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
     }
     setContent(prev => prev.filter((_, i) => i !== index));
   };
+
+  useEffect(() => {
+    const el = visualizerWrapRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const next = Math.max(220, Math.min(700, Math.floor(el.clientWidth || 320)));
+      setVisualizerWidth(next);
+    };
+
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => {
+      try { ro.disconnect(); } catch {}
+    };
+  }, []);
 
   return (
     <div className="flex flex-col gap-2">
@@ -365,8 +393,31 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               placeholder="Type your message here..."
               autoComplete="off"
               spellCheck={false}
-              disabled={isUploading() || props.gettingResponse}
+              disabled={isUploading() || props.isListening}
             />
+
+            {props.isListening && props.mediaRecorder && (
+              <div className="w-full px-2 pb-1 -mt-1">
+                <div className="w-full" ref={visualizerWrapRef}>
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border/50 bg-muted/15">
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,120,212,0.10),rgba(0,180,216,0.08),rgba(0,212,170,0.10))]" />
+                    <div className="relative px-2 py-1">
+                      <LiveAudioVisualizer
+                        mediaRecorder={props.mediaRecorder}
+                        width={visualizerWidth}
+                        height={38}
+                        barWidth={2}
+                        gap={1}
+                        fftSize={512}
+                        smoothingTimeConstant={0.8}
+                        barColor="rgb(0, 180, 216)"
+                        backgroundColor="transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-1 pb-3">
               <div className="flex items-center gap-2">
@@ -384,29 +435,57 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               </div>
               <div className="flex items-center">
                 {props.gettingResponse ? (
-                  <button
-                    type="button"
-                    title="Stop response"
-                    className="rounded-xl w-11 h-11 bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors"
-                    onClick={props.handleStopRequest}
-                    aria-label="Stop response"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
+                  props.isListening ? (
+                    // Voice combo mode: one button stops both chat + mic.
+                    <button
+                      type="button"
+                      title="Stop voice chat"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => {
+                        try { props.handleStopRequest(); } catch {}
+                        try { props.setIsListening?.(false); } catch {}
+                      }}
+                      disabled={isUploading()}
+                      aria-label="Stop voice chat"
                     >
-                      <rect x="6" y="6" width="12" height="12" />
-                    </svg>
-                  </button>
+                      <MicOff className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      title="Stop response"
+                      className="rounded-xl w-11 h-11 bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors"
+                      onClick={props.handleStopRequest}
+                      aria-label="Stop response"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <rect x="6" y="6" width="12" height="12" />
+                      </svg>
+                    </button>
+                  )
                 ) : (
-                  textInput.trim() === "" && content.length === 0 ? (
+                  props.isListening ? (
+                    <button
+                      type="button"
+                      title="Stop listening"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => props.setIsListening?.(false)}
+                      disabled={isUploading()}
+                      aria-label="Stop voice input"
+                    >
+                      <MicOff className="w-5 h-5" />
+                    </button>
+                  ) : textInput.trim() === "" && content.length === 0 ? (
                     <button
                       type="button"
                       title="Start listening"
-                      className="rounded-xl w-11 h-11 bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center transition-colors"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => props.setIsListening?.(true)}
                       disabled={isUploading()}
                       aria-label="Start voice input"
@@ -416,7 +495,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
                   ) : (
                     <button
                       type="button"
-                      className="rounded-xl w-11 h-11 bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center transition-colors"
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={handleSubmit}
                       aria-label="Send message"
                     >

@@ -41,7 +41,7 @@ import {
   createGridContainer,
 } from './workspaceTable/grid/gridConfig';
 import { setupTaskEventHandlers } from './workspaceTable/handlers';
-import { buildWorkspaceColumns } from './workspaceTable/columns';
+import { buildWorkspaceColumns } from './workspaceTable/columns/index';
 import {
   useGridReduxState,
   useDerivedGridState,
@@ -238,7 +238,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   );
 
   const getDoneStatusId = useDoneStatusId(globalStatusesRef);
-  const handleChangeStatus = useStatusChange(statusMap, getDoneStatusId, categories);
+  const handleChangeStatus = useStatusChange(statusMap, getDoneStatusId, categories, stableTaskApprovalInstances, approvalMap);
 
   const { useClientSide, clientRows, setClientRows } = useWorkspaceTableMode({
     gridApi: gridRef.current?.api,
