@@ -230,11 +230,6 @@ function Sidebar({
             ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
             : "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+2px)]"
         )}
-        style={
-          overlayExpanded && state === "expanded"
-            ? ({ width: 'var(--sidebar-width-icon)' } as React.CSSProperties)
-            : undefined
-        }
       />
       <div
         data-slot="sidebar-container"
