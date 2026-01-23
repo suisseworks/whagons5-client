@@ -382,7 +382,6 @@ function Settings() {
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const tags = useSelector((s: RootState) => s.tags?.value ?? []);
   const workflows = useSelector((s: RootState) => (s as any).workflows?.value ?? []);
-  const plugins = useSelector((s: RootState) => (s as any).plugins?.value ?? []);
 
   const counts = useMemo(() => {
     return {
@@ -1314,120 +1313,6 @@ function Settings() {
                 </SortableContext>
               </DndContext>
             )}
-          </div>
-        </motion.div>
-      )
-    },
-    {
-      value: 'plugins',
-      label: t('settings.tabs.plugins', 'Plugins'),
-      content: (
-        <motion.div
-          className="space-y-4 flex-1 h-full"
-          key="plugins"
-          initial={{ x: getSettingsTabInitialX(prevActiveTab, 'plugins') }}
-          animate={{ x: 0 }}
-          transition={SETTINGS_TAB_ANIMATION.transition}
-        >
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              {t('settings.plugins.description', 'Configure settings for enabled plugins')}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {(() => {
-                // Plugin display info mapping
-                const pluginInfoMap: Record<string, { icon: any; color: string; settingsRoute: string; mainRoute?: string }> = {
-                  'kpi-cards': {
-                    icon: faChartBar,
-                    color: 'text-blue-500',
-                    settingsRoute: '/settings/kpi-cards',
-                    mainRoute: '/settings/kpi-cards/manage'
-                  },
-                  'gamification': {
-                    icon: faTrophy,
-                    color: 'text-purple-500',
-                    settingsRoute: '/settings/gamification',
-                    mainRoute: '/gamification'
-                  },
-                  'analytics': {
-                    icon: faChartLine,
-                    color: 'text-blue-500',
-                    settingsRoute: '/settings/analytics',
-                    mainRoute: '/analytics'
-                  },
-                  'motivation': {
-                    icon: faRocket,
-                    color: 'text-yellow-500',
-                    settingsRoute: '/settings/motivation',
-                    mainRoute: '/motivation'
-                  },
-                  'boards': {
-                    icon: faUsers,
-                    color: 'text-violet-500',
-                    settingsRoute: '/settings/boards',
-                    mainRoute: '/boards'
-                  },
-                  'broadcasts': {
-                    icon: faBell,
-                    color: 'text-red-500',
-                    settingsRoute: '/settings/broadcasts',
-                    mainRoute: '/broadcasts'
-                  },
-                  'compliance': {
-                    icon: faFileAlt,
-                    color: 'text-emerald-500',
-                    settingsRoute: '/settings/compliance',
-                    mainRoute: '/compliance/standards'
-                  },
-                };
-
-                // Get enabled plugins that have display info
-                const enabledPlugins = plugins.filter(p => p.is_enabled && pluginInfoMap[p.slug]);
-                
-                if (enabledPlugins.length === 0) {
-                  return (
-                    <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
-                      <FontAwesomeIcon icon={faCog} className="mb-3 text-4xl" />
-                      <p className="font-medium">{t('settings.plugins.noPlugins', 'No plugins require configuration')}</p>
-                      <p className="text-sm">{t('settings.plugins.noPluginsDescription', 'Enable plugins in the admin panel to see them here')}</p>
-                    </div>
-                  );
-                }
-
-                return enabledPlugins.map((plugin) => {
-                  const info = pluginInfoMap[plugin.slug];
-                  if (!info) return null;
-
-                  return (
-                    <Card
-                      key={plugin.slug}
-                      className="transition-all duration-300 hover:shadow-xl hover:scale-[1.03] hover:-translate-y-1 cursor-pointer h-[180px] overflow-hidden border-2 hover:border-primary/20"
-                      onClick={() => navigate(info.settingsRoute)}
-                    >
-                      <CardHeader className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className={`text-4xl ${info.color}`}>
-                            <FontAwesomeIcon icon={info.icon} />
-                          </div>
-                          <Badge variant="outline" className="font-semibold text-xs px-2 py-0.5 opacity-80">
-                            Enabled
-                          </Badge>
-                        </div>
-                        <div className="space-y-2">
-                          <CardTitle className="text-2xl font-bold">
-                            {plugin.name || t(`plugins.${plugin.slug}.title`, plugin.slug)}
-                          </CardTitle>
-                          <CardDescription>
-                            {plugin.description || t(`plugins.${plugin.slug}.description`, '')}
-                          </CardDescription>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  );
-                });
-              })()}
-            </div>
           </div>
         </motion.div>
       )

@@ -262,19 +262,10 @@ function Spots() {
       width: 160,
       cellRenderer: ColorIndicatorCellRenderer as any,
       cellRendererParams: (p: any) => ({ name: p.data?.spot_type_name, color: p.data?.spot_type_color })
-    },
+    }
     // Tasks column removed per request
     // Updated column removed per request
-    {
-      field: 'actions',
-      headerName: ts('grid.columns.actions', 'Actions'),
-      width: 100,
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
-    }
+    // Actions column removed per request
   ], [handleEdit, handleDelete, spotTypes]);
 
   // Grid options for tree data with hierarchical selection

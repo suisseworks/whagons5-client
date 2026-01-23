@@ -598,26 +598,28 @@ export class TasksCache {
 
         // Match backend canonicalization exactly (must mirror wh_tasks hash trigger SQL)
 
+        // Normalize all numeric fields to ensure type consistency with backend (which uses direct values)
+        // Backend hash trigger order: id, name, description, workspace_id, category_id, team_id, template_id, spot_id, status_id, priority_id, approval_id, dates, durations, updated_at
         const row = [
-            task.id,
+            Number(task.id) || 0,
             (task as any).name || '',
             (task as any).description || '',
-            (task as any).workspace_id,
-            (task as any).category_id,
-            (task as any).team_id,
-            (task as any).template_id || 0,
-            (task as any).spot_id || 0,
-            (task as any).status_id,
-            (task as any).priority_id,
-            (task as any).approval_id || 0,
+            Number((task as any).workspace_id) || 0,
+            Number((task as any).category_id) || 0,
+            Number((task as any).team_id) || 0,
+            Number((task as any).template_id) || 0,
+            Number((task as any).spot_id) || 0,
+            Number((task as any).status_id) || 0, // Ensure number for hash consistency
+            Number((task as any).priority_id) || 0, // Ensure number for hash consistency
+            Number((task as any).approval_id) || 0,
             // Timestamps normalized to UTC epoch ms (empty string when falsy)
             this.toUtcEpochMs((task as any).start_date),
             this.toUtcEpochMs((task as any).due_date),
-            (task as any).expected_duration,
+            Number((task as any).expected_duration) || 0,
             this.toUtcEpochMs((task as any).response_date),
             this.toUtcEpochMs((task as any).resolution_date),
-            (task as any).work_duration,
-            (task as any).pause_duration,
+            Number((task as any).work_duration) || 0,
+            Number((task as any).pause_duration) || 0,
             this.toUtcEpochMs((task as any).updated_at)
         ].join('|');
         return sha256(row).toString(encHex);

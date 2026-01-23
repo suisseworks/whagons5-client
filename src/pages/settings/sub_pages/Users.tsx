@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser, faChartBar, faEnvelope, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
@@ -111,7 +113,6 @@ function Users() {
     name: string;
     email: string;
     job_position_id: string;
-    organization_name: string;
     color: string;
     is_admin: boolean;
     has_active_subscription: boolean;
@@ -119,7 +120,6 @@ function Users() {
     name: '',
     email: '',
     job_position_id: '',
-    organization_name: '',
     color: '',
     is_admin: false,
     has_active_subscription: false
@@ -130,29 +130,31 @@ function Users() {
   const [selectedGlobalRoles, setSelectedGlobalRoles] = useState<string[]>([]);
   const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
-  const [isTeamsDialogOpen, setIsTeamsDialogOpen] = useState(false);
-  const [teamsDialogUser, setTeamsDialogUser] = useState<UserData | null>(null);
-  const [teamAssignments, setTeamAssignments] = useState<Array<{ id?: number; teamId: string; roleId: string; key: string }>>([]);
-  const [isSavingTeams, setIsSavingTeams] = useState(false);
+  // Team-role assignments for edit dialog
+  const [editTeamAssignments, setEditTeamAssignments] = useState<Array<{ id?: number; teamId: string; roleId: string; key: string }>>([]);
 
   // Create form state
   const [createFormData, setCreateFormData] = useState<{
     name: string;
     email: string;
     job_position_id: string;
-    organization_name: string;
     color: string;
+    organization_name: string;
     is_admin: boolean;
     has_active_subscription: boolean;
   }>({
     name: '',
     email: '',
     job_position_id: '',
-    organization_name: '',
     color: '',
+    organization_name: '',
     is_admin: false,
     has_active_subscription: false
   });
+
+  // Merged Add User dialog state
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [addUserActiveTab, setAddUserActiveTab] = useState<'create' | 'invite'>('create');
 
   // Update form data when editing user changes
   useEffect(() => {
@@ -161,7 +163,6 @@ function Users() {
         name: editingUser.name || '',
         email: editingUser.email || '',
         job_position_id: editingUser.job_position_id != null ? editingUser.job_position_id.toString() : '',
-        organization_name: editingUser.organization_name || '',
         color: editingUser.color || '',
         is_admin: !!editingUser.is_admin,
         has_active_subscription: !!editingUser.has_active_subscription
@@ -170,6 +171,15 @@ function Users() {
       // Load existing user-team relationships
       const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
       setSelectedTeams(existingUserTeams.map((ut: UserTeam) => ut.team_id.toString()));
+      
+      // Initialize team-role assignments for edit dialog
+      const assignments: Array<{ id?: number; teamId: string; roleId: string; key: string }> = existingUserTeams.map((ut) => ({
+        id: ut.id,
+        teamId: String(ut.team_id),
+        roleId: getUserTeamRoleId(ut) != null ? String(getUserTeamRoleId(ut)) : '',
+        key: `existing-${ut.id}`
+      }));
+      setEditTeamAssignments(assignments);
 
       // Load existing global roles - extract role names from role objects
       const roleNames = Array.isArray(editingUser.global_roles) 
@@ -180,154 +190,63 @@ function Users() {
       // Reset selected teams and global roles when dialog closes
       setSelectedTeams([]);
       setSelectedGlobalRoles([]);
+      setEditTeamAssignments([]);
     }
   }, [editingUser, userTeams]);
 
-  // Reset create form when create dialog closes
+  // Reset create form when add user dialog closes (and we're on create tab)
   useEffect(() => {
-    if (!isCreateDialogOpen) {
+    if (!isAddUserDialogOpen || addUserActiveTab !== 'create') {
       setCreateFormData({
         name: '',
         email: '',
         job_position_id: '',
-        organization_name: '',
         color: '',
+        organization_name: '',
         is_admin: false,
         has_active_subscription: false
       });
       setCreateSelectedTeams([]);
     }
-  }, [isCreateDialogOpen]);
+  }, [isAddUserDialogOpen, addUserActiveTab]);
 
-  const handleOpenTeamsDialog = (user: UserData) => {
-    setTeamsDialogUser(user);
-    const related = userTeams.filter((ut: UserTeam) => ut.user_id === user.id);
-    const assignments: Array<{ id?: number; teamId: string; roleId: string; key: string }> = related.map((ut) => ({
-      id: ut.id,
-      teamId: String(ut.team_id),
-      roleId: getUserTeamRoleId(ut) != null ? String(getUserTeamRoleId(ut)) : '',
-      key: `existing-${ut.id}`
+  // Handle team selection changes in edit dialog
+  const handleEditTeamsChange = (teamIds: string[]) => {
+    setSelectedTeams(teamIds);
+    
+    // Update team assignments based on selected teams
+    const currentTeamIds = new Set(teamIds);
+    const existingAssignments = editTeamAssignments.filter(a => currentTeamIds.has(a.teamId));
+    const newTeamIds = teamIds.filter(id => !editTeamAssignments.some(a => a.teamId === id));
+    
+    // Get default role (prefer "user" or "usuario", otherwise first TEAM role)
+    const teamRoles = roles.filter((r: Role) => r.scope === 'TEAM');
+    const defaultRole = teamRoles.length > 0
+      ? (teamRoles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || teamRoles[0])
+      : null;
+    const defaultRoleId = defaultRole ? String(defaultRole.id) : '';
+    
+    // Add new team assignments with default role
+    const newAssignments = newTeamIds.map(teamId => ({
+      teamId,
+      roleId: defaultRoleId,
+      key: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
     }));
-    setTeamAssignments(assignments);
-    setIsTeamsDialogOpen(true);
+    
+    setEditTeamAssignments([...existingAssignments, ...newAssignments]);
   };
 
-  const handleCloseTeamsDialog = () => {
-    setIsTeamsDialogOpen(false);
-    setTeamsDialogUser(null);
-    setTeamAssignments([]);
-    setIsSavingTeams(false);
-  };
-
-  const addTeamAssignment = () => {
-    const usedTeamIds = new Set(teamAssignments.map((a) => a.teamId));
-    const firstAvailable = teams.find((t) => !usedTeamIds.has(String(t.id)));
-    if (!firstAvailable) {
-      setFormError(tu('dialogs.manageTeams.noAvailableTeams', 'No more teams available to add.'));
-      return;
-    }
-    setTeamAssignments((prev) => [
-      ...prev,
-      {
-        teamId: String(firstAvailable.id),
-        roleId: '',
-        key: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
-      }
-    ]);
-  };
-
-  const updateAssignment = (key: string, patch: Partial<{ teamId: string; roleId: string }>) => {
-    setTeamAssignments((prev) =>
+  const updateEditAssignment = (key: string, patch: Partial<{ teamId: string; roleId: string }>) => {
+    setEditTeamAssignments((prev) =>
       prev.map((a) => (a.key === key ? { ...a, ...patch } : a))
     );
   };
 
-  const removeAssignment = (key: string) => {
-    setTeamAssignments((prev) => prev.filter((a) => a.key !== key));
-  };
-
-  const handleSaveTeams = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!teamsDialogUser) return;
-    setIsSavingTeams(true);
-    setFormError(null);
-    try {
-      const existing = userTeams.filter((ut) => ut.user_id === teamsDialogUser.id);
-      const isEmpty = teamAssignments.length === 0;
-      const current = isEmpty
-        ? []
-        : teamAssignments.map((a) => ({
-            ...a,
-            teamIdNum: Number(a.teamId),
-            roleIdNum: a.roleId ? Number(a.roleId) : null
-          }));
-
-      if (!isEmpty) {
-        if (current.some((c) => !c.teamId || Number.isNaN(c.teamIdNum))) {
-          setFormError(tu('dialogs.manageTeams.errors.teamRequired', 'Selecciona un equipo para cada fila.'));
-          setIsSavingTeams(false);
-          return;
-        }
-        if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
-          setFormError(tu('dialogs.manageTeams.errors.roleRequired', 'Selecciona un rol para cada equipo.'));
-          setIsSavingTeams(false);
-          return;
-        }
-        const duplicate = current.find((c, idx) => current.findIndex((d) => d.teamIdNum === c.teamIdNum) !== idx);
-        if (duplicate) {
-          setFormError(tu('dialogs.manageTeams.errors.duplicateTeam', 'No puedes repetir el mismo equipo.'));
-          setIsSavingTeams(false);
-          return;
-        }
-      }
-
-      const toAdd = current.filter((c) => c.id == null);
-      const toUpdate = current.filter((c) => {
-        const match = existing.find((ex) => ex.id === c.id);
-        if (!match) return false;
-        return match.team_id !== c.teamIdNum || getUserTeamRoleId(match) !== c.roleIdNum;
-      });
-      const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
-
-      for (const add of toAdd) {
-        await dispatch((genericActions as any).userTeams.addAsync({
-          user_id: teamsDialogUser.id,
-          team_id: add.teamIdNum,
-          role_id: add.roleIdNum
-        })).unwrap();
-      }
-
-      for (const upd of toUpdate) {
-        await dispatch((genericActions as any).userTeams.updateAsync({
-          id: upd.id,
-          updates: {
-            team_id: upd.teamIdNum,
-            role_id: upd.roleIdNum
-          }
-        })).unwrap();
-      }
-
-      for (const del of toRemove) {
-        await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
-      }
-
-      // Refresh local cache
-      // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
-      handleCloseTeamsDialog();
-    } catch (err: any) {
-      // Provide better error messages for network errors
-      let errorMessage = 'Error updating teams';
-      if (err?.message?.includes('Network Error') || err?.code === 'ERR_NETWORK' || err?.code === 'ERR_CONNECTION_REFUSED') {
-        errorMessage = 'Unable to connect to the server. Please check if the API server is running.';
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      }
-      setFormError(errorMessage);
-      console.error('Error saving teams:', err);
-    } finally {
-      setIsSavingTeams(false);
+  const removeEditAssignment = (key: string) => {
+    const assignment = editTeamAssignments.find(a => a.key === key);
+    if (assignment) {
+      setSelectedTeams(prev => prev.filter(id => id !== assignment.teamId));
+      setEditTeamAssignments(prev => prev.filter((a) => a.key !== key));
     }
   };
 
@@ -345,7 +264,6 @@ function Users() {
     const noJobPositionLabel = tu('grid.values.noJobPosition', 'No Job Position');
     const activeLabel = tu('grid.values.active', 'Active');
     const inactiveLabel = tu('grid.values.inactive', 'Inactive');
-    const manageTeamsLabel = tu('grid.actions.manageTeams', 'Teams');
 
     return [
       {
@@ -458,24 +376,14 @@ function Users() {
         field: 'actions',
         headerName: columnLabels.actions,
         width: 220,
-        cellRenderer: createActionsCellRenderer({
-          customActions: [
-            {
-              icon: faUsers,
-              label: manageTeamsLabel,
-              variant: "secondary",
-              className: "p-1 h-7",
-              onClick: (data: UserData) => handleOpenTeamsDialog(data)
-            }
-          ]
-        }),
+        cellRenderer: createActionsCellRenderer({}),
         sortable: false,
         filter: false,
         resizable: false,
         pinned: 'right'
       }
     ];
-  }, [teams, jobPositions, userTeams, handleEdit, handleDelete, handleOpenTeamsDialog, t]);
+  }, [teams, jobPositions, userTeams, handleEdit, handleDelete, t]);
 
   // Copy button component for table cells
   const CopyButton = ({ text }: { text: string }) => {
@@ -864,8 +772,7 @@ function Users() {
     );
   };
 
-  // Invitation dialog state
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  // Invitation dialog state (for the invite tab)
   const [inviteSelectedTeams, setInviteSelectedTeams] = useState<string[]>([]);
   const [inviteEmail, setInviteEmail] = useState<string>('');
   const [sendEmail, setSendEmail] = useState<boolean>(true);
@@ -876,20 +783,21 @@ function Users() {
   const [isDeleteInvitationDialogOpen, setIsDeleteInvitationDialogOpen] = useState(false);
   const [deletingInvitation, setDeletingInvitation] = useState<Invitation | null>(null);
 
-  // Reset invitation form when invitation dialog closes
+  // Reset invitation form when add user dialog closes
   useEffect(() => {
-    if (!isInviteDialogOpen) {
+    if (!isAddUserDialogOpen) {
       setInviteSelectedTeams([]);
       setInviteEmail('');
       setSendEmail(true); // Reset to checked by default
       setInvitationLink('');
       setShowInvitationLink(false);
       setCopiedDialogLink(false); // Reset copied state
+      setAddUserActiveTab('create'); // Reset to create tab
     } else {
       // When dialog opens, ensure checkbox is checked by default
       setSendEmail(true);
     }
-  }, [isInviteDialogOpen]);
+  }, [isAddUserDialogOpen]);
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -917,11 +825,11 @@ function Users() {
           // If email was sent, close dialog after a moment
           if (sendEmail && inviteEmail) {
             setTimeout(() => {
-              setIsInviteDialogOpen(false);
+              setIsAddUserDialogOpen(false);
             }, 2000);
           } else {
             // Keep dialog open to show link
-            setIsInviteDialogOpen(true);
+            setIsAddUserDialogOpen(true);
           }
     } catch (error: any) {
       const backendErrors = error?.response?.data?.errors;
@@ -943,8 +851,8 @@ function Users() {
       name: createFormData.name,
       email: createFormData.email,
       job_position_id: createFormData.job_position_id ? Number(createFormData.job_position_id) : null,
-      organization_name: createFormData.organization_name || null,
       color: createFormData.color || null,
+      organization_name: createFormData.organization_name || null,
       is_admin: createFormData.is_admin,
       has_active_subscription: createFormData.has_active_subscription
     };
@@ -989,7 +897,7 @@ function Users() {
       }
       
       // Close dialog
-      setIsCreateDialogOpen(false);
+      setIsAddUserDialogOpen(false);
     } catch (error: any) {
       // Handle and display errors
       const backendErrors = error?.response?.data?.errors;
@@ -1013,7 +921,6 @@ function Users() {
       email: editFormData.email,
       job_position_id: editFormData.job_position_id ? Number(editFormData.job_position_id) : null,
       role_id: null, // Not used in this form
-      organization_name: editFormData.organization_name || null,
       color: editFormData.color || null,
       is_admin: editFormData.is_admin,
       has_active_subscription: editFormData.has_active_subscription,
@@ -1021,49 +928,42 @@ function Users() {
     };
     
     try {
+      // Validate team-role assignments
+      const assignmentsWithRoles = editTeamAssignments.filter(a => a.roleId && a.roleId !== '');
+      if (editTeamAssignments.length > 0 && assignmentsWithRoles.length !== editTeamAssignments.length) {
+        setFormError(tu('dialogs.manageTeams.errors.roleRequired', 'Selecciona un rol para cada equipo.'));
+        return;
+      }
+
       // Update user first
       await updateItem(editingUser.id, updates);
 
       // Handle user-team relationships
-      const selectedTeamIds = selectedTeams.map(id => Number(id));
       const existingUserTeams = userTeams.filter((ut: UserTeam) => ut.user_id === editingUser.id);
-      const existingTeamIds = existingUserTeams.map((ut: UserTeam) => ut.team_id);
-
-      // Find teams to add (in selectedTeams but not in existing)
-      const teamsToAdd = selectedTeamIds.filter(teamId => !existingTeamIds.includes(teamId));
       
-      // Find teams to remove (in existing but not in selectedTeams)
-      const teamsToRemove = existingTeamIds.filter(teamId => !selectedTeamIds.includes(teamId));
+      // Process team-role assignments
+      const currentAssignments = editTeamAssignments.map((a) => ({
+        ...a,
+        teamIdNum: Number(a.teamId),
+        roleIdNum: a.roleId ? Number(a.roleId) : null
+      }));
 
-      // Get default role (use existing role from userTeams if available, otherwise find default)
-      // Note: roles are not in Redux, so we can't find roles by ID
-      let defaultRole: Role | undefined;
-      if (existingUserTeams.length > 0 && roles.length > 0) {
-        // Use the role from the first existing user-team relationship
-        const firstRoleId = getUserTeamRoleId(existingUserTeams[0]);
-        if (firstRoleId != null) {
-          defaultRole = roles.find((r: Role) => r.id === firstRoleId);
-        }
-      }
-      // If no existing role, find a default role
-      if (!defaultRole && roles.length > 0) {
-        defaultRole = roles.find((r: Role) => r.name?.toLowerCase().includes('user') || r.name?.toLowerCase().includes('usuario')) || roles[0];
-      }
-      
-      // Note: If no defaultRole, we'll proceed without role assignment (roles should be managed separately)
-      // Only show error if roles array exists but no default role found
-      if (teamsToAdd.length > 0 && roles.length > 0 && !defaultRole) {
-        setFormError(tu('errors.noRoleAvailable', 'No roles available. Please create a role first.'));
-        return;
-      }
+      // Find assignments to add, update, and remove
+      const toAdd = currentAssignments.filter((c) => c.id == null);
+      const toUpdate = currentAssignments.filter((c) => {
+        const match = existingUserTeams.find((ex) => ex.id === c.id);
+        if (!match) return false;
+        return match.team_id !== c.teamIdNum || getUserTeamRoleId(match) !== c.roleIdNum;
+      });
+      const toRemove = existingUserTeams.filter((ex) => !currentAssignments.some((c) => c.id === ex.id));
 
       // Add new user-team relationships
-      for (const teamId of teamsToAdd) {
+      for (const add of toAdd) {
         try {
           await dispatch((genericActions as any).userTeams.addAsync({
             user_id: editingUser.id,
-            team_id: teamId,
-            role_id: defaultRole!.id
+            team_id: add.teamIdNum,
+            role_id: add.roleIdNum
           })).unwrap();
         } catch (error: any) {
           console.error(`Failed to add user-team relationship:`, error);
@@ -1073,18 +973,33 @@ function Users() {
         }
       }
 
+      // Update existing user-team relationships
+      for (const upd of toUpdate) {
+        try {
+          await dispatch((genericActions as any).userTeams.updateAsync({
+            id: upd.id!,
+            updates: {
+              team_id: upd.teamIdNum,
+              role_id: upd.roleIdNum
+            }
+          })).unwrap();
+        } catch (error: any) {
+          console.error(`Failed to update user-team relationship:`, error);
+          const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+          setFormError(tu('errors.updateTeamFailed', `Failed to update team relationship: ${errorMsg}`));
+          return;
+        }
+      }
+
       // Remove deleted user-team relationships
-      for (const teamId of teamsToRemove) {
-        const userTeamToRemove = existingUserTeams.find((ut: UserTeam) => ut.team_id === teamId);
-        if (userTeamToRemove) {
-          try {
-            await dispatch((genericActions as any).userTeams.removeAsync(userTeamToRemove.id)).unwrap();
-          } catch (error: any) {
-            console.error(`Failed to remove user-team relationship:`, error);
-            const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
-            setFormError(tu('errors.removeTeamFailed', `Failed to remove team relationship: ${errorMsg}`));
-            return;
-          }
+      for (const del of toRemove) {
+        try {
+          await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+        } catch (error: any) {
+          console.error(`Failed to remove user-team relationship:`, error);
+          const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+          setFormError(tu('errors.removeTeamFailed', `Failed to remove team relationship: ${errorMsg}`));
+          return;
         }
       }
 
@@ -1130,9 +1045,6 @@ function Users() {
       } : undefined}
       headerActions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/settings/teams')}>
-            {tu('header.manageTeams', 'Manage Teams')}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/settings/job-positions')}>
             {tu('header.manageJobPositions', 'Manage Job Positions')}
           </Button>
@@ -1140,20 +1052,12 @@ function Users() {
             {tu('header.rolesAndPermissions', 'Roles and Permissions')}
           </Button>
           <Button 
-            onClick={() => setIsCreateDialogOpen(true)} 
+            onClick={() => setIsAddUserDialogOpen(true)} 
             size="default"
             className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
           >
             <Plus className="mr-2 h-4 w-4" />
-            {tu('header.createUser', 'Create User')}
-          </Button>
-          <Button 
-            onClick={() => setIsInviteDialogOpen(true)} 
-            size="default"
-            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {tu('header.createInvitation', 'Create Invitation')}
+            {tu('header.addUser', 'Add User')}
           </Button>
         </div>
       }
@@ -1226,205 +1130,87 @@ function Users() {
         className="h-full flex flex-col"
       />
 
-      {/* Manage Teams Dialog */}
+
+      {/* Merged Add User Dialog */}
       <SettingsDialog
-        open={isTeamsDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCloseTeamsDialog();
-          } else {
-            setIsTeamsDialogOpen(true);
-          }
-        }}
-        type="custom"
-        title={tu('dialogs.manageTeams.title', 'Manage user teams')}
-        description={tu('dialogs.manageTeams.description', 'Assign or remove teams and set the user role for each team.')}
-        onSubmit={handleSaveTeams}
-        isSubmitting={isSavingTeams}
-        submitText={tu('dialogs.manageTeams.save', 'Save')}
-        submitDisabled={!teamsDialogUser || isSavingTeams}
-        cancelText={tu('dialogs.manageTeams.close', 'Close')}
-        contentClassName="max-w-4xl"
-      >
-        {!teamsDialogUser ? (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            {tu('dialogs.manageTeams.noUser', 'Select a user to manage teams.')}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
-                  {teamsDialogUser.name?.charAt(0)?.toUpperCase?.() || 'U'}
-                </div>
-                <div className="flex flex-col leading-tight">
-                  <span className="font-semibold text-sm">{teamsDialogUser.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    <FontAwesomeIcon icon={faUsers} className="w-3 h-3 mr-1" />
-                    {teamAssignments.length} {tu('dialogs.manageTeams.count', 'teams')}
-                  </span>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addTeamAssignment}
-                disabled={!teams.some((t) => !teamAssignments.find((a) => a.teamId === String(t.id)))}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                {tu('dialogs.manageTeams.add', 'Add team')}
-              </Button>
-            </div>
-
-            {teamAssignments.length === 0 ? (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                {tu('dialogs.manageTeams.empty', 'No teams assigned. Add one to get started.')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {teamAssignments.map((assignment) => {
-                  const usedIds = teamAssignments
-                    .filter((a) => a.key !== assignment.key)
-                    .map((a) => a.teamId);
-                  const baseTeamOptions = teams
-                    .filter((t) => assignment.teamId === String(t.id) || !usedIds.includes(String(t.id)))
-                    .map((t) => ({ value: String(t.id), label: t.name }));
-                  const hasCurrentTeam = assignment.teamId && baseTeamOptions.some((opt) => opt.value === assignment.teamId);
-                  const teamOptions = hasCurrentTeam || !assignment.teamId
-                    ? baseTeamOptions
-                    : [{ value: assignment.teamId, label: tu('dialogs.manageTeams.unknownTeam', `Team ${assignment.teamId}`) }, ...baseTeamOptions];
-
-                  // Filter roles to only show TEAM scope roles when associating teams
-                  // Note: roles are not in Redux, so we can't show role options
-                  const teamRoles = roles.filter((r) => r.scope === 'TEAM');
-                  const baseRoleOptions = teamRoles.length > 0 
-                    ? teamRoles.map((r) => ({ value: String(r.id), label: r.name }))
-                    : [];
-                  const hasCurrentRole = assignment.roleId && baseRoleOptions.some((opt) => opt.value === assignment.roleId);
-                  const roleOptions = hasCurrentRole || !assignment.roleId
-                    ? baseRoleOptions
-                    : [{ value: assignment.roleId, label: tu('dialogs.manageTeams.unknownRole', `Role ${assignment.roleId}`) }, ...baseRoleOptions];
-
-                  return (
-                    <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
-                      <div className="col-span-5">
-                        <SelectField
-                          id={`team-${assignment.key}`}
-                          label={tu('dialogs.manageTeams.team', 'Team')}
-                          value={assignment.teamId}
-                          onChange={(value) => updateAssignment(assignment.key, { teamId: value })}
-                          options={teamOptions}
-                          placeholder={teamsLoading ? tu('dialogs.manageTeams.loadingTeams', 'Loading teams...') : tu('dialogs.manageTeams.selectTeam', 'Select a team')}
-                          required
-                        />
-                      </div>
-                  <div className="col-span-5">
-                    <SelectField
-                      id={`role-${assignment.key}`}
-                      label={tu('dialogs.manageTeams.role', 'Role')}
-                      value={assignment.roleId}
-                      onChange={(value) => updateAssignment(assignment.key, { roleId: value })}
-                      options={roleOptions}
-                      placeholder={tu('dialogs.manageTeams.selectRole', 'Select a role')}
-                      required
-                    />
-                  </div>
-                      <div className="col-span-2 flex justify-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeAssignment(assignment.key)}
-                          aria-label={tu('dialogs.manageTeams.remove', 'Remove')}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </SettingsDialog>
-
-      {/* Create User Dialog */}
-      <SettingsDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        open={isAddUserDialogOpen}
+        onOpenChange={setIsAddUserDialogOpen}
         type="create"
-        title={tu('dialogs.createUser.title', 'Create User')}
-        description={tu('dialogs.createUser.description', 'Create a new user account.')}
-        onSubmit={handleCreateSubmit}
-        isSubmitting={isCreating}
+        title={tu('dialogs.addUser.title', 'Add User')}
+        description={tu('dialogs.addUser.description', 'Create a new user account or send an invitation.')}
+        onSubmit={addUserActiveTab === 'create' ? handleCreateSubmit : (showInvitationLink ? undefined : handleInviteSubmit)}
+        isSubmitting={addUserActiveTab === 'create' ? isCreating : isSendingInvitation}
         error={formError}
-        submitDisabled={isCreating}
-        contentClassName="sm:max-w-2xl"
+        submitDisabled={
+          addUserActiveTab === 'create' 
+            ? isCreating 
+            : (isSendingInvitation || showInvitationLink)
+        }
+        submitText={
+          addUserActiveTab === 'create'
+            ? tu('dialogs.createUser.submit', 'Create User')
+            : (showInvitationLink ? undefined : tu('dialogs.invitation.submit', 'Create Invitation'))
+        }
+        contentClassName="max-w-2xl"
       >
-        <div className="space-y-5">
-          <TextField
-            id="create-name"
-            label={tu('dialogs.createUser.fields.name', 'Name')}
-            value={createFormData.name}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
-            required
-          />
-          <TextField
-            id="create-email"
-            label={tu('dialogs.createUser.fields.email', 'Email')}
-            type="email"
-            value={createFormData.email}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
-            required
-          />
-          <div className="space-y-2">
-            <Label htmlFor="create-color" className="text-sm font-medium">
-              {tu('dialogs.createUser.fields.color', 'Color')}
-            </Label>
-            <div className="flex items-center gap-3">
-              <input
-                id="create-color"
-                type="color"
-                value={createFormData.color || '#3b82f6'}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, color: e.target.value }))}
-                className="h-12 w-24 rounded-md border border-input cursor-pointer"
-              />
-              <div 
-                className="flex-1 h-12 rounded-md border border-input flex items-center justify-center font-mono text-sm font-medium"
-                style={{ backgroundColor: createFormData.color || '#3b82f6' }}
-              >
-                <span className="px-3 py-1 rounded bg-background/80 backdrop-blur-sm shadow-sm">
-                  {createFormData.color || '#3b82f6'}
-                </span>
-              </div>
-            </div>
+        <Tabs value={addUserActiveTab} onValueChange={(value) => setAddUserActiveTab(value as 'create' | 'invite')} className="w-full">
+          <div className="flex justify-center w-full mb-4">
+            <TabsList className="w-fit">
+              <TabsTrigger value="create">
+                {tu('dialogs.addUser.tabs.create', 'Create User')}
+              </TabsTrigger>
+              <TabsTrigger value="invite">
+                {tu('dialogs.addUser.tabs.invite', 'Invite User')}
+              </TabsTrigger>
+            </TabsList>
           </div>
-          <SelectField
-            id="create-job_position_id"
-            label={tu('dialogs.createUser.fields.jobPosition', 'Job Position')}
-            value={createFormData.job_position_id}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
-            placeholder={
-              jobPositionsLoading && jobPositions.length === 0
-                ? tu('fields.loading', 'Loading…')
-                : tu('fields.noJobPosition', 'No Job Position')
-            }
-            options={jobPositions.map((jp: any) => ({
-              value: jp.id?.toString?.() ?? String(jp.id),
-              label: jp.title
-            }))}
-          />
-          <TextField
-            id="create-organization_name"
-            label={tu('dialogs.createUser.fields.organization', 'Organization')}
-            value={createFormData.organization_name}
-            onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
-          />
           
-          <div className="space-y-4 pt-2">
-            <div className="space-y-3">
+          {/* Create User Tab */}
+          <TabsContent value="create" className="mt-4">
+            <div className="grid gap-4">
+              <TextField
+                id="create-name"
+                label={tu('dialogs.createUser.fields.name', 'Name')}
+                value={createFormData.name}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
+                required
+              />
+              <TextField
+                id="create-email"
+                label={tu('dialogs.createUser.fields.email', 'Email')}
+                type="email"
+                value={createFormData.email}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, email: value }))}
+                required
+              />
+              <TextField
+                id="create-color"
+                label={tu('dialogs.createUser.fields.color', 'Color')}
+                type="color"
+                value={createFormData.color}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, color: value }))}
+              />
+              <SelectField
+                id="create-job_position_id"
+                label={tu('dialogs.createUser.fields.jobPosition', 'Job Position')}
+                value={createFormData.job_position_id}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, job_position_id: value }))}
+                placeholder={
+                  jobPositionsLoading && jobPositions.length === 0
+                    ? tu('fields.loading', 'Loading…')
+                    : tu('fields.noJobPosition', 'No Job Position')
+                }
+                options={jobPositions.map((jp: any) => ({
+                  value: jp.id?.toString?.() ?? String(jp.id),
+                  label: jp.title
+                }))}
+              />
+              <TextField
+                id="create-organization_name"
+                label={tu('dialogs.createUser.fields.organization', 'Organization')}
+                value={createFormData.organization_name}
+                onChange={(value) => setCreateFormData(prev => ({ ...prev, organization_name: value }))}
+              />
               <CheckboxField
                 id="create-is_admin"
                 label={tu('dialogs.createUser.fields.admin', 'Admin')}
@@ -1439,138 +1225,122 @@ function Users() {
                 onChange={(checked) => setCreateFormData(prev => ({ ...prev, has_active_subscription: checked }))}
                 description={tu('dialogs.createUser.fields.subscriptionDescription', 'Active subscription')}
               />
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">{tu('dialogs.createUser.fields.teams', 'Teams')}</Label>
+                <div className="col-span-3">
+                  <MultiSelect
+                    options={teams.map((team: Team) => ({
+                      value: team.id.toString(),
+                      label: team.name
+                    }))}
+                    onValueChange={setCreateSelectedTeams}
+                    defaultValue={createSelectedTeams}
+                    placeholder={
+                      teamsLoading && teams.length === 0
+                        ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                        : tu('multiSelect.selectTeams', 'Select teams...')
+                    }
+                    maxCount={10}
+                    className="w-full"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-2 pt-1">
-            <Label className="text-sm font-medium">
-              {tu('dialogs.createUser.fields.teams', 'Teams')}
-            </Label>
-            <MultiSelect
-              options={teams.map((team: Team) => ({
-                value: team.id.toString(),
-                label: team.name
-              }))}
-              onValueChange={setCreateSelectedTeams}
-              defaultValue={createSelectedTeams}
-              placeholder={
-                teamsLoading && teams.length === 0
-                  ? tu('multiSelect.loadingTeams', 'Loading teams...')
-                  : tu('multiSelect.selectTeams', 'Select teams...')
-              }
-              maxCount={10}
-              className="w-full"
-            />
-          </div>
-        </div>
-      </SettingsDialog>
-
-      {/* Create Invitation Dialog */}
-      <SettingsDialog
-        open={isInviteDialogOpen}
-        onOpenChange={setIsInviteDialogOpen}
-        type="create"
-        title={tu('dialogs.invitation.title', 'Create Invitation')}
-        description={
-          showInvitationLink
-            ? tu('dialogs.invitation.success', 'Invitation created successfully!')
-            : tu('dialogs.invitation.description', 'Create an invitation link. Users who sign up will be automatically added to the selected teams.')
-        }
-        onSubmit={showInvitationLink ? undefined : handleInviteSubmit}
-        isSubmitting={isSendingInvitation}
-        error={formError}
-        submitDisabled={isSendingInvitation || showInvitationLink}
-        submitText={showInvitationLink ? undefined : tu('dialogs.invitation.submit', 'Create Invitation')}
-      >
-        {showInvitationLink ? (
-          <div className="grid gap-4">
-            <div className="p-4 bg-muted rounded-lg">
-              <Label className="text-sm font-medium mb-2 block">
-                {tu('dialogs.invitation.linkLabel', 'Invitation Link')}
-              </Label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={invitationLink}
-                  className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
-                />
+          </TabsContent>
+          
+          {/* Invite User Tab */}
+          <TabsContent value="invite" className="mt-4">
+            {showInvitationLink ? (
+              <div className="grid gap-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <Label className="text-sm font-medium mb-2 block">
+                    {tu('dialogs.invitation.linkLabel', 'Invitation Link')}
+                  </Label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={invitationLink}
+                      className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(invitationLink);
+                        setCopiedDialogLink(true);
+                        setTimeout(() => setCopiedDialogLink(false), 4000);
+                      }}
+                      className="min-w-[80px]"
+                    >
+                      {copiedDialogLink ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          {tu('dialogs.invitation.copied', 'Copied')}
+                        </>
+                      ) : (
+                        <>
+                          <CopyIcon className="h-4 w-4 mr-1" />
+                          {tu('dialogs.invitation.copy', 'Copy')}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {tu('dialogs.invitation.instructions', 'Share this link with the user. They will be added to the selected teams when they sign up.')}
+                  </p>
+                </div>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(invitationLink);
-                    setCopiedDialogLink(true);
-                    setTimeout(() => setCopiedDialogLink(false), 4000);
-                  }}
-                  className="min-w-[80px]"
+                  onClick={() => setIsAddUserDialogOpen(false)}
+                  className="w-full"
                 >
-                  {copiedDialogLink ? (
-                    <>
-                      <Check className="h-4 w-4 mr-1" />
-                      {tu('dialogs.invitation.copied', 'Copied')}
-                    </>
-                  ) : (
-                    <>
-                      <CopyIcon className="h-4 w-4 mr-1" />
-                      {tu('dialogs.invitation.copy', 'Copy')}
-                    </>
-                  )}
+                  {tu('dialogs.invitation.close', 'Close')}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {tu('dialogs.invitation.instructions', 'Share this link with the user. They will be added to the selected teams when they sign up.')}
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={() => setIsInviteDialogOpen(false)}
-              className="w-full"
-            >
-              {tu('dialogs.invitation.close', 'Close')}
-            </Button>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            <TextField
-              id="invite-email"
-              label={tu('dialogs.invitation.emailLabel', 'Email (Optional)')}
-              type="email"
-              value={inviteEmail}
-              onChange={(value) => setInviteEmail(value)}
-              placeholder={tu('dialogs.invitation.emailPlaceholder', 'user@example.com')}
-            />
-            <CheckboxField
-              id="invite-send-email"
-              label=""
-              checked={sendEmail}
-              onChange={(checked) => setSendEmail(checked)}
-              description={tu('dialogs.invitation.sendEmailDescription', 'Send invitation email to the address above')}
-              disabled={!inviteEmail}
-            />
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-2">{tu('dialogs.invitation.teamsLabel', 'Teams')}</Label>
-              <div className="col-span-3">
-                <MultiSelect
-                  options={teams.map((team: Team) => ({
-                    value: team.id.toString(),
-                    label: team.name
-                  }))}
-                  onValueChange={setInviteSelectedTeams}
-                  defaultValue={inviteSelectedTeams}
-                  placeholder={
-                    teamsLoading && teams.length === 0
-                      ? tu('multiSelect.loadingTeams', 'Loading teams...')
-                      : tu('multiSelect.selectTeams', 'Select teams...')
-                  }
-                  maxCount={10}
-                  className="w-full"
+            ) : (
+              <div className="grid gap-4">
+                <TextField
+                  id="invite-email"
+                  label={tu('dialogs.invitation.emailLabel', 'Email (Optional)')}
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(value) => setInviteEmail(value)}
+                  placeholder={tu('dialogs.invitation.emailPlaceholder', 'user@example.com')}
                 />
+                <CheckboxField
+                  id="invite-send-email"
+                  label=""
+                  checked={sendEmail}
+                  onChange={(checked) => setSendEmail(checked)}
+                  description={tu('dialogs.invitation.sendEmailDescription', 'Send invitation email to the address above')}
+                  disabled={!inviteEmail}
+                />
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">{tu('dialogs.invitation.teamsLabel', 'Teams')}</Label>
+                  <div className="col-span-3">
+                    <MultiSelect
+                      options={teams.map((team: Team) => ({
+                        value: team.id.toString(),
+                        label: team.name
+                      }))}
+                      onValueChange={setInviteSelectedTeams}
+                      defaultValue={inviteSelectedTeams}
+                      placeholder={
+                        teamsLoading && teams.length === 0
+                          ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                          : tu('multiSelect.selectTeams', 'Select teams...')
+                      }
+                      maxCount={10}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
+          </TabsContent>
+        </Tabs>
       </SettingsDialog>
 
       {/* Edit User Dialog */}
@@ -1612,7 +1382,7 @@ function Users() {
                   {tu('dialogs.editUser.tabs.basic', 'Basic Information')}
                 </TabsTrigger>
                 <TabsTrigger value="professional">
-                  {tu('dialogs.editUser.tabs.professional', 'Professional Information')}
+                  {tu('dialogs.editUser.tabs.teams', 'Teams')}
                 </TabsTrigger>
                 <TabsTrigger value="permissions">
                   {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
@@ -1636,33 +1406,6 @@ function Users() {
                   onChange={(value) => setEditFormData(prev => ({ ...prev, email: value }))}
                   required
                 />
-                <div className="space-y-2">
-                  <Label htmlFor="edit-color" className="text-sm font-medium">
-                    {tu('dialogs.editUser.fields.color', 'Color')} *
-                  </Label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="edit-color"
-                      type="color"
-                      value={editFormData.color}
-                      onChange={(e) => setEditFormData(prev => ({ ...prev, color: e.target.value }))}
-                      className="h-12 w-24 rounded-md border border-input cursor-pointer"
-                    />
-                    <div 
-                      className="flex-1 h-12 rounded-md border border-input flex items-center justify-center font-mono text-sm font-medium"
-                      style={{ backgroundColor: editFormData.color }}
-                    >
-                      <span className="px-3 py-1 rounded bg-background/80 backdrop-blur-sm shadow-sm">
-                        {editFormData.color || '#000000'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="professional" className="mt-0 space-y-6 min-h-[300px] pt-2">
-              <div className="space-y-5">
                 <SelectField
                   id="edit-job_position_id"
                   label={tu('dialogs.editUser.fields.jobPosition', 'Job Position')}
@@ -1679,11 +1422,98 @@ function Users() {
                   }))}
                 />
                 <TextField
-                  id="edit-organization_name"
-                  label={tu('dialogs.editUser.fields.organization', 'Organization')}
-                  value={editFormData.organization_name}
-                  onChange={(value) => setEditFormData(prev => ({ ...prev, organization_name: value }))}
+                  id="edit-color"
+                  label={tu('dialogs.editUser.fields.color', 'Color')}
+                  type="color"
+                  value={editFormData.color}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
                 />
+              </div>
+            </TabsContent>
+            <TabsContent value="professional" className="mt-4 min-h-[200px]">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    {tu('dialogs.editUser.fields.teams', 'Teams')}
+                  </Label>
+                  <MultiSelect
+                    options={teams.map((team: Team) => ({
+                      value: team.id.toString(),
+                      label: team.name
+                    }))}
+                    onValueChange={handleEditTeamsChange}
+                    defaultValue={selectedTeams}
+                    placeholder={
+                      teamsLoading && teams.length === 0
+                        ? tu('multiSelect.loadingTeams', 'Loading teams...')
+                        : tu('multiSelect.selectTeams', 'Select teams...')
+                    }
+                    maxCount={10}
+                    className="w-full"
+                  />
+                </div>
+                
+                {editTeamAssignments.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <Label className="text-sm font-medium">
+                      {tu('dialogs.editUser.fields.teamRoles', 'Team Roles')}
+                    </Label>
+                    <div className="border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{tu('dialogs.editUser.fields.team', 'Team')}</TableHead>
+                            <TableHead>{tu('dialogs.editUser.fields.role', 'Role')}</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {editTeamAssignments.map((assignment) => {
+                            const team = teams.find((t: Team) => t.id === Number(assignment.teamId));
+                            const teamRoles = roles.filter((r) => r.scope === 'TEAM');
+                            const roleOptions = teamRoles.map((r) => ({ value: String(r.id), label: r.name }));
+                            
+                            return (
+                              <TableRow key={assignment.key}>
+                                <TableCell>
+                                  <span className="font-medium">{team?.name || assignment.teamId}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={assignment.roleId || undefined}
+                                    onValueChange={(value) => updateEditAssignment(assignment.key, { roleId: value })}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder={tu('dialogs.editUser.fields.selectRole', 'Select a role')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {roleOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeEditAssignment(assignment.key)}
+                                    aria-label={tu('dialogs.editUser.fields.remove', 'Remove')}
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="permissions" className="mt-4 min-h-[200px]">

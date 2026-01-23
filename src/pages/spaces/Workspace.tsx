@@ -163,6 +163,7 @@ export const Workspace = () => {
   const collapseGroups = useSelector(selectCollapseGroups);
 
   // Custom tab order state (persisted per workspace)
+  // Ensure 'grid' (tasks) is always first
   const [customTabOrder, setCustomTabOrder] = useState<WorkspaceTabKey[]>(() => {
     try {
       const key = `wh_workspace_tab_order_${id || 'all'}`;
@@ -170,7 +171,13 @@ export const Workspace = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-          return parsed as WorkspaceTabKey[];
+          const order = parsed as WorkspaceTabKey[];
+          // Ensure 'grid' is always first
+          if (order[0] !== 'grid') {
+            const filtered = order.filter(tab => tab !== 'grid');
+            return ['grid', ...filtered] as WorkspaceTabKey[];
+          }
+          return order;
         }
       }
     } catch {}
@@ -178,6 +185,7 @@ export const Workspace = () => {
   });
 
   // Update custom tab order when workspace changes
+  // Ensure 'grid' (tasks) is always first
   useEffect(() => {
     try {
       const key = `wh_workspace_tab_order_${id || 'all'}`;
@@ -185,7 +193,14 @@ export const Workspace = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-          setCustomTabOrder(parsed as WorkspaceTabKey[]);
+          const order = parsed as WorkspaceTabKey[];
+          // Ensure 'grid' is always first
+          if (order[0] !== 'grid') {
+            const filtered = order.filter(tab => tab !== 'grid');
+            setCustomTabOrder(['grid', ...filtered] as WorkspaceTabKey[]);
+          } else {
+            setCustomTabOrder(order);
+          }
           return;
         }
       }
@@ -308,18 +323,23 @@ export const Workspace = () => {
 
     if (!over || active.id === over.id) return;
 
-    // Get draggable tabs (exclude fixed tabs)
-    const draggableTabs = customTabOrder.filter(tab => !FIXED_TABS.includes(tab));
+    // Prevent moving 'grid' (tasks) tab - it must always stay first
+    if (active.id === 'grid') {
+      return;
+    }
+
+    // Get draggable tabs (exclude fixed tabs and grid)
+    const draggableTabs = customTabOrder.filter(tab => !FIXED_TABS.includes(tab) && tab !== 'grid');
     const oldIndex = draggableTabs.findIndex(tab => tab === active.id);
     const newIndex = draggableTabs.findIndex(tab => tab === over.id);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    // Reorder draggable tabs
+    // Reorder draggable tabs (excluding grid)
     const reorderedDraggable = arrayMove(draggableTabs, oldIndex, newIndex);
     
-    // Rebuild full order with fixed tabs at the end
-    const newOrder = [...reorderedDraggable, ...FIXED_TABS];
+    // Rebuild full order with 'grid' always first, then reordered tabs, then fixed tabs at the end
+    const newOrder = ['grid', ...reorderedDraggable, ...FIXED_TABS];
     setCustomTabOrder(newOrder);
   };
   const [showClearFilters, setShowClearFilters] = useState(false);
