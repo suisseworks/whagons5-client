@@ -954,8 +954,9 @@ function Header() {
                     <div className="flex items-center gap-4">
                         {/* Quick filter chips */}
                         <div className="flex items-center gap-2">
-                        <button 
-                            className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
+                        <Button 
+                            variant={!currentFilterModel ? "secondary" : "outline"}
+                            size="sm"
                             title={t('workspace.filters.allTasks', 'All tasks')}
                             onClick={() => {
                                 dispatch(setFilterModel(null));
@@ -967,11 +968,12 @@ function Header() {
                             }}
                         >
                             {t('workspace.filters.all', 'All')}
-                        </button>
+                        </Button>
                         {quickPresets.map((p: any, idx: number) => (
-                            <button
+                            <Button
                                 key={p.id || idx}
-                                className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
+                                variant="outline"
+                                size="sm"
                                 title={p.name}
                                 onClick={() => {
                                     dispatch(setFilterModel(p.model));
@@ -983,25 +985,27 @@ function Header() {
                                 }}
                             >
                                 {p.name}
-                            </button>
+                            </Button>
                         ))}
-                        <button 
-                            className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
+                        <Button 
+                            variant="outline"
+                            size="sm"
                             title={t('workspace.filters.customFilters', 'Custom filters')}
                             onClick={() => {
                                 window.dispatchEvent(new CustomEvent('workspace-filter-dialog-open', { detail: {} }));
                             }}
                         >
                             {t('workspace.filters.filters', 'Filters…')}
-                        </button>
+                        </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button 
-                                    className="h-8 px-3 rounded-md text-sm font-semibold border filter-button-visible"
+                                <Button 
+                                    variant="outline"
+                                    size="sm"
                                     title={t('workspace.filters.morePresets', 'More presets')}
                                 >
                                     {t('workspace.filters.more', 'More…')}
-                                </button>
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="min-w-[240px]">
                                 <DropdownMenuLabel>{t('workspace.filters.applyPreset', 'Apply preset')}</DropdownMenuLabel>
@@ -1027,13 +1031,9 @@ function Header() {
 
                         {/* Group by control */}
                         <div className="flex items-center gap-2 ml-auto">
-                            <Label className="text-sm whitespace-nowrap font-semibold" style={{ color: '#000000' }}>{t('workspace.group.group', 'Group')}</Label>
+                            <Label className="text-sm whitespace-nowrap font-semibold">{t('workspace.group.group', 'Group')}</Label>
                             <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
-                                <SelectTrigger size="sm" className="h-8 rounded-md px-3 text-sm font-semibold w-[120px] border" style={{ 
-                                    backgroundColor: '#ffffff', 
-                                    color: '#000000',
-                                    borderColor: '#9ca3af'
-                                }}>
+                                <SelectTrigger size="sm" className="h-8 w-[120px]">
                                     <SelectValue placeholder={t('workspace.group.group', 'Group')} />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1046,7 +1046,7 @@ function Header() {
                             {groupBy !== 'none' && (
                                 <div className="flex items-center gap-2">
                                     <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
-                                    <Label className="text-sm whitespace-nowrap font-semibold" style={{ color: '#000000' }}>{t('workspace.group.collapse', 'Collapse')}</Label>
+                                    <Label className="text-sm whitespace-nowrap font-semibold">{t('workspace.group.collapse', 'Collapse')}</Label>
                                 </div>
                             )}
                         </div>
