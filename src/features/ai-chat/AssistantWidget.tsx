@@ -850,6 +850,15 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       const isK = e.key.toLowerCase() === 'k';
       if ((e.ctrlKey || e.metaKey) && isK) {
         e.preventDefault();
+        // Prevent other window-level Ctrl+K handlers from running.
+        // (stopPropagation does not stop other listeners on the same target)
+        e.stopImmediatePropagation();
+
+        // Prevent sidebar "hover open" from triggering due to DOM changes under the cursor
+        // when this sheet opens.
+        try {
+          (window as any).__wh_suppressSidebarHoverUntil = Date.now() + 500;
+        } catch {}
         // If sheet was closed, start a new conversation when opening
         if (!open && wasClosedRef.current) {
           handleNewConversation();
@@ -858,8 +867,8 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         primeTtsAudio();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [open, handleNewConversation, primeTtsAudio]);
 
   useEffect(() => {

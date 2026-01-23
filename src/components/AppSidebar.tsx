@@ -642,6 +642,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const handleMouseEnter = () => {
     if (isMobile) return;
     if (state !== 'collapsed') return;
+    // If a keyboard shortcut (notably Ctrl+K for chat) just caused a UI re-render,
+    // the element under the cursor can change and spuriously trigger mouseenter.
+    // Suppress hover-open briefly to avoid the sidebar popping open unexpectedly.
+    try {
+      const suppressUntil = (window as any).__wh_suppressSidebarHoverUntil;
+      if (typeof suppressUntil === 'number' && suppressUntil > Date.now()) return;
+    } catch {}
     if ((hoverCloseTimerRef.current as any)) {
       clearTimeout(hoverCloseTimerRef.current as any);
       hoverCloseTimerRef.current = null;

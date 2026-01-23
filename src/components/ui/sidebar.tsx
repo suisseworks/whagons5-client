@@ -95,6 +95,10 @@ function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Explicitly ignore Ctrl+K (reserved for chat)
+      if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
+        return
+      }
       if (
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
