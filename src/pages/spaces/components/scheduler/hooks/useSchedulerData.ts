@@ -102,9 +102,28 @@ export function useSchedulerData(workspaceId: string | undefined) {
 
     const workspaceTasks = tasks.filter((t) => String(t.workspace_id) === workspaceId);
     const schedulerEvents: SchedulerEvent[] = [];
+    
+    console.log('[useSchedulerData] Processing tasks:', {
+      totalTasks: tasks.length,
+      workspaceTasks: workspaceTasks.length,
+      workspaceId,
+    });
 
+    let skippedTasks = 0;
     workspaceTasks.forEach((task) => {
       if (!task.start_date || !task.user_ids || task.user_ids.length === 0) {
+        skippedTasks++;
+        console.log('[useSchedulerData] Skipping task (missing start_date or user_ids):', {
+          id: task.id,
+          name: task.name,
+          start_date: task.start_date,
+          due_date: task.due_date,
+          user_ids: task.user_ids,
+          workspace_id: task.workspace_id,
+          hasStartDate: !!task.start_date,
+          hasUserIds: !!task.user_ids,
+          userIdsLength: task.user_ids?.length || 0,
+        });
         return; // Skip tasks without start date or user assignments
       }
 
@@ -123,7 +142,7 @@ export function useSchedulerData(workspaceId: string | undefined) {
 
       // Create one event per user assignment
       task.user_ids.forEach((userId) => {
-        schedulerEvents.push({
+        const event = {
           id: task.id * 10000 + userId, // Unique ID combining task and user
           resourceId: userId,
           name: task.name,
@@ -134,8 +153,25 @@ export function useSchedulerData(workspaceId: string | undefined) {
           priorityId: task.priority_id || undefined,
           statusId: task.status_id || undefined,
           categoryId: task.category_id || undefined,
-        });
+        };
+        schedulerEvents.push(event);
+        
+        // Debug: Log task being converted to event
+        if (workspaceTasks.length <= 5) { // Only log for small task sets
+          console.log('[useSchedulerData] Created event for task:', {
+            taskId: task.id,
+            taskName: task.name,
+            userId,
+            startDate,
+            endDate,
+          });
+        }
       });
+    });
+    
+    console.log('[useSchedulerData] Generated events:', {
+      eventsCount: schedulerEvents.length,
+      skippedTasks,
     });
 
     return schedulerEvents;

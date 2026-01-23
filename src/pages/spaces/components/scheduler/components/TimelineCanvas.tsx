@@ -104,9 +104,62 @@ export default function TimelineCanvas({
       .attr("stroke-width", 0.5)
       .attr("opacity", 0.1);
 
+    // Add hover cells for better interactivity
+    const hoverCells = g.append("g").attr("class", "hover-cells");
+    
+    // Create hover rectangles for each cell (time slot × resource)
+    const numRows = resources.length;
+    for (let rowIndex = 0; rowIndex < numRows; rowIndex++) {
+      for (let i = 0; i < ticks.length - 1; i++) {
+        const x1 = scale(ticks[i]);
+        const x2 = scale(ticks[i + 1]);
+        const cellWidth = x2 - x1;
+        
+        // Skip very narrow cells
+        if (cellWidth < 2) continue;
+        
+        hoverCells
+          .append("rect")
+          .attr("class", `scheduler-cell-${rowIndex}-${i}`)
+          .attr("data-row", rowIndex)
+          .attr("data-col", i)
+          .attr("x", x1)
+          .attr("y", rowIndex * rowHeight)
+          .attr("width", cellWidth)
+          .attr("height", rowHeight)
+          .attr("fill", "transparent")
+          .attr("stroke", "transparent")
+          .attr("rx", 4) // Rounded corners
+          .style("cursor", "crosshair")
+          .on("mouseenter", function() {
+            select(this)
+              .attr("fill", "rgba(59, 130, 246, 0.1)") // blue-500 with 10% opacity
+              .attr("stroke", "rgba(59, 130, 246, 0.35)")
+              .attr("stroke-width", 1.5)
+              .attr("stroke-dasharray", "3,2")
+              .style("transition", "all 0.12s ease-in-out");
+          })
+          .on("mouseleave", function() {
+            select(this)
+              .attr("fill", "transparent")
+              .attr("stroke", "transparent")
+              .attr("stroke-width", 0)
+              .attr("stroke-dasharray", "none");
+          })
+          .on("click", function(event: MouseEvent) {
+            event.stopPropagation();
+            event.preventDefault();
+            const clickDate = ticks[i];
+            if (onEmptySpaceClick) {
+              onEmptySpaceClick(clickDate, rowIndex);
+            }
+          });
+      }
+    }
+
     // Horizontal lines for resources
-    const numRows = Math.floor(height / rowHeight);
-    for (let i = 0; i <= numRows; i++) {
+    const numRowsForLines = Math.floor(height / rowHeight);
+    for (let i = 0; i <= numRowsForLines; i++) {
       gridLines
         .append("line")
         .attr("x1", 0)

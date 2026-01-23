@@ -137,15 +137,6 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
   // Fetch resources and events from Redux
   const { resources, events, loading } = useSchedulerData(workspaceId);
 
-  // Debug: Log events when they change
-  useEffect(() => {
-    console.log('[Scheduler] Events updated:', {
-      count: events.length,
-      workspaceId,
-      events: events.slice(0, 3), // Log first 3 events for debugging
-    });
-  }, [events, workspaceId]);
-
   // Save selected users to localStorage when they change
   useEffect(() => {
     try {
@@ -235,6 +226,23 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       console.log('[Scheduler] Task change detected:', data);
       console.log('[Scheduler] Refreshing tasks from IndexedDB');
       dispatch(getTasksFromIndexedDB());
+      
+      // If a new task was created and has user_ids, ensure those users are selected
+      if (data && Array.isArray(data.user_ids) && data.user_ids.length > 0) {
+        const taskUserIds = data.user_ids;
+        setSelectedUserIds((prev) => {
+          const newUserIds = new Set(prev);
+          let added = false;
+          taskUserIds.forEach((userId: number) => {
+            if (!newUserIds.has(userId)) {
+              newUserIds.add(userId);
+              added = true;
+              console.log('[Scheduler] Auto-selecting user', userId, 'to show newly created task');
+            }
+          });
+          return added ? Array.from(newUserIds) : prev;
+        });
+      }
     };
 
     const unsubscribers = [
@@ -264,6 +272,17 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
   }, [resources, selectedUserIds]);
 
   const { groupedResources } = useResourceGrouping(displayedResources, groupBy);
+
+  // Debug: Log events when they change
+  useEffect(() => {
+    console.log('[Scheduler] Events updated:', {
+      count: events.length,
+      workspaceId,
+      displayedResourcesCount: displayedResources.length,
+      selectedUserIdsCount: selectedUserIds.length,
+      sampleEvents: events.slice(0, 3), // Log first 3 events for debugging
+    });
+  }, [events, workspaceId, displayedResources.length, selectedUserIds.length]);
 
   // Calculate dimensions
   useEffect(() => {
@@ -320,56 +339,36 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
   );
 
   // Synchronize horizontal scrolling between TimeHeader and TimelineCanvas
+  const scrollHandlerRef = useRef<(() => void) | null>(null);
+  
   useEffect(() => {
-    // Use a small delay to ensure DOM is ready after dimension/user changes
-    const setupScrollSync = () => {
-      const timelineScroll = timelineScrollRef.current;
-      const headerScroll = timeHeaderScrollRef.current;
-      
-      if (!timelineScroll || !headerScroll) {
-        console.log('[Scheduler] Scroll sync: waiting for refs', {
-          hasTimeline: !!timelineScroll,
-          hasHeader: !!headerScroll
-        });
-        return null;
+    const timelineScroll = timelineScrollRef.current;
+    const headerScroll = timeHeaderScrollRef.current;
+    
+    if (!timelineScroll || !headerScroll) {
+      return;
+    }
+
+    // Remove previous listener if it exists
+    if (scrollHandlerRef.current) {
+      timelineScroll.removeEventListener('scroll', scrollHandlerRef.current);
+    }
+
+    const handleTimelineScroll = () => {
+      if (headerScroll && timelineScroll) {
+        headerScroll.scrollLeft = timelineScroll.scrollLeft;
       }
-
-      console.log('[Scheduler] Setting up scroll synchronization');
-
-      const handleTimelineScroll = () => {
-        if (headerScroll && timelineScroll) {
-          requestAnimationFrame(() => {
-            headerScroll.scrollLeft = timelineScroll.scrollLeft;
-          });
-        }
-      };
-
-      timelineScroll.addEventListener('scroll', handleTimelineScroll, { passive: true });
-      
-      return () => {
-        if (timelineScroll) {
-          timelineScroll.removeEventListener('scroll', handleTimelineScroll);
-        }
-      };
     };
 
-    // Try immediately
-    let cleanup = setupScrollSync();
+    scrollHandlerRef.current = handleTimelineScroll;
+    timelineScroll.addEventListener('scroll', handleTimelineScroll, { passive: true });
     
-    // If refs not ready, try again after a short delay
-    if (!cleanup) {
-      const timer = setTimeout(() => {
-        cleanup = setupScrollSync();
-      }, 100);
-      
-      return () => {
-        clearTimeout(timer);
-        cleanup?.();
-      };
-    }
-    
-    return cleanup;
-  }, [dimensions.width, dimensions.height, selectedUserIds.length, displayedResources.length]);
+    return () => {
+      if (scrollHandlerRef.current && timelineScroll) {
+        timelineScroll.removeEventListener('scroll', scrollHandlerRef.current);
+      }
+    };
+  }, []); // Empty deps - only set up once
 
   // Filter events based on filters
   const filteredEvents = useMemo(() => {
@@ -406,6 +405,16 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       return true;
     });
   }, [events, filters, resources]);
+
+  // Debug: Log filtered events
+  useEffect(() => {
+    console.log('[Scheduler] Filtered events:', {
+      totalEvents: events.length,
+      filteredEvents: filteredEvents.length,
+      filters,
+      sampleFiltered: filteredEvents.slice(0, 3),
+    });
+  }, [filteredEvents.length, events.length, filters]);
 
   // Export handlers
   const handleExportPDF = useCallback(async () => {
@@ -825,6 +834,23 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                         
                         if (resourceIndex >= 0 && resourceIndex < resourcesToUse.length) {
                           const resource = resourcesToUse[resourceIndex];
+                          
+                          console.log('[Scheduler] Empty space clicked:', {
+                            resourceIndex,
+                            resource,
+                            resourceId: resource.id,
+                            resourceName: resource.name,
+                            displayedResourcesCount: displayedResources.length,
+                            isUserAlreadySelected: selectedUserIds.includes(resource.id),
+                          });
+                          
+                          // Ensure the clicked user is in selectedUserIds
+                          // This is critical so the task will be visible after creation
+                          if (!selectedUserIds.includes(resource.id)) {
+                            console.log('[Scheduler] Auto-selecting user', resource.id, 'to show task after creation');
+                            setSelectedUserIds((prev) => [...prev, resource.id]);
+                          }
+                          
                           // Round to nearest 15 minutes
                           const start = new Date(date);
                           const minutes = Math.round(start.getMinutes() / 15) * 15;
@@ -841,7 +867,11 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                             workspace_id: workspaceId ? parseInt(workspaceId) : undefined,
                           };
                           
-                          console.log('[Scheduler] Creating task with initial data:', initialData);
+                          console.log('[Scheduler] Creating task with initial data:', {
+                            ...initialData,
+                            user_ids_type: typeof initialData.user_ids[0],
+                            resource_id_type: typeof resource.id,
+                          });
                           
                           setInitialTaskData(initialData);
                           setCreateEventData({ date, resourceIndex });
@@ -982,6 +1012,14 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
             setEditingEvent(null);
             setCreateEventData(null);
             setInitialTaskData(null);
+            
+            // Force refresh the scheduler after dialog closes
+            // Add a small delay to ensure IndexedDB and cache are fully updated
+            console.log('[Scheduler] TaskDialog closed, scheduling tasks refresh');
+            setTimeout(() => {
+              console.log('[Scheduler] Refreshing tasks from IndexedDB');
+              dispatch(getTasksFromIndexedDB());
+            }, 100);
           }
         }}
         mode={taskDialogMode}

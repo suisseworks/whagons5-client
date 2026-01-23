@@ -35,6 +35,29 @@ export const addTaskAsync = createAsyncThunk(
             // Update IndexedDB on success
             await TasksCache.addTask(newTask);
             
+            // Verify task was added correctly to IndexedDB
+            console.log('[addTaskAsync] Task added to IndexedDB:', {
+                id: newTask.id,
+                name: newTask.name,
+                start_date: newTask.start_date,
+                due_date: newTask.due_date,
+                user_ids: newTask.user_ids,
+                workspace_id: newTask.workspace_id,
+            });
+            
+            // Verify it can be retrieved
+            const verifyTask = await TasksCache.getTask(newTask.id.toString());
+            if (!verifyTask) {
+                console.error('[addTaskAsync] WARNING: Task not found in IndexedDB after adding!');
+            } else {
+                console.log('[addTaskAsync] Verified task in IndexedDB:', {
+                    id: verifyTask.id,
+                    hasStartDate: !!verifyTask.start_date,
+                    hasUserIds: !!verifyTask.user_ids,
+                    userIdsCount: verifyTask.user_ids?.length || 0,
+                });
+            }
+            
             return newTask;
         } catch (error: any) {
             console.error('Failed to add task:', error);

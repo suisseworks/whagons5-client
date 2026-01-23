@@ -20,7 +20,9 @@ export function useFormInitialization(params: any) {
     setStatusId,
     setTemplateId,
     setStartDate,
+    setStartTime,
     setDueDate,
+    setDueTime,
     setSelectedUserIds,
     setSlaId,
     setApprovalId,
@@ -51,8 +53,27 @@ export function useFormInitialization(params: any) {
       setSpotId(task.spot_id ? Number(task.spot_id) : null);
       setStatusId(task.status_id ? Number(task.status_id) : null);
       setTemplateId(task.template_id ? Number(task.template_id) : null);
-      setStartDate(task.start_date ? new Date(task.start_date).toISOString().split('T')[0] : '');
-      setDueDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
+      
+      // Extract date and time from start_date
+      if (task.start_date) {
+        const startDateObj = new Date(task.start_date);
+        setStartDate(startDateObj.toISOString().split('T')[0]);
+        setStartTime(startDateObj.toISOString().split('T')[1].substring(0, 5)); // HH:MM
+      } else {
+        setStartDate('');
+        setStartTime('');
+      }
+      
+      // Extract date and time from due_date
+      if (task.due_date) {
+        const dueDateObj = new Date(task.due_date);
+        setDueDate(dueDateObj.toISOString().split('T')[0]);
+        setDueTime(dueDateObj.toISOString().split('T')[1].substring(0, 5)); // HH:MM
+      } else {
+        setDueDate('');
+        setDueTime('');
+      }
+      
       // Get assigned user IDs from taskUsers table
       const assignedUserIds = getAssignedUserIdsFromTaskUsers(task.id, taskUsers || []);
       setSelectedUserIds(assignedUserIds);
@@ -69,11 +90,49 @@ export function useFormInitialization(params: any) {
       setDescription('');
       setSpotId(null);
       // Use initial values from task prop if provided (e.g., from scheduler)
-      setStartDate(task?.start_date ? new Date(task.start_date).toISOString().split('T')[0] : '');
-      setSelectedUserIds(task?.user_ids && Array.isArray(task.user_ids) 
+      let initialStartDate = '';
+      let initialStartTime = '';
+      let initialDueDate = '';
+      let initialDueTime = '';
+      
+      if (task?.start_date) {
+        const startDateObj = new Date(task.start_date);
+        initialStartDate = startDateObj.toISOString().split('T')[0];
+        initialStartTime = startDateObj.toISOString().split('T')[1].substring(0, 5); // HH:MM
+      }
+      
+      if (task?.due_date) {
+        const dueDateObj = new Date(task.due_date);
+        initialDueDate = dueDateObj.toISOString().split('T')[0];
+        initialDueTime = dueDateObj.toISOString().split('T')[1].substring(0, 5); // HH:MM
+      }
+      
+      const initialUserIds = task?.user_ids && Array.isArray(task.user_ids) 
         ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n))
-        : []);
-      setDueDate(task?.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
+        : [];
+      
+      console.log('[useFormInitialization] Create mode - initial data:', {
+        startDate: initialStartDate,
+        startTime: initialStartTime,
+        userIds: initialUserIds,
+        dueDate: initialDueDate,
+        dueTime: initialDueTime,
+        hasTaskProp: !!task,
+        taskData: task,
+        rawUserIds: task?.user_ids,
+      });
+      
+      setStartDate(initialStartDate);
+      setStartTime(initialStartTime);
+      
+      // CRITICAL: Set user IDs from scheduler click IMMEDIATELY
+      if (initialUserIds.length > 0) {
+        console.log('[useFormInitialization] Setting initial user_ids from scheduler:', initialUserIds);
+        setSelectedUserIds(initialUserIds);
+      }
+      
+      setDueDate(initialDueDate);
+      setDueTime(initialDueTime);
       setIsSubmitting(false);
       setSlaId(null);
       setApprovalId(null);
@@ -97,9 +156,12 @@ export function useFormInitialization(params: any) {
           setSpotId(firstTemplate.default_spot_id);
         }
         // Only use template default users if no initial users provided
-        if (!task?.user_ids || !Array.isArray(task.user_ids) || task.user_ids.length === 0) {
+        if (initialUserIds.length === 0) {
           const defaultsUsers = normalizeDefaultUserIds(firstTemplate.default_user_ids);
+          console.log('[useFormInitialization] No initial users, using template defaults:', defaultsUsers);
           setSelectedUserIds(defaultsUsers);
+        } else {
+          console.log('[useFormInitialization] Keeping initial users from task prop:', initialUserIds);
         }
       } else {
         setTemplateId(null);
@@ -112,7 +174,10 @@ export function useFormInitialization(params: any) {
       setDescription('');
       setSpotId(null);
       setSelectedUserIds([]);
+      setStartDate('');
+      setStartTime('');
       setDueDate('');
+      setDueTime('');
       setIsSubmitting(false);
       setSlaId(null);
       setApprovalId(null);
