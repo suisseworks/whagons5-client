@@ -672,19 +672,15 @@
     color: #ffffff !important;
   }
   
-  /* Secondary toolbar for dark headers */
-  header.wh-header.wh-header-dark ~ .sticky.top-16,
-  header.wh-header.wh-header-dark ~ .sticky.top-16 * {
-    color: #E8E8E8 !important;
+  /* Secondary toolbar for dark headers - now uses shadcn Button components with proper dark mode */
+  /* Removed forced colors - buttons now respect shadcn variants */
+  header.wh-header.wh-header-dark ~ .sticky.top-16 {
+    color: #E8E8E8;
   }
   
-  header.wh-header.wh-header-dark ~ .sticky.top-16 button {
-    color: #E8E8E8 !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-  }
-  
-  header.wh-header.wh-header-dark ~ .sticky.top-16 button:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
+  /* Labels and text in secondary toolbar */
+  header.wh-header.wh-header-dark ~ .sticky.top-16 label {
+    color: #E8E8E8;
   }
   .dark [data-sidebar="header"],
   .dark .bg-sidebar-header {
@@ -1899,40 +1895,9 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
   }
 }
 
-/* Force visible filter buttons - HIGH SPECIFICITY */
-button.filter-button-visible,
-button.h-8.px-3.rounded-md.text-sm.font-semibold.border.filter-button-visible,
-div[class*="flex items-center gap-2"] button.filter-button-visible {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  color: #000000 !important;
-  border-color: #9ca3af !important;
-  border: 1px solid #9ca3af !important;
-  font-weight: 600 !important;
-}
+/* Filter buttons now use shadcn Button component with proper dark mode support */
+/* Removed forced white background - buttons now respect theme */
 
-button.filter-button-visible:hover,
-button.h-8.px-3.rounded-md.text-sm.font-semibold.border.filter-button-visible:hover,
-div[class*="flex items-center gap-2"] button.filter-button-visible:hover {
-  background-color: #f3f4f6 !important;
-  background: #f3f4f6 !important;
-  border-color: #6b7280 !important;
-  border: 1px solid #6b7280 !important;
-}
-
-/* Force visible Select and Labels - ONLY in filter toolbar */
-div[class*="flex items-center gap-2 ml-auto"] button[data-radix-select-trigger],
-div[class*="flex items-center gap-2 ml-auto"] [data-radix-select-trigger],
-div[class*="flex items-center gap-2 ml-auto"] .SelectTrigger,
-button[role="combobox"].h-8 {
-  background-color: #ffffff !important;
-  background: #ffffff !important;
-  color: #000000 !important;
-  border-color: #9ca3af !important;
-  border: 1px solid #9ca3af !important;
-}
-
-div[class*="flex items-center gap-2 ml-auto"] label.text-sm.whitespace-nowrap.font-semibold {
-  color: #000000 !important;
-}
+/* Select and Labels in filter toolbar - now use shadcn components with proper dark mode */
+/* Removed forced white background - components now respect theme */
 
