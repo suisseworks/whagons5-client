@@ -440,7 +440,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   };
 
   // Update workspace info in Redux store
-  const handleUpdateWorkspace = useCallback((updates: Partial<WorkspaceInfo>) => {
+  const handleUpdateWorkspace = useCallback(async (updates: Partial<WorkspaceInfo>) => {
     if (!currentWorkspace) return;
 
     // Generate dynamic description based on name if no description is provided
@@ -469,10 +469,17 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       updatedAt: new Date().toISOString()
     };
 
-    dispatch(genericActions.workspaces.updateAsync({
-      id: currentWorkspace.id,
-      updates: updatedWorkspace
-    }));
+    try {
+      await dispatch(genericActions.workspaces.updateAsync({
+        id: currentWorkspace.id,
+        updates: updatedWorkspace
+      })).unwrap();
+    } catch (error: any) {
+      // Error is already handled by API interceptor (shows toast for 403)
+      // But we log it here for debugging
+      console.error('Failed to update workspace:', error);
+      // The optimistic update will be rolled back automatically by the thunk
+    }
   }, [currentWorkspace, dispatch]);
 
   // Define tabs for URL persistence
