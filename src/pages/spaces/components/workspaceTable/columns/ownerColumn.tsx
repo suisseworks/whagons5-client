@@ -19,9 +19,11 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
 
   const getCachedUserName = createUserNameCache(getUserDisplayName);
 
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return {
     field: 'user_ids',
-    headerName: 'Owner',
+    headerName: t('workspace.columns.owner', 'Owner'),
     width: 140,
     filter: 'agSetColumnFilter',
     filterValueGetter: (p: any) => {

@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect, lazy, Suspense, forwardRef, useCallback } from 'react';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
 import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { WorkspaceTableHandle } from './workspaceTable/types';
 
 // Organized imports
@@ -87,6 +88,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   onModeChange,
   tagDisplayMode = 'icon-text',
 }, ref): React.ReactNode => {
+  const { t } = useLanguage();
   const [modulesLoaded, setModulesLoaded] = useState(false);
   const gridRef = useRef<any>(null);
   const [emptyOverlayVisible, setEmptyOverlayVisible] = useState(false);
@@ -417,6 +419,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     categoryMap,
     showDescriptions: rowDensity !== 'compact',
     density: rowDensity,
+    t,
     approvalMap,
     taskApprovalInstances: stableTaskApprovalInstances,
     tagMap,

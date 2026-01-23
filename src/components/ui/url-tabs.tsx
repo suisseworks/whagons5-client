@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
 import { X } from 'lucide-react';
 import { Button } from './button';
+import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 
 interface TabItem {
   value: string;
@@ -25,6 +26,10 @@ interface UrlTabsProps {
   // Optional: control a right-side action (e.g., Clear filters)
   showClearFilters?: boolean;
   onClearFilters?: () => void;
+  // Drag and drop props
+  sortable?: boolean;
+  sortableItems?: string[];
+  renderSortableTab?: (tab: TabItem, isFixed: boolean) => React.ReactNode;
 }
 
 /**
@@ -44,6 +49,10 @@ export function UrlTabs({
   // Optional: control a right-side action (e.g., Clear filters)
   showClearFilters,
   onClearFilters,
+  // Drag and drop props
+  sortable = false,
+  sortableItems = [],
+  renderSortableTab,
 }: UrlTabsProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -125,19 +134,40 @@ export function UrlTabs({
     }
   }, [tabs, activeTab]);
 
+  const tabListContent = sortable && sortableItems.length > 0 ? (
+    <SortableContext items={sortableItems} strategy={horizontalListSortingStrategy}>
+      {tabs.map((tab) => {
+        if (renderSortableTab) {
+          return renderSortableTab(tab, !sortableItems.includes(tab.value));
+        }
+        return (
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            disabled={tab.disabled}
+          >
+            {tab.label}
+          </TabsTrigger>
+        );
+      })}
+    </SortableContext>
+  ) : (
+    tabs.map((tab) => (
+      <TabsTrigger
+        key={tab.value}
+        value={tab.value}
+        disabled={tab.disabled}
+      >
+        {tab.label}
+      </TabsTrigger>
+    ))
+  );
+
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>
       <div className="relative flex-1 flex flex-col min-h-0 w-full pt-0">
         <TabsList>
-          {tabs.map((tab) => (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              disabled={tab.disabled}
-            >
-              {tab.label}
-            </TabsTrigger>
-          ))}
+          {tabListContent}
         </TabsList>
 
         {showClearFilters && (

@@ -598,9 +598,11 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
 }
 
 export function createConfigColumn(opts: ColumnBuilderOptions) {
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return {
     colId: 'config',
-    headerName: 'Config',
+    headerName: t('workspace.columns.config', 'Config'),
     width: 140,
     minWidth: 120,
     maxWidth: 180,

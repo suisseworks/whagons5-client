@@ -76,7 +76,7 @@ export default function TimelineCanvas({
       .attr("width", width)
       .attr("height", height)
       .attr("fill", "transparent")
-      .style("cursor", "pointer");
+      .style("cursor", "crosshair");
 
     // Draw grid lines
     const gridLines = g.append("g").attr("class", "grid-lines");
@@ -132,12 +132,12 @@ export default function TimelineCanvas({
         .attr("class", "current-time-indicator");
     }
 
-    // Setup zoom behavior
+    // Setup zoom behavior (wheel/pinch only, not clicks)
     const zoom = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 4])
       .filter((event) => {
-        // Allow zoom with wheel/pinch, but not with clicks (we need clicks for creating events)
-        return !event.button && event.type !== 'click';
+        // Only allow zoom with wheel, not with any mouse buttons or clicks
+        return event.type === 'wheel';
       })
       .on("zoom", (event) => {
         const transform = event.transform;
@@ -150,17 +150,16 @@ export default function TimelineCanvas({
 
     svg.call(zoom);
 
-    // Disable double-click zoom reset (interferes with event creation)
+    // Disable all zoom-related click/dblclick behaviors
     svg.on("dblclick.zoom", null);
+    svg.on("click.zoom", null);
 
-    // Handle double-click on empty space to create new event
+    // Handle click on empty space to create new event
     if (onEmptySpaceClick) {
-      let clickTimeout: NodeJS.Timeout | null = null;
+      let lastClickedElement: SVGElement | null = null;
+      let lastClickTime = 0;
       
-      svg.on("dblclick", function(event: MouseEvent) {
-        event.preventDefault();
-        event.stopPropagation();
-        
+      svg.on("click", function(event: MouseEvent) {
         const target = event.target as SVGElement;
         
         // Don't trigger if clicking on event bars
@@ -171,11 +170,21 @@ export default function TimelineCanvas({
           return; // Let event handlers deal with it
         }
         
-        // Clear any pending single-click timeout
-        if (clickTimeout) {
-          clearTimeout(clickTimeout);
-          clickTimeout = null;
+        // Detect double-click to prevent duplicate creation
+        const now = Date.now();
+        const isDoubleClick = 
+          lastClickedElement === target && 
+          now - lastClickTime < 300;
+        
+        if (isDoubleClick) {
+          return; // Ignore second click of double-click
         }
+        
+        lastClickedElement = target;
+        lastClickTime = now;
+        
+        event.preventDefault();
+        event.stopPropagation();
         
         // Get click position relative to the transformed group
         const [x, y] = pointer(event, g.node() as SVGGElement);
@@ -184,23 +193,9 @@ export default function TimelineCanvas({
         const clickedDate = scale.invert(adjustedX);
         const resourceIndex = Math.floor(y / rowHeight);
         
-        console.log('[Scheduler] Double-click detected:', {
-          x,
-          adjustedX,
-          y,
-          clickedDate: clickedDate.toString(),
-          resourceIndex,
-          totalResources: resources.length,
-          hasCallback: !!onEmptySpaceClick,
-          resourcesArray: resources.map(r => r.id),
-        });
-        
         // Always call the callback if it exists - let the parent component validate
         if (onEmptySpaceClick) {
-          console.log('[Scheduler] Calling onEmptySpaceClick with:', { clickedDate, resourceIndex });
           onEmptySpaceClick(clickedDate, resourceIndex);
-        } else {
-          console.warn('[Scheduler] onEmptySpaceClick callback not provided');
         }
       });
     }
@@ -353,7 +348,7 @@ export default function TimelineCanvas({
         width={width + 80}
         height={height}
         className="timeline-canvas"
-        style={{ display: "block", cursor: "grab" }}
+        style={{ display: "block", cursor: "crosshair" }}
       >
         <g ref={gRef} className="timeline-content">
           <g ref={eventsGroupRef} className="events-group" />

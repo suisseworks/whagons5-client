@@ -23,10 +23,12 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
 
   const isVisible = createVisibilityChecker(visibleColumns);
 
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return [
     {
       field: 'id',
-      headerName: 'ID',
+      headerName: t('workspace.columns.id', 'ID'),
       width: 75,
       minWidth: 70,
       maxWidth: 85,
@@ -160,7 +162,7 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     },
     {
       field: 'due_date',
-      headerName: 'Due',
+      headerName: t('workspace.columns.due', 'Due'),
       filter: false,
       cellRenderer: (p: any) => {
         if (!p.data) {
@@ -207,7 +209,7 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     },
     {
       field: 'spot_id',
-      headerName: 'Location',
+      headerName: t('workspace.columns.location', 'Location'),
       sortable: true,
       filter: 'agSetColumnFilter',
       rowGroup: opts.groupField === 'spot_id' ? true : undefined,
@@ -256,7 +258,7 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     {
       field: 'updated_at',
       colId: 'created_at',
-      headerName: 'Last modified',
+      headerName: t('workspace.columns.lastModified', 'Last modified'),
       sortable: true,
       filter: false,
       valueGetter: (p: any) => {

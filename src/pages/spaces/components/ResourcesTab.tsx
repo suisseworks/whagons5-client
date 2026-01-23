@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, FilePlus2, File, Trash2, Download, Folder } from "lucide-react";
+import { useLanguage } from "@/providers/LanguageProvider";
 import {
   getWorkspaceResources,
   uploadWorkspaceResource,
@@ -26,6 +27,7 @@ function ResourceItem({
   onDownload: (item: WorkspaceResource) => void;
   onDelete: (id: string) => void;
   humanSize: (bytes: number) => string;
+  t: (key: string, fallback?: string) => string;
 }) {
   const [imageError, setImageError] = useState(false);
 
@@ -59,7 +61,7 @@ function ResourceItem({
           size="sm"
           variant="ghost"
           onClick={() => onDownload(item)}
-          title="Download"
+          title={t('workspace.collab.resources.download', 'Download')}
         >
           <Download className="w-4 h-4" />
         </Button>
@@ -67,7 +69,7 @@ function ResourceItem({
           size="sm"
           variant="ghost"
           onClick={() => onDelete(item.id.toString())}
-          title="Delete"
+          title={t('workspace.collab.resources.delete', 'Delete')}
         >
           <Trash2 className="w-4 h-4" />
         </Button>
@@ -77,6 +79,7 @@ function ResourceItem({
 }
 
 export default function ResourcesTab({ workspaceId }: { workspaceId: string | undefined }) {
+  const { t } = useLanguage();
   const [resources, setResources] = useState<WorkspaceResource[]>([]);
   const [creatingDocName, setCreatingDocName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -100,7 +103,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
       const data = await getWorkspaceResources(workspaceId);
       setResources(data);
     } catch (error: any) {
-      setError(error?.response?.data?.message || "Failed to load resources");
+      setError(error?.response?.data?.message || t('workspace.collab.resources.failedToLoad', 'Failed to load resources'));
       console.error("Failed to load resources:", error);
     } finally {
       setLoading(false);
@@ -109,7 +112,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
 
   const onFilesSelected = async (files: FileList) => {
     if (!workspaceId || workspaceId === 'all' || isNaN(Number(workspaceId))) {
-      setError("Valid workspace ID is required");
+      setError(t('workspace.collab.resources.validWorkspaceIdRequired', 'Valid workspace ID is required'));
       return;
     }
 
@@ -119,7 +122,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
         const resource = await uploadWorkspaceResource(workspaceId, file);
         return resource;
       } catch (error: any) {
-        setError(`Failed to upload ${file.name}: ${error?.response?.data?.message || error.message}`);
+        setError(`${t('workspace.collab.resources.failedToUpload', 'Failed to upload')} ${file.name}: ${error?.response?.data?.message || error.message}`);
         console.error("Upload failed:", error);
         return null;
       }
@@ -161,11 +164,11 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
 
   const createBlankDoc = async () => {
     if (!workspaceId || workspaceId === 'all' || isNaN(Number(workspaceId))) {
-      setError("Valid workspace ID is required");
+      setError(t('workspace.collab.resources.validWorkspaceIdRequired', 'Valid workspace ID is required'));
       return;
     }
 
-    const name = creatingDocName.trim() || `Untitled Document ${resources.length + 1}`;
+    const name = creatingDocName.trim() || `${t('workspace.collab.resources.untitledDocument', 'Untitled Document')} ${resources.length + 1}`;
     const fileName = name.endsWith(".md") ? name : `${name}.md`;
     
     // Create a blank markdown file
@@ -179,7 +182,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
       setCreatingDocName("");
       setError(null);
     } catch (error: any) {
-      setError(error?.response?.data?.message || "Failed to create document");
+      setError(error?.response?.data?.message || t('workspace.collab.resources.failedToCreate', 'Failed to create document'));
       console.error("Failed to create document:", error);
     } finally {
       setUploading(false);
@@ -194,7 +197,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
       setResources((prev) => prev.filter((r) => r.id.toString() !== resourceId));
       setError(null);
     } catch (error: any) {
-      setError(error?.response?.data?.message || "Failed to delete resource");
+      setError(error?.response?.data?.message || t('workspace.collab.resources.failedToDelete', 'Failed to delete resource'));
       console.error("Failed to delete resource:", error);
     }
   };
@@ -227,7 +230,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
     return (
       <div className="h-full w-full flex items-center justify-center">
         <div className="text-muted-foreground text-sm text-center p-4">
-          Select a specific workspace to view resources.
+          {t('workspace.collab.resources.selectWorkspace', 'Select a specific workspace to view resources.')}
         </div>
       </div>
     );
@@ -236,7 +239,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
-        <div className="text-muted-foreground">Loading resources...</div>
+        <div className="text-muted-foreground">{t('workspace.collab.resources.loading', 'Loading resources...')}</div>
       </div>
     );
   }
@@ -247,10 +250,10 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
       <div className="bg-primary/10 border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Folder className="w-5 h-5 text-primary" />
-          <h2 className="font-semibold text-base">Resources</h2>
+          <h2 className="font-semibold text-base">{t('workspace.collab.resources.resources', 'Resources')}</h2>
           {resources.length > 0 && (
             <span className="text-xs text-muted-foreground ml-2">
-              {resources.length} {resources.length === 1 ? 'item' : 'items'} • {humanSize(totalSize)}
+              {resources.length} {resources.length === 1 ? t('workspace.collab.resources.item', 'item') : t('workspace.collab.resources.items', 'items')} • {humanSize(totalSize)}
             </span>
           )}
         </div>
@@ -267,8 +270,8 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
         {resources.length === 0 ? (
           <div className="text-center text-muted-foreground text-sm py-20">
             <Folder className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="font-medium mb-1">No resources yet</p>
-            <p className="text-xs">Upload files or create a document to get started</p>
+            <p className="font-medium mb-1">{t('workspace.collab.resources.noResources', 'No resources yet')}</p>
+            <p className="text-xs">{t('workspace.collab.resources.getStarted', 'Upload files or create a document to get started')}</p>
           </div>
         ) : (
           <div className="divide-y">
@@ -285,6 +288,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
                   onDownload={handleDownload}
                   onDelete={handleDelete}
                   humanSize={humanSize}
+                  t={t}
                 />
               );
             })}
@@ -324,13 +328,13 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
                 disabled={uploading || !workspaceId || workspaceId === 'all' || isNaN(Number(workspaceId))}
               >
                 <Upload className="w-4 h-4" />
-                Upload Files
+                {t('workspace.collab.resources.uploadFiles', 'Upload Files')}
               </Button>
 
               <div className="h-6 w-px bg-border" />
 
               <Input
-                placeholder="New document name"
+                placeholder={t('workspace.collab.resources.newDocumentName', 'New document name')}
                 value={creatingDocName}
                 onChange={(e) => setCreatingDocName(e.target.value)}
                 className="h-9 w-48"
@@ -353,15 +357,15 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
                 disabled={uploading || !workspaceId || workspaceId === 'all' || isNaN(Number(workspaceId))}
               >
                 <FilePlus2 className="w-4 h-4" />
-                Create
+                {t('workspace.collab.resources.create', 'Create')}
               </Button>
             </div>
 
             <div className="text-xs text-muted-foreground">
               {uploading ? (
-                <span className="text-primary">Uploading...</span>
+                <span className="text-primary">{t('workspace.collab.resources.uploading', 'Uploading...')}</span>
               ) : (
-                "Drag & drop files here"
+                t('workspace.collab.resources.dragDrop', 'Drag & drop files here')
               )}
             </div>
           </div>

@@ -22,27 +22,97 @@ import type { AppDispatch, RootState } from "@/store/store";
 import type { SchedulerResource } from "./scheduler/types/scheduler";
 import toast from "react-hot-toast";
 import { Maximize2, Minimize2, Calendar } from "lucide-react";
+import { TaskEvents } from "@/store/eventEmiters/taskEvents";
+import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 
 export default function SchedulerViewTab({ workspaceId }: { workspaceId: string | undefined }) {
   const dispatch = useDispatch<AppDispatch>();
-  const [viewPreset, setViewPreset] = useState<ViewPreset>("hourAndDay");
-  const [baseDate, setBaseDate] = useState(new Date());
+  const [viewPreset, setViewPreset] = useState<ViewPreset>(() => {
+    // Restore view preset from localStorage
+    try {
+      const key = `wh_scheduler_view_preset_${workspaceId || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved && ['hourAndDay', 'dayAndWeek', 'weekAndMonth', 'monthAndYear'].includes(saved)) {
+        return saved as ViewPreset;
+      }
+    } catch {}
+    return "hourAndDay";
+  });
+  const [baseDate, setBaseDate] = useState(() => {
+    // Restore base date from localStorage if it's recent (within 7 days)
+    try {
+      const key = `wh_scheduler_base_date_${workspaceId || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const savedDate = new Date(saved);
+        const now = new Date();
+        const daysDiff = Math.abs((now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (!isNaN(savedDate.getTime()) && daysDiff <= 7) {
+          console.log('[Scheduler] Restored base date:', savedDate);
+          return savedDate;
+        }
+      }
+    } catch {}
+    return new Date();
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<number>>(new Set());
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
-  const [groupBy, setGroupBy] = useState<"none" | "team" | "role">("team");
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>(() => {
+    // Restore selected users from localStorage
+    try {
+      const key = `wh_scheduler_selected_users_${workspaceId || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.every((id) => typeof id === 'number')) {
+          console.log('[Scheduler] Restored selected users:', parsed);
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.error('[Scheduler] Error restoring selected users:', error);
+    }
+    return [];
+  });
+  const [groupBy, setGroupBy] = useState<"none" | "team" | "role">(() => {
+    // Restore groupBy from localStorage
+    try {
+      const key = `wh_scheduler_group_by_${workspaceId || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved && ['none', 'team', 'role'].includes(saved)) {
+        return saved as "none" | "team" | "role";
+      }
+    } catch {}
+    return "team";
+  });
   const [editingEvent, setEditingEvent] = useState<SchedulerEvent | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [taskDialogMode, setTaskDialogMode] = useState<"create" | "edit">("create");
   const [createEventData, setCreateEventData] = useState<{ date: Date; resourceIndex: number } | null>(null);
   const [initialTaskData, setInitialTaskData] = useState<any>(null);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [filters, setFilters] = useState({
-    categories: [] as number[],
-    statuses: [] as number[],
-    priorities: [] as number[],
-    teams: [] as number[],
+  const [filters, setFilters] = useState(() => {
+    // Restore filters from localStorage
+    try {
+      const key = `wh_scheduler_filters_${workspaceId || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+          statuses: Array.isArray(parsed.statuses) ? parsed.statuses : [],
+          priorities: Array.isArray(parsed.priorities) ? parsed.priorities : [],
+          teams: Array.isArray(parsed.teams) ? parsed.teams : [],
+        };
+      }
+    } catch {}
+    return {
+      categories: [] as number[],
+      statuses: [] as number[],
+      priorities: [] as number[],
+      teams: [] as number[],
+    };
   });
   const undoRedoManagerRef = useRef(new UndoRedoManager());
   const schedulerContainerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +136,124 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
 
   // Fetch resources and events from Redux
   const { resources, events, loading } = useSchedulerData(workspaceId);
+
+  // Debug: Log events when they change
+  useEffect(() => {
+    console.log('[Scheduler] Events updated:', {
+      count: events.length,
+      workspaceId,
+      events: events.slice(0, 3), // Log first 3 events for debugging
+    });
+  }, [events, workspaceId]);
+
+  // Save selected users to localStorage when they change
+  useEffect(() => {
+    try {
+      const key = `wh_scheduler_selected_users_${workspaceId || 'all'}`;
+      if (selectedUserIds.length > 0) {
+        localStorage.setItem(key, JSON.stringify(selectedUserIds));
+        console.log('[Scheduler] Saved selected users:', selectedUserIds);
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.error('[Scheduler] Error saving selected users:', error);
+    }
+  }, [selectedUserIds, workspaceId]);
+
+  // Restore selected users when workspace changes
+  useEffect(() => {
+    try {
+      const key = `wh_scheduler_selected_users_${workspaceId || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.every((id) => typeof id === 'number')) {
+          console.log('[Scheduler] Workspace changed, restoring users:', parsed);
+          setSelectedUserIds(parsed);
+        }
+      } else {
+        // Reset to empty when switching workspaces with no saved selection
+        setSelectedUserIds([]);
+      }
+    } catch (error) {
+      console.error('[Scheduler] Error restoring selected users on workspace change:', error);
+    }
+  }, [workspaceId]);
+
+  // Save view preset when it changes
+  useEffect(() => {
+    try {
+      const key = `wh_scheduler_view_preset_${workspaceId || 'all'}`;
+      localStorage.setItem(key, viewPreset);
+    } catch (error) {
+      console.error('[Scheduler] Error saving view preset:', error);
+    }
+  }, [viewPreset, workspaceId]);
+
+  // Save groupBy when it changes
+  useEffect(() => {
+    try {
+      const key = `wh_scheduler_group_by_${workspaceId || 'all'}`;
+      localStorage.setItem(key, groupBy);
+    } catch (error) {
+      console.error('[Scheduler] Error saving groupBy:', error);
+    }
+  }, [groupBy, workspaceId]);
+
+  // Save base date when it changes
+  useEffect(() => {
+    try {
+      const key = `wh_scheduler_base_date_${workspaceId || 'all'}`;
+      localStorage.setItem(key, baseDate.toISOString());
+    } catch (error) {
+      console.error('[Scheduler] Error saving base date:', error);
+    }
+  }, [baseDate, workspaceId]);
+
+  // Save filters when they change
+  useEffect(() => {
+    try {
+      const key = `wh_scheduler_filters_${workspaceId || 'all'}`;
+      const hasFilters = filters.categories.length > 0 || 
+                        filters.statuses.length > 0 || 
+                        filters.priorities.length > 0 || 
+                        filters.teams.length > 0;
+      if (hasFilters) {
+        localStorage.setItem(key, JSON.stringify(filters));
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.error('[Scheduler] Error saving filters:', error);
+    }
+  }, [filters, workspaceId]);
+
+  // Listen for task changes to refresh the scheduler
+  useEffect(() => {
+    const handleTaskChange = (data?: any) => {
+      console.log('[Scheduler] Task change detected:', data);
+      console.log('[Scheduler] Refreshing tasks from IndexedDB');
+      dispatch(getTasksFromIndexedDB());
+    };
+
+    const unsubscribers = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, handleTaskChange),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, handleTaskChange),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, handleTaskChange),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, handleTaskChange),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsub) => {
+        try {
+          unsub();
+        } catch (error) {
+          console.error('[Scheduler] Error unsubscribing from task event:', error);
+        }
+      });
+    };
+  }, [dispatch]);
   
   // Filter resources to only show selected users
   const displayedResources = useMemo(() => {
@@ -133,22 +321,55 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
 
   // Synchronize horizontal scrolling between TimeHeader and TimelineCanvas
   useEffect(() => {
-    const timelineScroll = timelineScrollRef.current;
-    const headerScroll = timeHeaderScrollRef.current;
-    
-    if (!timelineScroll || !headerScroll) return;
-
-    const handleTimelineScroll = () => {
-      if (headerScroll) {
-        headerScroll.scrollLeft = timelineScroll.scrollLeft;
+    // Use a small delay to ensure DOM is ready after dimension/user changes
+    const setupScrollSync = () => {
+      const timelineScroll = timelineScrollRef.current;
+      const headerScroll = timeHeaderScrollRef.current;
+      
+      if (!timelineScroll || !headerScroll) {
+        console.log('[Scheduler] Scroll sync: waiting for refs', {
+          hasTimeline: !!timelineScroll,
+          hasHeader: !!headerScroll
+        });
+        return null;
       }
+
+      console.log('[Scheduler] Setting up scroll synchronization');
+
+      const handleTimelineScroll = () => {
+        if (headerScroll && timelineScroll) {
+          requestAnimationFrame(() => {
+            headerScroll.scrollLeft = timelineScroll.scrollLeft;
+          });
+        }
+      };
+
+      timelineScroll.addEventListener('scroll', handleTimelineScroll, { passive: true });
+      
+      return () => {
+        if (timelineScroll) {
+          timelineScroll.removeEventListener('scroll', handleTimelineScroll);
+        }
+      };
     };
 
-    timelineScroll.addEventListener('scroll', handleTimelineScroll);
-    return () => {
-      timelineScroll.removeEventListener('scroll', handleTimelineScroll);
-    };
-  }, []);
+    // Try immediately
+    let cleanup = setupScrollSync();
+    
+    // If refs not ready, try again after a short delay
+    if (!cleanup) {
+      const timer = setTimeout(() => {
+        cleanup = setupScrollSync();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        cleanup?.();
+      };
+    }
+    
+    return cleanup;
+  }, [dimensions.width, dimensions.height, selectedUserIds.length, displayedResources.length]);
 
   // Filter events based on filters
   const filteredEvents = useMemo(() => {
@@ -548,16 +769,18 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                   {/* Time Header - with horizontal scroll sync */}
                   <div 
                     ref={timeHeaderScrollRef}
-                    className="border-b overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                    className="border-b overflow-x-scroll overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                     style={{ width: dimensions.width }}
                   >
-                    <TimeHeader
-                      scale={scale}
-                      height={40}
-                      preset={viewPreset}
-                      startDate={startDate}
-                      endDate={endDate}
-                    />
+                    <div style={{ width: timelineWidth + 80 }}>
+                      <TimeHeader
+                        scale={scale}
+                        height={40}
+                        preset={viewPreset}
+                        startDate={startDate}
+                        endDate={endDate}
+                      />
+                    </div>
                   </div>
 
                   {/* Timeline Canvas - scrollable */}
@@ -566,20 +789,21 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                     className="flex-1 overflow-auto"
                     style={{ width: dimensions.width }}
                   >
-                    <TimelineCanvas
-                      scale={scale}
-                      width={timelineWidth}
-                      height={Math.max(displayedResources.length * rowHeight, dimensions.height - 40)}
-                      preset={viewPreset}
-                      startDate={startDate}
-                      endDate={endDate}
-                      resources={displayedResources}
-                      events={filteredEvents}
-                      rowHeight={rowHeight}
-                      onEventSelect={(event) => {
-                        console.log("Event selected:", event);
-                      }}
-                      onEventDoubleClick={(event) => {
+                    <div style={{ width: timelineWidth + 80 }}>
+                      <TimelineCanvas
+                        scale={scale}
+                        width={timelineWidth}
+                        height={Math.max(displayedResources.length * rowHeight, dimensions.height - 40)}
+                        preset={viewPreset}
+                        startDate={startDate}
+                        endDate={endDate}
+                        resources={displayedResources}
+                        events={filteredEvents}
+                        rowHeight={rowHeight}
+                        onEventSelect={(event) => {
+                          // Event selected - could add visual feedback here if needed
+                        }}
+                        onEventDoubleClick={(event) => {
                         // Fetch the full task data for editing
                         TasksCache.getTask(event.taskId.toString()).then((task) => {
                           if (task) {
@@ -591,23 +815,10 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                         });
                       }}
                       onEmptySpaceClick={(date, resourceIndex) => {
-                        console.log('[SchedulerViewTab] onEmptySpaceClick called:', { 
-                          date, 
-                          resourceIndex, 
-                          displayedResourcesLength: displayedResources.length,
-                          resourcesLength: resources.length,
-                          selectedUserIds,
-                          displayedResources: displayedResources.map(r => ({ id: r.id, name: r.name })),
-                          allResources: resources.map(r => ({ id: r.id, name: r.name })),
-                        });
-                        
                         // The resourceIndex comes from the canvas which uses displayedResources
-                        // If displayedResources is empty but we have resources, use resources instead
-                        // This can happen if selectedUserIds is empty but resources exist
                         const resourcesToUse = displayedResources.length > 0 ? displayedResources : resources;
                         
                         if (resourcesToUse.length === 0) {
-                          console.warn('[SchedulerViewTab] No resources available to create task');
                           toast.error("Please select at least one user to create a task");
                           return;
                         }
@@ -622,22 +833,21 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                           const end = new Date(start);
                           end.setHours(end.getHours() + 1); // Default 1 hour duration
                           
-                          // Create initial task data with start_date and due_date
+                          // Create initial task data with start_date, due_date, user_ids, and workspace_id
                           const initialData = {
                             start_date: start.toISOString(),
                             due_date: end.toISOString(),
                             user_ids: [resource.id],
+                            workspace_id: workspaceId ? parseInt(workspaceId) : undefined,
                           };
                           
-                          console.log('[SchedulerViewTab] Opening TaskDialog with:', initialData);
+                          console.log('[Scheduler] Creating task with initial data:', initialData);
+                          
                           setInitialTaskData(initialData);
                           setCreateEventData({ date, resourceIndex });
                           setEditingEvent(null);
                           setTaskDialogMode("create");
                           setIsTaskDialogOpen(true);
-                          console.log('[SchedulerViewTab] TaskDialog state set to open');
-                        } else {
-                          console.warn('[SchedulerViewTab] Invalid resourceIndex:', resourceIndex, 'resourcesToUse.length:', resourcesToUse.length);
                         }
                       }}
                       onEventMove={async (event, newStartDate, newEndDate) => {
@@ -753,6 +963,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                         }
                       }}
                     />
+                    </div>
                   </div>
                 </SchedulerErrorBoundary>
               )}

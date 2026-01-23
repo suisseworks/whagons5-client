@@ -15,9 +15,11 @@ export function createPriorityColumn(opts: ColumnBuilderOptions) {
 
   const getPriorityPalette = createPriorityPaletteCache();
 
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return {
     field: 'priority_id',
-    headerName: 'Priority',
+    headerName: t('workspace.columns.priority', 'Priority'),
     sortable: true,
     filter: 'agSetColumnFilter',
     suppressHeaderMenuButton: true,
