@@ -131,11 +131,9 @@ export function SettingsDialog({
               {type === 'delete' && <FontAwesomeIcon icon={faTrash} className="text-destructive" />}
               <span>{getDefaultTitle()}</span>
             </DialogTitle>
-            {description && (
-              <DialogDescription className="text-sm text-muted-foreground/80 leading-relaxed">
-                {getDefaultDescription()}
-              </DialogDescription>
-            )}
+            <DialogDescription className="text-sm text-muted-foreground/80 leading-relaxed">
+              {getDefaultDescription()}
+            </DialogDescription>
           </DialogHeader>
 
           {type === 'delete' && entityData && renderEntityPreview && (

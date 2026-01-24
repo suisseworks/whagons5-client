@@ -34,9 +34,11 @@ export function createNameColumn(opts: ColumnBuilderOptions, latestNoteByTaskId:
     density = 'comfortable',
   } = opts;
 
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return {
     field: 'name',
-    headerName: 'Name',
+    headerName: t('workspace.columns.name', 'Name'),
     flex: 3.8,
     filter: false,
     cellRenderer: (p: any) => {

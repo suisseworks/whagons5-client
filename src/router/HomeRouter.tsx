@@ -27,6 +27,14 @@ import Workflows from '@/pages/settings/sub_pages/Workflows';
 import Approvals from '@/pages/settings/sub_pages/Approvals';
 import Global from '@/pages/settings/sub_pages/Global';
 import BoardsSettings from '@/pages/settings/sub_pages/Boards';
+import KpiCardsSettings from '@/pages/settings/sub_pages/KpiCardsSettings';
+import KpiCardsManage from '@/pages/settings/sub_pages/KpiCardsManage';
+import GamificationSettings from '@/pages/settings/sub_pages/GamificationSettings';
+import GamificationComingSoon from '@/pages/gamification/GamificationComingSoon';
+import AnalyticsSettings from '@/pages/settings/sub_pages/AnalyticsSettings';
+import AnalyticsComingSoon from '@/pages/analytics/AnalyticsComingSoon';
+import MotivationSettings from '@/pages/settings/sub_pages/MotivationSettings';
+import MotivationComingSoon from '@/pages/motivation/MotivationComingSoon';
 import Boards from '@/pages/boards/Boards';
 import Home from '@/pages/home/Home';
 // Messages removed
@@ -53,8 +61,10 @@ function AllPages() {
 
   const renderedPages = useMemo(() => pages.map(({ path, component }) => {
     const isVisible = !!matchPath({ path, end: false }, location.pathname);
+    // Only render the component when visible to avoid hook violations
+    if (!isVisible) return null;
     return (
-      <div key={path} style={{ display: isVisible ? 'block' : 'none', height: '100%' }}>
+      <div key={path} style={{ height: '100%' }}>
         {component}
       </div>
     );
@@ -89,6 +99,9 @@ export const HomeRoutes = () => {
           <Route path="/boards/:boardId" element={<BoardDetail />} />
           <Route path="/broadcasts" element={<BroadcastsPage />} />
           <Route path="/activity" element={<ActivityMonitor />} />
+          <Route path="/gamification" element={<GamificationComingSoon />} />
+          <Route path="/analytics" element={<AnalyticsComingSoon />} />
+          <Route path="/motivation" element={<MotivationComingSoon />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
@@ -108,6 +121,11 @@ export const HomeRoutes = () => {
           <Route path="/settings/approvals" element={<Approvals />} />
           <Route path="/settings/global" element={<Global />} />
           <Route path="/settings/boards" element={<BoardsSettings />} />
+          <Route path="/settings/kpi-cards" element={<KpiCardsSettings />} />
+          <Route path="/settings/kpi-cards/manage" element={<KpiCardsManage />} />
+          <Route path="/settings/gamification" element={<GamificationSettings />} />
+          <Route path="/settings/analytics" element={<AnalyticsSettings />} />
+          <Route path="/settings/motivation" element={<MotivationSettings />} />
           <Route path="/settings/test" element={<TestPage />} />
           
           {/* Compliance Routes */}

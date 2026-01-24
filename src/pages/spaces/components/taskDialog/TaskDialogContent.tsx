@@ -79,11 +79,15 @@ export default function TaskDialogContent({
   const formState = useTaskFormState();
   const t3 = perfEnabled ? performance.now() : 0;
   markOnce('useTaskFormState', t2, t3);
-  const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef } = formState;
+  const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef, startTime, dueTime } = formState;
 
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
   const customFieldValuesRef = useRef<Record<number, any>>({});
   const lastCustomFieldCategoryRef = useRef<number | null>(null);
+  
+  // Preserve initial user_ids from task prop (e.g., from scheduler click)
+  // This prevents templates from overwriting user assignments
+  const initialUserIdsRef = useRef<number[]>([]);
 
   // Use deferred values to mark heavy data as non-urgent - allows animation to start first
   const t4 = perfEnabled ? performance.now() : 0;
@@ -240,7 +244,10 @@ export default function TaskDialogContent({
     setSpotId: formState.setSpotId,
     setStatusId: formState.setStatusId,
     setTemplateId: formState.setTemplateId,
+    setStartDate: formState.setStartDate,
+    setStartTime: formState.setStartTime,
     setDueDate: formState.setDueDate,
+    setDueTime: formState.setDueTime,
     setSelectedUserIds: formState.setSelectedUserIds,
     setSlaId: formState.setSlaId,
     setApprovalId: formState.setApprovalId,
@@ -278,6 +285,17 @@ export default function TaskDialogContent({
   const t27 = perfEnabled ? performance.now() : 0;
   markOnce('useShareHandlers', t26, t27);
 
+  // Helper to combine date and time into ISO format
+  const combineDateAndTime = (date: string, time: string): string | null => {
+    if (!date) return null;
+    if (time) {
+      // Combine date and time
+      return `${date}T${time}:00`;
+    }
+    // If no time, use midnight
+    return `${date}T00:00:00`;
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit || !categoryId || !computed.derivedTeamId || !data.user?.id) return;
     if (mode === 'edit' && (!formState.statusId || !task?.id)) return;
@@ -296,7 +314,8 @@ export default function TaskDialogContent({
           template_id: templateId,
           sla_id: formState.slaId,
           approval_id: formState.approvalId,
-          due_date: formState.dueDate || null,
+          start_date: combineDateAndTime(formState.startDate, startTime),
+          due_date: combineDateAndTime(formState.dueDate, dueTime),
           user_ids:
             Array.isArray(formState.selectedUserIds) && formState.selectedUserIds.length > 0
               ? formState.selectedUserIds
@@ -352,8 +371,8 @@ export default function TaskDialogContent({
           priority_id: priorityId ?? 0,
           sla_id: formState.slaId,
           approval_id: formState.approvalId,
-          start_date: null,
-          due_date: formState.dueDate || null,
+          start_date: combineDateAndTime(formState.startDate, startTime),
+          due_date: combineDateAndTime(formState.dueDate, dueTime),
           expected_duration: Number.isFinite(computed.selectedTemplate?.expected_duration)
             ? computed.selectedTemplate.expected_duration
             : 0,
@@ -365,7 +384,12 @@ export default function TaskDialogContent({
         };
         if (computed.spotsApplicable) payload.spot_id = formState.spotId;
 
+        console.log('[TaskDialog] Creating task with payload:', JSON.stringify(payload, null, 2));
+
         const result = await dispatch((await import('@/store/reducers/tasksSlice')).addTaskAsync(payload)).unwrap();
+        
+        console.log('[TaskDialog] Task created successfully:', JSON.stringify(result, null, 2));
+        console.log('[TaskDialog] Task has start_date:', !!result?.start_date, 'user_ids:', result?.user_ids);
         const newTaskId = result?.id;
 
         if (mode === 'create' && newTaskId && formState.selectedTagIds.length > 0) {
@@ -389,6 +413,30 @@ export default function TaskDialogContent({
       formState.setIsSubmitting(false);
     }
   };
+
+  // Capture initial user_ids when dialog opens (from scheduler or other source)
+  useEffect(() => {
+    if (open && mode === 'create') {
+      console.log('[TaskDialog] Dialog opened with task prop:', {
+        task,
+        user_ids: task?.user_ids,
+        user_ids_type: typeof task?.user_ids,
+        is_array: Array.isArray(task?.user_ids),
+        user_ids_length: task?.user_ids?.length,
+      });
+      
+      if (task?.user_ids && Array.isArray(task.user_ids)) {
+        initialUserIdsRef.current = task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n));
+        console.log('[TaskDialog] Captured initial user_ids:', initialUserIdsRef.current);
+      } else {
+        console.warn('[TaskDialog] No valid user_ids in task prop!');
+        initialUserIdsRef.current = [];
+      }
+    } else if (!open) {
+      // Reset when dialog closes
+      initialUserIdsRef.current = [];
+    }
+  }, [open, mode, task?.user_ids]);
 
   // Initialize custom field values
   useEffect(() => {
@@ -460,8 +508,19 @@ export default function TaskDialogContent({
       } else if (t.default_spot_id) {
         formState.setSpotId(t.default_spot_id);
       }
-      const defaultsUsers = normalizeDefaultUserIds(t.default_user_ids);
-      formState.setSelectedUserIds(defaultsUsers.length > 0 ? defaultsUsers : []);
+      
+      // IMPORTANT: Only apply template's default users if no users were provided from initial task data
+      // This preserves user assignments from scheduler clicks
+      const hasInitialUsers = initialUserIdsRef.current.length > 0;
+      if (!hasInitialUsers) {
+        const defaultsUsers = normalizeDefaultUserIds(t.default_user_ids);
+        formState.setSelectedUserIds(defaultsUsers.length > 0 ? defaultsUsers : []);
+        console.log('[TaskDialog] Applied template default users:', defaultsUsers);
+      } else {
+        console.log('[TaskDialog] Preserving initial user_ids from ref:', initialUserIdsRef.current);
+        // Make sure the users are still set (in case template changed before form init completed)
+        formState.setSelectedUserIds(initialUserIdsRef.current);
+      }
     }
   }, [computed.selectedTemplate, computed.categoryPriorities, categoryId, mode]);
 
@@ -559,7 +618,12 @@ export default function TaskDialogContent({
                 {...{
                   mode,
                   workspaceTemplates: computed.workspaceTemplates,
+                  workspaceCategories: computed.workspaceCategories,
                   categories: data.categories,
+                  categoryId,
+                  setCategoryId: formState.setCategoryId,
+                  name: formState.name,
+                  setName: formState.setName,
                   templateId,
                   setTemplateId: formState.setTemplateId,
                   currentWorkspace: computed.currentWorkspace,
@@ -609,6 +673,8 @@ export default function TaskDialogContent({
                 approvals={data.approvals}
                 approvalId={formState.approvalId}
                 setApprovalId={formState.setApprovalId}
+                startDate={formState.startDate}
+                setStartDate={formState.setStartDate}
                 dueDate={formState.dueDate}
                 setDueDate={formState.setDueDate}
               />

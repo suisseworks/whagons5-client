@@ -125,19 +125,21 @@ export function UrlTabs({
     }
   }, [tabs, activeTab]);
 
+  const tabListContent = tabs.map((tab) => (
+    <TabsTrigger
+      key={tab.value}
+      value={tab.value}
+      disabled={tab.disabled}
+    >
+      {tab.label}
+    </TabsTrigger>
+  ));
+
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>
       <div className="relative flex-1 flex flex-col min-h-0 w-full pt-0">
         <TabsList>
-          {tabs.map((tab) => (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              disabled={tab.disabled}
-            >
-              {tab.label}
-            </TabsTrigger>
-          ))}
+          {tabListContent}
         </TabsList>
 
         {showClearFilters && (

@@ -1,7 +1,19 @@
-import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import React, { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp, Trash2 } from 'lucide-react';
+import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp, Trash2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { TabsTrigger } from '@/animated/Tabs';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import ChatTab from '@/pages/spaces/components/ChatTab';
@@ -52,6 +64,51 @@ const WORKSPACE_TAB_PATHS = {
 
 type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
 const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'statistics', 'settings'];
+const FIXED_TABS: WorkspaceTabKey[] = ['statistics', 'settings']; // Tabs that cannot be reordered
+
+// Sortable tab wrapper component
+interface SortableTabProps {
+  id: string;
+  children: React.ReactNode;
+  isDragging: boolean;
+  disabled?: boolean;
+}
+
+const SortableTab: React.FC<SortableTabProps> = ({ id, children, isDragging, disabled }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isThisTabDragging,
+  } = useSortable({ id, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isThisTabDragging ? 0.5 : 1,
+    cursor: disabled ? 'default' : 'grab',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...(disabled ? {} : listeners)}
+      className="relative"
+    >
+      {!disabled && (
+        <GripVertical 
+          className="absolute left-1 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/40 pointer-events-none" 
+          strokeWidth={2}
+        />
+      )}
+      {children}
+    </div>
+  );
+};
 
 export const Workspace = () => {
   const { t } = useLanguage();
@@ -105,11 +162,186 @@ export const Workspace = () => {
   const groupBy = useSelector(selectGroupBy);
   const collapseGroups = useSelector(selectCollapseGroups);
 
-  const allowedTabOrder = DEFAULT_TAB_SEQUENCE;
+  // Custom tab order state (persisted per workspace)
+  // Ensure 'grid' (tasks) is always first
+  const [customTabOrder, setCustomTabOrder] = useState<WorkspaceTabKey[]>(() => {
+    try {
+      const key = `wh_workspace_tab_order_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+          const order = parsed as WorkspaceTabKey[];
+          // Ensure 'grid' is always first
+          if (order[0] !== 'grid') {
+            const filtered = order.filter(tab => tab !== 'grid');
+            return ['grid', ...filtered] as WorkspaceTabKey[];
+          }
+          return order;
+        }
+      }
+    } catch {}
+    return DEFAULT_TAB_SEQUENCE;
+  });
+
+  // Update custom tab order when workspace changes
+  // Ensure 'grid' (tasks) is always first
+  useEffect(() => {
+    try {
+      const key = `wh_workspace_tab_order_${id || 'all'}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+          const order = parsed as WorkspaceTabKey[];
+          // Ensure 'grid' is always first
+          if (order[0] !== 'grid') {
+            const filtered = order.filter(tab => tab !== 'grid');
+            setCustomTabOrder(['grid', ...filtered] as WorkspaceTabKey[]);
+          } else {
+            setCustomTabOrder(order);
+          }
+          return;
+        }
+      }
+    } catch {}
+    setCustomTabOrder(DEFAULT_TAB_SEQUENCE);
+  }, [id]);
+
+  // Save custom tab order to localStorage
+  useEffect(() => {
+    try {
+      const key = `wh_workspace_tab_order_${id || 'all'}`;
+      localStorage.setItem(key, JSON.stringify(customTabOrder));
+    } catch {}
+  }, [customTabOrder, id]);
+
+  const allowedTabOrder = customTabOrder;
   const resolvedOrder = useMemo(() => buildTabSequence(allowedTabOrder), [allowedTabOrder]);
   const primaryTabValue = resolvedOrder[0] || 'grid';
   const invalidWorkspaceRoute = !id && !isAllWorkspaces;
   const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
+
+  // Save active tab to localStorage when it changes (but not on initial mount)
+  const isInitialMountRef = useRef(true);
+  useEffect(() => {
+    // Skip saving on initial mount
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+    
+    // Don't save if we're on an invalid workspace
+    if (invalidWorkspaceRoute || invalidWorkspaceId) return;
+    
+    try {
+      const key = `wh_workspace_last_tab_${id || 'all'}`;
+      localStorage.setItem(key, activeTab);
+      console.log(`[Workspace] Saved last tab for workspace ${id || 'all'}:`, activeTab);
+    } catch (error) {
+      console.error('[Workspace] Error saving last tab:', error);
+    }
+  }, [activeTab, id, invalidWorkspaceRoute, invalidWorkspaceId]);
+  
+  // Track previous workspace ID to detect workspace changes
+  const prevWorkspaceIdRef = useRef<string | undefined>(undefined);
+  
+  // Restore last tab when navigating to a workspace (only on workspace change)
+  useEffect(() => {
+    // Skip if we're on an invalid workspace
+    if (invalidWorkspaceRoute || invalidWorkspaceId) return;
+    
+    // Only restore on workspace change (not on every render)
+    const workspaceChanged = prevWorkspaceIdRef.current !== id;
+    prevWorkspaceIdRef.current = id;
+    
+    if (!workspaceChanged) return;
+    
+    const workspaceKey = id || 'all';
+    
+    try {
+      const key = `wh_workspace_last_tab_${workspaceKey}`;
+      const savedTab = localStorage.getItem(key);
+      
+      console.log(`[Workspace] Workspace changed to ${workspaceKey}, checking saved tab:`, savedTab);
+      
+      // Only restore if we have a saved tab and it's valid
+      if (savedTab && Object.keys(WORKSPACE_TAB_PATHS).includes(savedTab)) {
+        const currentTab = getCurrentTabFromUrl();
+        const currentPath = location.pathname;
+        
+        // Only restore if we're on the workspace root (grid tab) or navigating directly to workspace
+        const isExactWorkspaceRoot = currentPath === workspaceBasePath || 
+                                      currentPath === `${workspaceBasePath}/` || 
+                                      currentPath === `${workspaceBasePath}${WORKSPACE_TAB_PATHS.grid}`;
+        
+        console.log(`[Workspace] Current tab: ${currentTab}, Saved tab: ${savedTab}, isExactRoot: ${isExactWorkspaceRoot}`);
+        
+        if (savedTab !== 'grid' && isExactWorkspaceRoot) {
+          const savedTabPath = WORKSPACE_TAB_PATHS[savedTab as WorkspaceTabKey];
+          const targetPath = `${workspaceBasePath}${savedTabPath}`;
+          console.log(`[Workspace] Restoring last tab for workspace ${workspaceKey}:`, savedTab, '→', targetPath);
+          
+          // Use setTimeout to ensure this happens after the component is fully mounted
+          setTimeout(() => {
+            navigate(targetPath, { replace: true });
+          }, 0);
+        } else if (savedTab === 'grid' && !isExactWorkspaceRoot) {
+          // If saved tab is grid but we're not on the root, navigate to root
+          console.log(`[Workspace] Navigating to root for workspace ${workspaceKey}`);
+          setTimeout(() => {
+            navigate(workspaceBasePath, { replace: true });
+          }, 0);
+        }
+      }
+    } catch (error) {
+      console.error('[Workspace] Error restoring last tab:', error);
+    }
+  }, [id, navigate, workspaceBasePath, location.pathname, invalidWorkspaceRoute, invalidWorkspaceId]);
+
+  // Drag and drop state
+  const [isDraggingTab, setIsDraggingTab] = useState(false);
+  
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    })
+  );
+
+  // Handle drag start
+  const handleDragStart = (event: DragStartEvent) => {
+    setIsDraggingTab(true);
+  };
+
+  // Handle drag end (reorder tabs)
+  const handleDragEnd = (event: DragEndEvent) => {
+    setIsDraggingTab(false);
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    // Prevent moving 'grid' (tasks) tab - it must always stay first
+    if (active.id === 'grid') {
+      return;
+    }
+
+    // Get draggable tabs (exclude fixed tabs and grid)
+    const draggableTabs = customTabOrder.filter(tab => !FIXED_TABS.includes(tab) && tab !== 'grid');
+    const oldIndex = draggableTabs.findIndex(tab => tab === active.id);
+    const newIndex = draggableTabs.findIndex(tab => tab === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder draggable tabs (excluding grid)
+    const reorderedDraggable = arrayMove(draggableTabs, oldIndex, newIndex);
+    
+    // Rebuild full order with 'grid' always first, then reordered tabs, then fixed tabs at the end
+    const newOrder = ['grid', ...reorderedDraggable, ...FIXED_TABS];
+    setCustomTabOrder(newOrder);
+  };
   const [showClearFilters, setShowClearFilters] = useState(false);
   const [openCreateTask, setOpenCreateTask] = useState(false);
   const [openEditTask, setOpenEditTask] = useState(false);
@@ -445,7 +677,9 @@ export const Workspace = () => {
         if (isInitialLoadRef.current) {
           setStats((s) => ({ ...s, loading: true }));
         }
-        if (!TasksCache.initialized) await TasksCache.init();
+        if (!TasksCache.initialized) {
+          await TasksCache.init();
+        }
         const base: any = {};
         const ws = isAllWorkspaces ? undefined : id;
         if (ws) base.workspace_id = ws;
@@ -487,7 +721,8 @@ export const Workspace = () => {
           setStats({ total, inProgress, completedToday, trend, loading: false });
           isInitialLoadRef.current = false;
         }
-      } catch {
+      } catch (error) {
+        console.error('[Workspace Stats] Error loading stats:', error);
         if (!cancelled) {
           setStats((prev) => ({ ...prev, loading: false }));
           isInitialLoadRef.current = false;
@@ -660,9 +895,9 @@ export const Workspace = () => {
     {
       value: 'grid',
       label: (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pl-4">
           <ClipboardList />
-          <span className="tab-label-text">Tasks</span>
+          <span className="tab-label-text">{t('workspace.tabs.tasks', 'Tasks')}</span>
         </div>
       ),
       forceMount: true,
@@ -705,9 +940,9 @@ export const Workspace = () => {
     {
       value: 'calendar',
       label: (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pl-4">
           <Calendar />
-          <span className="tab-label-text">Calendar</span>
+          <span className="tab-label-text">{t('workspace.tabs.calendar', 'Calendar')}</span>
         </div>
       ),
       content: (
@@ -719,9 +954,9 @@ export const Workspace = () => {
     {
       value: 'scheduler',
       label: (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pl-4">
           <Clock />
-          <span className="tab-label-text">Scheduler</span>
+          <span className="tab-label-text">{t('workspace.tabs.scheduler', 'Scheduler')}</span>
         </div>
       ),
       content: (
@@ -733,9 +968,9 @@ export const Workspace = () => {
     {
       value: 'map',
       label: (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pl-4">
           <MapIcon />
-          <span className="tab-label-text">Map</span>
+          <span className="tab-label-text">{t('workspace.tabs.map', 'Map')}</span>
         </div>
       ),
       content: (
@@ -747,9 +982,9 @@ export const Workspace = () => {
     {
       value: 'board',
       label: (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pl-4">
           <LayoutDashboard />
-          <span className="tab-label-text">Board</span>
+          <span className="tab-label-text">{t('workspace.tabs.board', 'Board')}</span>
         </div>
       ),
       content: (
@@ -765,7 +1000,7 @@ export const Workspace = () => {
           <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/40 text-muted-foreground">
             <BarChart3 className="w-4 h-4" strokeWidth={2.2} />
           </div>
-          <span className="tab-label-text">Stats</span>
+          <span className="tab-label-text">{t('workspace.tabs.stats', 'Stats')}</span>
         </div>
       ),
       content: (
@@ -781,7 +1016,7 @@ export const Workspace = () => {
           <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/30 text-muted-foreground">
             <Settings className="w-4 h-4" strokeWidth={2.2} />
           </div>
-          <span className="tab-label-text">Config</span>
+          <span className="tab-label-text">{t('workspace.tabs.config', 'Config')}</span>
         </div>
       ),
       content: (
@@ -927,7 +1162,7 @@ export const Workspace = () => {
           </div>
         )}
 
-        <div className="flex-shrink-0 flex items-center gap-3">
+        <div className={`flex-shrink-0 flex items-center gap-3 ${showHeaderKpis ? '' : 'ml-auto'}`}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -1006,16 +1241,40 @@ export const Workspace = () => {
       )}
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
         <div className='flex-1 min-w-0'>
-        <UrlTabs
-          tabs={tabsForRender}
-          defaultValue={primaryTabValue}
-          basePath={`/workspace/${id}`}
-          pathMap={WORKSPACE_TAB_PATHS}
-          className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
-          onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v as WorkspaceTabKey); }}
-          showClearFilters={showClearFilters}
-          onClearFilters={() => tableRef.current?.clearFilters()}
-        />
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <UrlTabs
+            tabs={tabsForRender}
+            defaultValue={primaryTabValue}
+            basePath={`/workspace/${id}`}
+            pathMap={WORKSPACE_TAB_PATHS}
+            className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
+            onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v as WorkspaceTabKey); }}
+            showClearFilters={showClearFilters}
+            onClearFilters={() => tableRef.current?.clearFilters()}
+            sortable={true}
+            sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
+            renderSortableTab={(tab, isFixed) => (
+              <SortableTab 
+                key={tab.value} 
+                id={tab.value} 
+                isDragging={isDraggingTab}
+                disabled={isFixed}
+              >
+                <TabsTrigger
+                  value={tab.value}
+                  disabled={tab.disabled}
+                >
+                  {tab.label}
+                </TabsTrigger>
+              </SortableTab>
+            )}
+          />
+        </DndContext>
         </div>
         {rightPanel && (
           <>

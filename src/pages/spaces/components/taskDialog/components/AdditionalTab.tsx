@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 
 export function AdditionalTab(props: any) {
-  const { mode, tags, selectedTagIds, setSelectedTagIds, slas, slaId, setSlaId, approvals, approvalId, setApprovalId, dueDate, setDueDate } = props;
+  const { mode, tags, selectedTagIds, setSelectedTagIds, slas, slaId, setSlaId, approvals, approvalId, setApprovalId, startDate, setStartDate, dueDate, setDueDate } = props;
 
   return (
     <div className="space-y-4">
@@ -62,6 +62,18 @@ export function AdditionalTab(props: any) {
             )}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Start Date */}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="start" className="text-sm font-medium font-[500] text-foreground">Start Date</Label>
+        <Input 
+          id="start" 
+          type="date" 
+          value={startDate} 
+          onChange={(e) => setStartDate(e.target.value)} 
+          className="h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background" 
+        />
       </div>
 
       {/* Due Date */}

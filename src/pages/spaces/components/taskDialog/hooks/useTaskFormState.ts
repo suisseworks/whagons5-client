@@ -8,7 +8,10 @@ export function useTaskFormState() {
   const [spotId, setSpotId] = useState<number | null>(null);
   const [statusId, setStatusId] = useState<number | null>(null);
   const [templateId, setTemplateId] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<string>('');
+  const [startTime, setStartTime] = useState<string>('');
   const [dueDate, setDueDate] = useState<string>('');
+  const [dueTime, setDueTime] = useState<string>('');
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [slaId, setSlaId] = useState<number | null>(null);
   const [approvalId, setApprovalId] = useState<number | null>(null);
@@ -37,7 +40,10 @@ export function useTaskFormState() {
     spotId, setSpotId,
     statusId, setStatusId,
     templateId, setTemplateId,
+    startDate, setStartDate,
+    startTime, setStartTime,
     dueDate, setDueDate,
+    dueTime, setDueTime,
     selectedUserIds, setSelectedUserIds,
     slaId, setSlaId,
     approvalId, setApprovalId,

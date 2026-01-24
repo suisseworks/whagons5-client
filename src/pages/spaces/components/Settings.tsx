@@ -5,11 +5,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
 import { genericActions } from '@/store/genericSlices';
 import { useAuth } from "@/providers/AuthProvider";
+import { useLanguage } from "@/providers/LanguageProvider";
 import OverviewTab from "./OverviewTab";
 import UsersTab from "./UsersTab";
 import CreationTab from "./CreationTab";
@@ -68,6 +70,7 @@ interface WorkspaceInfo {
 }
 
 function Settings({ workspaceId }: { workspaceId?: string }) {
+  const { t } = useLanguage();
   const [prevActiveTab, setPrevActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('display');
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'filters' | 'display'>('display');
   const [modulesLoaded, setModulesLoaded] = useState(false);
@@ -346,16 +349,16 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
   // Column visibility handling for workspace task grid
   const baseColumns = useMemo(() => ([
-    { id: 'id', label: 'Task ID (always shown)', locked: true },
-    { id: 'name', label: 'Task name (always shown)', locked: true },
-    { id: 'config', label: 'Config / approvals', locked: false },
-    { id: 'status_id', label: 'Status', locked: false },
-    { id: 'priority_id', label: 'Priority', locked: false },
-    { id: 'user_ids', label: 'Owner', locked: false },
-    { id: 'due_date', label: 'Due date', locked: false },
-    { id: 'spot_id', label: 'Location', locked: false },
-    { id: 'created_at', label: 'Last modified', locked: false },
-  ] as const), []);
+    { id: 'id', label: t('workspace.settings.columns.taskId', 'Task ID (always shown)'), locked: true },
+    { id: 'name', label: t('workspace.settings.columns.taskName', 'Task name (always shown)'), locked: true },
+    { id: 'config', label: t('workspace.settings.columns.configApprovals', 'Config / approvals'), locked: false },
+    { id: 'status_id', label: t('workspace.settings.columns.status', 'Status'), locked: false },
+    { id: 'priority_id', label: t('workspace.settings.columns.priority', 'Priority'), locked: false },
+    { id: 'user_ids', label: t('workspace.settings.columns.owner', 'Owner'), locked: false },
+    { id: 'due_date', label: t('workspace.settings.columns.dueDate', 'Due date'), locked: false },
+    { id: 'spot_id', label: t('workspace.settings.columns.location', 'Location'), locked: false },
+    { id: 'created_at', label: t('workspace.settings.columns.lastModified', 'Last modified'), locked: false },
+  ] as const), [t]);
 
   // Workspace-scoped custom fields (from categories -> categoryCustomFields -> customFields)
   const workspaceCustomFields = useMemo(() => {
@@ -437,7 +440,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
   };
 
   // Update workspace info in Redux store
-  const handleUpdateWorkspace = useCallback((updates: Partial<WorkspaceInfo>) => {
+  const handleUpdateWorkspace = useCallback(async (updates: Partial<WorkspaceInfo>) => {
     if (!currentWorkspace) return;
 
     // Generate dynamic description based on name if no description is provided
@@ -466,10 +469,17 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       updatedAt: new Date().toISOString()
     };
 
-    dispatch(genericActions.workspaces.updateAsync({
-      id: currentWorkspace.id,
-      updates: updatedWorkspace
-    }));
+    try {
+      await dispatch(genericActions.workspaces.updateAsync({
+        id: currentWorkspace.id,
+        updates: updatedWorkspace
+      })).unwrap();
+    } catch (error: any) {
+      // Error is already handled by API interceptor (shows toast for 403)
+      // But we log it here for debugging
+      console.error('Failed to update workspace:', error);
+      // The optimistic update will be rolled back automatically by the thunk
+    }
   }, [currentWorkspace, dispatch]);
 
   // Define tabs for URL persistence
@@ -479,7 +489,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       label: (
         <div className="flex items-center space-x-2">
           <SlidersHorizontal className="w-4 h-4" />
-          <span>Display</span>
+          <span>{t('workspace.settings.tabs.display', 'Display')}</span>
         </div>
       ),
       content: (
@@ -494,8 +504,8 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
           <div className="mb-4 p-3 border rounded-md bg-background">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium">Show header KPIs</div>
-                <div className="text-xs text-muted-foreground">Toggle the Total / In progress / Completed today pills</div>
+                <div className="text-sm font-medium">{t('workspace.settings.display.showHeaderKpis', 'Show header KPIs')}</div>
+                <div className="text-xs text-muted-foreground">{t('workspace.settings.display.showHeaderKpisDesc', 'Toggle the Total / In progress / Completed today pills')}</div>
               </div>
               <Switch
                 defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_show_kpis_${workspaceId || 'all'}`) ?? 'true') !== 'false')}
@@ -509,8 +519,8 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
           <div className="mb-4 p-3 border rounded-md bg-background">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium">Tag display mode</div>
-                <div className="text-xs text-muted-foreground">Show tags as icon only or icon with text</div>
+                <div className="text-sm font-medium">{t('workspace.settings.display.tagDisplayMode', 'Tag display mode')}</div>
+                <div className="text-xs text-muted-foreground">{t('workspace.settings.display.tagDisplayModeDesc', 'Show tags as icon only or icon with text')}</div>
               </div>
               <ToggleGroup
                 type="single"
@@ -522,14 +532,14 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { tagDisplayMode: mode, workspaceId: workspaceId || 'all' } })); } catch {}
                 }}
               >
-                <ToggleGroupItem value="icon" aria-label="Icon only" className="h-8 px-2 text-xs">Icon</ToggleGroupItem>
-                <ToggleGroupItem value="icon-text" aria-label="Icon and text" className="h-8 px-2 text-xs">Icon + Text</ToggleGroupItem>
+                <ToggleGroupItem value="icon" aria-label={t('workspace.settings.display.iconOnly', 'Icon only')} className="h-8 px-2 text-xs">{t('workspace.settings.display.icon', 'Icon')}</ToggleGroupItem>
+                <ToggleGroupItem value="icon-text" aria-label={t('workspace.settings.display.iconAndText', 'Icon and text')} className="h-8 px-2 text-xs">{t('workspace.settings.display.iconText', 'Icon + Text')}</ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
           <div className="mb-4 p-3 border rounded-md bg-background">
             <div className="flex items-center gap-3">
-              <Label>Table density</Label>
+              <Label>{t('workspace.settings.display.tableDensity', 'Table density')}</Label>
               <ToggleGroup
                 type="single"
                 defaultValue={(typeof window !== 'undefined' && (localStorage.getItem('wh_workspace_density') as any)) || 'compact'}
@@ -539,9 +549,9 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   try { window.dispatchEvent(new CustomEvent('wh:rowDensityChanged', { detail: v })); } catch {}
                 }}
               >
-                <ToggleGroupItem value="compact" aria-label="Compact density" className="h-8 px-3 text-xs">Compact</ToggleGroupItem>
-                <ToggleGroupItem value="comfortable" aria-label="Comfortable density" className="h-8 px-3 text-xs">Comfortable</ToggleGroupItem>
-                <ToggleGroupItem value="spacious" aria-label="Spacious density" className="h-8 px-3 text-xs">Spacious</ToggleGroupItem>
+                <ToggleGroupItem value="compact" aria-label={t('workspace.settings.display.compactDensity', 'Compact density')} className="h-8 px-3 text-xs">{t('workspace.settings.display.compact', 'Compact')}</ToggleGroupItem>
+                <ToggleGroupItem value="comfortable" aria-label={t('workspace.settings.display.comfortableDensity', 'Comfortable density')} className="h-8 px-3 text-xs">{t('workspace.settings.display.comfortable', 'Comfortable')}</ToggleGroupItem>
+                <ToggleGroupItem value="spacious" aria-label={t('workspace.settings.display.spaciousDensity', 'Spacious density')} className="h-8 px-3 text-xs">{t('workspace.settings.display.spacious', 'Spacious')}</ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
@@ -550,20 +560,20 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
               <div className="flex-1 space-y-1">
                 <div className="text-sm font-medium flex items-center gap-2">
                   <Eye className="w-4 h-4 text-muted-foreground" />
-                  <span>Visible tabs</span>
+                  <span>{t('workspace.settings.display.visibleTabs', 'Visible tabs')}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Select which tabs are visible in the workspace. Tasks tab is always visible.
+                  {t('workspace.settings.display.visibleTabsDesc', 'Select which tabs are visible in the workspace. Tasks tab is always visible.')}
                 </div>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
-                { id: 'grid', label: 'Tasks', locked: true },
-                { id: 'calendar', label: 'Calendar', locked: false },
-                { id: 'scheduler', label: 'Scheduler', locked: false },
-                { id: 'map', label: 'Map', locked: false },
-                { id: 'board', label: 'Board', locked: false },
+                { id: 'grid', label: t('workspace.tabs.tasks', 'Tasks'), locked: true },
+                { id: 'calendar', label: t('workspace.tabs.calendar', 'Calendar'), locked: false },
+                { id: 'scheduler', label: t('workspace.tabs.scheduler', 'Scheduler'), locked: false },
+                { id: 'map', label: t('workspace.tabs.map', 'Map'), locked: false },
+                { id: 'board', label: t('workspace.tabs.board', 'Board'), locked: false },
               ].map(tab => (
                 <div
                   key={tab.id}
@@ -601,10 +611,40 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   />
                   <span className="text-xs">
                     {tab.label}
-                    {tab.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">(Required)</span>}
+                    {tab.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">({t('workspace.settings.required', 'Required')})</span>}
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 space-y-1">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+                  <span>{t('workspace.settings.display.tabOrder', 'Tab order')}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t('workspace.settings.display.tabOrderDesc', 'Drag and drop tabs in the workspace to reorder them. Stats and Config tabs always stay at the end.')}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => {
+                  try {
+                    const key = `wh_workspace_tab_order_${workspaceId || 'all'}`;
+                    localStorage.removeItem(key);
+                    window.dispatchEvent(new CustomEvent('wh:tabOrderReset', { detail: { workspaceId: workspaceId || 'all' } }));
+                    window.location.reload();
+                  } catch (error) {
+                    console.error('Failed to reset tab order:', error);
+                  }
+                }}
+              >
+                {t('workspace.settings.display.resetTabOrder', 'Reset to default')}
+              </Button>
             </div>
           </div>
           <div className="mb-4 p-3 border rounded-md bg-background">
@@ -612,10 +652,10 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
               <div className="flex-1 space-y-1">
                 <div className="text-sm font-medium flex items-center gap-2">
                   <Columns3 className="w-4 h-4 text-muted-foreground" />
-                  <span>Workspace grid columns</span>
+                  <span>{t('workspace.settings.display.workspaceGridColumns', 'Workspace grid columns')}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Choose which columns are visible in the workspace task grid. The task name column is always shown.
+                  {t('workspace.settings.display.workspaceGridColumnsDesc', 'Choose which columns are visible in the workspace task grid. The task name column is always shown.')}
                 </div>
               </div>
             </div>
@@ -651,7 +691,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                   />
                   <span className="text-xs">
                     {col.label}
-                    {col.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">(Required)</span>}
+                    {col.locked && <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground">({t('workspace.settings.required', 'Required')})</span>}
                   </span>
                 </div>
               ))}
@@ -665,7 +705,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       label: (
         <div className="flex items-center space-x-2">
           <Eye className="w-4 h-4" />
-          <span>Overview</span>
+          <span>{t('workspace.settings.tabs.overview', 'Overview')}</span>
         </div>
       ),
       content: (
@@ -694,7 +734,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       label: (
         <div className="flex items-center space-x-2">
           <Users className="w-4 h-4" />
-          <span>Users</span>
+          <span>{t('workspace.settings.tabs.users', 'Users')}</span>
         </div>
       ),
       content: (
@@ -718,7 +758,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       label: (
         <div className="flex items-center space-x-2">
           <Filter className="w-4 h-4" />
-          <span>Creation</span>
+          <span>{t('workspace.settings.tabs.creation', 'Creation')}</span>
         </div>
       ),
       content: (
@@ -745,12 +785,12 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     return (
       <div className="p-4 pt-0 space-y-4">
         <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground">Manage your application settings and preferences.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('workspace.settings.title', 'Settings')}</h1>
+          <p className="text-sm text-muted-foreground">{t('workspace.settings.description', 'Manage your application settings and preferences.')}</p>
         </div>
         {/* Main settings content would go here */}
         <div className="text-center text-muted-foreground">
-          Main settings page - workspace-specific settings are shown when accessed from a workspace.
+          {t('workspace.settings.mainPageNote', 'Main settings page - workspace-specific settings are shown when accessed from a workspace.')}
         </div>
       </div>
     );
@@ -761,12 +801,12 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     return (
       <div className="h-full w-full p-4 pt-0 flex flex-col">
         <div className="mb-3 flex-shrink-0">
-          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('workspace.settings.workspaceSettings', 'Workspace Settings')}</h1>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-            <p className="text-sm text-muted-foreground">Loading workspace...</p>
+            <p className="text-sm text-muted-foreground">{t('workspace.settings.loadingWorkspace', 'Loading workspace...')}</p>
           </div>
         </div>
       </div>
@@ -778,12 +818,12 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     return (
       <div className="h-full w-full p-4 pt-0 flex flex-col">
         <div className="mb-3 flex-shrink-0">
-          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('workspace.settings.workspaceSettings', 'Workspace Settings')}</h1>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-red-600">Invalid Workspace ID</h2>
-            <p className="text-gray-600 mt-2">ID: "{workspaceId}" - Please check the URL and try again.</p>
+            <h2 className="text-xl font-semibold text-red-600">{t('workspace.settings.invalidWorkspaceId', 'Invalid Workspace ID')}</h2>
+            <p className="text-gray-600 mt-2">{t('workspace.settings.invalidWorkspaceIdDesc', 'Invalid ID - Please check the URL and try again.')} ID: "{workspaceId}"</p>
           </div>
         </div>
       </div>
@@ -794,7 +834,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     <div className="h-full w-full p-4 pt-0 flex flex-col items-center">
       <div className="w-full max-w-2xl flex flex-col h-full">
         <div className="mb-3 flex-shrink-0">
-          <h1 className="text-xl font-bold text-foreground">Workspace Settings</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('workspace.settings.workspaceSettings', 'Workspace Settings')}</h1>
         </div>
 
         {/* Table density control moved into Overview tab */}

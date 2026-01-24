@@ -672,19 +672,15 @@
     color: #ffffff !important;
   }
   
-  /* Secondary toolbar for dark headers */
-  header.wh-header.wh-header-dark ~ .sticky.top-16,
-  header.wh-header.wh-header-dark ~ .sticky.top-16 * {
-    color: #E8E8E8 !important;
+  /* Secondary toolbar for dark headers - now uses shadcn Button components with proper dark mode */
+  /* Removed forced colors - buttons now respect shadcn variants */
+  header.wh-header.wh-header-dark ~ .sticky.top-16 {
+    color: #E8E8E8;
   }
   
-  header.wh-header.wh-header-dark ~ .sticky.top-16 button {
-    color: #E8E8E8 !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-  }
-  
-  header.wh-header.wh-header-dark ~ .sticky.top-16 button:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
+  /* Labels and text in secondary toolbar */
+  header.wh-header.wh-header-dark ~ .sticky.top-16 label {
+    color: #E8E8E8;
   }
   .dark [data-sidebar="header"],
   .dark .bg-sidebar-header {
@@ -1850,4 +1846,58 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
   perspective: 1000px;
   transform-style: preserve-3d;
 }
+
+/* New task row animation - flying in effect */
+@keyframes taskFlyIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-100px) scale(0.8) rotateX(-15deg);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 0.9;
+    transform: translateY(10px) scale(1.02) rotateX(2deg);
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0deg);
+    filter: blur(0);
+  }
+}
+
+.ag-theme-quartz .ag-row.wh-new-task-row,
+.ag-theme-quartz-dark .ag-row.wh-new-task-row,
+.wh-modern-grid .ag-row.wh-new-task-row,
+.wh-workspace-grid .ag-row.wh-new-task-row {
+  animation: taskFlyIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center top;
+  will-change: transform, opacity, filter;
+}
+
+/* Add a subtle glow effect during animation */
+.ag-theme-quartz .ag-row.wh-new-task-row .ag-cell,
+.ag-theme-quartz-dark .ag-row.wh-new-task-row .ag-cell,
+.wh-modern-grid .ag-row.wh-new-task-row .ag-cell,
+.wh-workspace-grid .ag-row.wh-new-task-row .ag-cell {
+  animation: taskCellGlow 1.2s ease-out forwards;
+}
+
+@keyframes taskCellGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(89, 195, 195, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(89, 195, 195, 0.3);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* Filter buttons now use shadcn Button component with proper dark mode support */
+/* Removed forced white background - buttons now respect theme */
+
+/* Select and Labels in filter toolbar - now use shadcn components with proper dark mode */
+/* Removed forced white background - components now respect theme */
 

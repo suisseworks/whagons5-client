@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,7 @@ export interface TextFieldProps {
   min?: string | number;
   max?: string | number;
   className?: string;
+  readOnly?: boolean;
 }
 
 
@@ -72,12 +73,46 @@ export function TextField({
   type = "text",
   min,
   max,
-  className = ""
+  className = "",
+  readOnly = false
 }: TextFieldProps) {
   const isControlled = value !== undefined && onChange !== undefined;
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Prevent auto-selection on focus - move cursor to end instead
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Use setTimeout to ensure this runs after browser's default selection
+    setTimeout(() => {
+      if (e.target.value) {
+        // Move cursor to end instead of selecting all
+        const length = e.target.value.length;
+        e.target.setSelectionRange(length, length);
+      }
+    }, 0);
+  };
+  
+  // Prevent selection on click if text is already selected
+  const handleClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    const input = e.target as HTMLInputElement;
+    if (input.selectionStart === 0 && input.selectionEnd === input.value.length && input.value.length > 0) {
+      // All text is selected, move cursor to end
+      const length = input.value.length;
+      input.setSelectionRange(length, length);
+    }
+  };
+  
   const inputProps = isControlled
-    ? { value, onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value) }
-    : { defaultValue };
+    ? { 
+        value, 
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value),
+        onFocus: handleFocus,
+        onClick: handleClick
+      }
+    : { 
+        defaultValue,
+        onFocus: handleFocus,
+        onClick: handleClick
+      };
 
   return (
     <FormField id={id} label={label} required={required} className={className}>
@@ -198,6 +233,7 @@ export function TextField({
         </Popover>
       ) : (
         <Input
+          ref={inputRef}
           id={id}
           name={name}
           type={type}
@@ -206,6 +242,7 @@ export function TextField({
           required={required}
           min={min}
           max={max}
+          readOnly={readOnly}
         />
       )}
     </FormField>

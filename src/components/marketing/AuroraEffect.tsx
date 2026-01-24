@@ -132,17 +132,6 @@ export default function AuroraEffect({ onClose }: AuroraEffectProps) {
         ref={canvasRef}
         className="w-full h-full bg-black/30"
       />
-      {onClose && (
-        <div className="fixed bottom-4 right-4 pointer-events-auto bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg transition-colors">
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-medium">Aurora</div>
-            <div className="text-xs opacity-75">(Ctrl+M)</div>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

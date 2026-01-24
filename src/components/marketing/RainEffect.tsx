@@ -116,21 +116,6 @@ export default function RainEffect({ onClose }: RainEffectProps) {
         ref={canvasRef}
         className="w-full h-full"
       />
-      {onClose && (
-        <div className={`fixed bottom-4 right-4 pointer-events-auto backdrop-blur-sm px-4 py-2 rounded-lg transition-colors ${
-          isDarkMode 
-            ? 'bg-white/10 hover:bg-white/20 text-white' 
-            : 'bg-black/10 hover:bg-black/20 text-black'
-        }`}>
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-medium">Rain</div>
-            <div className="text-xs opacity-75">(Ctrl+M)</div>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

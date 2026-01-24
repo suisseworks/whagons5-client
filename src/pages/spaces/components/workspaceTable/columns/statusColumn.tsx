@@ -28,9 +28,11 @@ export function createStatusColumn(opts: ColumnBuilderOptions) {
     return visibilitySet.has(id);
   };
 
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return {
     field: 'status_id',
-    headerName: 'Status',
+    headerName: t('workspace.columns.status', 'Status'),
     sortable: true,
     rowGroup: undefined,
     hide: !isVisible('status_id'),

@@ -262,6 +262,15 @@ export class DB {
             const store = db.createObjectStore('plugin_routes', { keyPath: 'id' });
             store.createIndex('plugin_id', 'plugin_id', { unique: false });
           }
+          
+          // KPI Cards
+          if (!db.objectStoreNames.contains('kpi_cards')) {
+            const store = db.createObjectStore('kpi_cards', { keyPath: 'id' });
+            store.createIndex('workspace_id', 'workspace_id', { unique: false });
+            store.createIndex('user_id', 'user_id', { unique: false });
+            store.createIndex('is_enabled', 'is_enabled', { unique: false });
+            store.createIndex('position', 'position', { unique: false });
+          }
 
           // Custom Fields & Values
           if (!db.objectStoreNames.contains('spot_custom_fields')) {

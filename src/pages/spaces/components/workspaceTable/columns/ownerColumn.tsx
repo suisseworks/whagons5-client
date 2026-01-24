@@ -19,9 +19,11 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
 
   const getCachedUserName = createUserNameCache(getUserDisplayName);
 
+  const t = opts.t || ((key: string, fallback?: string) => fallback || key);
+  
   return {
     field: 'user_ids',
-    headerName: 'Owner',
+    headerName: t('workspace.columns.owner', 'Owner'),
     width: 140,
     filter: 'agSetColumnFilter',
     filterValueGetter: (p: any) => {
@@ -63,17 +65,6 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
       const users = getAssignedUsersFromTaskUsers(taskId, taskUsers, userMap) || [];
       if (users.length === 0) return (
         <div className="flex items-center h-full py-1">
-          <button
-            className="text-sm text-muted-foreground hover:text-foreground underline-offset-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              try {
-                window.dispatchEvent(new CustomEvent('wh:assignOwners', { detail: { taskId: p.data?.id } }));
-              } catch {}
-            }}
-          >
-            Assign
-          </button>
         </div>
       );
       const displayUsers = users.slice(0, 3);

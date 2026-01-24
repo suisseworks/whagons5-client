@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { listPresets, savePreset, deletePreset, getPresetById, SavedFilterPreset } from './workspaceTable/utils/filterPresets';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 type Option = { id: number; name: string };
 type TagOption = { id: number; name: string; color?: string | null };
@@ -84,6 +85,7 @@ const getInitial = (model?: any) => {
 const useOptions = (items: Option[]) => useMemo(() => (items || []).map(i => ({ id: Number(i.id), name: i.name })), [items]);
 
 export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
+  const { t } = useLanguage();
   const { open, onOpenChange, workspaceId, statuses, priorities, spots, owners, tags, currentModel, currentSearchText, onApply } = props;
 
   const statusOptions = useOptions(statuses);
@@ -169,7 +171,7 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
   };
 
   const onSavePreset = () => {
-    const name = presetName.trim() || 'Untitled filter';
+    const name = presetName.trim() || t('workspace.filters.untitledFilter', 'Untitled filter');
     const model = buildModel({
       statusIds: selectedStatuses,
       priorityIds: selectedPriorities,
@@ -195,92 +197,92 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Filters</DialogTitle>
-          <DialogDescription>Build a custom filter and optionally save it for reuse.</DialogDescription>
+          <DialogTitle>{t('workspace.filters.title', 'Filters')}</DialogTitle>
+          <DialogDescription>{t('workspace.filters.description', 'Build a custom filter and optionally save it for reuse.')}</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label>{t('workspace.filters.status', 'Status')}</Label>
             <MultiSelectCombobox
               options={statusSelectOptions}
               value={selectedStatuses.map(String)}
               onValueChange={(vals) => setSelectedStatuses(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
-              placeholder="Any status"
-              searchPlaceholder="Search statuses..."
+              placeholder={t('workspace.filters.anyStatus', 'Any status')}
+              searchPlaceholder={t('workspace.filters.searchStatuses', 'Search statuses...')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Priority</Label>
+            <Label>{t('workspace.filters.priority', 'Priority')}</Label>
             <MultiSelectCombobox
               options={prioritySelectOptions}
               value={selectedPriorities.map(String)}
               onValueChange={(vals) => setSelectedPriorities(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
-              placeholder="Any priority"
-              searchPlaceholder="Search priorities..."
+              placeholder={t('workspace.filters.anyPriority', 'Any priority')}
+              searchPlaceholder={t('workspace.filters.searchPriorities', 'Search priorities...')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Location</Label>
+            <Label>{t('workspace.filters.location', 'Location')}</Label>
             <MultiSelectCombobox
               options={spotSelectOptions}
               value={selectedSpots.map(String)}
               onValueChange={(vals) => setSelectedSpots(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
-              placeholder="Any location"
-              searchPlaceholder="Search locations..."
+              placeholder={t('workspace.filters.anyLocation', 'Any location')}
+              searchPlaceholder={t('workspace.filters.searchLocations', 'Search locations...')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Owner</Label>
+            <Label>{t('workspace.filters.owner', 'Owner')}</Label>
             <MultiSelectCombobox
               options={ownerSelectOptions}
               value={selectedOwners.map(String)}
               onValueChange={(vals) => setSelectedOwners(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
-              placeholder="Any owner"
-              searchPlaceholder="Search owners..."
+              placeholder={t('workspace.filters.anyOwner', 'Any owner')}
+              searchPlaceholder={t('workspace.filters.searchOwners', 'Search owners...')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Tags</Label>
+            <Label>{t('workspace.filters.tags', 'Tags')}</Label>
             <TagMultiSelect
               tags={tagOptions}
               value={selectedTags}
               onValueChange={(vals) => setSelectedTags(vals.filter((n) => Number.isFinite(n)))}
-              placeholder="Any tag"
-              searchPlaceholder="Search tags..."
+              placeholder={t('workspace.filters.anyTag', 'Any tag')}
+              searchPlaceholder={t('workspace.filters.searchTags', 'Search tags...')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Due</Label>
+            <Label>{t('workspace.filters.due', 'Due')}</Label>
             <Select value={dueQuick} onValueChange={(v) => setDueQuick(v as DueQuick)}>
               <SelectTrigger>
-                <SelectValue placeholder="Any" />
+                <SelectValue placeholder={t('workspace.filters.any', 'Any')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="next7">Next 7 days</SelectItem>
+                <SelectItem value="any">{t('workspace.filters.any', 'Any')}</SelectItem>
+                <SelectItem value="overdue">{t('workspace.filters.overdue', 'Overdue')}</SelectItem>
+                <SelectItem value="today">{t('workspace.filters.today', 'Today')}</SelectItem>
+                <SelectItem value="next7">{t('workspace.filters.next7Days', 'Next 7 days')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label>Text contains (name or description)</Label>
-            <Input placeholder="e.g. leak, HVAC, meeting" value={textContains} onChange={(e) => setTextContains(e.target.value)} />
+            <Label>{t('workspace.filters.textContains', 'Text contains (name or description)')}</Label>
+            <Input placeholder={t('workspace.filters.textContainsPlaceholder', 'e.g. leak, HVAC, meeting')} value={textContains} onChange={(e) => setTextContains(e.target.value)} />
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label>Saved presets</Label>
+            <Label>{t('workspace.filters.savedPresets', 'Saved presets')}</Label>
             <div className="flex gap-2 items-center">
               <Select value={selectedPresetId} onValueChange={onLoadPreset}>
                 <SelectTrigger className="min-w-[220px]">
-                  <SelectValue placeholder={presets.length ? 'Choose a preset...' : 'No presets yet'} />
+                  <SelectValue placeholder={presets.length ? t('workspace.filters.choosePreset', 'Choose a preset...') : t('workspace.filters.noPresetsYet', 'No presets yet')} />
                 </SelectTrigger>
                 <SelectContent>
                   {presets.map(p => (
@@ -288,16 +290,16 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <Input placeholder="Preset name" value={presetName} onChange={(e) => setPresetName(e.target.value)} className="max-w-xs" />
-              <Button variant="outline" onClick={onSavePreset}>Save</Button>
-              <Button variant="ghost" onClick={onDeletePreset} disabled={!selectedPresetId}>Delete</Button>
+              <Input placeholder={t('workspace.filters.presetName', 'Preset name')} value={presetName} onChange={(e) => setPresetName(e.target.value)} className="max-w-xs" />
+              <Button variant="outline" onClick={onSavePreset}>{t('workspace.filters.save', 'Save')}</Button>
+              <Button variant="ghost" onClick={onDeletePreset} disabled={!selectedPresetId}>{t('workspace.filters.delete', 'Delete')}</Button>
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={apply}>Apply filters</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('workspace.filters.cancel', 'Cancel')}</Button>
+          <Button onClick={apply}>{t('workspace.filters.applyFilters', 'Apply filters')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

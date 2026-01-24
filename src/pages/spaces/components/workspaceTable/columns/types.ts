@@ -40,4 +40,5 @@ export interface ColumnBuilderOptions {
   slaMap: Record<number, any>;
   getDoneStatusId: () => number | undefined;
   formatDueDate: (date: string | null) => string;
+  t?: (key: string, fallback?: string) => string;
 }

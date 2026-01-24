@@ -21,6 +21,9 @@ import {
   Sparkles,
   Bell, // Add Bell icon for broadcasts
   Activity, // Add Activity icon
+  BarChart3, // Add BarChart3 icon for KPI Cards
+  Trophy, // Add Trophy icon for gamification
+  LineChart, // Add LineChart icon for analytics
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -117,7 +120,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     enabled: true,
     pinned: false,
     name: 'Boards',
-    icon: Users2,
+    icon: FileText,
     iconColor: '#8b5cf6', // violet-500 to match plugin card
     route: '/settings/boards', // Link to boards settings when unpinned
   },
@@ -129,6 +132,42 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     icon: FileText,
     iconColor: '#10b981', // emerald-500 to match plugin card
     route: '/compliance/standards',
+  },
+  {
+    id: 'kpi-cards',
+    enabled: true,
+    pinned: false,
+    name: 'KPI Cards',
+    icon: BarChart3,
+    iconColor: '#3b82f6', // blue-500
+    route: '/settings/kpi-cards/manage',
+  },
+  {
+    id: 'gamification',
+    enabled: true,
+    pinned: false,
+    name: 'Gamification',
+    icon: Trophy,
+    iconColor: '#a855f7', // purple-500
+    route: '/gamification',
+  },
+  {
+    id: 'analytics',
+    enabled: true,
+    pinned: false,
+    name: 'Analytics',
+    icon: LineChart,
+    iconColor: '#3b82f6', // blue-500
+    route: '/analytics',
+  },
+  {
+    id: 'motivation',
+    enabled: true,
+    pinned: false,
+    name: 'Motivation',
+    icon: Sparkles,
+    iconColor: '#eab308', // yellow-500
+    route: '/motivation',
   },
 ];
 
@@ -642,6 +681,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const handleMouseEnter = () => {
     if (isMobile) return;
     if (state !== 'collapsed') return;
+    // If a keyboard shortcut (notably Ctrl+K for chat) just caused a UI re-render,
+    // the element under the cursor can change and spuriously trigger mouseenter.
+    // Suppress hover-open briefly to avoid the sidebar popping open unexpectedly.
+    try {
+      const suppressUntil = (window as any).__wh_suppressSidebarHoverUntil;
+      if (typeof suppressUntil === 'number' && suppressUntil > Date.now()) return;
+    } catch {}
     if ((hoverCloseTimerRef.current as any)) {
       clearTimeout(hoverCloseTimerRef.current as any);
       hoverCloseTimerRef.current = null;
@@ -700,8 +746,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     });
   }, [pluginsConfig, pinnedPluginsOrder]);
   
-  // Include boards in unpinned plugins when it's unpinned (so it appears in "More" menu)
-  const unpinnedPlugins = pluginsConfig.filter(p => p.enabled && !p.pinned && p.id !== 'activity');
+  // Plugins that are not visible in sidebar (pinned=false) are not shown anywhere
+  const unpinnedPlugins: PluginConfig[] = [];
 
   // Check if boards plugin is enabled and pinned
   const boardsPluginEnabled = useMemo(() => {
@@ -898,7 +944,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             <SidebarGroup style={{ flexShrink: 0 }}>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1">
-                  {/* Unpinned plugins */}
+                  {/* Plugins with "Visible in sidebar" off are not shown here */}
                   {unpinnedPlugins.map(plugin => (
                     <PluginMenuItem 
                       key={plugin.id} 

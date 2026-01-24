@@ -15,7 +15,8 @@ import {
   SettingsDialog,
   useSettingsState,
   TextField,
-  SelectField
+  SelectField,
+  PreviewField
 } from "../components";
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
@@ -587,7 +588,6 @@ function Workspaces() {
       description: (formData.get('description') as string) || null,
       color: editFormData.color,
       icon: editFormData.icon,
-      type: editFormData.type,
       category_id: editFormData.category_id
     };
 
@@ -1090,6 +1090,7 @@ function Workspaces() {
               label={tw('dialogs.edit.fields.name', 'Name *')}
               defaultValue={editingWorkspace.name}
               required
+              readOnly={(editingWorkspace as any).type === 'DEFAULT'}
             />
             <TextField
               id="edit-description"
@@ -1103,17 +1104,23 @@ function Workspaces() {
               value={editFormData.color}
               onChange={(color) => setEditFormData(prev => ({ ...prev, color }))}
             />
-            <SelectField
-              id="edit-type"
-              label={tw('dialogs.edit.fields.type', 'Type')}
-              value={editFormData.type}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, type: value }))}
-              options={[
-                { value: 'standard', label: tw('dialogs.edit.fields.typeStandard', 'Standard') },
-                { value: 'project', label: tw('dialogs.edit.fields.typeProject', 'Project') },
-                { value: 'department', label: tw('dialogs.edit.fields.typeDepartment', 'Department') }
-              ]}
-            />
+            <PreviewField label={tw('dialogs.edit.fields.type', 'Type')}>
+              <Badge variant="outline">
+                {(() => {
+                  const type = (editingWorkspace as any).type || editFormData.type || 'standard';
+                  if (type === 'DEFAULT' || type === 'default') {
+                    return tw('dialogs.edit.fields.typeDefault', 'Default');
+                  } else if (type === 'PROJECT' || type === 'project') {
+                    return tw('dialogs.edit.fields.typeProject', 'Project');
+                  } else if (type === 'department') {
+                    return tw('dialogs.edit.fields.typeDepartment', 'Department');
+                  } else if (type === 'standard') {
+                    return tw('dialogs.edit.fields.typeStandard', 'Standard');
+                  }
+                  return type;
+                })()}
+              </Badge>
+            </PreviewField>
           </div>
         )}
       </SettingsDialog>

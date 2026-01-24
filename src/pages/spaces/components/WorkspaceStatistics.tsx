@@ -9,6 +9,7 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;
@@ -34,6 +35,7 @@ type WorkspaceStats = {
 };
 
 function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
+  const { t } = useLanguage();
   
   // Redux state - ensure we get arrays, not undefined
   const categories = useSelector((state: RootState) => (state.categories as any)?.value ?? []) as Category[];
@@ -76,6 +78,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         const loadedTasks = result?.rows || [];
         setWorkspaceTasks(loadedTasks);
       } catch (error) {
+        console.error('[WorkspaceStatistics] Error loading tasks:', error);
         setWorkspaceTasks([]);
       }
     };
@@ -86,11 +89,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {
     if (isCalculatingRef.current) {
-      return;
-    }
-    
-    // Don't calculate if tasks aren't loaded yet
-    if (workspaceTasks.length === 0 && statsLoading === false) {
       return;
     }
     
@@ -318,7 +316,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       
       setStatistics(finalStats);
     } catch (error) {
-      console.error('Error calculating statistics:', error);
+      console.error('[WorkspaceStatistics] Error calculating statistics:', error);
       // Set empty statistics on error to prevent infinite loading
       setStatistics({
         totalTasks: 0,
@@ -361,11 +359,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       isCalculatingRef.current = false;
     }
     
-    // Only calculate if we have workspaceTasks data
-    if (workspaceTasks.length === 0) {
-      return;
-    }
-    
+    // Always calculate to handle empty state properly
     lastCalculatedWorkspaceRef.current = workspaceId;
     calculateStatistics();
   }, [workspaceId, workspaceTasks, calculateStatistics]); // eslint-disable-line react-hooks-exhaustive-deps
@@ -439,7 +433,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
 
     return (
       <div className="flex-1 min-h-0 overflow-auto p-4">
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-screen-2xl mx-auto">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, idx) => SkeletonStatCard(`stat-skeleton-${idx}`))}
           </div>
@@ -469,25 +463,48 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     return renderSkeletonLayout();
   }
 
+  const hasNoData = statistics.totalTasks === 0;
+
   return (
     <div className="flex-1 min-h-0 overflow-auto p-4">
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-screen-2xl mx-auto">
+        {/* Empty State Message */}
+        {hasNoData && (
+          <Card className="border-dashed">
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <FontAwesomeIcon icon={faTasks} className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">
+                  {t('workspace.statistics.noTasksYet', 'No Tasks Yet')}
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  {workspaceId === 'all' 
+                    ? t('workspace.statistics.createFirstTaskAll', 'Create your first task in any workspace to see statistics and insights here.')
+                    : t('workspace.statistics.createFirstTask', 'Create your first task in this workspace to see statistics and insights.')}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {renderStatCard('Total Tasks', statistics.totalTasks, faTasks)}
-          {renderStatCard('Completed', statistics.completedTasksCount, faCheckCircle, 'text-green-600')}
-          {renderStatCard('Urgent Tasks', statistics.urgentTasksCount, faExclamationTriangle, 'text-orange-600')}
-          {renderStatCard('Overdue Tasks', statistics.overdueTasksCount, faExclamationTriangle, 'text-red-600')}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4" style={{ opacity: hasNoData ? 0.5 : 1 }}>
+          {renderStatCard(t('workspace.statistics.totalTasks', 'Total Tasks'), statistics.totalTasks, faTasks)}
+          {renderStatCard(t('workspace.statistics.completed', 'Completed'), statistics.completedTasksCount, faCheckCircle, 'text-green-600')}
+          {renderStatCard(t('workspace.statistics.urgentTasks', 'Urgent Tasks'), statistics.urgentTasksCount, faExclamationTriangle, 'text-orange-600')}
+          {renderStatCard(t('workspace.statistics.overdueTasks', 'Overdue Tasks'), statistics.overdueTasksCount, faExclamationTriangle, 'text-red-600')}
         </div>
 
         {/* Charts Row - Pie Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ opacity: hasNoData ? 0.4 : 1 }}>
           {/* Tasks by Category Pie Chart */}
           {statistics.tasksByCategory.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Tasks by Category</CardTitle>
-                <CardDescription className="text-xs">Distribution across categories</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.tasksByCategory', 'Tasks by Category')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.tasksByCategoryDesc', 'Distribution across categories')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReactECharts
@@ -540,12 +557,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Tasks by Category</CardTitle>
-                <CardDescription className="text-xs">Distribution across categories</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.tasksByCategory', 'Tasks by Category')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.tasksByCategoryDesc', 'Distribution across categories')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No category data available
+                  {t('workspace.statistics.noCategoryData', 'No category data available')}
                 </div>
               </CardContent>
             </Card>
@@ -555,8 +572,8 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           {statistics.tasksByStatus.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Tasks by Status</CardTitle>
-                <CardDescription className="text-xs">Distribution across statuses</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.tasksByStatus', 'Tasks by Status')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.tasksByStatusDesc', 'Distribution across statuses')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReactECharts
@@ -609,12 +626,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Tasks by Status</CardTitle>
-                <CardDescription className="text-xs">Distribution across statuses</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.tasksByStatus', 'Tasks by Status')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.tasksByStatusDesc', 'Distribution across statuses')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No status data available
+                  {t('workspace.statistics.noStatusData', 'No status data available')}
                 </div>
               </CardContent>
             </Card>
@@ -624,8 +641,8 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           {statistics.recentTaskTypes.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Recent Task Types</CardTitle>
-                <CardDescription className="text-xs">Categories from latest tasks</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.recentTaskTypes', 'Recent Task Types')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.recentTaskTypesDesc', 'Categories from latest tasks')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReactECharts
@@ -678,12 +695,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Recent Task Types</CardTitle>
-                <CardDescription className="text-xs">Categories from latest tasks</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.recentTaskTypes', 'Recent Task Types')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.recentTaskTypesDesc', 'Categories from latest tasks')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No recent task data available
+                  {t('workspace.statistics.noRecentTaskData', 'No recent task data available')}
                 </div>
               </CardContent>
             </Card>
@@ -691,11 +708,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         </div>
 
         {/* Tasks by Priority Bar Chart */}
+        <div style={{ opacity: hasNoData ? 0.4 : 1 }}>
         {statistics.tasksByPriority.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks by Priority</CardTitle>
-              <CardDescription className="text-xs">Distribution across priority levels</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.tasksByPriority', 'Tasks by Priority')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.tasksByPriorityDesc', 'Distribution across priority levels')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ReactECharts
@@ -734,25 +752,26 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks by Priority</CardTitle>
-              <CardDescription className="text-xs">Distribution across priority levels</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.tasksByPriority', 'Tasks by Priority')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.tasksByPriorityDesc', 'Distribution across priority levels')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                No priority data available
+                {t('workspace.statistics.noPriorityData', 'No priority data available')}
               </div>
             </CardContent>
           </Card>
         )}
+        </div>
 
         {/* Most Active Users and Most Used Templates Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" style={{ opacity: hasNoData ? 0.4 : 1 }}>
           {/* Most Active Users Chart */}
           {statistics.mostActiveUsers.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Most Active Users</CardTitle>
-                <CardDescription className="text-xs">Top users by assigned tasks</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.mostActiveUsers', 'Most Active Users')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.mostActiveUsersDesc', 'Top users by assigned tasks')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReactECharts
@@ -789,12 +808,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Most Active Users</CardTitle>
-                <CardDescription className="text-xs">Top users by assigned tasks</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.mostActiveUsers', 'Most Active Users')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.mostActiveUsersDesc', 'Top users by assigned tasks')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No user assignment data available
+                  {t('workspace.statistics.noUserData', 'No user assignment data available')}
                 </div>
               </CardContent>
             </Card>
@@ -804,8 +823,8 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           {statistics.mostUsedTemplates.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Most Used Templates</CardTitle>
-                <CardDescription className="text-xs">Top templates by task count</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.mostUsedTemplates', 'Most Used Templates')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.mostUsedTemplatesDesc', 'Top templates by task count')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <ReactECharts
@@ -842,12 +861,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Most Used Templates</CardTitle>
-                <CardDescription className="text-xs">Top templates by task count</CardDescription>
+                <CardTitle className="text-sm">{t('workspace.statistics.mostUsedTemplates', 'Most Used Templates')}</CardTitle>
+                <CardDescription className="text-xs">{t('workspace.statistics.mostUsedTemplatesDesc', 'Top templates by task count')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  No template usage data available
+                  {t('workspace.statistics.noTemplateData', 'No template usage data available')}
                 </div>
               </CardContent>
             </Card>
@@ -855,11 +874,12 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         </div>
 
         {/* Tasks by Spot Chart */}
+        <div style={{ opacity: hasNoData ? 0.4 : 1 }}>
         {statistics.tasksBySpot.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks by Location</CardTitle>
-              <CardDescription className="text-xs">Distribution across spots/locations</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.tasksByLocation', 'Tasks by Location')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.tasksByLocationDesc', 'Distribution across spots/locations')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ReactECharts
@@ -909,23 +929,25 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks by Location</CardTitle>
-              <CardDescription className="text-xs">Distribution across spots/locations</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.tasksByLocation', 'Tasks by Location')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.tasksByLocationDesc', 'Distribution across spots/locations')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                No location data available
+                {t('workspace.statistics.noLocationData', 'No location data available')}
               </div>
             </CardContent>
           </Card>
         )}
+        </div>
 
         {/* Tasks Over Time Chart */}
+        <div style={{ opacity: hasNoData ? 0.4 : 1 }}>
         {statistics.tasksOverTime.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks Created Over Time</CardTitle>
-              <CardDescription className="text-xs">Last 30 days of task creation</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.tasksOverTime', 'Tasks Created Over Time')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.tasksOverTimeDesc', 'Last 30 days of task creation')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ReactECharts
@@ -984,23 +1006,25 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Tasks Created Over Time</CardTitle>
-              <CardDescription className="text-xs">Last 30 days of task creation</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.tasksOverTime', 'Tasks Created Over Time')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.tasksOverTimeDesc', 'Last 30 days of task creation')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                No time series data available
+                {t('workspace.statistics.noTimeSeriesData', 'No time series data available')}
               </div>
             </CardContent>
           </Card>
         )}
+        </div>
 
         {/* Latest Tasks List */}
+        <div style={{ opacity: hasNoData ? 0.4 : 1 }}>
         {statistics.latestTasks.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Latest Tasks</CardTitle>
-              <CardDescription className="text-xs">Most recently created tasks</CardDescription>
+              <CardTitle className="text-sm">{t('workspace.statistics.latestTasks', 'Latest Tasks')}</CardTitle>
+              <CardDescription className="text-xs">{t('workspace.statistics.latestTasksDesc', 'Most recently created tasks')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -1024,6 +1048,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
             </CardContent>
           </Card>
         )}
+        </div>
 
       </div>
     </div>

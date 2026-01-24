@@ -6,6 +6,7 @@ import { MessageSquare, Send, Paperclip, Smile } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
+import { useLanguage } from "@/providers/LanguageProvider";
 import dayjs from "dayjs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getUserDisplayName, getUserInitials } from "./workspaceTable/utils/userUtils";
@@ -29,6 +30,7 @@ interface WorkspaceChatMessage {
 }
 
 export default function ChatTab({ workspaceId }: { workspaceId: string | undefined }) {
+  const { t } = useLanguage();
   const [input, setInput] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const dispatch = useDispatch<any>();
@@ -82,8 +84,8 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
       // Restore input on error
       setInput(messageText);
 
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to send message. Please try again.";
-      alert(`Error: ${errorMessage}`);
+      const errorMessage = error?.response?.data?.message || error?.message || t('workspace.collab.chat.failedToSend', 'Failed to send message. Please try again.');
+      alert(`${t('workspace.collab.chat.error', 'Error')}: ${errorMessage}`);
     }
   };
 
@@ -118,14 +120,14 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
     <div className="h-full w-full flex flex-col">
       <div className="mb-3 flex items-center gap-2 text-muted-foreground">
         <MessageSquare className="w-4 h-4" />
-        <span>Workspace Chat</span>
+        <span>{t('workspace.collab.chat.workspaceChat', 'Workspace Chat')}</span>
       </div>
       <Card className="flex-1 flex overflow-hidden">
         <CardContent className="p-0 flex-1 flex flex-col">
           <div className="flex-1 overflow-auto p-4 space-y-4 bg-muted/10">
             {messages.length === 0 && (
               <div className="text-center text-muted-foreground text-sm py-8">
-                No messages yet. Start the conversation!
+                {t('workspace.collab.chat.noMessages', 'No messages yet. Start the conversation!')}
               </div>
             )}
 
@@ -205,7 +207,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
                     handleSend();
                   }
                 }}
-                placeholder="Type a message..."
+                placeholder={t('workspace.collab.chat.typeMessage', 'Type a message...')}
                 className="flex-1"
                 disabled={!workspaceId || isNaN(Number(workspaceId))}
               />

@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Whagons — Preview 5 correos (preventa demo)</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel2: rgba(255, 255, 255, 0.08);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.68);
+        --line: rgba(255, 255, 255, 0.12);
+        --accent: #7c3aed;
+        --accent2: #22c55e;
+        --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        --radius: 16px;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background:
+          radial-gradient(1200px 800px at 20% 10%, rgba(124, 58, 237, 0.28), transparent 60%),
+          radial-gradient(900px 600px at 75% 30%, rgba(34, 197, 94, 0.18), transparent 55%),
+          radial-gradient(900px 700px at 40% 85%, rgba(59, 130, 246, 0.16), transparent 60%),
+          var(--bg);
+        color: var(--text);
+      }
+      a { color: inherit; }
+
+      .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 18px 60px; }
+      .top {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 18px 18px 12px;
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel2), var(--panel));
+        border-radius: var(--radius);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 280px;
+      }
+      .logo {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background:
+          radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.25), transparent 45%),
+          linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(59, 130, 246, 0.8));
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
+      .sub { margin: 4px 0 0; color: rgba(255, 255, 255, 0.68); font-size: 13px; line-height: 1.35; }
+
+      .controls { display: grid; gap: 10px; justify-items: end; }
+      .pillrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+      .pill {
+        font-size: 12px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.68);
+      }
+      .ctaRow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+      .btn {
+        appearance: none;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        color: rgba(255, 255, 255, 0.92);
+        background: rgba(255, 255, 255, 0.06);
+        padding: 9px 12px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: transform 120ms ease, background 120ms ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-1px); }
+      .btnPrimary {
+        border-color: rgba(124, 58, 237, 0.55);
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(59, 130, 246, 0.85));
+      }
+      .btnPrimary:hover { background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(59, 130, 246, 0.92)); }
+      .note { color: rgba(255, 255, 255, 0.68); font-size: 12px; margin: 0; }
+
+      .grid { margin-top: 16px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+      .card {
+        grid-column: span 12;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+      }
+      .cardHead {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .cardHead .left { display: flex; align-items: center; gap: 10px; }
+      .num {
+        width: 28px;
+        height: 28px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(124, 58, 237, 0.25);
+      }
+      .title { margin: 0; font-size: 14px; letter-spacing: 0.2px; }
+      .meta { margin: 0; font-size: 12px; color: rgba(255, 255, 255, 0.68); }
+      .tag {
+        font-size: 11px;
+        color: rgba(255,255,255,0.82);
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.06);
+        padding: 6px 10px;
+        border-radius: 999px;
+      }
+
+      .cardBody { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 14px; padding: 14px; }
+      @media (max-width: 900px) { .cardBody { grid-template-columns: 1fr; } }
+
+      .shot {
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.14);
+        overflow: hidden;
+        background: rgba(255,255,255,0.04);
+      }
+      .shot img { display: block; width: 100%; height: auto; }
+      .shotCap {
+        padding: 10px 12px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.68);
+        border-top: 1px solid rgba(255,255,255,0.12);
+      }
+
+      .email {
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(0,0,0,0.14);
+        overflow: hidden;
+      }
+      .emailTop {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .subject { font-weight: 800; font-size: 13px; margin: 0; }
+      .preheader { margin: 2px 0 0; color: rgba(255, 255, 255, 0.68); font-size: 12px; }
+      .emailBody { padding: 12px; }
+      .emailBody p { margin: 0 0 10px; color: rgba(255,255,255,0.9); font-size: 13px; line-height: 1.45; }
+      .emailBody ul { margin: 0 0 12px 18px; padding: 0; color: rgba(255,255,255,0.9); }
+      .emailBody li { margin: 6px 0; font-size: 13px; line-height: 1.35; }
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.92), rgba(59, 130, 246, 0.72));
+        border: 1px solid rgba(255,255,255,0.16);
+        text-decoration: none;
+        font-weight: 800;
+        font-size: 13px;
+      }
+      .ctaSmall { margin-top: 10px; display: block; color: rgba(255, 255, 255, 0.68); font-size: 12px; }
+      .footer {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border: 1px dashed rgba(255,255,255,0.18);
+        border-radius: 16px;
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .k { color: rgba(255,255,255,0.9); font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <h1>Whagons — Preview 5 correos (preventa para demo)</h1>
+            <p class="sub">Audiencia: gerentes y gerentes de operación. Enfoque: Analytics + Motivación. CTA: agendar demo.</p>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="pillrow">
+            <span class="pill">Email 1: Panel Ejecutivo</span>
+            <span class="pill">Email 2: KPI → Acción</span>
+            <span class="pill">Email 3: Alertas</span>
+            <span class="pill">Email 4: Comparativos</span>
+            <span class="pill">Email 5: Motivación</span>
+          </div>
+          <div class="ctaRow">
+            <a class="btn btnPrimary" href="https://example.com/agendar-demo" target="_blank" rel="noreferrer">Agendar demo (reemplazar link)</a>
+            <a class="btn" href="#assets">Checklist assets</a>
+          </div>
+          <p class="note">Tip: usa esto como “pantalla” para aprobar copy + screenshots antes de enviarlo.</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="card" id="email-1">
+          <div class="cardHead">
+            <div class="left">
+              <div class="num">1</div>
+              <div>
+                <p class="title">Panel Ejecutivo (Hoy)</p>
+                <p class="meta">Asunto: Tu operación, en 1 pantalla (nuevo Whagons)</p>
+              </div>
+            </div>
+            <span class="tag">Screen 1</span>
+          </div>
+          <div class="cardBody">
+            <div class="shot">
+              <img src="https://placehold.co/1200x675/png?text=Screen+1%3A+Panel+Ejecutivo%0AKPIs+%7C+Tendencia+%7C+Top+Riesgos" alt="Panel ejecutivo del nuevo Whagons con KPIs y riesgos prioritarios" />
+              <div class="shotCap">Imagen sugerida: tarjetas KPI + tendencia + “Top riesgos”. (Reemplazar por captura real o maqueta.)</div>
+            </div>
+            <div class="email">
+              <div class="emailTop">
+                <div>
+                  <p class="subject">Tu operación, en 1 pantalla (nuevo Whagons)</p>
+                  <p class="preheader">Visibilidad inmediata para decidir más rápido cada día.</p>
+                </div>
+                <span class="tag">CTA: demo</span>
+              </div>
+              <div class="emailBody">
+                <p>Hola,</p>
+                <p>La nueva experiencia de Whagons está diseñada para que un gerente de operación entienda <b>qué pasa hoy</b> en segundos.</p>
+                <p>Con el <b>Panel Ejecutivo</b>, vas a poder:</p>
+                <ul>
+                  <li>Ver los KPIs clave del día (y su tendencia) en un solo lugar</li>
+                  <li>Identificar rápidamente <b>riesgos</b> y prioridades</li>
+                  <li>Filtrar por sitio/turno/equipo para actuar sin perder tiempo</li>
+                </ul>
+                <p><b>¿Te muestro cómo se vería con tus datos?</b></p>
+                <a class="cta" href="https://example.com/agendar-demo" target="_blank" rel="noreferrer">Agendar demo</a>
+                <span class="ctaSmall">Alt text imagen: “Panel ejecutivo del nuevo Whagons con KPIs y riesgos prioritarios”.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="email-2">
+          <div class="cardHead">
+            <div class="left">
+              <div class="num">2</div>
+              <div>
+                <p class="title">KPIs accionables (de KPI → Acción)</p>
+                <p class="meta">Asunto: Del KPI a la acción (sin fricción)</p>
+              </div>
+            </div>
+            <span class="tag">Screen 2</span>
+          </div>
+          <div class="cardBody">
+            <div class="shot">
+              <img src="https://placehold.co/1200x675/png?text=Screen+2%3A+KPI%E2%86%92Acci%C3%B3n%0ADrivers+%7C+Desglose+%7C+Crear+Acci%C3%B3n" alt="Detalle de KPI con desglose y acciones recomendadas en Whagons" />
+              <div class="shotCap">Imagen sugerida: KPI seleccionado + panel lateral con drivers/causas.</div>
+            </div>
+            <div class="email">
+              <div class="emailTop">
+                <div>
+                  <p class="subject">Del KPI a la acción (sin fricción)</p>
+                  <p class="preheader">Entiende el “por qué” y asigna el siguiente paso.</p>
+                </div>
+                <span class="tag">CTA: demo</span>
+              </div>
+              <div class="emailBody">
+                <p>Hola,</p>
+                <p>Un KPI sin contexto solo genera reuniones. El nuevo Whagons convierte el dato en una ruta clara para actuar.</p>
+                <p>Al abrir un KPI, podrás:</p>
+                <ul>
+                  <li>Ver <b>drivers/causas</b> y desglose por equipo/turno/ruta</li>
+                  <li>Detectar dónde se rompe el proceso con evidencia</li>
+                  <li>Crear y asignar acciones en el momento</li>
+                </ul>
+                <p>Si tu objetivo es <b>reducir retrabajo</b> y decisiones a ciegas, este cambio te va a gustar.</p>
+                <a class="cta" href="https://example.com/agendar-demo" target="_blank" rel="noreferrer">Agendar demo</a>
+                <span class="ctaSmall">Alt text imagen: “Detalle de KPI con desglose y acciones recomendadas en Whagons”.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="email-3">
+          <div class="cardHead">
+            <div class="left">
+              <div class="num">3</div>
+              <div>
+                <p class="title">Alertas y Anomalías (antes de que explote)</p>
+                <p class="meta">Asunto: Alertas inteligentes para anticiparte</p>
+              </div>
+            </div>
+            <span class="tag">Screen 3</span>
+          </div>
+          <div class="cardBody">
+            <div class="shot">
+              <img src="https://placehold.co/1200x675/png?text=Screen+3%3A+Alertas+%26+Anomal%C3%ADas%0ASeveridad+%7C+Vs+Hist%C3%B3rico+%7C+Asignar" alt="Alertas y anomalías del nuevo Whagons con comparación histórica" />
+              <div class="shotCap">Imagen sugerida: feed de alertas + una alerta abierta con comparativo vs histórico.</div>
+            </div>
+            <div class="email">
+              <div class="emailTop">
+                <div>
+                  <p class="subject">Alertas inteligentes para anticiparte</p>
+                  <p class="preheader">Detecta anomalías vs histórico y actúa antes.</p>
+                </div>
+                <span class="tag">CTA: demo</span>
+              </div>
+              <div class="emailBody">
+                <p>Hola,</p>
+                <p>En operación, lo caro no es el problema: es enterarte tarde. En el nuevo Whagons incorporamos <b>alertas y anomalías</b> con contexto.</p>
+                <p>Esto te permite:</p>
+                <ul>
+                  <li>Ver qué se desvió <b>vs histórico</b> (no solo “subió/bajó”)</li>
+                  <li>Priorizar por severidad e impacto</li>
+                  <li>Asignar responsable y seguimiento desde la alerta</li>
+                </ul>
+                <p>Menos sorpresas. Más control.</p>
+                <a class="cta" href="https://example.com/agendar-demo" target="_blank" rel="noreferrer">Agendar demo</a>
+                <span class="ctaSmall">Alt text imagen: “Alertas y anomalías del nuevo Whagons con comparación histórica”.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="email-4">
+          <div class="cardHead">
+            <div class="left">
+              <div class="num">4</div>
+              <div>
+                <p class="title">Tablero por Equipo/Turno (comparativos)</p>
+                <p class="meta">Asunto: Comparativos que alinean al equipo (sin discusiones)</p>
+              </div>
+            </div>
+            <span class="tag">Screen 4</span>
+          </div>
+          <div class="cardBody">
+            <div class="shot">
+              <img src="https://placehold.co/1200x675/png?text=Screen+4%3A+Comparativos%0ARanking+%7C+Heatmap+%7C+Filtros+Fecha" alt="Tablero comparativo por equipo y turno con ranking y heatmap" />
+              <div class="shotCap">Imagen sugerida: ranking + heatmap + filtros visibles (fecha, sitio, turno).</div>
+            </div>
+            <div class="email">
+              <div class="emailTop">
+                <div>
+                  <p class="subject">Comparativos que alinean al equipo (sin discusiones)</p>
+                  <p class="preheader">Ranking, brechas y mejoras por turno/equipo/sitio.</p>
+                </div>
+                <span class="tag">CTA: demo</span>
+              </div>
+              <div class="emailBody">
+                <p>Hola,</p>
+                <p>Cuando todos ven la misma foto, la conversación cambia. El nuevo Whagons trae tableros comparativos para gestión diaria.</p>
+                <p>Podrás:</p>
+                <ul>
+                  <li>Comparar desempeño por <b>equipo/turno/sitio</b></li>
+                  <li>Identificar brechas con heatmap y ranking</li>
+                  <li>Detectar “quién mejoró” y replicar buenas prácticas</li>
+                </ul>
+                <p>Ideal para rituales de operación (daily/weekly) con datos claros.</p>
+                <a class="cta" href="https://example.com/agendar-demo" target="_blank" rel="noreferrer">Agendar demo</a>
+                <span class="ctaSmall">Alt text imagen: “Tablero comparativo por equipo y turno con ranking y heatmap”.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="email-5">
+          <div class="cardHead">
+            <div class="left">
+              <div class="num">5</div>
+              <div>
+                <p class="title">Motivación (Retos + Progreso)</p>
+                <p class="meta">Asunto: Motivación que mejora KPIs (no solo gamificación)</p>
+              </div>
+            </div>
+            <span class="tag">Screen 5</span>
+          </div>
+          <div class="cardBody">
+            <div class="shot">
+              <img src="https://placehold.co/1200x675/png?text=Screen+5%3A+Motivaci%C3%B3n%0AReto+Semanal+%7C+Progreso+%7C+Badges" alt="Reto semanal y progreso del equipo en el nuevo Whagons" />
+              <div class="shotCap">Imagen sugerida: reto semanal + progreso por equipo + badges.</div>
+            </div>
+            <div class="email">
+              <div class="emailTop">
+                <div>
+                  <p class="subject">Motivación que mejora KPIs (no solo gamificación)</p>
+                  <p class="preheader">Retos semanales, progreso y reconocimiento con reglas claras.</p>
+                </div>
+                <span class="tag">CTA: demo</span>
+              </div>
+              <div class="emailBody">
+                <p>Hola,</p>
+                <p>La motivación en operación funciona cuando está conectada al resultado. Por eso el nuevo Whagons incorpora retos y progreso enfocados en KPIs.</p>
+                <p>Lo más importante:</p>
+                <ul>
+                  <li>Retos semanales con reglas transparentes</li>
+                  <li>Progreso por persona/equipo y reconocimiento visible</li>
+                  <li>Conexión directa con impacto en KPIs</li>
+                </ul>
+                <p>Esta semana estamos abriendo demos para clientes actuales.</p>
+                <a class="cta" href="https://example.com/agendar-demo" target="_blank" rel="noreferrer">Agendar demo</a>
+                <span class="ctaSmall">Alt text imagen: “Reto semanal y progreso del equipo en el nuevo Whagons”.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="footer" id="assets">
+        <div class="k">Checklist de assets (rápido)</div>
+        <ul>
+          <li><span class="k">Imagen desktop</span>: 1200×675 (16:9) o 1200×900 (4:3). PNG si hay texto pequeño.</li>
+          <li><span class="k">Versión móvil</span>: 900×1200 (3:4) opcional (recorte del mismo screen).</li>
+          <li><span class="k">Overlay</span>: 4–7 palabras máximo (ej.: “Tu operación, en 1 pantalla”).</li>
+          <li><span class="k">CTA único</span>: “Agendar demo” (botón) + link secundario en texto si quieres.</li>
+          <li><span class="k">UTM sugerido</span>: <span class="mono">utm_campaign=whagons_nuevo&utm_content=email_1...email_5</span></li>
+        </ul>
+        <div style="margin-top:10px;">
+          <span class="k">Importante:</span> reemplaza <span class="mono">https://example.com/agendar-demo</span> por tu link real de agenda.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

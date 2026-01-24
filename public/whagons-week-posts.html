@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WHagons — Semana de teasers (5 posts)</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: rgba(255, 255, 255, 0.06);
+        --panel2: rgba(255, 255, 255, 0.08);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.68);
+        --line: rgba(255, 255, 255, 0.12);
+        --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        --radius: 16px;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background:
+          radial-gradient(1200px 800px at 20% 10%, rgba(111, 71, 255, 0.28), transparent 60%),
+          radial-gradient(900px 600px at 75% 30%, rgba(35, 221, 255, 0.18), transparent 55%),
+          radial-gradient(900px 700px at 40% 85%, rgba(255, 97, 213, 0.16), transparent 60%),
+          var(--bg);
+        color: var(--text);
+      }
+      a { color: inherit; }
+
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 28px 18px 60px; }
+      .top {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 18px 18px 12px;
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel2), var(--panel));
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+      @media (max-width: 900px) { .top { flex-wrap: wrap; } }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 280px;
+      }
+      .logo {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background:
+          radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.25), transparent 45%),
+          linear-gradient(135deg, rgba(111, 71, 255, 0.95), rgba(35, 221, 255, 0.75));
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
+      .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.35; }
+
+      .controls { display: grid; gap: 10px; justify-items: end; }
+      .pillrow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+      .pill {
+        font-size: 12px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--muted);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .seg button {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 8px 12px;
+        font-weight: 800;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .seg button.active {
+        background: rgba(255, 255, 255, 0.10);
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .note { color: var(--muted); font-size: 12px; margin: 0; line-height: 1.35; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+      .grid { margin-top: 16px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+      .card {
+        grid-column: span 6;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+      }
+      .card.wide { grid-column: span 12; }
+      @media (max-width: 980px) { .card { grid-column: span 12; } }
+
+      .hero {
+        height: 150px;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+        overflow: hidden;
+        background: rgba(255,255,255,0.03);
+      }
+      .hero svg, .hero img { width: 100%; height: 100%; display: block; object-fit: cover; }
+      .badge {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.34);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #23ddff;
+        box-shadow: 0 0 0 3px rgba(35, 221, 255, .12);
+      }
+
+      .content { padding: 14px; display: grid; gap: 10px; }
+      .hook { font-weight: 900; font-size: 14px; letter-spacing: 0.2px; line-height: 1.25; }
+      .body { color: rgba(255,255,255,0.88); font-size: 13px; line-height: 1.45; white-space: pre-line; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip {
+        font-size: 11px;
+        color: rgba(255,255,255,0.70);
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.05);
+        padding: 6px 10px;
+        border-radius: 999px;
+      }
+      .cta {
+        border-top: 1px dashed rgba(255,255,255,0.16);
+        padding-top: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(0,0,0,0.14);
+        text-decoration: none;
+        font-weight: 900;
+        font-size: 12px;
+      }
+      .btn:hover { background: rgba(0,0,0,0.20); }
+      .hashtags { color: rgba(255,255,255,0.62); font-size: 12px; }
+      .kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        padding: 2px 6px;
+        border: 1px solid rgba(255,255,255,0.16);
+        border-bottom-color: rgba(255,255,255,0.09);
+        background: rgba(0,0,0,0.20);
+        border-radius: 6px;
+        color: rgba(255,255,255,0.9);
+        font-size: 11px;
+      }
+
+      .footer {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border: 1px dashed rgba(255,255,255,0.18);
+        border-radius: var(--radius);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div>
+            <h1>WHagons — Semana de teasers (5 posts)</h1>
+            <p class="sub">
+              Pantalla para revisar y aprobar copy + “imágenes” (SVG). Cambia el modo con el selector.
+              Reemplaza <span class="kbd">&lt;TU_ENLACE&gt;</span> cuando lo tengas.
+            </p>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="pillrow">
+            <span class="pill">Lunes: nuevo WHagons</span>
+            <span class="pill">Martes: workspaces</span>
+            <span class="pill">Miércoles: custom fields</span>
+            <span class="pill">Jueves: aprobaciones + SLAs</span>
+            <span class="pill">Viernes: KPIs + motivación</span>
+          </div>
+          <div class="seg" role="tablist" aria-label="Modo de publicación">
+            <button id="btnLi" class="active" type="button">LinkedIn</button>
+            <button id="btnFb" type="button">Facebook</button>
+          </div>
+          <p class="note">Tip: usa <span class="kbd">Ctrl</span> + <span class="kbd">P</span> y guarda como PDF para tener una “lámina”.</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- 1 -->
+        <section class="card">
+          <div class="hero">
+            <div class="badge"><span class="dot" style="background:#6f47ff;box-shadow:0 0 0 3px rgba(111,71,255,.14)"></span> Lunes (1/5) · Nuevo WHagons</div>
+            <img src="/images/marketing/hero/whagons-teaser-01-nuevo.svg" alt="WHagons — Semana del nuevo WHagons (1/5)" />
+          </div>
+          <div class="content">
+            <div class="hook" data-li>Se viene el nuevo WHagons. Más claro, más modular, más control.</div>
+            <div class="hook" data-fb style="display:none;">Esta semana arrancamos con novedades del nuevo WHagons: workspaces, custom fields, KPIs, motivación, aprobaciones y SLAs.</div>
+
+            <div class="body" data-li>
+Esta semana empezamos a mostrar lo que viene en el nuevo WHagons.
+Más organización por workspaces, más flexibilidad con custom fields, mejor lectura con KPIs, y más control con aprobaciones y SLAs.
+Sin humo: cambios pensados para equipos que necesitan orden, visibilidad y ejecución.
+
+Mañana: cómo los workspaces cambian el “contexto” del trabajo.</div>
+            <div class="body" data-fb style="display:none;">
+Esta semana arrancamos con novedades del nuevo WHagons: workspaces, custom fields, KPIs, motivación, aprobaciones y SLAs.</div>
+
+            <div class="meta">
+              <span class="chip">Teasing</span>
+              <span class="chip">Serie 1/5</span>
+              <span class="chip">Módulos: workspaces · fields · KPIs · aprobaciones · SLAs</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn" href="#" onclick="return false;">Pide una demo: &lt;TU_ENLACE&gt;</a>
+              <span class="hashtags" data-li>#Productividad #Operaciones #SaaS #GestiónDeEquipos #WorkManagement</span>
+              <span class="hashtags" data-fb style="display:none;">#Productividad #GestiónDeEquipos #SaaS</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2 -->
+        <section class="card">
+          <div class="hero">
+            <div class="badge"><span class="dot" style="background:#23ddff"></span> Martes (2/5) · Workspaces</div>
+            <img src="/images/marketing/hero/whagons-teaser-02-workspaces.svg" alt="WHagons — Workspaces (2/5)" />
+          </div>
+          <div class="content">
+            <div class="hook" data-li>Workspaces que sí ordenan. Menos ruido, más contexto.</div>
+            <div class="hook" data-fb style="display:none;">Workspaces en el nuevo WHagons: menos ruido, más contexto y mejor organización por equipo/área.</div>
+
+            <div class="body" data-li>
+En el nuevo WHagons, los workspaces no son “carpetas bonitas”: son contexto.
+Separas equipos/áreas, reduces ruido, y haces que cada persona vea lo que necesita para avanzar.
+
+Si tu operación crece, el orden no es opcional.
+Mañana: custom fields para adaptar WHagons a tu negocio (sin caos).</div>
+            <div class="body" data-fb style="display:none;">
+Workspaces en el nuevo WHagons: menos ruido, más contexto y mejor organización por equipo/área.</div>
+
+            <div class="meta">
+              <span class="chip">Orden</span>
+              <span class="chip">Contexto</span>
+              <span class="chip">Serie 2/5</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn" href="#" onclick="return false;">Pide una demo: &lt;TU_ENLACE&gt;</a>
+              <span class="hashtags" data-li>#Operaciones #Gestión #Productividad #Equipos #SaaS</span>
+              <span class="hashtags" data-fb style="display:none;">#Operaciones #Productividad</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3 -->
+        <section class="card">
+          <div class="hero">
+            <div class="badge"><span class="dot" style="background:#ff61d5;box-shadow:0 0 0 3px rgba(255,97,213,.14)"></span> Miércoles (3/5) · Custom fields</div>
+            <img src="/images/marketing/hero/whagons-teaser-03-custom-fields.svg" alt="WHagons — Custom fields (3/5)" />
+          </div>
+          <div class="content">
+            <div class="hook" data-li>Custom fields sin dolor. Flexible, pero ordenado.</div>
+            <div class="hook" data-fb style="display:none;">Nuevo WHagons: custom fields para adaptar tus flujos a tu operación, sin perder orden.</div>
+
+            <div class="body" data-li>
+Cada equipo mide cosas distintas. Por eso el nuevo WHagons trae custom fields para capturar lo que importa en tu operación
+(sin convertirlo en un “Excel infinito”). La idea: flexibilidad, pero con estándares que se sostienen.
+
+Si hoy te falta información clave en tus flujos, esto te va a encantar.
+Mañana: control y cumplimiento con aprobaciones + SLAs.</div>
+            <div class="body" data-fb style="display:none;">
+Custom fields para adaptar tus flujos a tu operación, sin perder orden.</div>
+
+            <div class="meta">
+              <span class="chip">Flexibilidad</span>
+              <span class="chip">Estandarización</span>
+              <span class="chip">Serie 3/5</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn" href="#" onclick="return false;">Pide una demo: &lt;TU_ENLACE&gt;</a>
+              <span class="hashtags" data-li>#Procesos #Operaciones #Digitalización #SaaS #Productividad</span>
+              <span class="hashtags" data-fb style="display:none;">#Procesos #Digitalización</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4 -->
+        <section class="card">
+          <div class="hero">
+            <div class="badge"><span class="dot" style="background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.14)"></span> Jueves (4/5) · Aprobaciones + SLAs</div>
+            <img src="/images/marketing/hero/whagons-teaser-04-aprobaciones-slas.svg" alt="WHagons — Aprobaciones y SLAs (4/5)" />
+          </div>
+          <div class="content">
+            <div class="hook" data-li>Control sin frenar. Aprobaciones que acompañan el flujo.</div>
+            <div class="hook" data-fb style="display:none;">Aprobaciones + SLAs para tener control y cumplimiento sin frenar el trabajo.</div>
+
+            <div class="body" data-li>
+Dos novedades clave para equipos que operan con presión y responsabilidades:
+- Aprobaciones: para que lo crítico tenga el “ok” correcto, en el momento correcto.
+- SLAs: para que los tiempos estén claros y el seguimiento sea parte del sistema, no de la memoria.
+
+Menos “¿quién lo vio?” y más “ya avanzó”.
+Mañana: cerramos con KPIs + motivación.</div>
+            <div class="body" data-fb style="display:none;">
+Aprobaciones + SLAs para tener control y cumplimiento sin frenar el trabajo.</div>
+
+            <div class="meta">
+              <span class="chip">Gobernanza</span>
+              <span class="chip">Cumplimiento</span>
+              <span class="chip">Serie 4/5</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn" href="#" onclick="return false;">Pide una demo: &lt;TU_ENLACE&gt;</a>
+              <span class="hashtags" data-li>#Operaciones #Compliance #GestiónDeProcesos #SLA #Productividad</span>
+              <span class="hashtags" data-fb style="display:none;">#Operaciones #SLA</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5 -->
+        <section class="card wide">
+          <div class="hero">
+            <div class="badge"><span class="dot" style="background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.14)"></span> Viernes (5/5) · KPIs + Motivación</div>
+            <img src="/images/marketing/hero/whagons-teaser-05-kpis-motivacion.svg" alt="WHagons — KPIs y Motivación (5/5)" />
+          </div>
+          <div class="content">
+            <div class="hook" data-li>Lo que no se ve, no se mejora. KPIs claros, acción rápida.</div>
+            <div class="hook" data-fb style="display:none;">KPIs + motivación para que el progreso se vea y el equipo avance con más constancia.</div>
+
+            <div class="body" data-li>
+Cerramos la semana con dos piezas que cambian el día a día:
+- KPIs: para ver progreso, cuellos de botella y resultados sin perseguir reportes.
+- Motivación: para reforzar hábitos de ejecución y celebrar avances (sin perder foco en el trabajo real).
+
+Si quieres que tu operación sea más predecible, esto ayuda más de lo que parece.</div>
+            <div class="body" data-fb style="display:none;">
+KPIs + motivación para que el progreso se vea y el equipo avance con más constancia.</div>
+
+            <div class="meta">
+              <span class="chip">KPIs</span>
+              <span class="chip">Motivación</span>
+              <span class="chip">Serie 5/5</span>
+            </div>
+
+            <div class="cta">
+              <a class="btn" href="#" onclick="return false;">Pide una demo: &lt;TU_ENLACE&gt;</a>
+              <span class="hashtags" data-li>#KPIs #Productividad #GestiónDeEquipos #Operaciones #SaaS</span>
+              <span class="hashtags" data-fb style="display:none;">#KPIs #Productividad</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="footer">
+        Archivo servido desde <span class="mono">public/</span> (Vite). URL esperada: <span class="mono">http://localhost:5173/whagons-week-posts.html</span>
+      </div>
+    </div>
+
+    <script>
+      const btnLi = document.getElementById('btnLi');
+      const btnFb = document.getElementById('btnFb');
+
+      function setMode(mode) {
+        const liNodes = document.querySelectorAll('[data-li]');
+        const fbNodes = document.querySelectorAll('[data-fb]');
+        liNodes.forEach((n) => (n.style.display = mode === 'li' ? '' : 'none'));
+        fbNodes.forEach((n) => (n.style.display = mode === 'fb' ? '' : 'none'));
+        btnLi.classList.toggle('active', mode === 'li');
+        btnFb.classList.toggle('active', mode === 'fb');
+      }
+
+      btnLi.addEventListener('click', () => setMode('li'));
+      btnFb.addEventListener('click', () => setMode('fb'));
+    </script>
+  </body>
+</html>

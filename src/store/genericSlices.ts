@@ -78,7 +78,7 @@ const genericSliceConfigs = [
     { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','category_id','priority_id','sla_id','approval_id','is_private','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workflows', table: 'wh_workflows', endpoint: '/workflows', store: 'workflows', hashFields: ['id','name','description','workspace_id','is_active','current_version_id','created_by','updated_by','activated_at','updated_at'] },
-    { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
+    { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','view_modes','allow_ad_hoc_tasks','type','category_id','spots','created_by','updated_at'] },
 
     // Boards (Communication Boards)
     { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
@@ -98,6 +98,9 @@ const genericSliceConfigs = [
     // Plugin System
     { name: 'plugins', table: 'wh_plugins', endpoint: '/plugins', store: 'plugins', hashFields: ['id','slug','name','description','version','is_enabled','updated_at'] },
     { name: 'pluginRoutes', table: 'wh_plugin_routes', endpoint: '/plugin-routes', store: 'plugin_routes', hashFields: ['id','plugin_id','method','path','controller','action','updated_at'] },
+    
+    // KPI Cards (Custom dashboard metrics)
+    { name: 'kpiCards', table: 'wh_kpi_cards', endpoint: '/kpi-cards', store: 'kpi_cards', hashFields: ['id','name','type','query_config','display_config','position','is_enabled','updated_at'] },
 
     // Schedule Management
     { name: 'scheduleTemplates', table: 'wh_schedule_templates', endpoint: '/schedule-templates', store: 'schedule_templates', hashFields: ['id','name','description','schedule_type','weekly_hours','updated_at'] },
@@ -174,6 +177,7 @@ export const {
     complianceAudits,
     plugins,
     pluginRoutes,
+    kpiCards,
     scheduleTemplates,
     scheduleTemplateDays,
     userSchedules,
@@ -252,6 +256,7 @@ export const genericEventNames = {
     complianceAudits: genericSlices.slices.complianceAudits.eventNames,
     plugins: genericSlices.slices.plugins.eventNames,
     pluginRoutes: genericSlices.slices.pluginRoutes.eventNames,
+    kpiCards: genericSlices.slices.kpiCards.eventNames,
     scheduleTemplates: genericSlices.slices.scheduleTemplates.eventNames,
     scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.eventNames,
     userSchedules: genericSlices.slices.userSchedules.eventNames,
@@ -332,6 +337,7 @@ export const genericInternalActions = {
     complianceAudits: genericSlices.slices.complianceAudits.actions,
     plugins: genericSlices.slices.plugins.actions,
     pluginRoutes: genericSlices.slices.pluginRoutes.actions,
+    kpiCards: genericSlices.slices.kpiCards.actions,
     scheduleTemplates: genericSlices.slices.scheduleTemplates.actions,
     scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.actions,
     userSchedules: genericSlices.slices.userSchedules.actions,
@@ -404,6 +410,7 @@ export const genericActions = {
     complianceAudits: publicActions(genericInternalActions.complianceAudits),
     plugins: publicActions(genericInternalActions.plugins),
     pluginRoutes: publicActions(genericInternalActions.pluginRoutes),
+    kpiCards: publicActions(genericInternalActions.kpiCards),
     scheduleTemplates: publicActions(genericInternalActions.scheduleTemplates),
     scheduleTemplateDays: publicActions(genericInternalActions.scheduleTemplateDays),
     userSchedules: publicActions(genericInternalActions.userSchedules),
