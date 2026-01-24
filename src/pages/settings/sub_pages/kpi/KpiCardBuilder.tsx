@@ -19,9 +19,20 @@ import {
   faPercent,
   faHashtag,
   faCode,
+  faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface KpiCard {
   id?: number;
@@ -38,6 +49,7 @@ interface KpiCardBuilderProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (card: Partial<KpiCard>) => Promise<void>;
+  onDelete?: () => Promise<void>;
   editingCard?: KpiCard | null;
 }
 
@@ -52,7 +64,7 @@ const COLOR_OPTIONS = [
   { name: 'Orange', value: 'text-orange-500', badgeClass: 'bg-gradient-to-br from-orange-500 to-red-500', barClass: 'from-orange-500 via-orange-400 to-orange-500' },
 ];
 
-export default function KpiCardBuilder({ isOpen, onClose, onSave, editingCard }: KpiCardBuilderProps) {
+export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, editingCard }: KpiCardBuilderProps) {
   const { t } = useLanguage();
   const workspaces = useSelector((state: RootState) => (state as any).workspaces?.value ?? []);
   const statuses = useSelector((state: RootState) => state.statuses?.value ?? []);
@@ -72,6 +84,7 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, editingCard }:
     is_enabled: true,
   });
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (editingCard) {
@@ -106,6 +119,18 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, editingCard }:
     setSaving(true);
     try {
       await onSave(formData);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setSaving(true);
+    try {
+      await onDelete();
+      setConfirmDeleteOpen(false);
       onClose();
     } finally {
       setSaving(false);
@@ -410,7 +435,8 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, editingCard }:
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
@@ -440,6 +466,19 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, editingCard }:
               )}
             </div>
             <div className="flex items-center gap-2">
+              {editingCard?.id && onDelete ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  title={t('common.delete', 'Delete')}
+                  aria-label={t('common.delete', 'Delete')}
+                  disabled={saving}
+                >
+                  <FontAwesomeIcon icon={faTrash} />
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={onClose}>
                 {t('common.cancel', 'Cancel')}
               </Button>
@@ -457,5 +496,30 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, editingCard }:
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('common.delete', 'Delete')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('common.deleteConfirm', 'Are you sure? This action cannot be undone.')}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={saving}>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault();
+              void handleDelete();
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={saving}
+          >
+            {saving ? t('common.deleting', 'Deleting...') : t('common.delete', 'Delete')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

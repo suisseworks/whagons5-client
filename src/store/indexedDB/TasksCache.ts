@@ -143,10 +143,22 @@ export class TasksCache {
         if (normalized.id === undefined || normalized.id === null) {
             normalized.id = Number.isFinite(idNum) ? idNum : id;
         }
+
+        // Soft-delete handling: tasks are a custom cache (not GenericCache), so we need to
+        // mirror the generic behavior. If backend sends an UPDATE with deleted_at set,
+        // remove the task from local stores so the UI treats it as deleted.
+        if (Object.prototype.hasOwnProperty.call(normalized, 'deleted_at') && normalized.deleted_at != null) {
+            await this.deleteTask(String(normalized.id));
+            return;
+        }
+
         // Determine which store contains the task and update atomically using IndexedDB's upsert behavior
         // DB.put() automatically replaces existing records with the same key, making this operation atomic
         const existingInTasks = await DB.get('tasks', normalized.id);
-        const storeName = existingInTasks ? 'tasks' : 'shared_tasks';
+        // If it doesn't exist in the primary tasks store, check shared_tasks. If it's in neither,
+        // default to restoring into the primary tasks store (common for soft-delete restore flows).
+        const existingInShared = existingInTasks ? null : await DB.get('shared_tasks', normalized.id);
+        const storeName = existingInTasks ? 'tasks' : (existingInShared ? 'shared_tasks' : 'tasks');
         await DB.put(storeName, normalized);
         this._memTasks = null;
         this._memTasksStamp = 0;
@@ -164,6 +176,13 @@ export class TasksCache {
             // Use Date.now as temporary id if absolutely missing (shouldn't happen for server rows)
             normalized.id = Date.now();
         }
+
+        // If a soft-deleted task comes through (rare but possible), ensure it's not stored locally.
+        if (Object.prototype.hasOwnProperty.call(normalized, 'deleted_at') && normalized.deleted_at != null) {
+            await this.deleteTask(String(normalized.id));
+            return;
+        }
+
         await DB.put('tasks', normalized);
         this._memTasks = null;
         this._memTasksStamp = 0;
@@ -408,21 +427,8 @@ export class TasksCache {
     }
 
     public static async validateTasks(serverGlobalHash?: string | null, serverBlockCount?: number | null) {
-        // Tasks are now visibility-scoped (workspace access / shares), so comparing against global table hashes
-        // will cause false mismatches. Skip integrity validation for tasks by default.
-        const integrityEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('wh-enable-task-integrity') === 'true';
-        if (!integrityEnabled) {
-            // Still ensure we bootstrap the tasks cache when empty, otherwise users see no tasks after DB resets.
-            try {
-                const existingTasks = await this.getTasks();
-                if (existingTasks.length === 0) {
-                    return await this.fetchTasks();
-                }
-            } catch (e) {
-                console.warn('[TasksCache] validateTasks bootstrap (integrity disabled) failed:', e);
-            }
-            return true;
-        }
+        // Integrity validation for tasks should always run. We rely on the server's integrity endpoints
+        // (global/block/row hashes) to detect changes like status_id updates and selectively refetch.
         try {
             if (this.validating) {
                 this.dlog('validateTasks: already running, skipping re-entry');

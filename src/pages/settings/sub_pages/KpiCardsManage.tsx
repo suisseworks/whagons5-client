@@ -1,28 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { RootState } from '@/store/store';
-import { genericActions, genericInternalActions } from '@/store/genericSlices';
+import { AppDispatch, RootState } from '@/store/store';
+import { genericActions } from '@/store/genericSlices';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus,
-  faEdit,
-  faTrash,
-  faGripVertical,
   faChartBar,
   faArrowLeft,
   faCog,
@@ -39,8 +27,8 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
 import toast from 'react-hot-toast';
-import { api } from '@/api/whagonsApi';
 import KpiCardBuilder from './kpi/KpiCardBuilder';
+import { reorderKpiCardsAsync } from '@/store/actions/kpiCards';
 
 interface KpiQueryConfig {
   filters?: Record<string, any>;
@@ -60,12 +48,10 @@ interface KpiCard {
   is_enabled: boolean;
 }
 
-function SortableKpiCard({ card, onEdit, onDelete, onToggle, deleting, toggling }: {
+function SortableKpiCard({ card, onEdit, onToggle, toggling }: {
   card: KpiCard;
   onEdit: (card: KpiCard) => void;
-  onDelete: (card: KpiCard) => void;
   onToggle: (id: number, enabled: boolean) => void;
-  deleting: number | null;
   toggling: number | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
@@ -103,20 +89,30 @@ function SortableKpiCard({ card, onEdit, onDelete, onToggle, deleting, toggling 
     }
   };
 
+  const handleCardClick = (e: ReactMouseEvent<HTMLElement>) => {
+    // Don't trigger edit if clicking on switch or if it's a default card
+    const target = e.target as HTMLElement;
+    const isSwitch = target.closest('[role="switch"]') || target.closest('button[type="button"]');
+    
+    if (!isSwitch && !isDefault) {
+      onEdit(card);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`${isDragging ? 'opacity-50' : ''}`}
     >
-      <Card className="mb-3">
+      <Card 
+        {...listeners}
+        {...attributes}
+        className={`mb-3 cursor-grab active:cursor-grabbing ${!isDefault ? 'hover:bg-accent/50 transition-colors' : ''}`}
+        onClick={handleCardClick}
+      >
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            {/* Drag handle */}
-            <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
-              <FontAwesomeIcon icon={faGripVertical} />
-            </div>
-
             {/* Icon */}
             <div className={`text-2xl ${card.display_config?.color || 'text-blue-500'}`}>
               <FontAwesomeIcon icon={faChartBar} />
@@ -141,7 +137,11 @@ function SortableKpiCard({ card, onEdit, onDelete, onToggle, deleting, toggling 
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <div className={`${toggling === card.id ? 'opacity-50' : ''}`}>
                 <Switch
                   checked={card.is_enabled}
@@ -149,33 +149,6 @@ function SortableKpiCard({ card, onEdit, onDelete, onToggle, deleting, toggling 
                   disabled={toggling === card.id}
                 />
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (!isDefault) {
-                    onEdit(card);
-                  }
-                }}
-                title={t('common.edit', 'Edit')}
-                disabled={isDefault}
-              >
-                <FontAwesomeIcon icon={faEdit} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (!isDefault) {
-                    onDelete(card);
-                  }
-                }}
-                className="text-destructive hover:text-destructive"
-                title={t('common.delete', 'Delete')}
-                disabled={isDefault || deleting === card.id}
-              >
-                <FontAwesomeIcon icon={faTrash} />
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -187,27 +160,30 @@ function SortableKpiCard({ card, onEdit, onDelete, onToggle, deleting, toggling 
 export default function KpiCardsManage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const kpiCards = useSelector((state: RootState) => (state as any).kpiCards?.value ?? []);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<KpiCard | null>(null);
-  const [deleting, setDeleting] = useState<number | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [cardToDelete, setCardToDelete] = useState<KpiCard | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
 
-  // Load KPI cards on mount
-  useEffect(() => {
-    dispatch(genericInternalActions.kpiCards.getFromIndexedDB());
-    dispatch(genericInternalActions.kpiCards.fetchFromAPI());
-  }, [dispatch]);
-
   // Sort cards by position
-  const sortedCards = useMemo(() => {
+  const sortedCardsFromStore = useMemo(() => {
     return [...kpiCards].sort((a, b) => a.position - b.position);
   }, [kpiCards]);
 
-  const cardIds = useMemo(() => sortedCards.map(card => card.id), [sortedCards]);
+  // Local order state to prevent "snap back" while we persist reorder to the API
+  const [cards, setCards] = useState<KpiCard[]>([]);
+  const cardsRef = useRef<KpiCard[]>([]);
+
+  useEffect(() => {
+    setCards(sortedCardsFromStore);
+  }, [sortedCardsFromStore]);
+
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
+
+  const cardIds = useMemo(() => cards.map(card => card.id), [cards]);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -222,11 +198,18 @@ export default function KpiCardsManage() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = sortedCards.findIndex(card => card.id === active.id);
-    const newIndex = sortedCards.findIndex(card => card.id === over.id);
+    const previousCards = cardsRef.current;
+    const oldIndex = previousCards.findIndex(card => card.id === active.id);
+    const newIndex = previousCards.findIndex(card => card.id === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(sortedCards, oldIndex, newIndex);
+      const newOrder = arrayMove(previousCards, oldIndex, newIndex).map((card, index) => ({
+        ...card,
+        position: index,
+      }));
+
+      // Optimistically update UI so it doesn't "snap back" while persisting
+      setCards(newOrder);
       
       // Update positions
       const reorderData = newOrder.map((card, index) => ({
@@ -235,12 +218,12 @@ export default function KpiCardsManage() {
       }));
 
       try {
-        await api.post('/kpi-cards/reorder', { cards: reorderData });
-        // Refresh from API
-        dispatch(genericInternalActions.kpiCards.fetchFromAPI());
+        await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
         toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error reordering cards:', error);
+        // Rollback optimistic reorder
+        setCards(previousCards);
         toast.error(t('errors.reorderFailed', 'Failed to reorder cards'));
       }
     }
@@ -259,37 +242,6 @@ export default function KpiCardsManage() {
     setIsBuilderOpen(true);
   };
 
-  const handleDeleteClick = (card: KpiCard) => {
-    if (card.query_config?.is_default) {
-      return;
-    }
-    setCardToDelete(card);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!cardToDelete) return;
-
-    setDeleting(cardToDelete.id);
-    setDeleteDialogOpen(false);
-    
-    try {
-      await dispatch(genericActions.kpiCards.removeAsync(cardToDelete.id)).unwrap();
-      toast.success(t('kpiCards.deleted', 'KPI card deleted successfully'));
-    } catch (error: any) {
-      console.error('Error deleting card:', error);
-      toast.error(error?.message || t('errors.deleteFailed', 'Failed to delete card'));
-    } finally {
-      setDeleting(null);
-      setCardToDelete(null);
-    }
-  };
-
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-    setCardToDelete(null);
-  };
-
   const handleToggle = async (id: number, enabled: boolean) => {
     setToggling(id);
     
@@ -301,11 +253,7 @@ export default function KpiCardsManage() {
     );
     
     try {
-      // Call toggle API endpoint
-      await api.post(`/kpi-cards/${id}/toggle`, { is_enabled: enabled });
-      
-      // Refresh from API to get updated state
-      await dispatch(genericInternalActions.kpiCards.fetchFromAPI());
+      await dispatch(genericActions.kpiCards.updateAsync({ id, updates: { is_enabled: enabled } as any })).unwrap();
       
       // Dismiss loading and show success
       toast.dismiss(loadingToast);
@@ -314,7 +262,7 @@ export default function KpiCardsManage() {
           ? t('kpiCards.enabled', 'KPI card enabled')
           : t('kpiCards.disabled', 'KPI card disabled')
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling card:', error);
       // Dismiss loading and show error
       toast.dismiss(loadingToast);
@@ -357,6 +305,19 @@ export default function KpiCardsManage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!editingCard?.id) return;
+    try {
+      await dispatch(genericActions.kpiCards.removeAsync(editingCard.id)).unwrap();
+      toast.success(t('kpiCards.deleted', 'KPI card deleted successfully'));
+      setIsBuilderOpen(false);
+      setEditingCard(null);
+    } catch (error: any) {
+      console.error('[KpiCardsManage] Error deleting card:', error);
+      toast.error(t('errors.deleteFailed', 'Failed to delete card'));
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -384,7 +345,7 @@ export default function KpiCardsManage() {
       </div>
 
       {/* Cards List */}
-      {sortedCards.length === 0 ? (
+      {cards.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>{t('kpiCards.noCards', 'No KPI Cards')}</CardTitle>
@@ -404,14 +365,12 @@ export default function KpiCardsManage() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-              {sortedCards.map((card) => (
+              {cards.map((card) => (
                 <SortableKpiCard
                   key={card.id}
                   card={card}
                   onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
                   onToggle={handleToggle}
-                  deleting={deleting}
                   toggling={toggling}
                 />
               ))}
@@ -428,6 +387,7 @@ export default function KpiCardsManage() {
           setEditingCard(null);
         }}
         onSave={handleSave}
+        onDelete={editingCard ? handleDelete : undefined}
         editingCard={editingCard}
       />
 
@@ -451,39 +411,6 @@ export default function KpiCardsManage() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('kpiCards.deleteTitle', 'Delete KPI Card')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {cardToDelete && (
-                <>
-                  {t('kpiCards.deleteDescription', 'Are you sure you want to delete the KPI card')}{' '}
-                  <strong className="font-semibold text-foreground">"{cardToDelete.name}"</strong>?
-                  <br />
-                  <span className="text-xs text-muted-foreground mt-1 block">
-                    {t('kpiCards.deleteWarning', 'This action cannot be undone.')}
-                  </span>
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDeleteCancel}>
-              {t('common.cancel', 'Cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t('common.delete', 'Delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

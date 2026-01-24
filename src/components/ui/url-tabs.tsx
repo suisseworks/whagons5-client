@@ -25,6 +25,10 @@ interface UrlTabsProps {
   // Optional: control a right-side action (e.g., Clear filters)
   showClearFilters?: boolean;
   onClearFilters?: () => void;
+  // Optional: allow parent to render sortable tab triggers (Workspace uses this)
+  sortable?: boolean;
+  sortableItems?: string[]; // values that are draggable; others treated as fixed
+  renderSortableTab?: (tab: TabItem, isFixed: boolean) => React.ReactNode;
 }
 
 /**
@@ -44,6 +48,9 @@ export function UrlTabs({
   // Optional: control a right-side action (e.g., Clear filters)
   showClearFilters,
   onClearFilters,
+  sortable,
+  sortableItems,
+  renderSortableTab,
 }: UrlTabsProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -125,15 +132,21 @@ export function UrlTabs({
     }
   }, [tabs, activeTab]);
 
-  const tabListContent = tabs.map((tab) => (
-    <TabsTrigger
-      key={tab.value}
-      value={tab.value}
-      disabled={tab.disabled}
-    >
-      {tab.label}
-    </TabsTrigger>
-  ));
+  const tabListContent = tabs.map((tab) => {
+    if (sortable && renderSortableTab) {
+      const isFixed = Array.isArray(sortableItems) ? !sortableItems.includes(tab.value) : false;
+      return <React.Fragment key={tab.value}>{renderSortableTab(tab, isFixed)}</React.Fragment>;
+    }
+    return (
+      <TabsTrigger
+        key={tab.value}
+        value={tab.value}
+        disabled={tab.disabled}
+      >
+        {tab.label}
+      </TabsTrigger>
+    );
+  });
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>

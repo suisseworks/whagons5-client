@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { celebrateTaskCompletion } from "@/utils/confetti";
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -1204,7 +1205,11 @@ function Categories() {
                 id="celebration-effect"
                 label={tc('fields.celebrationEffect', 'Task Completion Celebration')}
                 value={createFormData.celebration_effect}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }))}
+                onChange={(value) => {
+                  setCreateFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }));
+                  // Preview selection immediately. "default" previews the global setting.
+                  celebrateTaskCompletion(value === 'default' ? null : value);
+                }}
                 placeholder={tc('fields.placeholders.selectCelebration', 'Select celebration…')}
                 options={[
                   { value: 'default', label: tc('fields.placeholders.useGlobalDefault', 'Use Global Default') },
@@ -1366,7 +1371,11 @@ function Categories() {
                 id="edit-celebration-effect"
                 label={tc('fields.celebrationEffect', 'Task Completion Celebration')}
                 value={editFormData.celebration_effect}
-                onChange={(value) => setEditFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }))}
+                onChange={(value) => {
+                  setEditFormData(prev => ({ ...prev, celebration_effect: value === 'default' ? '' : value }));
+                  // Preview selection immediately. "default" previews the global setting.
+                  celebrateTaskCompletion(value === 'default' ? null : value);
+                }}
                 placeholder={tc('fields.placeholders.selectCelebration', 'Select celebration…')}
                 options={[
                   { value: 'default', label: tc('fields.placeholders.useGlobalDefault', 'Use Global Default') },

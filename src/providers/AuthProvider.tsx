@@ -32,6 +32,7 @@ interface AuthContextType {
   loading: boolean;
   userLoading: boolean;
   hydrating: boolean;
+  bootstrapComplete: boolean;
   hydrationError: string | null;
   refetchUser: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
@@ -39,6 +40,10 @@ interface AuthContextType {
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const POST_ONBOARDING_BOOTSTRAP_KEY = 'wh_post_onboarding_bootstrap_pending';
+const POST_ONBOARDING_BOOTSTRAP_PENDING_EVENT = 'wh:postOnboardingBootstrapPending';
+const POST_ONBOARDING_BOOTSTRAP_DONE_EVENT = 'wh:postOnboardingBootstrapDone';
 
 const CORE_ENCRYPTED_STORES: readonly string[] = [
   'workspaces',
@@ -163,6 +168,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [userLoading, setUserLoading] = useState<boolean>(false);
   const [hydrating, setHydrating] = useState<boolean>(false);
+  const [bootstrapComplete, setBootstrapComplete] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(POST_ONBOARDING_BOOTSTRAP_KEY) !== '1';
+    } catch (_e) {
+      return true;
+    }
+  });
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
   
@@ -288,9 +300,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             try {
               setHydrating(true);
               setHydrationError(null);
+              let shouldBlockWelcome = false;
+              try {
+                shouldBlockWelcome = localStorage.getItem(POST_ONBOARDING_BOOTSTRAP_KEY) === '1';
+              } catch (_e) {
+                shouldBlockWelcome = false;
+              }
+              setBootstrapComplete(!shouldBlockWelcome);
               if (!userData?.tenant_domain_prefix) {
                 // Ensure crypto knows we're not in tenant mode
                 CryptoHandler.setTenantMode(false);
+                setBootstrapComplete(true);
                 return;
               }
               // Enable tenant mode for crypto operations
@@ -300,6 +320,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.log('DB.init: result', result);
               if (!result) {
                 console.warn('DB failed to initialize, deferring cache hydration');
+                // Keep the bootstrap gate in place; user can refresh to retry.
                 return;
               }
 
@@ -327,20 +348,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               } catch (err) {
                 console.warn('AuthProvider: loadCoreFromIndexedDB failed (continuing to network hydration)', err);
               }
-              (async () => {
+              if (shouldBlockWelcome) {
+                // First load after onboarding: block the Welcome "Get Started" button
+                // until the initial validation + refresh finishes.
                 try {
                   await dataManager.validateAndRefresh();
                 } catch (e) {
                   console.warn('AuthProvider: validation failed', e);
                 }
-              })();
-              setHydrationError(null);
+                setHydrationError(null);
 
-              // Verify manifest
-              try {
-                await dataManager.verifyManifest();
-              } catch (e) {
-                console.warn('Manifest fetch/verify failed (continuing):', e);
+                // Verify manifest (best-effort)
+                try {
+                  await dataManager.verifyManifest();
+                } catch (e) {
+                  console.warn('Manifest fetch/verify failed (continuing):', e);
+                }
+
+                try {
+                  localStorage.removeItem(POST_ONBOARDING_BOOTSTRAP_KEY);
+                } catch (_e) {}
+                try {
+                  window.dispatchEvent(new CustomEvent(POST_ONBOARDING_BOOTSTRAP_DONE_EVENT));
+                } catch (_e) {}
+                setBootstrapComplete(true);
+              } else {
+                // Normal loads: keep validation in background.
+                (async () => {
+                  try {
+                    await dataManager.validateAndRefresh();
+                  } catch (e) {
+                    console.warn('AuthProvider: validation failed', e);
+                  }
+                })();
+                setHydrationError(null);
+
+                // Verify manifest (best-effort)
+                try {
+                  await dataManager.verifyManifest();
+                } catch (e) {
+                  console.warn('Manifest fetch/verify failed (continuing):', e);
+                }
+                setBootstrapComplete(true);
               }
 
               // Category custom fields will be hydrated by DataManager + on-demand fetches
@@ -407,6 +456,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    // Allow any part of the app (e.g. onboarding) to immediately signal that the
+    // first post-onboarding bootstrap is pending, so the Welcome screen can block
+    // instantly even before the /users/me refetch hydration flow begins.
+    const onPostOnboardingBootstrapPending = () => {
+      setBootstrapComplete(false);
+    };
+    window.addEventListener(POST_ONBOARDING_BOOTSTRAP_PENDING_EVENT, onPostOnboardingBootstrapPending as EventListener);
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       // console.log('AuthContext: Auth state changed:', currentUser?.uid);
       setFirebaseUser(currentUser);
@@ -419,6 +476,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
         CryptoHandler.setTenantMode(false);
         setHydrating(false);
+        setBootstrapComplete(true);
         setHydrationError(null);
         
         // Unregister FCM token on logout
@@ -454,6 +512,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
 
     return () => {
+      window.removeEventListener(POST_ONBOARDING_BOOTSTRAP_PENDING_EVENT, onPostOnboardingBootstrapPending as EventListener);
       unsubscribe();
     };
   }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
@@ -498,6 +557,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loading,
         userLoading,
         hydrating,
+        bootstrapComplete,
         hydrationError,
         refetchUser,
         updateUser,

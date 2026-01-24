@@ -24,7 +24,7 @@ interface OnboardingWrapperProps {
 
 const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const navigate = useNavigate();
-  const { refetchUser } = useAuth();
+  const { refetchUser, updateUser } = useAuth();
   const { language, t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
   const [currentStep, setCurrentStep] = useState<number>(0);
@@ -182,9 +182,17 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             dataToUse.tenant_domain_prefix
           );
           if (success) {
-            // Immediately refetch user data to ensure tenant_domain_prefix is updated
-            // This prevents redirect issues where user data hasn't been refreshed yet
-            await refetchUser();
+            // Optimistically update user state to avoid loading screen
+            // This prevents the loading screen from appearing during step transition
+            updateUser({
+              tenant_domain_prefix: dataToUse.tenant_domain_prefix,
+              organization_name: dataToUse.organization_name,
+              initialization_stage: 2
+            });
+            // Refetch user data in the background without blocking UI
+            refetchUser().catch(err => {
+              console.warn('Background user refetch failed:', err);
+            });
             setCurrentStep(2);
           }
         }
@@ -204,6 +212,12 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
           // Refetch user data to ensure AuthProvider has the latest state,
           // then initialize caches and populate Redux before navigating
           setLoading(true);
+          // One-time: on the very first post-onboarding load, block the Welcome "Get Started"
+          // button until the initial cache validation + refresh is finished.
+          try {
+            localStorage.setItem('wh_post_onboarding_bootstrap_pending', '1');
+            window.dispatchEvent(new CustomEvent('wh:postOnboardingBootstrapPending'));
+          } catch (_e) {}
           await refetchUser();
           await syncCachesAndStore();
           setLoading(false);

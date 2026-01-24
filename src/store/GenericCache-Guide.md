@@ -60,7 +60,7 @@ This avoids full refreshes and keeps large caches in sync quickly.
 
 `src/store/indexedDB/TasksCache.ts` predates `GenericCache` and implements:
 - Initialization that waits for auth and IndexedDB (`DB.init()`)
-- A full `fetchTasks()` (paginated) and `validateTasks()` with hashing
+- A full `fetchTasks()` (paginated) and `validateTasks()` with hashing (always-on)
 - Query helpers (`queryTasks(params)`) to filter/sort/paginate locally, mirroring backend behavior
 - Emits UI events via `TaskEvents` on cache writes
 

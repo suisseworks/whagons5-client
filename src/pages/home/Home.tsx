@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useAuth } from "@/providers/AuthProvider";
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import RotatingBackground from "@/components/marketing/RotatingBackground";
 import { HERO_BACKGROUND_IMAGES } from "@/assets/marketing/heroBackgrounds";
@@ -14,7 +15,15 @@ function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, t } = useLanguage();
+  const { bootstrapComplete, hydrating } = useAuth();
   const [showWelcome, setShowWelcome] = useState<boolean>(false);
+  const [postOnboardingPending, setPostOnboardingPending] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('wh_post_onboarding_bootstrap_pending') === '1';
+    } catch (_e) {
+      return false;
+    }
+  });
   
   const isSpanish = language === 'es-ES' || language.startsWith('es');
   
@@ -78,6 +87,25 @@ function Home() {
     }
   }, [location.pathname, location.search, quotes.length]);
 
+  // Clear the one-time post-onboarding gate once bootstrap has finished.
+  useEffect(() => {
+    if (!bootstrapComplete) return;
+    if (!postOnboardingPending) return;
+    setPostOnboardingPending(false);
+  }, [bootstrapComplete, postOnboardingPending]);
+
+  // Keep this screen in sync with the one-time onboarding gate across fast route transitions.
+  useEffect(() => {
+    const onPending = () => setPostOnboardingPending(true);
+    const onDone = () => setPostOnboardingPending(false);
+    window.addEventListener('wh:postOnboardingBootstrapPending', onPending as EventListener);
+    window.addEventListener('wh:postOnboardingBootstrapDone', onDone as EventListener);
+    return () => {
+      window.removeEventListener('wh:postOnboardingBootstrapPending', onPending as EventListener);
+      window.removeEventListener('wh:postOnboardingBootstrapDone', onDone as EventListener);
+    };
+  }, []);
+
   // Keep the screen awake while the welcome view is visible (best-effort)
   useEffect(() => {
     if (!showWelcome) return;
@@ -135,6 +163,7 @@ function Home() {
   const topWorkspaces = useMemo(() => workspaces.slice(0, 6), [workspaces]);
 
   if (showWelcome) {
+    const isBlocked = postOnboardingPending && (hydrating || !bootstrapComplete);
     return (
       <RotatingBackground images={HERO_BACKGROUND_IMAGES} intervalMs={10_000} className="h-screen w-screen">
         {/* Dark gradient overlay for readability */}
@@ -153,11 +182,19 @@ function Home() {
           <div className="mt-8">
             <Button
               size="lg"
-              className="cursor-pointer bg-primary text-white hover:bg-primary/90"
+              className="cursor-pointer bg-primary text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-80"
+              disabled={isBlocked}
               onClick={() => navigate('/workspace/all', { replace: true })}
               cypress-id="get-started-button"
             >
-              {t('home.getStarted', 'Get Started')}
+              {isBlocked ? (
+                <span className="inline-flex items-center">
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/90 border-t-transparent" />
+                  {t('common.loading', 'Loading…')}
+                </span>
+              ) : (
+                t('home.getStarted', 'Get Started')
+              )}
             </Button>
           </div>
         </div>

@@ -42,6 +42,9 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       host: true,  // Listen on all addresses (allows access via IP)
+      // Allow tenant subdomains in local dev like `tenant.localhost`
+      // (prevents "Blocked request. This host is not allowed" in some Vite versions/configs)
+      allowedHosts: ['.localhost', 'localhost', '127.0.0.1'],
       // Use mkcert certificates if HTTPS is explicitly enabled and certificates are available
       ...(shouldUseHttps ? {
         https: {

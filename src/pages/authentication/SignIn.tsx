@@ -232,24 +232,23 @@ const SignIn: React.FC = () => {
                     <div className="absolute inset-0 bg-primary/20 rounded-[3rem] blur-2xl transform scale-105"></div>
                     
                     {/* iPhone 15 device frame */}
-                    <div className="relative">
-                      {/* The actual iPhone mockup image as background */}
-                      <div className="relative" style={{ aspectRatio: '430/878' }}>
-                        <img 
-                          src="https://mockuphone.com/images/mockup_templates/apple-iphone-15-black-portrait.png"
-                          alt="iPhone 15"
-                          className="w-full h-auto"
+                    <div className="relative w-full">
+                      {/* Screen cutout: ONLY render the photo inside the screen bounds */}
+                      <div className="absolute top-[3.4%] left-[7%] right-[7%] bottom-[3.2%] overflow-hidden rounded-[2.6rem] bg-gradient-to-br from-primary/20 to-primary/5 z-0">
+                        <img
+                          src={randomImage}
+                          alt="Task Management"
+                          className="w-full h-full object-cover"
                         />
-                        
-                        {/* Video content positioned inside the phone screen */}
-                        <div className="absolute top-[4.5%] left-[7%] right-[7%] bottom-[7%] overflow-hidden rounded-[2.8rem] bg-gradient-to-br from-primary/20 to-primary/5">
-                          <img
-                            src={randomImage}
-                            alt="Task Management"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
                       </div>
+
+                      {/* Phone frame on top */}
+                      <img
+                        src="https://mockuphone.com/images/mockup_templates/apple-iphone-15-black-portrait.png"
+                        alt="iPhone 15"
+                        className="w-full h-auto block select-none pointer-events-none relative z-10"
+                        draggable={false}
+                      />
                     </div>
                   </div>
                 </div>

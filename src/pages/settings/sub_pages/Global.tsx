@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -41,7 +41,7 @@ import {
 import { LANGUAGE_OPTIONS } from "@/config/languages";
 import { useBranding } from "@/providers/BrandingProvider";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { getCelebrationType, setCelebrationType, type CelebrationType } from "@/utils/confetti";
+import { celebrateTaskCompletion, getCelebrationType, setCelebrationType, type CelebrationType } from "@/utils/confetti";
 import { getFontStyle, setFontStyle, initFontStyle, type FontStyle } from "@/utils/fontStyle";
 
 const SIDEBAR_LIGHT = '#FAFBFC';
@@ -1381,6 +1381,10 @@ function Global() {
                   onValueChange={(value: CelebrationType) => {
                     setCelebrationType(value);
                     setCelebrationTypeState(value);
+                    // Preview the selected celebration immediately
+                    if (value !== 'none') {
+                      celebrateTaskCompletion(value);
+                    }
                   }}
                 >
                   <SelectTrigger id="celebrationType" className="w-full sm:w-[280px]">

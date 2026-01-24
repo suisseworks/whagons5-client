@@ -58,6 +58,7 @@ export function WorkspaceKpiCard({
         "bg-card/95",
         "shadow-sm hover:shadow-md transition-all duration-200",
         "border-border/60 hover:-translate-y-0.5",
+        "h-full min-h-[100px]",
         a.glow,
         onClick && "cursor-pointer"
       )}
@@ -81,23 +82,23 @@ export function WorkspaceKpiCard({
         )}
       />
 
-      <div className="relative z-10 flex items-start gap-3 px-4 py-3">
+      <div className="relative z-10 flex items-start gap-3 px-4 py-3 h-full">
         <div className="workspace-kpi-icon flex h-9 w-9 shrink-0 items-center justify-center">
           <span className={cn("kpi-icon-inner", a.icon)}>{icon}</span>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
-            {label}
-          </div>
-          <div className="text-[26px] font-semibold leading-tight text-foreground truncate">
-            {value}
-          </div>
-          {helperText ? (
-            <div className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-              {helperText}
+        <div className="min-w-0 flex-1 flex flex-col justify-between h-full">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80 truncate mb-0.5">
+              {label}
             </div>
-          ) : null}
+            <div className="text-[26px] font-semibold leading-tight text-foreground truncate">
+              {value}
+            </div>
+          </div>
+          <div className="text-[11px] text-muted-foreground/70 truncate mt-0.5 min-h-[14px]">
+            {helperText || '\u00A0'}
+          </div>
         </div>
 
         {right ? (
