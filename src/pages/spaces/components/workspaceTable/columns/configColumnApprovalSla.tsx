@@ -8,10 +8,10 @@ import { CheckCircle2, Clock, XCircle, X, Check, User, ChevronRight } from 'luci
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { actionsApi } from "@/api/whagonsActionsApi";
 import { promptForComment } from '../columnUtils/promptForComment';
 import { ColumnBuilderOptions } from './types';
 import { computeApprovalStatusForTask } from '../utils/approvalStatus';
+import { decideApprovalAndSync } from '@/store/actions/approvalDecisions';
 
 function formatSlaDuration(seconds?: number | null) {
   const secs = Number(seconds);
@@ -404,8 +404,6 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
     getUserDisplayName,
     currentUserId,
     slaMap,
-    statusMap,
-    getDoneStatusId,
   } = opts;
 
   const row = p?.data || {};
@@ -467,7 +465,7 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
       return;
     }
     try {
-      await actionsApi.post('/approvals/decide', {
+      await decideApprovalAndSync({
         task_id: p.data?.id,
         approval_id: approvalId,
         approver_user_id: approverUserIdToSend,

@@ -62,6 +62,48 @@ export class GenericCache {
 		return this.hashFields.some((f) => Object.prototype.hasOwnProperty.call(row, f));
 	}
 
+	/**
+	 * Some endpoints return an envelope like:
+	 *   { data: {...} } or { row: {...} } or { invitation: {...}, invitation_link: "..." }
+	 * This ensures we persist the actual entity row (must contain idField).
+	 */
+	private unwrapSingleEntity(payload: any): any {
+		const maxDepth = 4;
+		const seen = new Set<any>();
+
+		const find = (node: any, depth: number): any => {
+			if (!node || typeof node !== 'object') return null;
+			if (seen.has(node)) return null;
+			seen.add(node);
+
+			// If it already looks like a row (has id), keep it.
+			if (node?.[this.idField] !== undefined && node?.[this.idField] !== null) return node;
+			if (depth <= 0) return null;
+
+			// Common wrapper keys first
+			const preferredKeys = ['data', 'row', 'invitation', 'result', 'item'];
+			for (const k of preferredKeys) {
+				if (Object.prototype.hasOwnProperty.call(node, k)) {
+					const hit = find((node as any)[k], depth - 1);
+					if (hit) return hit;
+				}
+			}
+
+			// Otherwise traverse object properties (skip arrays)
+			for (const key of Object.keys(node)) {
+				const val = (node as any)[key];
+				if (!val || typeof val !== 'object') continue;
+				if (Array.isArray(val)) continue;
+				const hit = find(val, depth - 1);
+				if (hit) return hit;
+			}
+
+			return null;
+		};
+
+		return find(payload, maxDepth) ?? payload;
+	}
+
 	async add(row: any): Promise<void> {
 		if (!DB.inited) await DB.init();
 
@@ -136,7 +178,7 @@ export class GenericCache {
 		try {
 			const resp = await api.post(this.endpoint, row);
 			
-			const result = resp.data?.data ?? resp.data?.row ?? resp.data;
+			const result = this.unwrapSingleEntity(resp.data);
 			if (!result) {
 				console.error(`[GenericCache:${this.store}] createRemote: No data in response`, resp.data);
 				throw new Error(`Server response missing data for ${this.store}`);
@@ -438,6 +480,10 @@ export class GenericCache {
 					for (let i = 0; i < toRefetch.length; i += chunk) {
 						const ids = toRefetch.slice(i, i + chunk);
 						try {
+							if (!this.endpoint) {
+								this.dlog('validate: cannot refetch rows; missing endpoint', { table: this.table, store: this.store });
+								break;
+							}
 							const resp = await api.get(this.endpoint, { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
 							const rows = (resp.data?.data || resp.data?.rows) as any[];
 							if (rows?.length) {

@@ -4,14 +4,34 @@ import { getEnvVariables } from "@/lib/getEnvVariables";
 const { VITE_API_URL, VITE_CHAT_URL } = getEnvVariables();
 const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
 
-// Defaults requested (ElevenLabs TTS voices; kept here for consistency with audio UX).
-const DEFAULT_VOICE_ID_EN = "ZoiZ8fuDWInAcwPXaVeq";
-const DEFAULT_VOICE_ID_ES = "452WrNT9o8dphaYW5YGU";
-
 interface UseSpeechToTextOptions {
   conversationId: string;
   gettingResponse: boolean;
   onTranscript: (text: string) => void;
+  /**
+   * Fired when frontend VAD detects the user has started speaking.
+   * Useful for "barge-in" interruption: stop TTS + cancel streaming response.
+   */
+  onSpeechStart?: () => void;
+  /**
+   * Fired when frontend VAD detects the user has stopped speaking.
+   */
+  onSpeechEnd?: () => void;
+  /**
+   * Frontend VAD config (lightweight RMS-based).
+   * This is independent of server-side STT VAD (commit_strategy=vad).
+   */
+  vad?: {
+    enabled?: boolean;
+    /** Start talking threshold on raw RMS (0..1). */
+    startThreshold?: number;
+    /** Stop talking threshold on raw RMS (0..1). */
+    stopThreshold?: number;
+    /** Require this many ms above startThreshold before firing onSpeechStart. */
+    minSpeechMs?: number;
+    /** Require this many ms below stopThreshold before firing onSpeechEnd. */
+    hangoverMs?: number;
+  };
   /**
    * Two-letter language code (e.g., "en", "es") derived from the app's language setting.
    * If omitted, falls back to browser language detection.
@@ -27,6 +47,9 @@ export function useSpeechToText({
   conversationId,
   gettingResponse,
   onTranscript,
+  onSpeechStart,
+  onSpeechEnd,
+  vad,
   languageCode,
 }: UseSpeechToTextOptions) {
   const [isListening, setIsListening] = useState<boolean>(false);
@@ -35,9 +58,13 @@ export function useSpeechToText({
   const voiceLevelRef = useRef<number>(0);
   const lastLevelUpdateRef = useRef<number>(0);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [isUserSpeaking, setIsUserSpeaking] = useState<boolean>(false);
   
   // Store callback in ref so it can be updated without recreating the hook
   const onTranscriptRef = useRef(onTranscript);
+  const onSpeechStartRef = useRef(onSpeechStart);
+  const onSpeechEndRef = useRef(onSpeechEnd);
+  const vadRef = useRef(vad);
   
   // Audio processing refs
   const sttWsRef = useRef<WebSocket | null>(null);
@@ -55,6 +82,18 @@ export function useSpeechToText({
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
+
+  useEffect(() => {
+    onSpeechStartRef.current = onSpeechStart;
+  }, [onSpeechStart]);
+
+  useEffect(() => {
+    onSpeechEndRef.current = onSpeechEnd;
+  }, [onSpeechEnd]);
+
+  useEffect(() => {
+    vadRef.current = vad;
+  }, [vad]);
 
   // Keep a ref in sync so audio callbacks don't capture stale state.
   useEffect(() => {
@@ -77,6 +116,7 @@ export function useSpeechToText({
     isListeningRef.current = false;
     setVoiceLevel(0);
     voiceLevelRef.current = 0;
+    setIsUserSpeaking(false);
     setMediaRecorder(null);
 
     const ws = sttWsRef.current;
@@ -121,6 +161,7 @@ export function useSpeechToText({
       stopListening();
       setIsListening(true);
       isListeningRef.current = true;
+      setIsUserSpeaking(false);
 
       const wsBase = getSttWsBase();
       const lang =
@@ -129,9 +170,6 @@ export function useSpeechToText({
           : (navigator.language || "en").toLowerCase().startsWith("es")
             ? "es"
             : "en";
-      // keep requested defaults (currently unused in STT, but ensures we persist your chosen defaults for future TTS)
-      const _defaultVoiceId = lang === "es" ? DEFAULT_VOICE_ID_ES : DEFAULT_VOICE_ID_EN;
-      void _defaultVoiceId;
 
       const sttUrl =
         `${wsBase}/api/v1/stt/ws/${encodeURIComponent(conversationId)}` +
@@ -199,7 +237,14 @@ export function useSpeechToText({
 
       ws.onopen = async () => {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Use built-in WebRTC audio processing. This is the "good" AEC most apps rely on.
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
           sttStreamRef.current = stream;
 
           // Create a MediaRecorder purely for visualization. (We don't persist audio blobs.)
@@ -232,6 +277,12 @@ export function useSpeechToText({
 
           const targetSampleRate = 16000;
           let sentChunks = 0;
+          // Lightweight frontend VAD (RMS-based) for "barge-in" interruption.
+          const vadState = {
+            speaking: false,
+            aboveSince: 0,
+            belowSince: 0,
+          };
           processor.onaudioprocess = (event) => {
             const socket = sttWsRef.current;
             if (!socket || socket.readyState !== WebSocket.OPEN) return;
@@ -254,6 +305,42 @@ export function useSpeechToText({
             if (nowMs - lastLevelUpdateRef.current > 50) { // ~20fps
               lastLevelUpdateRef.current = nowMs;
               setVoiceLevel(smoothed);
+            }
+
+            // Frontend VAD state machine (uses raw RMS, not the boosted UI value).
+            const cfg = vadRef.current || {};
+            const enabled = cfg.enabled !== false;
+            if (enabled) {
+              const startTh = Number.isFinite(cfg.startThreshold) ? (cfg.startThreshold as number) : 0.02;
+              const stopTh = Number.isFinite(cfg.stopThreshold) ? (cfg.stopThreshold as number) : 0.012;
+              const minSpeechMs = Number.isFinite(cfg.minSpeechMs) ? (cfg.minSpeechMs as number) : 160;
+              const hangoverMs = Number.isFinite(cfg.hangoverMs) ? (cfg.hangoverMs as number) : 350;
+
+              if (!vadState.speaking) {
+                if (rms >= startTh) {
+                  if (!vadState.aboveSince) vadState.aboveSince = nowMs;
+                  if (nowMs - vadState.aboveSince >= minSpeechMs) {
+                    vadState.speaking = true;
+                    vadState.belowSince = 0;
+                    setIsUserSpeaking(true);
+                    try { onSpeechStartRef.current?.(); } catch {}
+                  }
+                } else {
+                  vadState.aboveSince = 0;
+                }
+              } else {
+                if (rms <= stopTh) {
+                  if (!vadState.belowSince) vadState.belowSince = nowMs;
+                  if (nowMs - vadState.belowSince >= hangoverMs) {
+                    vadState.speaking = false;
+                    vadState.aboveSince = 0;
+                    setIsUserSpeaking(false);
+                    try { onSpeechEndRef.current?.(); } catch {}
+                  }
+                } else {
+                  vadState.belowSince = 0;
+                }
+              }
             }
 
             const pcm16 = floatTo16BitPCM(resampleFloat32(input, audioCtx.sampleRate, targetSampleRate));
@@ -323,6 +410,7 @@ export function useSpeechToText({
     stopListening,
     voiceLevel,
     mediaRecorder,
+    isUserSpeaking,
   };
 }
 

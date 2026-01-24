@@ -61,7 +61,7 @@ export class RealTimeListener {
    * Get the WebSocket URL for connection
    */
   private getWebSocketUrl(): string {
-    const { VITE_API_URL, VITE_DEVELOPMENT } = getEnvVariables();
+    const { VITE_API_URL, VITE_DEVELOPMENT, VITE_RTE_DOMAIN } = getEnvVariables();
     const subdomain = this.getSubdomain();
     const token = this.getStoredToken();
     
@@ -81,7 +81,16 @@ export class RealTimeListener {
     
     // WebSocket uses ws:// or wss:// protocol
     const protocol = VITE_DEVELOPMENT === 'true' ? 'ws' : 'wss';
-    const host = VITE_DEVELOPMENT === 'true' ? 'localhost:8082' : domain;
+    // Allow explicit RTE host override (primarily for production)
+    // Accept either "rte.example.com" or "https://rte.example.com" (protocol will be ignored)
+    const normalizedRteHost = typeof VITE_RTE_DOMAIN === 'string' && VITE_RTE_DOMAIN.trim()
+      ? VITE_RTE_DOMAIN.trim().replace(/^(wss?:\/\/|https?:\/\/)/, '')
+      : '';
+
+    const host =
+      VITE_DEVELOPMENT === 'true'
+        ? 'localhost:8082'
+        : (normalizedRteHost || domain);
     
     const wsUrl = `${protocol}://${host}/ws?domain=${encodeURIComponent(domain)}&token=${encodeURIComponent(token)}`;
     
@@ -89,6 +98,7 @@ export class RealTimeListener {
     this.debugLog('WebSocket URL construction:', {
       VITE_API_URL,
       VITE_DEVELOPMENT,
+      VITE_RTE_DOMAIN,
       rawSubdomain: subdomain,
       cleanSubdomain,
       apiUrlWithoutPort,
@@ -124,12 +134,18 @@ export class RealTimeListener {
    * Check if WebSocket server is available
    */
   async checkServerAvailability(): Promise<boolean> {
-    const { VITE_DEVELOPMENT } = getEnvVariables();
+    const { VITE_DEVELOPMENT, VITE_RTE_DOMAIN } = getEnvVariables();
     
     if (VITE_DEVELOPMENT === 'true') {
       // In development, check if localhost:8082 is accessible
       try {
-        const response = await fetch('http://localhost:8082/api/health', { 
+        // (Dev-only) allow overriding the health-check host too
+        const normalizedRteHost = typeof VITE_RTE_DOMAIN === 'string' && VITE_RTE_DOMAIN.trim()
+          ? VITE_RTE_DOMAIN.trim().replace(/^(wss?:\/\/|https?:\/\/)/, '')
+          : '';
+        const healthHost = normalizedRteHost || 'localhost:8082';
+
+        const response = await fetch(`http://${healthHost}/api/health`, { 
           method: 'GET',
           mode: 'no-cors' // Allow connection even if CORS isn't configured
         });
@@ -137,7 +153,7 @@ export class RealTimeListener {
         return true;
       } catch (error) {
         this.debugLog('Server health check failed:', error);
-        console.warn('⚠️  WebSocket server appears to be offline at localhost:8082');
+        console.warn('⚠️  WebSocket server appears to be offline (development health-check failed)');
         console.warn('💡 Make sure your WebSocket server is running before connecting');
         return false;
       }

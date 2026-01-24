@@ -832,7 +832,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
   return (
     <div className="h-full w-full p-4 pt-0 flex flex-col items-center">
-      <div className="w-full max-w-2xl flex flex-col h-full">
+      <div className="w-full max-w-6xl flex flex-col h-full">
         <div className="mb-3 flex-shrink-0">
           <h1 className="text-xl font-bold text-foreground">{t('workspace.settings.workspaceSettings', 'Workspace Settings')}</h1>
         </div>

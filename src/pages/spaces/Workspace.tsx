@@ -1,28 +1,20 @@
-import React, { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useRef, useMemo, useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { ClipboardList, Settings, MessageSquare, FolderPlus, Calendar, Clock, LayoutDashboard, X, Map as MapIcon, CheckCircle2, UserRound, CalendarDays, Flag, BarChart3, Activity, Sparkles, TrendingUp, Trash2, GripVertical } from 'lucide-react';
+import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2 } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
-  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
-import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { TabsTrigger } from '@/animated/Tabs';
-import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
-import SettingsComponent from '@/pages/spaces/components/Settings';
+import { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import ChatTab from '@/pages/spaces/components/ChatTab';
 import ResourcesTab from '@/pages/spaces/components/ResourcesTab';
-import CalendarViewTab from '@/pages/spaces/components/CalendarViewTab';
-import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
-import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
-import MapViewTab from '@/pages/spaces/components/MapViewTab';
-import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/store';
 import {
@@ -30,572 +22,152 @@ import {
   setSearchText,
   setGroupBy,
   setCollapseGroups,
-  setPresets,
   selectSearchText,
   selectGroupBy,
   selectCollapseGroups,
 } from '@/store/reducers/uiStateSlice';
 import { Button } from '@/components/ui/button';
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
-import { motion } from 'motion/react';
-import { TAB_ANIMATION, getWorkspaceTabInitialX } from '@/config/tabAnimation';
+import { TAB_ANIMATION, getTabInitialX, type TabAnimationConfig } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
-import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/utils/filterPresets';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { removeTaskAsync } from '@/store/reducers/tasksSlice';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
-import toast from 'react-hot-toast';
-import type { AppDispatch } from '@/store/store';
 import { WorkspaceKpiCard } from '@/pages/spaces/components/WorkspaceKpiCard';
-
-const WORKSPACE_TAB_PATHS = {
-  grid: '',
-  calendar: '/calendar',
-  scheduler: '/scheduler',
-  map: '/map',
-  board: '/board',
-  settings: '/settings',
-  statistics: '/statistics'
-} as const;
-
-type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
-const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'statistics', 'settings'];
-const FIXED_TABS: WorkspaceTabKey[] = ['statistics', 'settings']; // Tabs that cannot be reordered
-
-// Sortable tab wrapper component
-interface SortableTabProps {
-  id: string;
-  children: React.ReactNode;
-  isDragging: boolean;
-  disabled?: boolean;
-}
-
-const SortableTab: React.FC<SortableTabProps> = ({ id, children, isDragging, disabled }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging: isThisTabDragging,
-  } = useSortable({ id, disabled });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isThisTabDragging ? 0.5 : 1,
-    cursor: disabled ? 'default' : 'grab',
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...(disabled ? {} : listeners)}
-      className="relative"
-    >
-      {!disabled && (
-        <GripVertical 
-          className="absolute left-1 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/40 pointer-events-none" 
-          strokeWidth={2}
-        />
-      )}
-      {children}
-    </div>
-  );
-};
+import { useWorkspaceRouting } from './workspace/hooks/useWorkspaceRouting';
+import { useWorkspaceTabOrder } from './workspace/hooks/useWorkspaceTabOrder';
+import { useWorkspaceDisplayOptions } from './workspace/hooks/useWorkspaceDisplayOptions';
+import { useWorkspaceTabState } from './workspace/hooks/useWorkspaceTabState';
+import { useWorkspaceStats } from './workspace/hooks/useWorkspaceStats';
+import { useWorkspaceKpiCards } from './workspace/hooks/useWorkspaceKpiCards';
+import { useWorkspaceTaskActions } from './workspace/hooks/useWorkspaceTaskActions';
+import { useWorkspaceRightPanel } from './workspace/hooks/useWorkspaceRightPanel';
+import { useWorkspaceFilters } from './workspace/hooks/useWorkspaceFilters';
+import { useWorkspaceDragDrop } from './workspace/hooks/useWorkspaceDragDrop';
+import { useWorkspaceTaskDialog } from './workspace/hooks/useWorkspaceTaskDialog';
+import { useWorkspaceRowDensity } from './workspace/hooks/useWorkspaceRowDensity';
+import { createWorkspaceTabs } from './workspace/utils/workspaceTabs';
+import { SortableTab } from './workspace/components/SortableTab';
+import { SortableKpiCard } from './workspace/components/SortableKpiCard';
+import { WORKSPACE_TAB_PATHS, ALWAYS_VISIBLE_TABS, FIXED_TABS, type WorkspaceTabKey } from './workspace/constants';
 
 export const Workspace = () => {
   const { t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useDispatch();
   const location = useLocation();
-  const navigate = useNavigate();
 
-  // Extract workspace ID from the current path
-  const getWorkspaceIdFromPath = (pathname: string): string | undefined => {
-    const match = pathname.match(/\/workspace\/([^/?]+)/);
-    return match ? match[1] : undefined;
-  };
+  // Routing
+  const routing = useWorkspaceRouting(location);
+  const { id, workspaceBasePath, isAllWorkspaces, workspaceIdNum, invalidWorkspaceRoute, invalidWorkspaceId } = routing;
+  const workspaceKey = id || 'all';
 
-  const id = getWorkspaceIdFromPath(location.pathname);
-  const workspaceBasePath = `/workspace/${id || 'all'}`.replace(/\/+$/, '');
-  const isAllWorkspaces = location.pathname === '/workspace/all' || id === 'all';
+  // Tab order and state
+  const { customTabOrder, setCustomTabOrder, resolvedOrder, primaryTabValue } = useWorkspaceTabOrder(workspaceKey);
+  const { activeTab, setActiveTab, prevActiveTab, setPrevActiveTab } = useWorkspaceTabState({
+    location,
+    workspaceBasePath,
+    invalidWorkspaceRoute,
+    invalidWorkspaceId,
+    resolvedOrder,
+  });
 
-  // Get taskId from URL query parameters
-  const searchParams = new URLSearchParams(location.search);
-  const taskIdFromUrl = searchParams.get('taskId');
-  
-  // Helper function to get current tab from URL (matches UrlTabs logic)
-  const getCurrentTabFromUrl = (): WorkspaceTabKey => {
-    const normalizedBase = workspaceBasePath;
-    if (location.pathname.startsWith(normalizedBase)) {
-      const rest = location.pathname.slice(normalizedBase.length) || '';
-      const entries = Object.entries(WORKSPACE_TAB_PATHS) as Array<[WorkspaceTabKey, string]>;
-      entries.sort((a, b) => (b[1].length || 0) - (a[1].length || 0));
-      for (const [key, value] of entries) {
-        const val = value || '';
-        if (val === '' && (rest === '' || rest === '/')) {
-          return key;
-        } else if (rest === val || rest.replace(/\/$/, '') === val.replace(/\/$/, '') || rest.startsWith(val.endsWith('/') ? val : `${val}/`)) {
-          return key;
-        }
-      }
-    }
-    return 'grid';
-  };
+  // Display options
+  const { showHeaderKpis, tagDisplayMode, visibleTabs } = useWorkspaceDisplayOptions(workspaceKey);
+  const { computedRowHeight } = useWorkspaceRowDensity();
 
-  // Initialize tab state from URL to prevent incorrect animation on mount
-  const initialTab = getCurrentTabFromUrl();
-  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>(initialTab);
-  const [prevActiveTab, setPrevActiveTab] = useState<WorkspaceTabKey>(initialTab);
-
+  // Refs
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const tableRef = useRef<WorkspaceTableHandle | null>(null);
 
-  // Redux UI state selectors
+  // Redux UI state
   const searchText = useSelector(selectSearchText);
   const groupBy = useSelector(selectGroupBy);
   const collapseGroups = useSelector(selectCollapseGroups);
+  const currentUser = useSelector((s: RootState) => (s as any).auth?.user);
+  const currentUserId = Number((currentUser as any)?.id);
 
-  // Custom tab order state (persisted per workspace)
-  // Ensure 'grid' (tasks) is always first
-  const [customTabOrder, setCustomTabOrder] = useState<WorkspaceTabKey[]>(() => {
-    try {
-      const key = `wh_workspace_tab_order_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-          const order = parsed as WorkspaceTabKey[];
-          // Ensure 'grid' is always first
-          if (order[0] !== 'grid') {
-            const filtered = order.filter(tab => tab !== 'grid');
-            return ['grid', ...filtered] as WorkspaceTabKey[];
-          }
-          return order;
-        }
-      }
-    } catch {}
-    return DEFAULT_TAB_SEQUENCE;
-  });
-
-  // Update custom tab order when workspace changes
-  // Ensure 'grid' (tasks) is always first
-  useEffect(() => {
-    try {
-      const key = `wh_workspace_tab_order_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-          const order = parsed as WorkspaceTabKey[];
-          // Ensure 'grid' is always first
-          if (order[0] !== 'grid') {
-            const filtered = order.filter(tab => tab !== 'grid');
-            setCustomTabOrder(['grid', ...filtered] as WorkspaceTabKey[]);
-          } else {
-            setCustomTabOrder(order);
-          }
-          return;
-        }
-      }
-    } catch {}
-    setCustomTabOrder(DEFAULT_TAB_SEQUENCE);
-  }, [id]);
-
-  // Save custom tab order to localStorage
-  useEffect(() => {
-    try {
-      const key = `wh_workspace_tab_order_${id || 'all'}`;
-      localStorage.setItem(key, JSON.stringify(customTabOrder));
-    } catch {}
-  }, [customTabOrder, id]);
-
-  const allowedTabOrder = customTabOrder;
-  const resolvedOrder = useMemo(() => buildTabSequence(allowedTabOrder), [allowedTabOrder]);
-  const primaryTabValue = resolvedOrder[0] || 'grid';
-  const invalidWorkspaceRoute = !id && !isAllWorkspaces;
-  const invalidWorkspaceId = !isAllWorkspaces && id !== undefined && isNaN(Number(id));
-
-  // Save active tab to localStorage when it changes (but not on initial mount)
-  const isInitialMountRef = useRef(true);
-  useEffect(() => {
-    // Skip saving on initial mount
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      return;
-    }
-    
-    // Don't save if we're on an invalid workspace
-    if (invalidWorkspaceRoute || invalidWorkspaceId) return;
-    
-    try {
-      const key = `wh_workspace_last_tab_${id || 'all'}`;
-      localStorage.setItem(key, activeTab);
-      console.log(`[Workspace] Saved last tab for workspace ${id || 'all'}:`, activeTab);
-    } catch (error) {
-      console.error('[Workspace] Error saving last tab:', error);
-    }
-  }, [activeTab, id, invalidWorkspaceRoute, invalidWorkspaceId]);
-  
-  // Track previous workspace ID to detect workspace changes
-  const prevWorkspaceIdRef = useRef<string | undefined>(undefined);
-  
-  // Restore last tab when navigating to a workspace (only on workspace change)
-  useEffect(() => {
-    // Skip if we're on an invalid workspace
-    if (invalidWorkspaceRoute || invalidWorkspaceId) return;
-    
-    // Only restore on workspace change (not on every render)
-    const workspaceChanged = prevWorkspaceIdRef.current !== id;
-    prevWorkspaceIdRef.current = id;
-    
-    if (!workspaceChanged) return;
-    
-    const workspaceKey = id || 'all';
-    
-    try {
-      const key = `wh_workspace_last_tab_${workspaceKey}`;
-      const savedTab = localStorage.getItem(key);
-      
-      console.log(`[Workspace] Workspace changed to ${workspaceKey}, checking saved tab:`, savedTab);
-      
-      // Only restore if we have a saved tab and it's valid
-      if (savedTab && Object.keys(WORKSPACE_TAB_PATHS).includes(savedTab)) {
-        const currentTab = getCurrentTabFromUrl();
-        const currentPath = location.pathname;
-        
-        // Only restore if we're on the workspace root (grid tab) or navigating directly to workspace
-        const isExactWorkspaceRoot = currentPath === workspaceBasePath || 
-                                      currentPath === `${workspaceBasePath}/` || 
-                                      currentPath === `${workspaceBasePath}${WORKSPACE_TAB_PATHS.grid}`;
-        
-        console.log(`[Workspace] Current tab: ${currentTab}, Saved tab: ${savedTab}, isExactRoot: ${isExactWorkspaceRoot}`);
-        
-        if (savedTab !== 'grid' && isExactWorkspaceRoot) {
-          const savedTabPath = WORKSPACE_TAB_PATHS[savedTab as WorkspaceTabKey];
-          const targetPath = `${workspaceBasePath}${savedTabPath}`;
-          console.log(`[Workspace] Restoring last tab for workspace ${workspaceKey}:`, savedTab, '→', targetPath);
-          
-          // Use setTimeout to ensure this happens after the component is fully mounted
-          setTimeout(() => {
-            navigate(targetPath, { replace: true });
-          }, 0);
-        } else if (savedTab === 'grid' && !isExactWorkspaceRoot) {
-          // If saved tab is grid but we're not on the root, navigate to root
-          console.log(`[Workspace] Navigating to root for workspace ${workspaceKey}`);
-          setTimeout(() => {
-            navigate(workspaceBasePath, { replace: true });
-          }, 0);
-        }
-      }
-    } catch (error) {
-      console.error('[Workspace] Error restoring last tab:', error);
-    }
-  }, [id, navigate, workspaceBasePath, location.pathname, invalidWorkspaceRoute, invalidWorkspaceId]);
-
-  // Drag and drop state
-  const [isDraggingTab, setIsDraggingTab] = useState(false);
-  
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // Require 8px movement before drag starts
-      },
-    })
-  );
-
-  // Handle drag start
-  const handleDragStart = (event: DragStartEvent) => {
-    setIsDraggingTab(true);
-  };
-
-  // Handle drag end (reorder tabs)
-  const handleDragEnd = (event: DragEndEvent) => {
-    setIsDraggingTab(false);
-    const { active, over } = event;
-
-    if (!over || active.id === over.id) return;
-
-    // Prevent moving 'grid' (tasks) tab - it must always stay first
-    if (active.id === 'grid') {
-      return;
-    }
-
-    // Get draggable tabs (exclude fixed tabs and grid)
-    const draggableTabs = customTabOrder.filter(tab => !FIXED_TABS.includes(tab) && tab !== 'grid');
-    const oldIndex = draggableTabs.findIndex(tab => tab === active.id);
-    const newIndex = draggableTabs.findIndex(tab => tab === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    // Reorder draggable tabs (excluding grid)
-    const reorderedDraggable = arrayMove(draggableTabs, oldIndex, newIndex);
-    
-    // Rebuild full order with 'grid' always first, then reordered tabs, then fixed tabs at the end
-    const newOrder = ['grid', ...reorderedDraggable, ...FIXED_TABS];
-    setCustomTabOrder(newOrder);
-  };
-  const [showClearFilters, setShowClearFilters] = useState(false);
-  const [openCreateTask, setOpenCreateTask] = useState(false);
-  const [openEditTask, setOpenEditTask] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<any | null>(null);
-  const [rightPanel, setRightPanel] = useState<'chat' | 'resources' | null>(null);
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('wh_workspace_right_panel_w');
-      return saved ? Math.max(280, Math.min(640, parseInt(saved, 10))) : 384; // default 384px (w-96)
-    } catch {
-      return 384;
-    }
-  });
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeStartX, setResizeStartX] = useState<number | null>(null);
-  const [resizeStartWidth, setResizeStartWidth] = useState<number | null>(null);
-  const toggleRightPanel = (panel: 'chat' | 'resources') => {
-    setRightPanel((prev) => (prev === panel ? null : panel));
-  };
-
-  // Display options - workspace-specific
-  const [showHeaderKpis, setShowHeaderKpis] = useState<boolean>(() => {
-    try {
-      const key = `wh_workspace_show_kpis_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      return saved == null ? true : saved === 'true';
-    } catch { return true; }
-  });
-  const [tagDisplayMode, setTagDisplayMode] = useState<'icon' | 'icon-text'>(() => {
-    try {
-      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      return (saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text';
-    } catch { return 'icon-text'; }
-  });
-  const [visibleTabs, setVisibleTabs] = useState<string[]>(() => {
-    const defaultTabs = ['grid', 'calendar', 'scheduler', 'map', 'board'];
-    try {
-      const key = `wh_workspace_visible_tabs_${id || 'all'}`;
-      const raw = localStorage.getItem(key);
-      if (!raw) return defaultTabs;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        // Always ensure grid is included
-        return Array.from(new Set(['grid', ...parsed]));
-      }
-    } catch {
-      // ignore
-    }
-    return defaultTabs;
-  });
-  useEffect(() => {
-    // Update when workspace changes
-    try {
-      const key = `wh_workspace_show_kpis_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      setShowHeaderKpis(saved == null ? true : saved === 'true');
-    } catch {}
-    try {
-      const key = `wh_workspace_tag_display_mode_${id || 'all'}`;
-      const saved = localStorage.getItem(key);
-      setTagDisplayMode((saved === 'icon' || saved === 'icon-text') ? saved : 'icon-text');
-    } catch {}
-    try {
-      const key = `wh_workspace_visible_tabs_${id || 'all'}`;
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-          setVisibleTabs(Array.from(new Set(['grid', ...parsed])));
-        }
-      } else {
-        setVisibleTabs(['grid', 'calendar', 'scheduler', 'map', 'board']);
-      }
-    } catch {}
-  }, [id]);
-  useEffect(() => {
-    const handler = (e: any) => {
-      const eventWorkspaceId = e?.detail?.workspaceId || 'all';
-      const currentWorkspaceId = id || 'all';
-      // Only update if the event is for the current workspace
-      if (eventWorkspaceId === currentWorkspaceId) {
-        const v = e?.detail?.showKpis;
-        if (typeof v === 'boolean') setShowHeaderKpis(v);
-        const tagMode = e?.detail?.tagDisplayMode;
-        if (tagMode === 'icon' || tagMode === 'icon-text') setTagDisplayMode(tagMode);
-      }
-    };
-    window.addEventListener('wh:displayOptionsChanged', handler as any);
-    return () => window.removeEventListener('wh:displayOptionsChanged', handler as any);
-  }, [id]);
-  useEffect(() => {
-    const handler = (e: any) => {
-      const eventWorkspaceId = e?.detail?.workspaceId || 'all';
-      const currentWorkspaceId = id || 'all';
-      // Only update if the event is for the current workspace
-      if (eventWorkspaceId === currentWorkspaceId) {
-        const tabs = e?.detail?.visibleTabs;
-        if (Array.isArray(tabs) && tabs.every((x) => typeof x === 'string')) {
-          setVisibleTabs(Array.from(new Set(['grid', ...tabs])));
-        }
-      }
-    };
-    window.addEventListener('wh:workspaceTabsChanged', handler as any);
-    return () => window.removeEventListener('wh:workspaceTabsChanged', handler as any);
-  }, [id]);
-
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('wh_workspace_right_panel_w', String(rightPanelWidth));
-    } catch {}
-  }, [rightPanelWidth]);
-
-  useEffect(() => {
-    if (!isResizing) return;
-    const handleMove = (e: MouseEvent) => {
-      if (resizeStartX == null || resizeStartWidth == null) return;
-      const dx = resizeStartX - e.clientX; // moving left increases width
-      const next = Math.max(280, Math.min(640, resizeStartWidth + dx));
-      setRightPanelWidth(next);
-      e.preventDefault();
-    };
-    const handleUp = () => {
-      setIsResizing(false);
-      setResizeStartX(null);
-      setResizeStartWidth(null);
-    };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, [isResizing, resizeStartX, resizeStartWidth]);
-
-
-  // Row density (affects grid row height)
-  const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
-    try {
-      return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
-    } catch { return 'compact'; }
-  });
-  const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 68 : 110;
-  useEffect(() => {
-    try { localStorage.setItem('wh_workspace_density', rowDensity); } catch {}
-  }, [rowDensity]);
-  // Listen for external density changes (from Settings screen)
-  useEffect(() => {
-    const handler = (e: any) => {
-      const v = e?.detail as any;
-      if (v === 'compact' || v === 'comfortable' || v === 'spacious') setRowDensity(v);
-    };
-    window.addEventListener('wh:rowDensityChanged', handler);
-    return () => window.removeEventListener('wh:rowDensityChanged', handler);
-  }, []);
-
-  // Handle opening task from URL parameter (from notifications)
-  useEffect(() => {
-    if (!taskIdFromUrl) return;
-
-    // Fetch task from cache and open dialog
-    (async () => {
-      try {
-        if (!TasksCache.initialized) await TasksCache.init();
-        
-        const taskId = Number(taskIdFromUrl);
-        if (!Number.isFinite(taskId)) return;
-
-        const task = await TasksCache.getTask(String(taskId));
-        if (task) {
-          setSelectedTask(task);
-          setOpenEditTask(true);
-
-          // Remove taskId from URL to prevent reopening on refresh
-          const newSearchParams = new URLSearchParams(location.search);
-          newSearchParams.delete('taskId');
-          const newSearch = newSearchParams.toString();
-          const newUrl = location.pathname + (newSearch ? `?${newSearch}` : '');
-          navigate(newUrl, { replace: true });
-        }
-      } catch (error) {
-        console.error('Failed to open task from URL:', error);
-      }
-    })();
-  }, [taskIdFromUrl, location.pathname, location.search, navigate]);
-
-  // Selected tasks (for bulk actions)
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  // Delete dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
-  // Handle delete of selected tasks
-  const handleDeleteSelected = async () => {
-    if (selectedIds.length === 0) return;
-    
-    setDeleteDialogOpen(false);
-    const taskCount = selectedIds.length;
-    const taskIds = [...selectedIds];
-    
-    // Clear selection immediately
-    setSelectedIds([]);
-    tableRef.current?.clearSelection?.();
-    
-    // Delete all selected tasks (normalize results so typing stays consistent)
-    const results = await Promise.all(
-      taskIds.map(async (taskId) => {
-        try {
-          await dispatch(removeTaskAsync(taskId)).unwrap();
-          return { taskId, ok: true as const };
-        } catch (error: any) {
-          const status = error?.response?.status || error?.status;
-          // Only log non-403 errors (403 errors are handled by API interceptor)
-          if (status !== 403) {
-            console.error(`Failed to delete task ${taskId}:`, error);
-          }
-          return { taskId, ok: false as const, error };
-        }
-      })
-    );
-
-    const succeeded = results.filter((r) => r.ok);
-    const failed = results.filter((r) => !r.ok);
-    // Filter out 403 errors (already handled by API interceptor)
-    const failedNon403 = failed.filter((r) => {
-      const status = r.error?.response?.status || r.error?.status;
-      return status !== 403;
-    });
-    
-    if (succeeded.length > 0) {
-      toast.success(
-        succeeded.length === taskCount
-          ? `Deleted ${succeeded.length} task${succeeded.length > 1 ? 's' : ''}`
-          : `Deleted ${succeeded.length} of ${taskCount} task${taskCount > 1 ? 's' : ''}`,
-        { duration: 5000 }
-      );
-    }
-    
-    // Only show toast for non-403 errors (403 errors already shown by API interceptor)
-    if (failedNon403.length > 0) {
-      toast.error(
-        `Failed to delete ${failedNon403.length} task${failedNon403.length > 1 ? 's' : ''}`,
-        { duration: 5000 }
-      );
-    }
-  };
-  
   // Metadata for filters
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const users = useSelector((s: RootState) => (s as any).users.value as any[]);
   const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
-  const currentUser = useSelector((s: RootState) => (s as any).auth?.user);
+
+  // Derived status groupings for stats
+  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
+    ?? (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
+    ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
+  const workingStatusIds: number[] = (statuses || [])
+    .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
+    .map((s: any) => Number((s as any).id))
+    .filter((n: number) => Number.isFinite(n));
+
+  // Stats
+  const stats = useWorkspaceStats({
+    workspaceId: id,
+    isAllWorkspaces,
+    doneStatusId,
+    workingStatusIds,
+  });
+
+  // KPI Cards
+  const {
+    headerKpiCards,
+    setHeaderKpiCards,
+    headerCards,
+    canReorderHeaderKpis
+  } = useWorkspaceKpiCards({
+    workspaceIdNum,
+    currentUserId,
+    doneStatusId,
+    stats,
+  });
+
+  // Task actions
+  const {
+    selectedIds,
+    setSelectedIds,
+    deleteDialogOpen,
+    setDeleteDialogOpen,
+    handleDeleteSelected
+  } = useWorkspaceTaskActions();
+
+  // Right panel
+  const { rightPanel, setRightPanel, rightPanelWidth, isResizing, toggleRightPanel, startResize } = useWorkspaceRightPanel();
+
+  // Filters
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { handleTableReady } = useWorkspaceFilters({
+    workspaceKey,
+    currentUser,
+    filtersOpen,
+    tableRef,
+  });
+
+  // Task dialog
+  const { openCreateTask, setOpenCreateTask, openEditTask, setOpenEditTask, selectedTask, handleOpenTaskDialog } = useWorkspaceTaskDialog();
+
+  // Drag and drop
+  const { activeKpiId, handleDragStart, handleDragEnd, handleKpiDragStart, handleKpiDragEnd } = useWorkspaceDragDrop({
+    customTabOrder,
+    setCustomTabOrder,
+    headerKpiCards,
+    setHeaderKpiCards,
+  });
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+  const kpiSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
   // Load groupBy and collapseGroups from localStorage when workspace changes
   useEffect(() => {
     if (!id && !isAllWorkspaces) return;
@@ -614,33 +186,7 @@ export const Workspace = () => {
     } catch {}
   }, [id, isAllWorkspaces, dispatch]);
 
-  // Listen for filter apply events from Header component
-  useEffect(() => {
-    const handleFilterApply = (event: CustomEvent<{ filterModel: any; clearSearch?: boolean }>) => {
-      if (tableRef.current) {
-        const filterModel = event.detail.filterModel || null;
-        tableRef.current.setFilterModel(filterModel);
-        dispatch(setFilterModel(filterModel));
-        const key = `wh_workspace_filters_${id || 'all'}`;
-        try {
-          if (filterModel) {
-            localStorage.setItem(key, JSON.stringify(filterModel));
-          } else {
-            localStorage.removeItem(key);
-          }
-        } catch {}
-        if (event.detail.clearSearch) {
-          dispatch(setSearchText(''));
-        }
-      }
-    };
-    window.addEventListener('workspace-filter-apply', handleFilterApply as EventListener);
-    return () => {
-      window.removeEventListener('workspace-filter-apply', handleFilterApply as EventListener);
-    };
-  }, [id, dispatch]);
-
-  // Listen for filter dialog open events from Header component
+  // Listen for filter dialog open events
   useEffect(() => {
     const handleFilterDialogOpen = () => {
       setFiltersOpen(true);
@@ -651,195 +197,12 @@ export const Workspace = () => {
     };
   }, []);
 
-  // Derived status groupings for stats
-  const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
-    ?? (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'DONE')?.id
-    ?? (statuses || []).find((s: any) => String((s as any).name || '').toLowerCase().includes('done'))?.id;
-  const workingStatusIds: number[] = (statuses || [])
-    .filter((s: any) => String((s as any).action || '').toUpperCase() === 'WORKING')
-    .map((s: any) => Number((s as any).id))
-    .filter((n: number) => Number.isFinite(n));
-
-  // Header stats
-  const [stats, setStats] = useState<{ total: number; inProgress: number; completedToday: number; trend: number[]; loading: boolean }>({
-    total: 0,
-    inProgress: 0,
-    completedToday: 0,
-    trend: [],
-    loading: true
-  });
-  const isInitialLoadRef = useRef(true);
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        // Only set loading state on initial load, preserve values during updates
-        if (isInitialLoadRef.current) {
-          setStats((s) => ({ ...s, loading: true }));
-        }
-        if (!TasksCache.initialized) {
-          await TasksCache.init();
-        }
-        const base: any = {};
-        const ws = isAllWorkspaces ? undefined : id;
-        if (ws) base.workspace_id = ws;
-
-        const totalResp = await TasksCache.queryTasks({ ...base, startRow: 0, endRow: 0 });
-        const total = totalResp?.rowCount ?? 0;
-
-        let inProgress = 0;
-        if (workingStatusIds.length > 0) {
-          for (const sid of workingStatusIds) {
-            const r = await TasksCache.queryTasks({ ...base, status_id: sid, startRow: 0, endRow: 0 });
-            inProgress += r?.rowCount ?? 0;
-          }
-        }
-
-        let completedToday = 0;
-        let trend: number[] = [];
-        if (doneStatusId != null) {
-          const midnight = new Date();
-          midnight.setHours(0, 0, 0, 0);
-          const r = await TasksCache.queryTasks({ ...base, status_id: Number(doneStatusId), updated_after: midnight.toISOString(), startRow: 0, endRow: 0 });
-          completedToday = r?.rowCount ?? 0;
-
-          // Build a 7-day completion trend (including today)
-          const sevenDaysAgo = new Date(midnight);
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-          const trendResp = await TasksCache.queryTasks({ ...base, updated_after: sevenDaysAgo.toISOString() });
-          const trendRows: any[] = (trendResp as any)?.rows ?? [];
-          trend = Array.from({ length: 7 }, (_, idx) => {
-            const dayStart = new Date(sevenDaysAgo);
-            dayStart.setDate(dayStart.getDate() + idx);
-            const dayEnd = new Date(dayStart);
-            dayEnd.setDate(dayEnd.getDate() + 1);
-            return trendRows.filter((t: any) => Number(t.status_id) === Number(doneStatusId) && new Date(t.updated_at) >= dayStart && new Date(t.updated_at) < dayEnd).length;
-          });
-        }
-
-        if (!cancelled) {
-          setStats({ total, inProgress, completedToday, trend, loading: false });
-          isInitialLoadRef.current = false;
-        }
-      } catch (error) {
-        console.error('[Workspace Stats] Error loading stats:', error);
-        if (!cancelled) {
-          setStats((prev) => ({ ...prev, loading: false }));
-          isInitialLoadRef.current = false;
-        }
-      }
-    };
-    // Reset initial load flag when workspace changes
-    isInitialLoadRef.current = true;
-    load();
-    const unsubs = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, load),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, load),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, load),
-      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, load),
-      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, load),
-    ];
-    return () => { cancelled = true; unsubs.forEach((u) => { try { u(); } catch {} }); };
-  }, [id, isAllWorkspaces, doneStatusId, workingStatusIds.join(',')]);
-
-  // Filter builder dialog
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
-
-
-
-  // Sync tab state when URL changes (e.g., navigating from settings to workspace)
-  useEffect(() => {
-    const currentTabFromUrl = getCurrentTabFromUrl();
-    if (currentTabFromUrl !== activeTab) {
-      // When URL changes (e.g., navigating from settings), sync both states
-      // to the same value to prevent incorrect animation on mount
-      // This ensures prevActiveTab matches activeTab so initial position is correct
-      setPrevActiveTab(currentTabFromUrl);
-      setActiveTab(currentTabFromUrl);
-    }
-  }, [location.pathname, id]);
-
-  useEffect(() => {
-    if (invalidWorkspaceRoute || invalidWorkspaceId) return;
-    const allowedSet = new Set(resolvedOrder);
-    if (!allowedSet.has(activeTab)) {
-      const fallbackTab = resolvedOrder[0] || 'grid';
-      const targetPath = `${workspaceBasePath}${WORKSPACE_TAB_PATHS[fallbackTab]}`;
-      const normalizedTarget = targetPath.replace(/\/+$/, '');
-      const normalizedCurrent = location.pathname.replace(/\/+$/, '');
-      if (normalizedCurrent !== normalizedTarget) {
-        navigate(targetPath, { replace: true });
-      }
-    }
-  }, [resolvedOrder, activeTab, navigate, location.pathname, workspaceBasePath, invalidWorkspaceRoute, invalidWorkspaceId]);
-
-  //
   // Clear cache when workspace ID changes
   useEffect(() => {
     if (id) {
       rowCache.current.clear();
     }
   }, [id, location.pathname]);
-
-  
-
-  // Initialize common presets if they don't exist
-  useEffect(() => {
-    const ws = isAllWorkspaces ? 'all' : (id || 'all');
-    const currentUserId = Number((currentUser as any)?.id);
-    if (!Number.isFinite(currentUserId)) return;
-    const all = listPresets(ws);
-    
-    // Check if common presets exist, if not create them
-    // Normalize dates to YYYY-MM-DD format for consistent TasksCache date parsing
-    const today = new Date().toISOString().split('T')[0];
-    const commonPresets = [
-      { name: 'My tasks', model: { user_ids: { filterType: 'set', values: [currentUserId] } } },
-      { name: 'Overdue', model: { due_date: { filterType: 'date', type: 'dateBefore', filter: today } } },
-      { name: 'Due today', model: { due_date: { filterType: 'date', type: 'equals', filter: today } } },
-    ];
-    
-    const existingNames = new Set(all.map(p => p.name.toLowerCase()));
-    let needsUpdate = false;
-    
-    for (const preset of commonPresets) {
-      if (!existingNames.has(preset.name.toLowerCase())) {
-        savePreset({ name: preset.name, workspaceScope: ws, model: preset.model });
-        needsUpdate = true;
-      }
-    }
-    
-    if (needsUpdate) {
-      // Reload presets after creating common ones
-      const quick = listPinnedPresets(ws).slice(0, 4);
-      const updatedAll = listPresets(ws);
-      dispatch(setPresets({ quickPresets: quick, allPresets: updatedAll }));
-    }
-  }, [id, isAllWorkspaces, currentUser, dispatch]);
-
-  // Load quick presets scoped to workspace (refresh after dialog closes to capture new saves)
-  useEffect(() => {
-    const ws = isAllWorkspaces ? 'all' : (id || 'all');
-    try {
-      const quick = listPinnedPresets(ws).slice(0, 4);
-      const all = listPresets(ws);
-      dispatch(setPresets({ quickPresets: quick, allPresets: all }));
-    } catch {
-      dispatch(setPresets({ quickPresets: [], allPresets: [] }));
-    }
-  }, [id, isAllWorkspaces, filtersOpen, dispatch]);
-
-  // Persist and restore search text globally
-  useEffect(() => {
-    const key = `wh_workspace_search_global`;
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved != null) {
-        dispatch(setSearchText(saved));
-      }
-    } catch {}
-  }, [dispatch]);
 
   // Save search text to localStorage when it changes
   useEffect(() => {
@@ -853,18 +216,68 @@ export const Workspace = () => {
     } catch {}
   }, [searchText]);
 
-  // Restore saved filters for this workspace when grid is ready
-  const handleTableReady = () => {
-    const key = `wh_workspace_filters_${id || 'all'}`;
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved && tableRef.current) {
-        const model = JSON.parse(saved);
-        tableRef.current.setFilterModel(model);
-      }
-    } catch {}
-  };
+  // Filter tabs based on visibility preferences
+  const visibleTabSet = useMemo(() => new Set(visibleTabs), [visibleTabs]);
+  const filteredOrder = useMemo(() => resolvedOrder.filter(key => 
+    ALWAYS_VISIBLE_TABS.includes(key) || visibleTabSet.has(key)
+  ), [resolvedOrder, visibleTabSet]);
+  
+  // Create dynamic animation config
+  const dynamicTabAnimation = useMemo<TabAnimationConfig<WorkspaceTabKey>>(() => ({
+    order: filteredOrder,
+    distance: TAB_ANIMATION.distance,
+    transition: TAB_ANIMATION.transition,
+  }), [filteredOrder]);
+  
+  const getDynamicTabInitialX = useMemo(() => {
+    return (prev: WorkspaceTabKey | string | null | undefined, next: WorkspaceTabKey | string): number => {
+      const prevStr = prev ? String(prev) : null;
+      const nextStr = String(next);
+      const result = getTabInitialX(prevStr, nextStr, dynamicTabAnimation);
+      return typeof result === 'number' ? result : 0;
+    };
+  }, [dynamicTabAnimation]);
 
+  // Create tabs
+  const workspaceTabs = createWorkspaceTabs({
+    workspaceId: id,
+    isAllWorkspaces,
+    rowCache,
+    tableRef,
+    searchText,
+    groupBy,
+    collapseGroups,
+    tagDisplayMode,
+    computedRowHeight,
+    activeTab,
+    prevActiveTab,
+    dynamicTabAnimation,
+    getDynamicTabInitialX,
+    onFiltersChanged: (active) => {
+      setShowClearFilters(active);
+      const model = tableRef.current?.getFilterModel?.();
+      dispatch(setFilterModel(model || null));
+    },
+    onSelectionChanged: setSelectedIds,
+    onOpenTaskDialog: handleOpenTaskDialog,
+    onReady: handleTableReady,
+    onFilterModelChange: (model) => dispatch(setFilterModel(model)),
+  });
+
+  const workspaceTabMap = workspaceTabs.reduce<Record<string, typeof workspaceTabs[number]>>((acc, tab) => {
+    acc[tab.value] = tab;
+    return acc;
+  }, {});
+  
+  const orderedVisibleTabs = filteredOrder
+    .map((key) => workspaceTabMap[key])
+    .filter((tab): tab is typeof workspaceTabs[number] => Boolean(tab));
+  const tabsForRender = orderedVisibleTabs.length > 0 ? orderedVisibleTabs : workspaceTabs.filter(tab => {
+    const tabValue = tab.value as WorkspaceTabKey;
+    return ALWAYS_VISIBLE_TABS.includes(tabValue) || visibleTabSet.has(tabValue);
+  });
+
+  const [showClearFilters, setShowClearFilters] = useState(false);
 
   if (invalidWorkspaceRoute) {
     return (
@@ -874,8 +287,6 @@ export const Workspace = () => {
           <p className="text-gray-600 mt-2">Please check the URL and try again.</p>
         </div>
       </div>
-      
-      
     );
   }
 
@@ -890,275 +301,68 @@ export const Workspace = () => {
     );
   }
 
-  // Define tabs for URL persistence
-  const workspaceTabs = [
-    {
-      value: 'grid',
-      label: (
-        <div className="flex items-center gap-2 pl-4">
-          <ClipboardList />
-          <span className="tab-label-text">{t('workspace.tabs.tasks', 'Tasks')}</span>
-        </div>
-      ),
-      forceMount: true,
-      content: (
-        <motion.div
-          className='flex-1 h-full'
-          key='grid'
-          initial={false}
-          animate={{ x: activeTab === 'grid' ? 0 : getWorkspaceTabInitialX(activeTab, 'grid') }}
-          transition={activeTab === 'grid' ? TAB_ANIMATION.transition : { duration: 0 }}
-        >
-          <WorkspaceTable 
-            key={isAllWorkspaces ? 'all' : (id || 'root')}
-            ref={tableRef}
-            rowCache={rowCache} 
-            workspaceId={isAllWorkspaces ? 'all' : (id || '')} 
-            searchText={searchText}
-            onFiltersChanged={(active) => {
-              setShowClearFilters(!!active);
-              // Track current filter model for active filter chips
-              const model = tableRef.current?.getFilterModel?.();
-              dispatch(setFilterModel(model || null));
-            }}
-            onSelectionChanged={setSelectedIds}
-            onOpenTaskDialog={(task) => {
-              setSelectedTask(task);
-              // Perf mark: used by TaskDialog to measure click→animationstart
-              (window as any).__taskDialogClickTime = performance.now();
-              setOpenEditTask(true);
-            }}
-            rowHeight={computedRowHeight}
-            groupBy={groupBy}
-            collapseGroups={collapseGroups}
-            tagDisplayMode={tagDisplayMode}
-            onReady={handleTableReady}
-          />
-        </motion.div>
-      )
-		},
-    {
-      value: 'calendar',
-      label: (
-        <div className="flex items-center gap-2 pl-4">
-          <Calendar />
-          <span className="tab-label-text">{t('workspace.tabs.calendar', 'Calendar')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full' key='calendar' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <CalendarViewTab workspaceId={id} />
-        </motion.div>
-      )
-    },
-    {
-      value: 'scheduler',
-      label: (
-        <div className="flex items-center gap-2 pl-4">
-          <Clock />
-          <span className="tab-label-text">{t('workspace.tabs.scheduler', 'Scheduler')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full' key='scheduler' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <SchedulerViewTab workspaceId={id} />
-        </motion.div>
-      )
-    },
-    {
-      value: 'map',
-      label: (
-        <div className="flex items-center gap-2 pl-4">
-          <MapIcon />
-          <span className="tab-label-text">{t('workspace.tabs.map', 'Map')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full' key='map' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <MapViewTab workspaceId={id} />
-        </motion.div>
-      )
-    },
-    {
-      value: 'board',
-      label: (
-        <div className="flex items-center gap-2 pl-4">
-          <LayoutDashboard />
-          <span className="tab-label-text">{t('workspace.tabs.board', 'Board')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full' key='board' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <TaskBoardTab workspaceId={id} />
-        </motion.div>
-      )
-    },
-    {
-      value: 'statistics',
-      label: (
-        <div className="flex items-center gap-2" aria-label="Statistics">
-          <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/40 text-muted-foreground">
-            <BarChart3 className="w-4 h-4" strokeWidth={2.2} />
-          </div>
-          <span className="tab-label-text">{t('workspace.tabs.stats', 'Stats')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full' key='statistics' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <WorkspaceStatistics workspaceId={id} />
-        </motion.div>
-      )
-    },
-    {
-      value: 'settings',
-      label: (
-        <div className="flex items-center gap-2" aria-label="Settings">
-          <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/30 text-muted-foreground">
-            <Settings className="w-4 h-4" strokeWidth={2.2} />
-          </div>
-          <span className="tab-label-text">{t('workspace.tabs.config', 'Config')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full' key='settings' initial={{ x: getWorkspaceTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <SettingsComponent workspaceId={id} />
-        </motion.div>
-      )
-    }
-  ];
-
-  function buildTabSequence(order: WorkspaceTabKey[]) {
-    const sequence: WorkspaceTabKey[] = [];
-    const seen = new Set<WorkspaceTabKey>();
-    const pushUnique = (key: WorkspaceTabKey) => {
-      if (!seen.has(key)) {
-        seen.add(key);
-        sequence.push(key);
-      }
-    };
-    order.forEach(pushUnique);
-    ['statistics', 'settings'].forEach((key) => pushUnique(key as WorkspaceTabKey));
-    return sequence;
-  }
-
-  const workspaceTabMap = workspaceTabs.reduce<Record<string, typeof workspaceTabs[number]>>((acc, tab) => {
-    acc[tab.value] = tab;
-    return acc;
-  }, {});
-  
-  // Filter tabs based on visibility preferences (always show grid, statistics, settings)
-  const visibleTabSet = new Set(visibleTabs);
-  const alwaysVisibleTabs = ['grid', 'statistics', 'settings'];
-  const filteredOrder = resolvedOrder.filter(key => 
-    alwaysVisibleTabs.includes(key) || visibleTabSet.has(key)
-  );
-  
-  const orderedVisibleTabs = filteredOrder
-    .map((key) => workspaceTabMap[key])
-    .filter((tab): tab is typeof workspaceTabs[number] => Boolean(tab));
-  const tabsForRender = orderedVisibleTabs.length > 0 ? orderedVisibleTabs : workspaceTabs.filter(tab => 
-    alwaysVisibleTabs.includes(tab.value) || visibleTabSet.has(tab.value)
-  );
-
-  const statsArePending = stats.loading && stats.total === 0 && stats.inProgress === 0 && stats.completedToday === 0;
-  const formatStatValue = (value: number) => (statsArePending ? '—' : value.toLocaleString());
-  const completedLast7Days = stats.trend.reduce((sum, val) => sum + val, 0);
-  const trendDelta = stats.trend.length >= 2 ? stats.trend[stats.trend.length - 1] - stats.trend[stats.trend.length - 2] : 0;
-
-  const TrendSparkline = ({ data, className }: { data: number[]; className?: string }) => {
-    if (!data || data.length === 0) {
-      return <div className="text-xs text-muted-foreground">—</div>;
-    }
-    const width = 100;
-    const height = 40;
-    const max = Math.max(...data, 1);
-    const points = data.map((val, idx) => {
-      const x = data.length === 1 ? width / 2 : (idx / Math.max(data.length - 1, 1)) * width;
-      const y = height - ((val / max) * height);
-      return `${x},${y}`;
-    }).join(' ');
-    const lastX = data.length === 1 ? width / 2 : width;
-    const lastY = height - ((data[data.length - 1] / max) * height);
-
-    return (
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className={`w-full h-10 ${className || 'text-sky-600'}`}
-        role="img"
-        aria-label="7 day completion trend"
-      >
-        <polyline fill="none" stroke="currentColor" strokeWidth="2.4" points={points} strokeLinecap="round" />
-        <circle cx={lastX} cy={lastY} r="2.6" fill="currentColor" />
-      </svg>
-    );
-  };
-
-  type KpiCard = {
-    key: string;
-    label: string;
-    value: string;
-    icon: ReactNode;
-    accent: 'indigo' | 'amber' | 'emerald' | 'purple';
-    sparkline?: ReactNode;
-    helperText?: string;
-  };
-
-  const kpiCards: KpiCard[] = [
-    {
-      key: 'total',
-      label: t('workspace.stats.total', 'Total'),
-      value: formatStatValue(stats.total),
-      icon: <BarChart3 className="h-5 w-5" />,
-      accent: 'indigo',
-    },
-    {
-      key: 'inProgress',
-      label: t('workspace.stats.inProgress', 'In progress'),
-      value: formatStatValue(stats.inProgress),
-      icon: <Activity className="h-5 w-5" />,
-      accent: 'amber',
-    },
-    {
-      key: 'completedToday',
-      label: t('workspace.stats.completedToday', 'Completed today'),
-      value: formatStatValue(stats.completedToday),
-      icon: <Sparkles className="h-5 w-5" />,
-      accent: 'emerald',
-      helperText: stats.completedToday === 0 && !statsArePending ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!') : undefined
-    },
-    {
-      key: 'trend',
-      label: t('workspace.stats.sevenDayTrend', '7-day trend'),
-      value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
-      icon: <TrendingUp className="h-5 w-5" />,
-      accent: 'purple',
-      sparkline: <TrendSparkline data={stats.trend} className="text-purple-600" />,
-      helperText: statsArePending 
-        ? '' 
-        : completedLast7Days === 0 
-          ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
-          : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`
-    }
-  ];
-
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex items-start gap-3 -mt-1 mb-3">
         {showHeaderKpis && (
           <div className="flex-1 min-w-0">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-              {kpiCards.map((card) => (
-                <WorkspaceKpiCard
-                  key={card.key}
-                  label={card.label}
-                  value={card.value}
-                  icon={card.icon}
-                  accent={card.accent}
-                  helperText={card.helperText}
-                  right={card.sparkline}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={kpiSensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleKpiDragStart}
+              onDragEnd={handleKpiDragEnd}
+              onDragCancel={() => {
+                // Handled in hook
+              }}
+            >
+              {canReorderHeaderKpis ? (
+                <>
+                  <SortableContext items={headerCards.map((c: any) => c.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                      {headerCards.map((card: any) => (
+                        <SortableKpiCard
+                          key={card.id}
+                          id={card.id}
+                          card={card}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                  <DragOverlay zIndex={10000}>
+                    {activeKpiId != null ? (() => {
+                      const card = headerCards.find((c: any) => c.id === activeKpiId);
+                      if (!card) return null;
+                      return (
+                        <div className="opacity-90 scale-105">
+                          <WorkspaceKpiCard
+                            label={card.label}
+                            value={card.value}
+                            icon={card.icon}
+                            accent={card.accent}
+                            helperText={card.helperText}
+                            right={card.sparkline}
+                          />
+                        </div>
+                      );
+                    })() : null}
+                  </DragOverlay>
+                </>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                  {headerCards.map((card: any) => (
+                    <WorkspaceKpiCard
+                      key={card.id}
+                      label={card.label}
+                      value={card.value}
+                      icon={card.icon}
+                      accent={card.accent}
+                      helperText={card.helperText}
+                      right={card.sparkline}
+                    />
+                  ))}
+                </div>
+              )}
+            </DndContext>
           </div>
         )}
 
@@ -1200,6 +404,7 @@ export const Workspace = () => {
           </DropdownMenu>
         </div>
       </div>
+
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
         <div className="flex items-center gap-2 mb-2 border rounded px-2 py-1 bg-background/60">
@@ -1239,68 +444,72 @@ export const Workspace = () => {
           </Button>
         </div>
       )}
+
       <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
         <div className='flex-1 min-w-0'>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <UrlTabs
-            tabs={tabsForRender}
-            defaultValue={primaryTabValue}
-            basePath={`/workspace/${id}`}
-            pathMap={WORKSPACE_TAB_PATHS}
-            className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
-            onValueChange={(v) => { setPrevActiveTab(activeTab); setActiveTab(v as WorkspaceTabKey); }}
-            showClearFilters={showClearFilters}
-            onClearFilters={() => tableRef.current?.clearFilters()}
-            sortable={true}
-            sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
-            renderSortableTab={(tab, isFixed) => (
-              <SortableTab 
-                key={tab.value} 
-                id={tab.value} 
-                isDragging={isDraggingTab}
-                disabled={isFixed}
-              >
-                <TabsTrigger
-                  value={tab.value}
-                  disabled={tab.disabled}
-                >
-                  {tab.label}
-                </TabsTrigger>
-              </SortableTab>
-            )}
-          />
-        </DndContext>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={filteredOrder} strategy={rectSortingStrategy}>
+              <UrlTabs
+                tabs={tabsForRender}
+                defaultValue={primaryTabValue}
+                basePath={`/workspace/${id}`}
+                pathMap={WORKSPACE_TAB_PATHS}
+                className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
+                onValueChange={(v) => { 
+                  if (Object.keys(WORKSPACE_TAB_PATHS).includes(v)) {
+                    const tabValue = v as WorkspaceTabKey;
+                    setPrevActiveTab(activeTab); 
+                    setActiveTab(tabValue);
+                  }
+                }}
+                showClearFilters={showClearFilters}
+                onClearFilters={() => tableRef.current?.clearFilters()}
+                sortable={true}
+                sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
+                renderSortableTab={(tab, isFixed) => (
+                  <SortableTab
+                    key={tab.value}
+                    id={tab.value}
+                    disabled={isFixed}
+                  >
+                    <TabsTrigger
+                      value={tab.value}
+                      disabled={tab.disabled}
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  </SortableTab>
+                )}
+              />
+            </SortableContext>
+          </DndContext>
         </div>
         {rightPanel && (
           <>
             <div
               className="w-1.5 cursor-col-resize bg-border hover:bg-primary/40"
-              onMouseDown={(e) => {
-                setIsResizing(true);
-                setResizeStartX(e.clientX);
-                setResizeStartWidth(rightPanelWidth);
-              }}
+              onMouseDown={startResize}
               title="Drag to resize"
             />
             <div className="border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
-            <div className="flex items-center justify-between px-3 py-2 border-b">
-              <div className="text-sm font-medium">{rightPanel === 'chat' ? t('workspace.collab.chat', 'Chat') : t('workspace.collab.resources', 'Resources')}</div>
-              <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto p-2">
-              {rightPanel === 'chat' ? (
-                <ChatTab workspaceId={id} />
-              ) : (
-                <ResourcesTab workspaceId={id} />
-              )}
-            </div>
+              <div className="flex items-center justify-between px-3 py-2 border-b">
+                <div className="text-sm font-medium">{rightPanel === 'chat' ? t('workspace.collab.chat', 'Chat') : t('workspace.collab.resources', 'Resources')}</div>
+                <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto p-2">
+                {rightPanel === 'chat' ? (
+                  <ChatTab workspaceId={id} />
+                ) : (
+                  <ResourcesTab workspaceId={id} />
+                )}
+              </div>
             </div>
           </>
         )}
@@ -1341,7 +550,6 @@ export const Workspace = () => {
         }}
       />
 
-
       {/* Task Dialog - Unified component for create/edit */}
       {!isAllWorkspaces && !isNaN(Number(id)) && (
         <TaskDialog 
@@ -1372,6 +580,5 @@ export const Workspace = () => {
         taskName={selectedIds.length === 1 ? undefined : `${selectedIds.length} tasks`}
       />
     </div>
-
   );
 };

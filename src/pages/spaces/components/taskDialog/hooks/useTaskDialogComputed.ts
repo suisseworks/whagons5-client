@@ -124,13 +124,6 @@ export function useTaskDialogComputed(params: any) {
           if (template?.enabled === false) return false;
           const cat = categories.find((c: any) => c.id === template.category_id);
           const match = cat && cat.workspace_id === currentWorkspaceData.id;
-          console.log('[useTaskDialogComputed] Template:', template.name, {
-            categoryId: template.category_id,
-            categoryName: cat?.name,
-            categoryWorkspaceId: cat?.workspace_id,
-            currentWorkspaceId: currentWorkspaceData.id,
-            match
-          });
           return match;
         });
       } else if (currentWorkspaceData.type === "PROJECT") {

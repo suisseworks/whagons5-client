@@ -9,7 +9,9 @@ const OnboardingRoute: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Show loading while checking auth state or fetching user data
-  if (authLoading || userLoading) {
+  // Important: allow background user refetches without flashing a full-screen loader
+  // during onboarding step transitions (we already have a usable `user` object).
+  if (authLoading || (userLoading && !user)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

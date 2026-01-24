@@ -190,7 +190,6 @@ function PluginCardDisplay({
 			assets: 'hover:border-sky-500/40 hover:shadow-sky-500/20',
 			boards: 'hover:border-violet-500/40 hover:shadow-violet-500/20',
 			compliance: 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
-			analytics: 'hover:border-purple-500/40 hover:shadow-purple-500/20',
 			clockin: 'hover:border-indigo-500/40 hover:shadow-indigo-500/20',
 			costs: 'hover:border-amber-500/40 hover:shadow-amber-500/20',
 			inventory: 'hover:border-teal-500/40 hover:shadow-teal-500/20',
@@ -224,10 +223,10 @@ function PluginCardDisplay({
 		>
 			<div className={`
 				relative rounded-xl overflow-hidden
-				bg-card/50 backdrop-blur-sm
+				${isDragging ? 'bg-card shadow-2xl' : 'bg-card/50 backdrop-blur-sm'}
 				border-2 border-border/40
 				transition-all duration-300
-				hover:shadow-2xl hover:scale-105
+				${isDragging ? '' : 'hover:shadow-2xl hover:scale-105'}
 				${isEnabled ? borderColor : 'opacity-70'}
 				h-[180px]
 			`}>
@@ -338,9 +337,11 @@ function SortablePluginCard({ plugin, pluginsConfig, onPluginClick, pluginStatus
 		isDragging,
 	} = useSortable({ id: plugin.id });
 
-	const style = {
+	const style: React.CSSProperties = {
 		transform: CSS.Transform.toString(transform),
 		transition,
+		position: isDragging ? 'relative' : undefined,
+		zIndex: isDragging ? 9999 : undefined,
 	};
 
 	return (
@@ -654,6 +655,17 @@ const saveOrder = (key: string, ids: string[]) => {
 	} catch {}
 };
 
+const dedupeIds = (ids: string[]): string[] => {
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const id of ids) {
+		if (seen.has(id)) continue;
+		seen.add(id);
+		out.push(id);
+	}
+	return out;
+};
+
 function Plugins() {
 	const navigate = useNavigate();
 	const { t } = useLanguage();
@@ -732,21 +744,6 @@ function Plugins() {
 					'Reduce downtime with predictive maintenance alerts',
 					'Track asset ROI and optimize capital expenditures',
 					'Ensure compliance with safety inspections'
-				]
-			},
-			analytics: {
-				features: [
-					'Customizable dashboards with real-time data visualization',
-					'Automated report generation and scheduling',
-					'Predictive analytics and trend forecasting',
-					'Cross-module data integration',
-					'Export to Excel, PDF, and custom formats'
-				],
-				benefits: [
-					'Make data-driven decisions with actionable insights',
-					'Identify cost-saving opportunities automatically',
-					'Monitor KPIs in real-time across all departments',
-					'Forecast future needs with AI-powered predictions'
 				]
 			},
 			clockin: {
@@ -1013,9 +1010,9 @@ function Plugins() {
 			{
 				id: 'analytics',
 				title: t('plugins.analytics.title', 'Analytics'),
-				description: t('plugins.analytics.description', 'Data insights, reports and performance metrics'),
-				icon: faChartBar,
-				color: 'text-purple-500',
+				description: t('plugins.analytics.description', 'Track and analyze your workspace data and performance metrics'),
+				icon: faChartLine,
+				color: 'text-blue-500',
 				configurable: true,
 			},
 			{
@@ -1075,14 +1072,6 @@ function Plugins() {
 				configurable: true,
 			},
 			{
-				id: 'analytics',
-				title: t('plugins.analytics.title', 'Analytics'),
-				description: t('plugins.analytics.description', 'Track and analyze your workspace data and performance metrics'),
-				icon: faChartLine,
-				color: 'text-blue-500',
-				configurable: true,
-			},
-			{
 				id: 'motivation',
 				title: t('plugins.motivation.title', 'Motivation'),
 				description: t('plugins.motivation.description', 'Configure motivation and engagement settings'),
@@ -1113,17 +1102,33 @@ function Plugins() {
 
 	// Order state
 	const [pluginOrder, setPluginOrder] = useState<string[]>(() => {
-		const currentIds = allPlugins.map(p => p.id);
-		const saved = loadOrder(PLUGINS_ORDER_KEY);
-		return [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
+		const currentIds = dedupeIds(allPlugins.map(p => p.id));
+		const savedRaw = loadOrder(PLUGINS_ORDER_KEY);
+		const saved = dedupeIds(savedRaw);
+		const savedSet = new Set(saved);
+		const merged = dedupeIds([
+			...saved.filter(id => currentIds.includes(id)),
+			...currentIds.filter(id => !savedSet.has(id)),
+		]);
+		// Auto-repair persisted duplicates/bad order
+		if (savedRaw.length !== saved.length || JSON.stringify(savedRaw) !== JSON.stringify(merged)) {
+			saveOrder(PLUGINS_ORDER_KEY, merged);
+		}
+		return merged;
 	});
 
 	// Update order when plugins change
 	useEffect(() => {
-		const currentIds = allPlugins.map(p => p.id);
-		const saved = loadOrder(PLUGINS_ORDER_KEY);
-		const merged = [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
+		const currentIds = dedupeIds(allPlugins.map(p => p.id));
+		const savedRaw = loadOrder(PLUGINS_ORDER_KEY);
+		const saved = dedupeIds(savedRaw).filter(id => currentIds.includes(id));
+		const savedSet = new Set(saved);
+		const merged = dedupeIds([...saved, ...currentIds.filter(id => !savedSet.has(id))]);
 		setPluginOrder(merged);
+		// Keep localStorage clean so we don't reintroduce duplicate React keys
+		if (savedRaw.length !== dedupeIds(savedRaw).length || JSON.stringify(savedRaw) !== JSON.stringify(merged)) {
+			saveOrder(PLUGINS_ORDER_KEY, merged);
+		}
 	}, [allPlugins.map(p => p.id).join(',')]);
 
 	// Ordered plugins

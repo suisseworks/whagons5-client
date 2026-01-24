@@ -14,11 +14,11 @@ import { Team, UserTeam, Invitation, Role } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
-import { getEnvVariables } from "@/lib/getEnvVariables";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/animated/Tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { buildInvitationLink } from "@/lib/invitationLink";
 
 const getUserTeamRoleId = (ut: UserTeam | any) => {
   const val = ut?.role_id ?? ut?.roleId ?? ut?.role?.id;
@@ -91,8 +91,6 @@ function Users() {
     isSubmitting,
     formError,
     setFormError,
-    isCreateDialogOpen,
-    setIsCreateDialogOpen,
     isEditDialogOpen,
     setIsEditDialogOpen,
     isDeleteDialogOpen,
@@ -154,7 +152,7 @@ function Users() {
 
   // Merged Add User dialog state
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  const [addUserActiveTab, setAddUserActiveTab] = useState<'create' | 'invite'>('create');
+  const [addUserActiveTab, setAddUserActiveTab] = useState<'create' | 'invite'>('invite');
 
   // Update form data when editing user changes
   useEffect(() => {
@@ -534,19 +532,11 @@ function Users() {
       cellRenderer: (params: ICellRendererParams) => {
         const invitation = params.data as Invitation;
         if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
-        
-        // Generate invitation link using VITE_DOMAIN
-        const { VITE_DOMAIN } = getEnvVariables();
-        const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
-        const tenantPrefix = invitation.tenant_domain_prefix || '';
-        const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-        
-        // Build domain: {tenant_prefix}.{base_domain}
-        const domain = tenantPrefix 
-          ? `${tenantPrefix}.${baseDomain}`
-          : baseDomain;
-        
-        const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+
+        const invitationLink = buildInvitationLink({
+          invitationToken: invitation.invitation_token,
+          tenantDomainPrefix: invitation.tenant_domain_prefix,
+        });
         
         return (
           <div className="flex items-center gap-2">
@@ -636,18 +626,10 @@ function Users() {
       })
       .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
 
-    // Generate invitation link using VITE_DOMAIN
-    const { VITE_DOMAIN } = getEnvVariables();
-    const baseDomain = VITE_DOMAIN || 'whagons5.whagons.com';
-    const tenantPrefix = invitation.tenant_domain_prefix || '';
-    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-    
-    // Build domain: {tenant_prefix}.{base_domain}
-    const domain = tenantPrefix 
-      ? `${tenantPrefix}.${baseDomain}`
-      : baseDomain;
-    
-    const invitationLink = `${protocol}://${domain}/auth/invitation/${invitation.invitation_token}`;
+    const invitationLink = buildInvitationLink({
+      invitationToken: invitation.invitation_token,
+      tenantDomainPrefix: invitation.tenant_domain_prefix,
+    });
 
     return (
       <div className="space-y-2">
@@ -792,7 +774,7 @@ function Users() {
       setInvitationLink('');
       setShowInvitationLink(false);
       setCopiedDialogLink(false); // Reset copied state
-      setAddUserActiveTab('create'); // Reset to create tab
+      setAddUserActiveTab('invite'); // Reset to invite tab (default)
     } else {
       // When dialog opens, ensure checkbox is checked by default
       setSendEmail(true);
@@ -816,9 +798,16 @@ function Users() {
           // Refresh invitations list from IndexedDB (real-time listener will update cache automatically)
           // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
           
-          // Show invitation link if available
-          if (result?.invitation_link) {
-            setInvitationLink(result.invitation_link);
+          // Show invitation link (build locally so dev host/port is always correct)
+          const inv = (result as any)?.data ?? result;
+          const token = inv?.invitation_token;
+          if (token) {
+            setInvitationLink(
+              buildInvitationLink({
+                invitationToken: token,
+                tenantDomainPrefix: inv?.tenant_domain_prefix,
+              })
+            );
             setShowInvitationLink(true);
           }
           
@@ -1156,11 +1145,11 @@ function Users() {
         <Tabs value={addUserActiveTab} onValueChange={(value) => setAddUserActiveTab(value as 'create' | 'invite')} className="w-full">
           <div className="flex justify-center w-full mb-4">
             <TabsList className="w-fit">
-              <TabsTrigger value="create">
-                {tu('dialogs.addUser.tabs.create', 'Create User')}
-              </TabsTrigger>
               <TabsTrigger value="invite">
                 {tu('dialogs.addUser.tabs.invite', 'Invite User')}
+              </TabsTrigger>
+              <TabsTrigger value="create">
+                {tu('dialogs.addUser.tabs.create', 'Create User')}
               </TabsTrigger>
             </TabsList>
           </div>

@@ -65,6 +65,7 @@ const coreKeys = [
   // Plugin tables
   'plugins',
   'pluginRoutes',
+  'kpiCards',
   'complianceStandards',
   'complianceRequirements',
   'complianceMappings',
@@ -119,29 +120,20 @@ export class DataManager {
           .map((k) => (genericCaches as any)[k])
           .filter((c: any): c is GenericCache => !!c);
         
-        // Run generic caches and tasks validation in parallel to avoid blocking
-        await Promise.all([
-          // 1. Generic caches (batched)
-          GenericCache.validateMultiple(caches, ['wh_tasks'])
-            .then(res => {
-              return res;
-            })
-            .catch(e => {
-              console.warn('DataManager: generic cache batch failed', e);
-              return null;
-            }),
+        // Validate caches using one global-batch call, and pass the already-fetched server
+        // tasks hash into TasksCache so it doesn't need to make its own /integrity/global call.
+        const batch = await GenericCache.validateMultiple(caches, ['wh_tasks']).catch(e => {
+          console.warn('DataManager: generic cache batch failed', e);
+          return null;
+        });
 
-          // 2. Tasks cache (independent)
-          (async () => {
-            try {
-              await TasksCache.init();
-              // Call without server data to trigger self-fetch of global hash
-              await TasksCache.validateTasks();
-            } catch (e) {
-              console.warn('DataManager: tasks cache validate failed', e);
-            }
-          })()
-        ]);
+        try {
+          await TasksCache.init();
+          const taskServer = batch?.serverMap?.['wh_tasks'] ?? null;
+          await TasksCache.validateTasks(taskServer?.global_hash ?? null, taskServer?.block_count ?? null);
+        } catch (e) {
+          console.warn('DataManager: tasks cache validate failed', e);
+        }
         
         // Small delay to ensure IDB transactions are fully committed/visible
         await new Promise(resolve => setTimeout(resolve, 50));

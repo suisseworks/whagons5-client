@@ -224,6 +224,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const expectingTtsRef = useRef<boolean>(false);
   const ttsCloseTimerRef = useRef<number | null>(null);
   const lastTtsChunkAtRef = useRef<number>(0);
+  const lastBargeInAtRef = useRef<number>(0);
 
   const scheduleWsIdleClose = useCallback((ms: number) => {
     try {
@@ -323,10 +324,43 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const { language } = useLanguage();
   const appLanguageCode = useMemo(() => (language || "en").toLowerCase().startsWith("es") ? "es" : "en", [language]);
 
+  const handleStopRequest = useCallback(async () => {
+    abortControllerRef.current = true;
+    setGettingResponse(false);
+    
+    try {
+      try { ttsPlayerRef.current?.stop(); } catch {}
+      if (unsubscribeWSRef.current) {
+        try { unsubscribeWSRef.current(); } catch {}
+        unsubscribeWSRef.current = null;
+      }
+      wsManager.close(conversationId);
+      console.log('[WS] Stopped chat by closing WebSocket connection');
+    } catch (e) {
+      console.error("Failed to stop chat:", e);
+    }
+  }, [conversationId]);
+
+  const onSpeechStart = useCallback(() => {
+    // "Barge-in": if the user starts speaking, stop local TTS immediately,
+    // and cancel any in-flight assistant stream by closing the WS.
+    const now = Date.now();
+    if (now - (lastBargeInAtRef.current || 0) < 750) return; // rate-limit
+    lastBargeInAtRef.current = now;
+
+    try { ttsPlayerRef.current?.stop(); } catch {}
+    if (gettingResponse || expectingTtsRef.current) {
+      void handleStopRequest();
+    }
+  }, [gettingResponse, handleStopRequest]);
+
   const { isListening, startListening, stopListening, voiceLevel, mediaRecorder } = useSpeechToText({
     conversationId,
     gettingResponse,
     onTranscript: handleTranscript,
+    onSpeechStart,
+    // Keep VAD lightweight + browser-friendly. These defaults can be tuned later.
+    vad: { enabled: true, startThreshold: 0.02, stopThreshold: 0.012, minSpeechMs: 160, hangoverMs: 350 },
     languageCode: appLanguageCode,
   });
 
@@ -367,6 +401,37 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
     queueMicrotask(() => updateScrollBottomVisibility());
   }, [messages, updateScrollBottomVisibility]);
+
+  // Auto-scroll to bottom during voice chat
+  useEffect(() => {
+    if (isListening) {
+      // Scroll immediately when voice listening starts
+      queueMicrotask(() => {
+        scrollContainerToBottom();
+      });
+    }
+  }, [isListening, scrollContainerToBottom]);
+
+  // Auto-scroll when messages change during voice chat
+  useEffect(() => {
+    if (isListening && messages.length > 0) {
+      // Small delay to ensure DOM has updated
+      const timeoutId = setTimeout(() => {
+        scrollContainerToBottom();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [messages, isListening, scrollContainerToBottom]);
+
+  // Auto-scroll when assistant starts responding during voice chat
+  useEffect(() => {
+    if (isListening && gettingResponse) {
+      // Scroll when assistant starts responding
+      queueMicrotask(() => {
+        scrollContainerToBottom();
+      });
+    }
+  }, [gettingResponse, isListening, scrollContainerToBottom]);
 
   useEffect(() => {
     return () => {
@@ -808,23 +873,6 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
-
-  const handleStopRequest = async () => {
-    abortControllerRef.current = true;
-    setGettingResponse(false);
-    
-    try {
-      try { ttsPlayerRef.current?.stop(); } catch {}
-      if (unsubscribeWSRef.current) {
-        try { unsubscribeWSRef.current(); } catch {}
-        unsubscribeWSRef.current = null;
-      }
-      wsManager.close(conversationId);
-      console.log('[WS] Stopped chat by closing WebSocket connection');
-    } catch (e) {
-      console.error("Failed to stop chat:", e);
-    }
-  };
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const wasClosedRef = useRef<boolean>(true); // Track if sheet was closed
