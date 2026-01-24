@@ -684,13 +684,13 @@
   }
   .dark [data-sidebar="header"],
   .dark .bg-sidebar-header {
-    background: var(--bg-primary) !important;
+    background: var(--sidebar-header) !important;
     box-shadow: none !important;
     border-bottom: 0 !important;
   }
   .dark [data-sidebar="sidebar"],
   .dark .bg-sidebar {
-    background: var(--bg-primary) !important;
+    background: var(--sidebar) !important;
   }
   .starwars [data-sidebar="sidebar"],
   .starwars .bg-sidebar {
