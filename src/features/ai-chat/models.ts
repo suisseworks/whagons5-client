@@ -37,6 +37,16 @@ export interface Message {
   role: "user" | "assistant" | "tool_call" | "tool_result";
   content: string | ContentItem[] | ToolCallContent | ToolResultContent;
   reasoning?: string;
+  meta?: {
+    /** Dev-only: voice TTS latency from submit to first scheduled playback. */
+    ttsTimeToPlaybackMs?: number;
+    /** Dev-only: voice latency measured from speech end → first TTS playback. */
+    voiceTotalMs?: number;
+    /** Dev-only: Groq STT duration (speech end → transcript ready). */
+    voiceSttMs?: number;
+    /** Dev-only: LLM+TTS portion (transcript ready/submit → first playback). */
+    voiceLlmToPlaybackMs?: number;
+  };
 }
 
 export interface ModelConfig {

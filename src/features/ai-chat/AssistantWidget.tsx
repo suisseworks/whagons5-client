@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Sparkles, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,9 +32,10 @@ import {
 import { useSpeechToText } from "./hooks/useSpeechToText";
 import "./styles.css";
 
-const { VITE_API_URL, VITE_CHAT_URL } = getEnvVariables();
+const { VITE_API_URL, VITE_CHAT_URL, VITE_DEVELOPMENT } = getEnvVariables();
 // Use separate chat URL, fallback to API URL, then to current origin
 const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
+const IS_DEV = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -136,6 +137,9 @@ const wsManager = createWSManager(CHAT_HOST);
 export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = true, renderTrigger }) => {
   const navigate = useNavigate();
   const authedUser = useAuthUser();
+  // STT provider is controlled server-side (whagons_assistant/config/stt_config.go).
+  // Frontend default is Groq, and we best-effort fetch the server default on mount.
+  const [sttProvider, setSttProvider] = useState<"groq" | "elevenlabs">("groq");
 
   // Pull from generic slices (populated during AuthProvider hydration).
   const teams = useSelector(
@@ -225,6 +229,10 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const ttsCloseTimerRef = useRef<number | null>(null);
   const lastTtsChunkAtRef = useRef<number>(0);
   const lastBargeInAtRef = useRef<number>(0);
+  const voiceTurnSubmitPerfMsRef = useRef<number>(0);
+  const voiceTurnPlaybackRecordedRef = useRef<boolean>(false);
+  const voiceTurnSpeechEndPerfMsRef = useRef<number>(0);
+  const voiceTurnSttMsRef = useRef<number | null>(null);
 
   const scheduleWsIdleClose = useCallback((ms: number) => {
     try {
@@ -314,7 +322,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const handleSubmitRef = useRef<(content: string | ContentItem[], opts?: SubmitOptions) => Promise<void>>();
   
   // Speech-to-text hook (uses ref for callback so handleSubmit can be defined later)
-  const handleTranscript = useCallback((text: string) => {
+  const handleTranscript = useCallback((text: string, info?: { provider: "groq" | "elevenlabs"; sttMs?: number }) => {
+    if (IS_DEV && typeof info?.sttMs === "number") {
+      voiceTurnSttMsRef.current = Math.max(0, info.sttMs);
+    } else {
+      voiceTurnSttMsRef.current = null;
+    }
     // Use the ref to call handleSubmit when it's available
     if (handleSubmitRef.current) {
       handleSubmitRef.current(text, { inputMode: "voice" });
@@ -354,15 +367,47 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
   }, [gettingResponse, handleStopRequest]);
 
+  const onSpeechEnd = useCallback(() => {
+    // For Groq mode, this is effectively "utterance ended" right before we transcribe.
+    if (!IS_DEV) return;
+    voiceTurnSpeechEndPerfMsRef.current = performance.now();
+    voiceTurnSttMsRef.current = null;
+    voiceTurnPlaybackRecordedRef.current = false;
+  }, []);
+
   const { isListening, startListening, stopListening, voiceLevel, mediaRecorder } = useSpeechToText({
     conversationId,
     gettingResponse,
     onTranscript: handleTranscript,
     onSpeechStart,
+    onSpeechEnd,
     // Keep VAD lightweight + browser-friendly. These defaults can be tuned later.
     vad: { enabled: true, startThreshold: 0.02, stopThreshold: 0.012, minSpeechMs: 160, hangoverMs: 350 },
     languageCode: appLanguageCode,
+    provider: sttProvider,
   });
+
+  // Best-effort: fetch server-side default STT provider (no UI toggle).
+  useEffect(() => {
+    let cancelled = false;
+    const base = CHAT_HOST.includes("://") ? CHAT_HOST : `${window.location.protocol}//${CHAT_HOST}`;
+    const url = `${base}/api/v1/config`;
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const json = await res.json();
+        const p = String(json?.stt?.default_provider || "").toLowerCase();
+        const next = p === "elevenlabs" ? "elevenlabs" : "groq";
+        if (!cancelled) setSttProvider(next);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Save messages when they change
   useEffect(() => {
@@ -487,6 +532,10 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
     // Voice mode: keep the message WS warm between sends. Text mode: do not.
     keepWsOpenForVoiceRef.current = opts?.inputMode === "voice";
+    if (opts?.inputMode === "voice") {
+      voiceTurnSubmitPerfMsRef.current = performance.now();
+      voiceTurnPlaybackRecordedRef.current = false;
+    }
 
     // Create conversation if it doesn't exist
     if (messages.length === 0) {
@@ -560,7 +609,41 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           // eslint-disable-next-line no-console
           console.debug("[TTS] audio chunk received:", audioB64.length);
           if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
-          ttsPlayerRef.current.enqueueBase64Mp3(audioB64);
+          ttsPlayerRef.current.enqueueBase64Mp3(audioB64, (playbackStartPerfMs) => {
+            if (!IS_DEV) return;
+            if (voiceTurnPlaybackRecordedRef.current) return;
+            voiceTurnPlaybackRecordedRef.current = true;
+
+            const speechEndMs = voiceTurnSpeechEndPerfMsRef.current || 0;
+            const total = speechEndMs > 0 ? playbackStartPerfMs - speechEndMs : 0;
+            const sttMs = typeof voiceTurnSttMsRef.current === "number" ? voiceTurnSttMsRef.current : null;
+            const llmToPlaybackMs = sttMs != null ? Math.max(0, total - sttMs) : undefined;
+
+            // Attach metric to the latest assistant message (best-effort).
+            setMessages(prev => {
+              const next = [...prev];
+              for (let i = next.length - 1; i >= 0; i--) {
+                if (next[i]?.role === "assistant") {
+                  next[i] = {
+                    ...next[i],
+                    meta: {
+                      ...(next[i].meta || {}),
+                      voiceTotalMs: Math.max(0, total),
+                      voiceSttMs: sttMs != null ? Math.max(0, sttMs) : undefined,
+                      voiceLlmToPlaybackMs: llmToPlaybackMs,
+                      // Keep the old metric for backward compatibility (was "submit → playback").
+                      ttsTimeToPlaybackMs:
+                        voiceTurnSubmitPerfMsRef.current > 0
+                          ? Math.max(0, playbackStartPerfMs - voiceTurnSubmitPerfMsRef.current)
+                          : undefined,
+                    },
+                  };
+                  break;
+                }
+              }
+              return next;
+            });
+          });
 
           // In voice mode, keep the WS open between turns but still auto-close after a longer idle.
           if (keepWsOpenForVoiceRef.current) {
@@ -762,16 +845,21 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     wsEventHandlerRef.current = handleWebSocketEvent;
 
     const ensureSubscription = () => {
-      // If we're already subscribed for this conversation, keep it. (The stable handler will
-      // invoke the latest closure via wsEventHandlerRef.)
-      if (unsubscribeWSRef.current) return;
+      // If we're already subscribed AND the underlying socket is alive, keep it.
+      // If the socket was closed by the server between turns (common in voice mode),
+      // re-subscribe to force `wsManager.connect(...)` to run again.
+      const state = wsManager.getState(conversationId);
+      const socketAlive = state === WebSocket.OPEN || state === WebSocket.CONNECTING;
+      if (unsubscribeWSRef.current && socketAlive) return;
+
+      // If we had a stale subscription but the socket is dead, clear it to avoid confusion.
+      if (unsubscribeWSRef.current && !socketAlive) {
+        try { unsubscribeWSRef.current(); } catch {}
+        unsubscribeWSRef.current = null;
+      }
 
       const selectedModel = getPreferredModel();
-      unsubscribeWSRef.current = wsManager.subscribe(
-        conversationId,
-        stableWsHandlerRef.current!,
-        selectedModel
-      );
+      unsubscribeWSRef.current = wsManager.subscribe(conversationId, stableWsHandlerRef.current!, selectedModel);
     };
 
     try {
@@ -977,6 +1065,11 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           className="max-w-full sm:max-w-2xl p-0 gap-0 flex flex-col h-full"
           onPointerDown={primeTtsAudio}
         >
+          {/* Radix Sheet is built on Dialog primitives; it requires a Title + Description for a11y */}
+          <SheetHeader className="sr-only">
+            <SheetTitle>Copilot</SheetTitle>
+            <SheetDescription>AI chat panel</SheetDescription>
+          </SheetHeader>
           <div className="flex w-full h-full flex-col justify-between z-5 bg-background rounded-lg">
             {/* Conversation Selector Dropdown */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-border/50">
@@ -1020,6 +1113,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                   })()}
                 </SelectContent>
               </Select>
+              {/* STT provider is configured server-side (no frontend toggle). */}
               <Button
                 variant="outline"
                 size="sm"
