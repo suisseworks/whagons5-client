@@ -11,6 +11,12 @@ class SessionWSManager {
   private reconnectTimers: Map<string, number> = new Map();
   private shouldReconnect: Map<string, boolean> = new Map();
   private sessionModels: Map<string, string> = new Map();
+  private lastUrlBySession: Map<string, string> = new Map();
+  private lastCloseBySession: Map<
+    string,
+    { code: number; reason: string; wasClean: boolean; at: number }
+  > = new Map();
+  private lastErrorBySession: Map<string, { at: number; readyState: number }> = new Map();
 
   constructor(urlBase: string) {
     // Normalize URL: if no scheme provided, assume ws:// for localhost or http:// otherwise
@@ -30,17 +36,29 @@ class SessionWSManager {
     }
   }
 
+  private buildWsUrl(sessionId: string, modelId?: string): string {
+    // Support either:
+    // - host only: "localhost:8080" => ws://localhost:8080/api/v1/chat/ws/{id}
+    // - full base including /api/v1: "https://example.com/api/v1" => wss://example.com/api/v1/chat/ws/{id}
+    const baseHasApiV1 = /\/api\/v1\/?$/.test(this.urlBase);
+    let wsUrl = baseHasApiV1
+      ? `${this.urlBase.replace(/\/+$/, "")}/chat/ws/${sessionId}`
+      : `${this.urlBase.replace(/\/+$/, "")}/api/v1/chat/ws/${sessionId}`;
+
+    if (modelId) {
+      wsUrl += `?model=${encodeURIComponent(modelId)}`;
+    }
+    return wsUrl;
+  }
+
   private connect(sessionId: string, modelId?: string): WebSocket {
     const existing = this.connections.get(sessionId);
     if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
       return existing;
     }
 
-    let wsUrl = `${this.urlBase}/api/v1/chat/ws/${sessionId}`;
-    
-    if (modelId) {
-      wsUrl += `?model=${encodeURIComponent(modelId)}`;
-    }
+    const wsUrl = this.buildWsUrl(sessionId, modelId);
+    this.lastUrlBySession.set(sessionId, wsUrl);
     
     console.log(`[WS] Connecting to: ${wsUrl}`);
     
@@ -50,6 +68,9 @@ class SessionWSManager {
 
     ws.onopen = () => {
       console.log(`[WS] Connected to session: ${sessionId}`);
+      // Clear previous errors/close info when we successfully connect.
+      this.lastErrorBySession.delete(sessionId);
+      this.lastCloseBySession.delete(sessionId);
       const timer = this.reconnectTimers.get(sessionId);
       if (timer !== undefined) {
         clearTimeout(timer);
@@ -84,6 +105,12 @@ class SessionWSManager {
         wasClean: event.wasClean,
         url: wsUrl
       });
+      this.lastCloseBySession.set(sessionId, {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+        at: Date.now(),
+      });
       this.connections.delete(sessionId);
       
       const hasHandlers = this.handlers.get(sessionId)?.size || 0 > 0;
@@ -107,6 +134,7 @@ class SessionWSManager {
         wsUrl: wsUrl,
         readyState: ws.readyState
       });
+      this.lastErrorBySession.set(sessionId, { at: Date.now(), readyState: ws.readyState });
     };
 
     return ws;
@@ -143,8 +171,11 @@ class SessionWSManager {
         this.sessionModels.delete(sessionId);
         
         const ws = this.connections.get(sessionId);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.close(1000, 'No more listeners');
+        // Close even if still CONNECTING to avoid stray sockets and reconnect races.
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          try {
+            ws.close(1000, 'No more listeners');
+          } catch {}
         }
         this.connections.delete(sessionId);
         
@@ -182,6 +213,7 @@ class SessionWSManager {
     }
     this.handlers.delete(sessionId);
     this.sessionModels.delete(sessionId);
+    // Keep lastUrl/close/error for debug after close.
     
     const timer = this.reconnectTimers.get(sessionId);
     if (timer !== undefined) {
@@ -193,6 +225,27 @@ class SessionWSManager {
   getState(sessionId: string): number {
     const ws = this.connections.get(sessionId);
     return ws?.readyState ?? WebSocket.CLOSED;
+  }
+
+  getDebugInfo(sessionId: string): {
+    sessionId: string;
+    url?: string;
+    readyState: number;
+    lastClose?: { code: number; reason: string; wasClean: boolean; at: number };
+    lastError?: { at: number; readyState: number };
+    handlersCount: number;
+    shouldReconnect?: boolean;
+  } {
+    const handlersCount = this.handlers.get(sessionId)?.size ?? 0;
+    return {
+      sessionId,
+      url: this.lastUrlBySession.get(sessionId),
+      readyState: this.getState(sessionId),
+      lastClose: this.lastCloseBySession.get(sessionId),
+      lastError: this.lastErrorBySession.get(sessionId),
+      handlersCount,
+      shouldReconnect: this.shouldReconnect.get(sessionId),
+    };
   }
 }
 

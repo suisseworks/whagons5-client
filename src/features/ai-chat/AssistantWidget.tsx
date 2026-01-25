@@ -706,7 +706,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           // Create a callback to send user responses back to the AI
           const sendResponseMessage = (message: string) => {
             if (message && !gettingResponse) {
-              handleSubmit(message);
+              // Preserve voice mode when we're in a voice session (prevents disabling WS keepalive).
+              const voiceMode = keepWsOpenForVoiceRef.current || isListening;
+              handleSubmit(message, voiceMode ? { inputMode: "voice" } : undefined);
             }
           };
           
@@ -878,11 +880,12 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
       // Increased timeout for voice chat scenarios where server might be processing previous requests
       // Also allow CONNECTING state since the connection might be establishing
-      const maxWaitTime = opts?.inputMode === "voice" ? 15000 : 10000;
+      const maxWaitTime = opts?.inputMode === "voice" ? 25000 : 15000;
       const checkInterval = 100;
       const maxAttempts = maxWaitTime / checkInterval;
       
       let connected = false;
+      let reconnectBudget = 3;
       for (let i = 0; i < maxAttempts; i++) {
         const wsState = wsManager.getState(conversationId);
         if (wsState === WebSocket.OPEN) {
@@ -894,8 +897,17 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
           await new Promise(resolve => setTimeout(resolve, checkInterval));
           continue;
         }
-        // If closed or closing, break early
+        // If closed/closing, try a limited reconnect instead of failing immediately.
         if (wsState === WebSocket.CLOSED || wsState === WebSocket.CLOSING) {
+          if (reconnectBudget > 0) {
+            reconnectBudget--;
+            try {
+              // Force a re-subscribe attempt (common in prod when the server/proxy closes idle sockets).
+              ensureSubscription();
+            } catch {}
+            await new Promise(resolve => setTimeout(resolve, 250));
+            continue;
+          }
           break;
         }
         await new Promise(resolve => setTimeout(resolve, checkInterval));
@@ -903,8 +915,15 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
       if (!connected) {
         const wsState = wsManager.getState(conversationId);
-        console.error('[WS] Connection failed. State:', wsState);
-        throw new Error(`WebSocket connection timeout. State: ${wsState}`);
+        const wsDebug = (wsManager as any)?.getDebugInfo?.(conversationId);
+        console.error('[WS] Connection failed.', { wsState, wsDebug, CHAT_HOST });
+        const urlHint =
+          wsDebug?.url ? ` url=${wsDebug.url}` : ` chatHost=${String(CHAT_HOST || "")}`;
+        const closeHint =
+          wsDebug?.lastClose
+            ? ` close=${wsDebug.lastClose.code}${wsDebug.lastClose.reason ? `(${wsDebug.lastClose.reason})` : ""}`
+            : "";
+        throw new Error(`WebSocket connection failed (state=${wsState}).${urlHint}${closeHint}`);
       }
 
       // Use app language (from LanguageProvider) so voice/text chat matches the UI language toggle.
