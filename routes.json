@@ -1,0 +1,456 @@
+{
+  "generatedAt": "2026-01-25T05:29:38.021Z",
+  "routes": [
+    {
+      "path": "/activity",
+      "description": "Activity page",
+      "category": "main"
+    },
+    {
+      "path": "/admin/plugins",
+      "description": "Admin plugins page",
+      "category": "main"
+    },
+    {
+      "path": "/analytics",
+      "description": "Analytics page",
+      "category": "main"
+    },
+    {
+      "path": "/boards",
+      "description": "Boards page",
+      "category": "main"
+    },
+    {
+      "path": "/broadcasts",
+      "description": "Broadcasts page",
+      "category": "main",
+      "tabs": [
+        "all",
+        "my-broadcasts",
+        "pending",
+        "completed"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/broadcasts?tab=all",
+        "/broadcasts?tab=my-broadcasts",
+        "/broadcasts?tab=pending"
+      ]
+    },
+    {
+      "path": "/gamification",
+      "description": "Gamification page",
+      "category": "main"
+    },
+    {
+      "path": "/home",
+      "description": "Home page",
+      "category": "main"
+    },
+    {
+      "path": "/integrations",
+      "description": "Integrations page",
+      "category": "main"
+    },
+    {
+      "path": "/motivation",
+      "description": "Motivation page",
+      "category": "main"
+    },
+    {
+      "path": "/onboarding",
+      "description": "Onboarding page",
+      "category": "main"
+    },
+    {
+      "path": "/plugins",
+      "description": "Plugins page",
+      "category": "main"
+    },
+    {
+      "path": "/profile",
+      "description": "Profile page",
+      "category": "main"
+    },
+    {
+      "path": "/shared-with-me",
+      "description": "Shared with me page",
+      "category": "main"
+    },
+    {
+      "path": "/stripe",
+      "description": "Stripe page",
+      "category": "main"
+    },
+    {
+      "path": "/stuff",
+      "description": "Stuff page",
+      "category": "main"
+    },
+    {
+      "path": "/tasks",
+      "description": "Tasks page",
+      "category": "main"
+    },
+    {
+      "path": "/welcome",
+      "description": "Welcome page",
+      "category": "main"
+    },
+    {
+      "path": "/workspace/all",
+      "description": "Workspace all page",
+      "category": "main"
+    },
+    {
+      "path": "/settings",
+      "description": "Settings page",
+      "category": "settings",
+      "tabs": [
+        "favorites",
+        "basics",
+        "advanced"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings?tab=favorites",
+        "/settings?tab=basics",
+        "/settings?tab=advanced"
+      ]
+    },
+    {
+      "path": "/settings/analytics",
+      "description": "Settings analytics page",
+      "category": "settings",
+      "tabs": [
+        "settings"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings/analytics?tab=settings"
+      ]
+    },
+    {
+      "path": "/settings/approvals",
+      "description": "Settings approvals page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/boards",
+      "description": "Settings boards page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/categories",
+      "description": "Settings categories page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/categories/custom-fields",
+      "description": "Settings categories custom fields page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/forms",
+      "description": "Settings forms page",
+      "category": "settings",
+      "tabs": [
+        "list",
+        "builder"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings/forms?tab=list",
+        "/settings/forms?tab=builder",
+        "/settings/forms?tab=builder&editing_form=<form_id>"
+      ]
+    },
+    {
+      "path": "/settings/gamification",
+      "description": "Settings gamification page",
+      "category": "settings",
+      "tabs": [
+        "settings"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings/gamification?tab=settings"
+      ]
+    },
+    {
+      "path": "/settings/global",
+      "description": "Settings global page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/job-positions",
+      "description": "Settings job positions page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/kpi-cards",
+      "description": "Settings kpi cards page",
+      "category": "settings",
+      "tabs": [
+        "settings"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings/kpi-cards?tab=settings"
+      ]
+    },
+    {
+      "path": "/settings/kpi-cards/manage",
+      "description": "Settings kpi cards manage page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/motivation",
+      "description": "Settings motivation page",
+      "category": "settings",
+      "tabs": [
+        "settings"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings/motivation?tab=settings"
+      ]
+    },
+    {
+      "path": "/settings/priorities",
+      "description": "Settings priorities page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/roles-and-permissions",
+      "description": "Settings roles and permissions page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/slas",
+      "description": "Settings slas page",
+      "category": "settings",
+      "tabs": [
+        "slas",
+        "alerts",
+        "policies"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/settings/slas?tab=slas",
+        "/settings/slas?tab=alerts",
+        "/settings/slas?tab=policies"
+      ]
+    },
+    {
+      "path": "/settings/spots",
+      "description": "Settings spots page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/spots/types",
+      "description": "Settings spots types page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/statuses",
+      "description": "Settings statuses page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/tags",
+      "description": "Settings tags page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/teams",
+      "description": "Settings teams page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/templates",
+      "description": "Settings templates page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/test",
+      "description": "Settings test page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/users",
+      "description": "Settings users page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/workflows",
+      "description": "Settings workflows page",
+      "category": "settings"
+    },
+    {
+      "path": "/settings/workspaces",
+      "description": "Settings workspaces page",
+      "category": "settings"
+    },
+    {
+      "path": "/compliance/standards",
+      "description": "Compliance standards page",
+      "category": "compliance"
+    },
+    {
+      "path": "/compliance/standards/:id",
+      "description": "Compliance standards specific id page",
+      "category": "compliance",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/compliance/standards/<id>"
+      ]
+    },
+    {
+      "path": "/auth/invitation/:token",
+      "description": "Auth invitation specific token page",
+      "category": "authentication",
+      "params": [
+        "token"
+      ],
+      "examples": [
+        "/auth/invitation/<token>"
+      ]
+    },
+    {
+      "path": "/auth/signin",
+      "description": "Auth signin page",
+      "category": "authentication"
+    },
+    {
+      "path": "/auth/signup",
+      "description": "Auth signup page",
+      "category": "authentication"
+    },
+    {
+      "path": "/boards/:boardId",
+      "description": "Boards specific board id page",
+      "category": "other",
+      "params": [
+        "boardId"
+      ],
+      "examples": [
+        "/boards/<boardId>"
+      ]
+    },
+    {
+      "path": "/plugins/:pluginId/settings",
+      "description": "Plugins specific plugin id settings page",
+      "category": "other",
+      "params": [
+        "pluginId"
+      ],
+      "tabs": [
+        "settings"
+      ],
+      "queryParams": [
+        "tab"
+      ],
+      "examples": [
+        "/plugins/<pluginId>/settings",
+        "/plugins/<pluginId>/settings?tab=settings"
+      ]
+    },
+    {
+      "path": "/workspace/:id",
+      "description": "Workspace specific id page",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>"
+      ]
+    },
+    {
+      "path": "/workspace/:id/board",
+      "description": "Workspace board/kanban view",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>/board"
+      ]
+    },
+    {
+      "path": "/workspace/:id/calendar",
+      "description": "Workspace calendar view",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>/calendar"
+      ]
+    },
+    {
+      "path": "/workspace/:id/map",
+      "description": "Workspace map view",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>/map"
+      ]
+    },
+    {
+      "path": "/workspace/:id/scheduler",
+      "description": "Workspace scheduler view",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>/scheduler"
+      ]
+    },
+    {
+      "path": "/workspace/:id/settings",
+      "description": "Workspace settings and configuration",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>/settings"
+      ]
+    },
+    {
+      "path": "/workspace/:id/statistics",
+      "description": "Workspace statistics and analytics",
+      "category": "other",
+      "params": [
+        "id"
+      ],
+      "examples": [
+        "/workspace/<id>/statistics"
+      ]
+    }
+  ]
+}

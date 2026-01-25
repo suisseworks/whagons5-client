@@ -433,8 +433,10 @@ function ToolMessageRenderer({
                   maxHeight: isOpen ? "1000px" : "0",
                   opacity: isOpen ? 1 : 0,
                   visibility: isOpen ? "visible" : "hidden",
-                  border: isOpen ? "1px solid hsl(var(--border))" : "none",
                   borderTop: "none",
+                  borderRight: isOpen ? "1px solid hsl(var(--border))" : "none",
+                  borderBottom: isOpen ? "1px solid hsl(var(--border))" : "none",
+                  borderLeft: isOpen ? "1px solid hsl(var(--border))" : "none",
                 }}
               >
                 {isOpen && (

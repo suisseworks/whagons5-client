@@ -71,6 +71,15 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // {/* </React.StrictMode>, */}
 );
 
+// Dev-only: expose the sandbox so you can test from the console quickly.
+if (import.meta.env.DEV) {
+  import('./sandbox/devExpose')
+    .then((m) => m.exposeSandboxToWindow())
+    .catch(() => {
+      // ignore
+    });
+}
+
 
 
 // PWA registration temporarily disabled for debugging
