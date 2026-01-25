@@ -226,13 +226,22 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const previousConversationIdRef = useRef<string>(conversationId);
   const ttsPlayerRef = useRef<StreamingTtsPlayer | null>(null);
   const expectingTtsRef = useRef<boolean>(false);
+  const activeTtsContextIdRef = useRef<string>("");
   const ttsCloseTimerRef = useRef<number | null>(null);
   const lastTtsChunkAtRef = useRef<number>(0);
   const lastBargeInAtRef = useRef<number>(0);
+  const lastWsClosedNoticeAtRef = useRef<number>(0);
+  const lastWsClosedNoticeKeyRef = useRef<string>("");
   const voiceTurnSubmitPerfMsRef = useRef<number>(0);
   const voiceTurnPlaybackRecordedRef = useRef<boolean>(false);
   const voiceTurnSpeechEndPerfMsRef = useRef<number>(0);
   const voiceTurnSttMsRef = useRef<number | null>(null);
+  // Dev-only timing probes to diagnose “STT is fast but response takes forever” and “no TTS”.
+  const voiceTurnIdRef = useRef<number>(0);
+  const voiceTurnTranscriptPerfMsRef = useRef<number>(0);
+  const voiceTurnWsSendPerfMsRef = useRef<number>(0);
+  const voiceTurnFirstAssistantPerfMsRef = useRef<number>(0);
+  const voiceTurnFirstTtsChunkPerfMsRef = useRef<number>(0);
 
   const scheduleWsIdleClose = useCallback((ms: number) => {
     try {
@@ -249,6 +258,8 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       }, ms);
     } catch {}
   }, [conversationId]);
+
+  const VOICE_WS_IDLE_CLOSE_MS = 5 * 60 * 1000; // 5 minutes (voice sessions should not churn sockets)
 
   // Prime AudioContext on a real user gesture to avoid autoplay restrictions blocking TTS playback.
   const primeTtsAudio = useCallback(() => {
@@ -323,6 +334,22 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   
   // Speech-to-text hook (uses ref for callback so handleSubmit can be defined later)
   const handleTranscript = useCallback((text: string, info?: { provider: "groq" | "elevenlabs"; sttMs?: number }) => {
+    // New voice turn marker (best-effort). This is dev-only instrumentation.
+    if (IS_DEV) {
+      voiceTurnIdRef.current = (voiceTurnIdRef.current || 0) + 1;
+      voiceTurnTranscriptPerfMsRef.current = performance.now();
+      voiceTurnWsSendPerfMsRef.current = 0;
+      voiceTurnFirstAssistantPerfMsRef.current = 0;
+      voiceTurnFirstTtsChunkPerfMsRef.current = 0;
+      // eslint-disable-next-line no-console
+      console.debug("[VOICE]", {
+        turn: voiceTurnIdRef.current,
+        event: "transcript_committed",
+        chars: String(text || "").length,
+        provider: info?.provider,
+        sttMs: info?.sttMs,
+      });
+    }
     if (IS_DEV && typeof info?.sttMs === "number") {
       voiceTurnSttMsRef.current = Math.max(0, info.sttMs);
     } else {
@@ -356,33 +383,52 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
   const onSpeechStart = useCallback(() => {
     // "Barge-in": if the user starts speaking, stop local TTS immediately,
-    // and cancel any in-flight assistant stream by closing the WS.
+    // but do NOT cancel the in-flight stream by closing the WS.
+    //
+    // Important: STT already buffers transcripts while `gettingResponse` is true
+    // (see `useSpeechToText`), so the user can speak over the assistant and the
+    // utterance will be submitted right after the assistant finishes.
+    //
+    // Closing the message WS here was causing frequent disconnects (especially when
+    // the mic picks up TTS and VAD false-triggers).
     const now = Date.now();
     if (now - (lastBargeInAtRef.current || 0) < 750) return; // rate-limit
     lastBargeInAtRef.current = now;
 
-    try { ttsPlayerRef.current?.stop(); } catch {}
+    // Duck assistant audio ONLY if the assistant is currently responding / expected to speak.
+    // If we duck while the assistant is idle, and VAD gets stuck, it can make later TTS feel "broken".
     if (gettingResponse || expectingTtsRef.current) {
-      void handleStopRequest();
+      // This prevents perceived "latency" spikes (audio starts late) and reduces mic feedback.
+      try { ttsPlayerRef.current?.setDucked(true); } catch {}
     }
-  }, [gettingResponse, handleStopRequest]);
+    // IMPORTANT:
+    // Do NOT auto-cancel the assistant on VAD start. VAD can false-trigger on noise / TTS bleed,
+    // which would cancel TTS and make it feel like "only the first message plays".
+    // We already buffer transcripts during `gettingResponse`, so the user can speak over the assistant
+    // and their utterance will be submitted right after the assistant finishes.
+  }, [gettingResponse]);
 
   const onSpeechEnd = useCallback(() => {
-    // For Groq mode, this is effectively "utterance ended" right before we transcribe.
+    // Always un-duck: otherwise a single VAD trigger can leave TTS permanently quiet in production.
+    try { ttsPlayerRef.current?.setDucked(false); } catch {}
+
+    // Dev-only: record timing metrics.
     if (!IS_DEV) return;
     voiceTurnSpeechEndPerfMsRef.current = performance.now();
     voiceTurnSttMsRef.current = null;
     voiceTurnPlaybackRecordedRef.current = false;
   }, []);
 
-  const { isListening, startListening, stopListening, voiceLevel, mediaRecorder } = useSpeechToText({
+  const { isListening, isStarting: isSttStarting, startListening, stopListening, voiceLevel, mediaRecorder } = useSpeechToText({
     conversationId,
     gettingResponse,
     onTranscript: handleTranscript,
     onSpeechStart,
     onSpeechEnd,
-    // Keep VAD lightweight + browser-friendly. These defaults can be tuned later.
-    vad: { enabled: true, startThreshold: 0.02, stopThreshold: 0.012, minSpeechMs: 160, hangoverMs: 350 },
+    // Keep VAD lightweight + browser-friendly. Tune to be less aggressive (fewer false starts).
+    // NOTE: The previous thresholds were too high and could make it feel like "I speak and nothing happens".
+    // We also set a maxSpeechMs fail-safe in the hook to prevent "stuck speaking" which can keep TTS ducked.
+    vad: { enabled: true, startThreshold: 0.02, stopThreshold: 0.015, minSpeechMs: 200, hangoverMs: 450, maxSpeechMs: 8000 },
     languageCode: appLanguageCode,
     provider: sttProvider,
   });
@@ -484,7 +530,8 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         try { unsubscribeWSRef.current(); } catch {}
         unsubscribeWSRef.current = null;
       }
-      try { ttsPlayerRef.current?.stop(); } catch {}
+      try { ttsPlayerRef.current?.dispose(); } catch {}
+      ttsPlayerRef.current = null;
       try {
         if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
         ttsCloseTimerRef.current = null;
@@ -500,7 +547,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   useEffect(() => {
     if (!open) {
       stopListening();
-      try { ttsPlayerRef.current?.stop(); } catch {}
+      // Fully dispose audio only when closing the widget (re-open will re-prime on user gesture).
+      try { ttsPlayerRef.current?.dispose(); } catch {}
+      ttsPlayerRef.current = null;
       expectingTtsRef.current = false;
       keepWsOpenForVoiceRef.current = false;
       try {
@@ -530,11 +579,30 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     if (gettingResponse) return;
     setGettingResponse(true);
 
-    // Voice mode: keep the message WS warm between sends. Text mode: do not.
-    keepWsOpenForVoiceRef.current = opts?.inputMode === "voice";
-    if (opts?.inputMode === "voice") {
+    // Voice mode: keep the message WS warm between sends.
+    // Important: do NOT reset voice mode just because `opts` is omitted (e.g., tool follow-ups or typed
+    // messages during a voice session). Only change it when explicitly provided.
+    const voiceSessionWasEnabled = keepWsOpenForVoiceRef.current;
+    if (opts?.inputMode) {
+      keepWsOpenForVoiceRef.current = opts.inputMode === "voice";
+    }
+    const effectiveInputMode: SubmitOptions["inputMode"] =
+      opts?.inputMode ?? (voiceSessionWasEnabled ? "voice" : undefined);
+
+    if (effectiveInputMode === "voice") {
       voiceTurnSubmitPerfMsRef.current = performance.now();
       voiceTurnPlaybackRecordedRef.current = false;
+      if (IS_DEV) {
+        // eslint-disable-next-line no-console
+        console.debug("[VOICE]", {
+          turn: voiceTurnIdRef.current,
+          event: "submit_begin",
+          transcriptToSubmitMs:
+            voiceTurnTranscriptPerfMsRef.current > 0
+              ? Math.max(0, voiceTurnSubmitPerfMsRef.current - voiceTurnTranscriptPerfMsRef.current)
+              : undefined,
+        });
+      }
     }
 
     // Create conversation if it doesn't exist
@@ -602,13 +670,36 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
       // ElevenLabs TTS audio stream (voice mode)
       if (data.type === "tts_audio_chunk") {
+        // While the user is speaking, we duck audio (see onSpeechStart) instead of dropping chunks.
         const audioB64 = typeof data.audio === "string" ? data.audio : "";
+        const ctxId = typeof data.context_id === "string" ? data.context_id : "";
+        // Ignore chunks from old contexts (prevents old audio bleeding into the next turn).
+        if (ctxId && activeTtsContextIdRef.current && ctxId !== activeTtsContextIdRef.current) {
+          return;
+        }
         if (audioB64) {
           lastTtsChunkAtRef.current = Date.now();
           // Helpful for debugging “no audio” issues.
           // eslint-disable-next-line no-console
           console.debug("[TTS] audio chunk received:", audioB64.length);
           if (!ttsPlayerRef.current) ttsPlayerRef.current = new StreamingTtsPlayer();
+          if (IS_DEV && voiceTurnFirstTtsChunkPerfMsRef.current <= 0) {
+            voiceTurnFirstTtsChunkPerfMsRef.current = performance.now();
+            const turn = voiceTurnIdRef.current;
+            const t0 = voiceTurnTranscriptPerfMsRef.current || 0;
+            const tSend = voiceTurnWsSendPerfMsRef.current || 0;
+            const tFirstTok = voiceTurnFirstAssistantPerfMsRef.current || 0;
+            const tFirstTts = voiceTurnFirstTtsChunkPerfMsRef.current || 0;
+            // eslint-disable-next-line no-console
+            console.debug("[VOICE]", {
+              turn,
+              event: "first_tts_chunk",
+              transcriptToFirstTtsMs: t0 > 0 ? Math.max(0, tFirstTts - t0) : undefined,
+              sendToFirstTtsMs: tSend > 0 ? Math.max(0, tFirstTts - tSend) : undefined,
+              sendToFirstTokenMs: tSend > 0 && tFirstTok > 0 ? Math.max(0, tFirstTok - tSend) : undefined,
+              transcriptToFirstTokenMs: t0 > 0 && tFirstTok > 0 ? Math.max(0, tFirstTok - t0) : undefined,
+            });
+          }
           ttsPlayerRef.current.enqueueBase64Mp3(audioB64, (playbackStartPerfMs) => {
             if (!IS_DEV) return;
             if (voiceTurnPlaybackRecordedRef.current) return;
@@ -647,13 +738,17 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
           // In voice mode, keep the WS open between turns but still auto-close after a longer idle.
           if (keepWsOpenForVoiceRef.current) {
-            scheduleWsIdleClose(60000);
+            scheduleWsIdleClose(VOICE_WS_IDLE_CLOSE_MS);
           }
         }
         return;
       }
       if (data.type === "tts_context_final") {
-        expectingTtsRef.current = false;
+        const ctxId = typeof (data as any)?.context_id === "string" ? String((data as any).context_id) : "";
+        if (!ctxId || !activeTtsContextIdRef.current || ctxId === activeTtsContextIdRef.current) {
+          expectingTtsRef.current = false;
+          activeTtsContextIdRef.current = "";
+        }
         try {
           if (ttsCloseTimerRef.current) window.clearTimeout(ttsCloseTimerRef.current);
           ttsCloseTimerRef.current = null;
@@ -661,7 +756,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
         // For voice mode, keep the WS open between turns.
         if (keepWsOpenForVoiceRef.current) {
-          scheduleWsIdleClose(60000);
+          scheduleWsIdleClose(VOICE_WS_IDLE_CLOSE_MS);
         } else {
           // Non-voice: close promptly once the streaming context ends.
           if (unsubscribeWSRef.current) {
@@ -676,6 +771,21 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         return;
       }
 
+      if (data.type === "tts_context_started") {
+        const ctxId = typeof (data as any)?.context_id === "string" ? String((data as any).context_id) : "";
+        if (ctxId) {
+          activeTtsContextIdRef.current = ctxId;
+          // New context means new turn; don't let old audio continue.
+          try { ttsPlayerRef.current?.stop(); } catch {}
+          expectingTtsRef.current = true;
+          if (IS_DEV) {
+            // eslint-disable-next-line no-console
+            console.debug("[TTS] context started:", ctxId);
+          }
+        }
+        return;
+      }
+
       if (data.type === "done" || data.type === "stopped" || data.type === "error") {
         setGettingResponse(false);
         if (data.type === "error") {
@@ -684,15 +794,66 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
 
         // Voice mode: keep WS warm between turns (still auto-close after idle).
         if (keepWsOpenForVoiceRef.current) {
-          scheduleWsIdleClose(60000);
+          scheduleWsIdleClose(VOICE_WS_IDLE_CLOSE_MS);
           return;
         }
 
+        // Do NOT close the AudioContext here; it can break subsequent turns due to autoplay restrictions.
         try { ttsPlayerRef.current?.stop(); } catch {}
         if (unsubscribeWSRef.current) {
           try { unsubscribeWSRef.current(); } catch {}
           unsubscribeWSRef.current = null;
         }
+        return;
+      }
+
+      // If the WebSocket drops mid-stream/tool, stop loading and show a recoverable message.
+      if (data.type === "ws_closed") {
+        const key = `${String((data as any)?.at || "")}:${String((data as any)?.code || "")}:${String((data as any)?.reason || "")}`;
+        const now = Date.now();
+        // De-dupe: only surface this once per close (and ignore rapid repeats).
+        if (key && key === lastWsClosedNoticeKeyRef.current) return;
+        if (now - (lastWsClosedNoticeAtRef.current || 0) < 1000) return;
+        lastWsClosedNoticeAtRef.current = now;
+        lastWsClosedNoticeKeyRef.current = key;
+
+        expectingTtsRef.current = false;
+        setGettingResponse(false);
+        try { ttsPlayerRef.current?.stop(); } catch {}
+
+        const LOST_MSG =
+          "Connection lost while the assistant was responding. Please try again (voice or text).";
+
+        setMessages(prev => {
+          const next = [...prev];
+          // Don't spam duplicates.
+          const last = next[next.length - 1];
+          if (last?.role === "assistant" && typeof last.content === "string" && last.content.trim() === LOST_MSG) {
+            return prev;
+          }
+          // If the last assistant message is still the empty placeholder, replace it with a helpful error.
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i]?.role === "assistant") {
+              const cur = next[i];
+              if (typeof cur.content === "string" && cur.content.trim() === "") {
+                next[i] = {
+                  ...cur,
+                  content: LOST_MSG,
+                };
+              } else {
+                // Otherwise append a short note.
+                next.push({
+                  role: "assistant",
+                  content: LOST_MSG,
+                } as any);
+              }
+              break;
+            }
+          }
+          return next;
+        });
+
+        // Reconnect is handled by wsManager's onclose auto-reconnect (as long as we're subscribed).
         return;
       }
 
@@ -752,6 +913,19 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       }
 
       if (data.parts && Array.isArray(data.parts)) {
+        if (IS_DEV && voiceTurnFirstAssistantPerfMsRef.current <= 0 && (keepWsOpenForVoiceRef.current || expectingTtsRef.current)) {
+          voiceTurnFirstAssistantPerfMsRef.current = performance.now();
+          const t0 = voiceTurnTranscriptPerfMsRef.current || 0;
+          const tSend = voiceTurnWsSendPerfMsRef.current || 0;
+          // eslint-disable-next-line no-console
+          console.debug("[VOICE]", {
+            turn: voiceTurnIdRef.current,
+            event: "first_assistant_chunk",
+            transcriptToFirstTokenMs: t0 > 0 ? Math.max(0, voiceTurnFirstAssistantPerfMsRef.current - t0) : undefined,
+            sendToFirstTokenMs: tSend > 0 ? Math.max(0, voiceTurnFirstAssistantPerfMsRef.current - tSend) : undefined,
+            kind: "parts",
+          });
+        }
         setMessages(prevMessages => {
           let currentMessageState = [...prevMessages];
           let lastMessage = currentMessageState[currentMessageState.length - 1];
@@ -791,6 +965,24 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         return;
       }
 
+      if (
+        IS_DEV &&
+        voiceTurnFirstAssistantPerfMsRef.current <= 0 &&
+        (keepWsOpenForVoiceRef.current || expectingTtsRef.current) &&
+        (data.type === "part_start" || data.type === "part_delta" || data.type === "content_chunk")
+      ) {
+        voiceTurnFirstAssistantPerfMsRef.current = performance.now();
+        const t0 = voiceTurnTranscriptPerfMsRef.current || 0;
+        const tSend = voiceTurnWsSendPerfMsRef.current || 0;
+        // eslint-disable-next-line no-console
+        console.debug("[VOICE]", {
+          turn: voiceTurnIdRef.current,
+          event: "first_assistant_chunk",
+          transcriptToFirstTokenMs: t0 > 0 ? Math.max(0, voiceTurnFirstAssistantPerfMsRef.current - t0) : undefined,
+          sendToFirstTokenMs: tSend > 0 ? Math.max(0, voiceTurnFirstAssistantPerfMsRef.current - tSend) : undefined,
+          kind: data.type,
+        });
+      }
       setMessages(prevMessages => {
         let currentMessageState = [...prevMessages];
         let lastMessage = currentMessageState[currentMessageState.length - 1];
@@ -939,11 +1131,16 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       if (userContext) {
         messagePayload.user_context = userContext;
       }
-      if (opts?.inputMode) {
-        messagePayload.input_mode = opts.inputMode;
+      if (effectiveInputMode) {
+        messagePayload.input_mode = effectiveInputMode;
       }
-      expectingTtsRef.current = opts?.inputMode === "voice";
+      expectingTtsRef.current = effectiveInputMode === "voice";
       
+      if (IS_DEV && effectiveInputMode === "voice") {
+        voiceTurnWsSendPerfMsRef.current = performance.now();
+        // eslint-disable-next-line no-console
+        console.debug("[VOICE]", { turn: voiceTurnIdRef.current, event: "ws_send" });
+      }
       const sent = wsManager.send(conversationId, messagePayload);
       
       if (!sent) {
@@ -1249,10 +1446,28 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 onSubmit={handleSubmit}
                 gettingResponse={gettingResponse}
                 setIsListening={(v) => {
-                  if (v) startListening();
-                  else stopListening();
+                  if (v) {
+                    // Prime audio on the *same user gesture* that starts mic capture.
+                    // This avoids AudioContext being stuck suspended, which manifests as “agent not talking”.
+                    primeTtsAudio();
+                    try { ttsPlayerRef.current?.setDucked(false); } catch {}
+                    startListening();
+                  } else {
+                    stopListening();
+                    // User explicitly turned off the mic: end voice keepalive and close the chat WS.
+                    keepWsOpenForVoiceRef.current = false;
+                    expectingTtsRef.current = false;
+                    activeTtsContextIdRef.current = "";
+                    try { ttsPlayerRef.current?.stop(); } catch {}
+                    if (unsubscribeWSRef.current) {
+                      try { unsubscribeWSRef.current(); } catch {}
+                      unsubscribeWSRef.current = null;
+                    }
+                    wsManager.close(conversationId);
+                  }
                 }}
                 isListening={isListening}
+                isStarting={isSttStarting}
                 voiceLevel={voiceLevel}
                 mediaRecorder={mediaRecorder}
                 handleStopRequest={handleStopRequest}
