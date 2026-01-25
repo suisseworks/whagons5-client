@@ -59,7 +59,8 @@ export interface Template {
     default_spot_id?: number | null;
     default_user_ids?: number[] | null;
     expected_duration?: number | null;
-    // Legacy/previous fields kept optional for compatibility during transition
+    form_id?: number | null;
+    spots_not_applicable?: boolean;
     description?: string | null;
     team_id?: number;
     workspace_id?: number;

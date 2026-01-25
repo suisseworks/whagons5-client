@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { OnboardingData } from '@/types/user';
 import { useLanguage } from '@/providers/LanguageProvider';
 
@@ -13,7 +13,32 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
   const { t } = useLanguage();
   const [photoUrl, setPhotoUrl] = useState(data.url_picture || '');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get user initials for fallback display
+  const getUserInitials = (): string => {
+    if (data?.name) {
+      return data.name.split(' ').map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2);
+    }
+    if (data?.email) {
+      return data.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const handleImageError = () => {
+    setImageLoadError(true);
+  };
+
+  // Reset error state when photoUrl changes from props
+  useEffect(() => {
+    const newPhotoUrl = data.url_picture || '';
+    if (newPhotoUrl !== photoUrl) {
+      setPhotoUrl(newPhotoUrl);
+      setImageLoadError(false);
+    }
+  }, [data.url_picture]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -41,6 +66,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
       // For now, we'll create a local URL for preview
       const localUrl = URL.createObjectURL(file);
       setPhotoUrl(localUrl);
+      setImageLoadError(false); // Reset error state when new image is uploaded
       onUpdate({ url_picture: localUrl });
       
       // TODO: Replace with actual API call
@@ -60,6 +86,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
 
   const handleRemovePhoto = () => {
     setPhotoUrl('');
+    setImageLoadError(false);
     onUpdate({ url_picture: '' });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -101,31 +128,22 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
         <div className="flex flex-col items-center space-y-4">
           <div className="relative">
             <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600">
-              {photoUrl ? (
+              {photoUrl && !imageLoadError ? (
                 <img
                   src={photoUrl}
                   alt={t('onboarding.optionalStep.profile', 'Profile')}
                   className="w-full h-full object-cover"
+                  onError={handleImageError}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <svg
-                    className="w-8 h-8 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
+                <div className="w-full h-full flex items-center justify-center bg-primary/10 dark:bg-primary/20">
+                  <span className="text-lg font-semibold text-primary dark:text-primary/90">
+                    {getUserInitials()}
+                  </span>
                 </div>
               )}
             </div>
-            {photoUrl && (
+            {photoUrl && !imageLoadError && (
               <button
                 onClick={handleRemovePhoto}
                 className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"

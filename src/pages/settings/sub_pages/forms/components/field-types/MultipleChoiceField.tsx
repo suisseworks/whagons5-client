@@ -15,9 +15,6 @@ export function MultipleChoiceField({ options, onOptionsChange, isEditing = true
   // Ensure at least one empty option exists
   const currentOptions = options.length > 0 ? options : [''];
   
-  // Check if "Other" option exists in the current options
-  const hasOther = currentOptions.some(option => option.toLowerCase() === 'other');
-  
   // State for preview select value
   const [selectedValue, setSelectedValue] = useState<string>("");
 
@@ -39,10 +36,6 @@ export function MultipleChoiceField({ options, onOptionsChange, isEditing = true
     }
   };
 
-  const handleAddOther = () => {
-    const newOptions = [...currentOptions, 'Other'];
-    onOptionsChange(newOptions);
-  };
 
   // Rendered view - what users see when filling the form
   if (!isEditing) {
@@ -103,20 +96,8 @@ export function MultipleChoiceField({ options, onOptionsChange, isEditing = true
             onClick={handleAddOption}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Add option
+            Add option or add "Other"
           </button>
-          {!hasOther && (
-            <>
-              <span className="text-sm text-muted-foreground">or</span>
-              <button
-                type="button"
-                onClick={handleAddOther}
-                className="text-sm text-primary hover:underline"
-              >
-                add "Other"
-              </button>
-            </>
-          )}
         </div>
       </div>
     </div>
