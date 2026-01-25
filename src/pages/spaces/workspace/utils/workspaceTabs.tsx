@@ -25,7 +25,7 @@ type TabContentProps = {
   activeTab: WorkspaceTabKey;
   prevActiveTab: WorkspaceTabKey;
   dynamicTabAnimation: TabAnimationConfig<WorkspaceTabKey>;
-  getDynamicTabInitialX: (prev: WorkspaceTabKey | string | null | undefined, next: WorkspaceTabKey | string) => number;
+  getDynamicTabInitialX: (prev: WorkspaceTabKey | string | null | undefined, next: WorkspaceTabKey | string) => string | number;
   onFiltersChanged: (active: boolean) => void;
   onSelectionChanged: (ids: number[]) => void;
   onOpenTaskDialog: (task: any) => void;

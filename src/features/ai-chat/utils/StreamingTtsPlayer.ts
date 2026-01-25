@@ -5,6 +5,12 @@ export class StreamingTtsPlayer {
   private decodeChain: Promise<void> = Promise.resolve();
   private activeSources: Set<AudioBufferSourceNode> = new Set();
 
+  /**
+   * Called with a predicted wall-clock timestamp (performance.now-based) for when audio playback should begin.
+   * Useful for dev-only latency metrics.
+   */
+  private onNextPlaybackScheduled: ((playbackStartPerfMs: number) => void) | null = null;
+
   async ensureStarted(): Promise<void> {
     if (!this.audioCtx) {
       const Ctx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
@@ -23,8 +29,17 @@ export class StreamingTtsPlayer {
     }
   }
 
-  enqueueBase64Mp3(audioBase64: string): void {
+  /**
+   * Enqueue a base64 MP3 chunk for playback.
+   * If `onPlaybackScheduled` is provided, it will be invoked once (next chunk only) with an estimated
+   * `performance.now()` timestamp for when playback should start.
+   */
+  enqueueBase64Mp3(
+    audioBase64: string,
+    onPlaybackScheduled?: (playbackStartPerfMs: number) => void
+  ): void {
     if (!audioBase64) return;
+    if (onPlaybackScheduled) this.onNextPlaybackScheduled = onPlaybackScheduled;
     this.decodeChain = this.decodeChain.then(async () => {
       await this.ensureStarted();
       if (!this.audioCtx || !this.gain) return;
@@ -52,6 +67,17 @@ export class StreamingTtsPlayer {
         console.warn("[TTS] source.start failed:", e);
         this.activeSources.delete(src);
         return;
+      }
+
+      // Estimate playback start time in wall-clock (performance.now) space.
+      // Note: this is an estimate; AudioContext scheduling is very accurate but decode time can vary.
+      if (this.onNextPlaybackScheduled) {
+        try {
+          const deltaSec = Math.max(0, startAt - now);
+          const perfStart = performance.now() + deltaSec * 1000;
+          this.onNextPlaybackScheduled(perfStart);
+        } catch {}
+        this.onNextPlaybackScheduled = null;
       }
 
       src.onended = () => {

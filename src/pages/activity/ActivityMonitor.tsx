@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Activity as ActivityIcon } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
+import { RealTimeListener } from '@/store/realTimeListener/RTL';
+import { useAuth } from '@/providers/AuthProvider';
 
 // Import visualization components
 import ActivityRiver from './visualizations/ActivityRiver';
@@ -55,97 +59,244 @@ const visualizationOptions = [
   { value: 'physics', label: 'Physics Card Wall', description: 'Cards with physics falling and stacking' },
 ];
 
+interface RTLMessage {
+  type: 'ping' | 'system' | 'error' | 'echo' | 'database';
+  operation?: string;
+  message?: string;
+  data?: any;
+  tenant_name?: string;
+  table?: string;
+  new_data?: any;
+  old_data?: any;
+  db_timestamp?: number;
+  client_timestamp?: string;
+  sessionId?: string;
+}
+
 export default function ActivityMonitor() {
   const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('river');
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const { user } = useAuth();
+  const users = useSelector((s: RootState) => (s as any).users?.value as any[] || []);
+  const priorities = useSelector((s: RootState) => (s as any).priorities?.value as any[] || []);
 
-  // Mock data generator for demonstration
-  const generateMockActivity = useCallback((): ActivityEvent => {
-    const types: ActivityEvent['type'][] = [
-      'task_created',
-      'task_updated',
-      'status_changed',
-      'message_sent',
-      'approval_requested',
-      'approval_decided',
-      'broadcast_sent',
-      'user_assigned',
-    ];
-    
-    const users = [
-      { id: 1, name: 'John Doe' },
-      { id: 2, name: 'Jane Smith' },
-      { id: 3, name: 'Mike Wilson' },
-      { id: 4, name: 'Sarah Johnson' },
-      { id: 5, name: 'Tom Brown' },
-    ];
+  // Convert RTL publication message to ActivityEvent
+  const convertPublicationToActivity = useCallback((data: RTLMessage): ActivityEvent | null => {
+    if (data.type !== 'database' || !data.table || !data.operation) {
+      console.debug('ActivityMonitor: Skipping non-database message', data.type);
+      return null;
+    }
 
-    const priorities: ActivityEvent['priority'][] = ['low', 'normal', 'high', 'urgent'];
-    
-    const type = types[Math.floor(Math.random() * types.length)];
-    const user = users[Math.floor(Math.random() * users.length)];
-    const priority = priorities[Math.floor(Math.random() * priorities.length)];
+    const table = data.table;
+    const operation = data.operation.toUpperCase();
+    const newData = data.new_data || {};
+    const oldData = data.old_data || {};
 
-    const titles: Record<ActivityEvent['type'], string[]> = {
-      task_created: ['Created new task', 'Added task', 'Started new task'],
-      task_updated: ['Updated task details', 'Modified task', 'Changed task info'],
-      status_changed: ['Moved to In Progress', 'Completed task', 'Changed status'],
-      message_sent: ['Sent team message', 'Posted update', 'Shared message'],
-      approval_requested: ['Requested approval', 'Sent for review', 'Asked for approval'],
-      approval_decided: ['Approved request', 'Rejected proposal', 'Made decision'],
-      broadcast_sent: ['Sent broadcast', 'Posted announcement', 'Shared news'],
-      user_assigned: ['Assigned task', 'Delegated work', 'Assigned to team member'],
+    // Helper to normalize userId to number
+    const normalizeUserId = (id: any): number | undefined => {
+      if (id === null || id === undefined) return undefined;
+      const numId = typeof id === 'number' ? id : Number(id);
+      return isNaN(numId) ? undefined : numId;
     };
 
-    const relatedUser = type === 'user_assigned' || type === 'approval_requested' 
-      ? users[Math.floor(Math.random() * users.length)].id 
-      : undefined;
+    // Determine activity type based on table and operation
+    let activityType: ActivityEvent['type'] | null = null;
+    let title = '';
+    let description = '';
+    let priority: ActivityEvent['priority'] | undefined = undefined;
+    let userId: number | undefined = undefined;
+    let relatedUserId: number | undefined = undefined;
 
-    return {
-      id: `${Date.now()}-${Math.random()}`,
-      type,
-      userId: user.id,
-      userName: user.name,
-      timestamp: new Date(),
-      title: titles[type][Math.floor(Math.random() * titles[type].length)],
-      description: `Task #${Math.floor(Math.random() * 1000)}`,
+    // Get user info from new_data or old_data
+    const getUserInfo = (data: any) => {
+      const userId = data.created_by || data.updated_by || data.user_id || data.assigned_to;
+      if (userId && users.length > 0) {
+        const user = users.find((u: any) => u.id === userId);
+        return user ? { id: userId, name: user.name || user.email || `User ${userId}` } : null;
+      }
+      return null;
+    };
+
+    // Map priority_id to activity priority level
+    const getPriorityLevel = (priorityId: any): ActivityEvent['priority'] | undefined => {
+      if (!priorityId) return undefined;
+      const priority = priorities.find((p: any) => p.id === priorityId);
+      if (!priority || !priority.name) return undefined;
+      
+      // Normalize priority name to lowercase and map to activity priority levels
+      const name = priority.name.toLowerCase().trim();
+      if (name === 'low') return 'low';
+      if (name === 'medium' || name === 'normal') return 'normal';
+      if (name === 'high') return 'high';
+      if (name === 'urgent') return 'urgent';
+      
+      // Default fallback based on common patterns
+      return 'normal';
+    };
+
+    // Handle different tables
+    switch (table) {
+      case 'wh_tasks':
+        if (operation === 'INSERT') {
+          activityType = 'task_created';
+          title = `Created task: ${newData.name || 'Untitled'}`;
+          description = newData.description || '';
+          priority = getPriorityLevel(newData.priority_id);
+          userId = normalizeUserId(newData.created_by);
+        } else if (operation === 'UPDATE') {
+          // Check if status changed
+          if (oldData.status_id !== newData.status_id) {
+            activityType = 'status_changed';
+            title = `Status changed for task: ${newData.name || 'Untitled'}`;
+            description = `Changed from status ${oldData.status_id} to ${newData.status_id}`;
+          } else {
+            activityType = 'task_updated';
+            title = `Updated task: ${newData.name || 'Untitled'}`;
+            description = newData.description || '';
+          }
+          priority = getPriorityLevel(newData.priority_id);
+          // Tasks only have created_by, no updated_by field
+          userId = normalizeUserId(newData.created_by);
+        }
+        break;
+
+      case 'wh_task_users':
+        if (operation === 'INSERT') {
+          activityType = 'user_assigned';
+          title = `User assigned to task`;
+          userId = normalizeUserId(newData.user_id);
+          relatedUserId = normalizeUserId(newData.task_id);
+        }
+        break;
+
+      case 'wh_broadcasts':
+        if (operation === 'INSERT') {
+          activityType = 'broadcast_sent';
+          title = `Broadcast sent: ${newData.name || newData.title || 'Untitled'}`;
+          description = newData.message || '';
+          userId = normalizeUserId(newData.created_by);
+        }
+        break;
+
+      case 'wh_task_approval_instances':
+        if (operation === 'INSERT') {
+          activityType = 'approval_requested';
+          title = `Approval requested`;
+          userId = normalizeUserId(newData.requested_by);
+          relatedUserId = normalizeUserId(newData.approver_id);
+        } else if (operation === 'UPDATE' && oldData.status !== newData.status) {
+          activityType = 'approval_decided';
+          title = `Approval ${newData.status === 'approved' ? 'approved' : 'rejected'}`;
+          userId = normalizeUserId(newData.approver_id);
+        }
+        break;
+
+      default:
+        // Generic activity for other tables
+        if (operation === 'INSERT') {
+          activityType = 'task_created';
+          title = `Created ${table.replace('wh_', '')}`;
+          userId = normalizeUserId(newData.created_by);
+        } else if (operation === 'UPDATE') {
+          activityType = 'task_updated';
+          title = `Updated ${table.replace('wh_', '')}`;
+          userId = normalizeUserId(newData.updated_by || newData.created_by);
+        }
+    }
+
+    if (!activityType) {
+      console.debug('ActivityMonitor: No activity type determined', { table, operation });
+      return null;
+    }
+
+    // Use current user as fallback if no userId found
+    if (!userId && user?.id) {
+      userId = typeof user.id === 'number' ? user.id : Number(user.id);
+      console.debug('ActivityMonitor: Using current user as fallback', userId);
+    }
+
+    // If still no userId, we can't create an activity
+    if (!userId) {
+      console.debug('ActivityMonitor: No userId found, skipping activity', { table, operation, newData });
+      return null;
+    }
+
+    const userInfo = getUserInfo(newData);
+    const userName = userInfo?.name || (users.find((u: any) => u.id === userId)?.name) || (users.find((u: any) => u.id === userId)?.email) || `User ${userId}`;
+
+    // Create timestamp from db_timestamp or use current time
+    // db_timestamp is Unix timestamp in seconds (with fractional seconds)
+    const timestamp = data.db_timestamp 
+      ? new Date(Math.floor(data.db_timestamp * 1000)) 
+      : new Date();
+
+    const activity: ActivityEvent = {
+      id: `${table}-${newData.id || oldData.id || Date.now()}-${Math.random()}`,
+      type: activityType,
+      userId,
+      userName,
+      timestamp,
+      title,
+      description,
       priority,
-      relatedUserId: relatedUser,
       metadata: {
-        taskId: Math.floor(Math.random() * 1000),
-        workspaceId: Math.floor(Math.random() * 10) + 1,
+        table,
+        operation,
+        ...newData,
       },
+      relatedUserId,
     };
-  }, []);
 
-  // Simulate real-time activity stream
+    console.debug('ActivityMonitor: Created activity', activity);
+    return activity;
+  }, [users, user, priorities]);
+
+  // Connect to real-time listener (RTL)
   useEffect(() => {
-    // Add initial activities
-    const initialActivities = Array.from({ length: 10 }, () => generateMockActivity());
-    setActivities(initialActivities);
-    setIsConnected(true);
+    if (!user) {
+      setIsConnected(false);
+      return;
+    }
 
-    // Generate new activities periodically
-    const interval = setInterval(() => {
-      const newActivity = generateMockActivity();
-      setActivities(prev => [newActivity, ...prev].slice(0, 50)); // Keep last 50
-    }, 3000); // New activity every 3 seconds
+    const rtl = new RealTimeListener({ debug: false });
 
-    return () => clearInterval(interval);
-  }, [generateMockActivity]);
+    // Handle publication messages
+    const handlePublication = (data: RTLMessage) => {
+      console.debug('ActivityMonitor: Received publication', data);
+      const activity = convertPublicationToActivity(data);
+      if (activity) {
+        console.debug('ActivityMonitor: Adding activity', activity);
+        setActivities(prev => [activity, ...prev].slice(0, 100)); // Keep last 100
+      } else {
+        console.debug('ActivityMonitor: No activity created from publication', data);
+      }
+    };
 
-  // TODO: Connect to real-time listener (RTL) here
-  // useEffect(() => {
-  //   const rtl = new RealTimeListener({ debug: true });
-  //   rtl.on('publication:received', (data) => {
-  //     // Convert publication data to ActivityEvent
-  //     const activity = convertPublicationToActivity(data);
-  //     setActivities(prev => [activity, ...prev].slice(0, 50));
-  //   });
-  //   rtl.connectAndHold();
-  //   return () => rtl.disconnect();
-  // }, []);
+    // Handle connection status
+    const handleConnectionStatus = (status: any) => {
+      if (status.status === 'connected') {
+        setIsConnected(true);
+      } else if (status.status === 'disconnected' || status.status === 'failed') {
+        setIsConnected(false);
+      }
+    };
+
+    rtl.on('publication:received', handlePublication);
+    rtl.on('connection:status', handleConnectionStatus);
+
+    // Connect to RTE
+    rtl.connectAndHold().catch((error) => {
+      console.error('Failed to connect to RTE:', error);
+      setIsConnected(false);
+    });
+
+    return () => {
+      rtl.off('publication:received', handlePublication);
+      rtl.off('connection:status', handleConnectionStatus);
+      rtl.disconnect();
+    };
+  }, [user, convertPublicationToActivity]);
 
   const selectedOption = useMemo(
     () => visualizationOptions.find(opt => opt.value === selectedVisualization),

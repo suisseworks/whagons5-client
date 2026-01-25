@@ -230,11 +230,10 @@ export const Workspace = () => {
   }), [filteredOrder]);
   
   const getDynamicTabInitialX = useMemo(() => {
-    return (prev: WorkspaceTabKey | string | null | undefined, next: WorkspaceTabKey | string): number => {
+    return (prev: WorkspaceTabKey | string | null | undefined, next: WorkspaceTabKey | string): string | number => {
       const prevStr = prev ? String(prev) : null;
       const nextStr = String(next);
-      const result = getTabInitialX(prevStr, nextStr, dynamicTabAnimation);
-      return typeof result === 'number' ? result : 0;
+      return getTabInitialX(prevStr, nextStr, dynamicTabAnimation);
     };
   }, [dynamicTabAnimation]);
 

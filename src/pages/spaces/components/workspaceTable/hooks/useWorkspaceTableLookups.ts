@@ -16,6 +16,8 @@ export interface WorkspaceTableLookupsParams {
   spots: any[];
   users: any[];
   categories: any[];
+  templates: any[];
+  forms: any[];
   statusTransitions: any[];
   slas: any[];
   tags: any[];
@@ -50,6 +52,26 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     [p.priorities, p.defaultCategoryId]
   );
   const tagMap = useMemo(() => createTagMap(p.tags), [p.tags]);
+
+  const templateMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const tpl of p.templates || []) {
+      const id = Number((tpl as any)?.id);
+      if (!Number.isFinite(id)) continue;
+      m[id] = tpl;
+    }
+    return m;
+  }, [p.templates]);
+
+  const formMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const f of p.forms || []) {
+      const id = Number((f as any)?.id);
+      if (!Number.isFinite(id)) continue;
+      m[id] = f;
+    }
+    return m;
+  }, [p.forms]);
 
   const taskTagsMap = useMemo(() => {
     const m = new Map<number, number[]>();
@@ -148,6 +170,8 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     userMap,
     filteredPriorities,
     tagMap,
+    templateMap,
+    formMap,
     taskTagsMap,
     categoryMap,
     workspaceCustomFields,

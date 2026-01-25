@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Message, ContentItem, ImageData, PdfData } from "../models";
 import AssistantMessageRenderer from "./AssistantMessageRenderer";
+import { getEnvVariables } from "@/lib/getEnvVariables";
 
 interface ChatMessageItemProps {
   message: Message;
@@ -21,6 +22,8 @@ const isPdfData = (content: any): content is PdfData => {
 const ChatMessageItem: React.FC<ChatMessageItemProps> = (props) => {
   const isUser = useMemo(() => props.message.role === "user", [props.message.role]);
   const isLast = useMemo(() => props.isLast, [props.isLast]);
+  const { VITE_DEVELOPMENT } = getEnvVariables();
+  const isDev = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
 
   const renderUserContent = () => {
     const content = props.message.content as string | ContentItem[] | { name: string };
@@ -93,12 +96,31 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = (props) => {
             <div className="p-2">{renderUserContent()}</div>
           </div>
         ) : (
-          <AssistantMessageRenderer
-            fullContent={props.message.content as any}
-            gettingResponse={props.gettingResponse && isLast}
-            isLast={isLast}
-            reasoning={props.message.reasoning}
-          />
+          <div className="w-full">
+            <AssistantMessageRenderer
+              fullContent={props.message.content as any}
+              gettingResponse={props.gettingResponse && isLast}
+              isLast={isLast}
+              reasoning={props.message.reasoning}
+            />
+            {isDev && typeof props.message.meta?.voiceTotalMs === "number" ? (
+              <div className="px-2 pb-1 text-[11px] text-muted-foreground">
+                Voice latency: {Math.max(0, Math.round(props.message.meta.voiceTotalMs))}ms
+                {typeof props.message.meta.voiceSttMs === "number" &&
+                  typeof props.message.meta.voiceLlmToPlaybackMs === "number" && (
+                    <>
+                      {" "}
+                      (STT {Math.max(0, Math.round(props.message.meta.voiceSttMs))}ms + LLM/TTS{" "}
+                      {Math.max(0, Math.round(props.message.meta.voiceLlmToPlaybackMs))}ms)
+                    </>
+                  )}
+              </div>
+            ) : isDev && typeof props.message.meta?.ttsTimeToPlaybackMs === "number" && (
+              <div className="px-2 pb-1 text-[11px] text-muted-foreground">
+                TTS time-to-playback: {Math.max(0, Math.round(props.message.meta.ttsTimeToPlaybackMs))}ms
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
