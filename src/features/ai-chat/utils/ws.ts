@@ -81,7 +81,13 @@ class SessionWSManager {
     ws.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data as string);
-        console.log(`[WS] Message received:`, data.type || 'unknown');
+        const label =
+          (data && typeof data.type === "string" && data.type) ||
+          (data && Array.isArray((data as any).parts) ? "parts" : "") ||
+          (data && typeof (data as any).event === "string" && (data as any).event) ||
+          (data && typeof (data as any).kind === "string" && (data as any).kind) ||
+          "unknown";
+        console.log(`[WS] Message received:`, label);
         
         const listeners = this.handlers.get(sessionId);
         if (listeners && listeners.size > 0) {
@@ -111,6 +117,30 @@ class SessionWSManager {
         wasClean: event.wasClean,
         at: Date.now(),
       });
+
+      // Notify listeners so UI can stop "loading forever" if the socket drops mid-stream/tool.
+      try {
+        const listeners = this.handlers.get(sessionId);
+        if (listeners && listeners.size > 0) {
+          const payload = {
+            type: "ws_closed",
+            session_id: sessionId,
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+            url: wsUrl,
+            at: Date.now(),
+          };
+          for (const fn of listeners) {
+            try {
+              fn(payload);
+            } catch (error) {
+              console.error("[WS] Handler error (ws_closed):", error);
+            }
+          }
+        }
+      } catch {}
+
       this.connections.delete(sessionId);
       
       const hasHandlers = this.handlers.get(sessionId)?.size || 0 > 0;

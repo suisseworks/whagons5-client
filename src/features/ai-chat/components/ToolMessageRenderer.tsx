@@ -5,6 +5,61 @@ import { useTheme } from "@/providers/ThemeProvider";
 
 const MAX_RENDER_CHARS = 20000;
 
+function extractFirstImageUrlFromText(text: string): string | null {
+  if (!text) return null;
+
+  // Prefer explicit markdown image syntax: ![alt](url)
+  const mdMatch = text.match(/!\[[^\]]*]\(([^)\s]+)\)/);
+  if (mdMatch && mdMatch[1]) return mdMatch[1];
+
+  // Fallback: any http(s) URL that looks like an image path.
+  const urlMatch = text.match(/https?:\/\/[^\s)"]+\/images\/[^\s)"]+/);
+  if (urlMatch && urlMatch[0]) return urlMatch[0];
+
+  // Fallback: any http(s) URL ending in common image extensions.
+  const extMatch = text.match(/https?:\/\/[^\s)"]+\.(png|jpe?g|webp|gif)(\?[^\s)"]+)?/i);
+  if (extMatch && extMatch[0]) return extMatch[0];
+
+  return null;
+}
+
+function extractImageUrlFromToolResult(toolName: string | undefined, toolResult: any, rawMessageContent: any): string | null {
+  // If the tool itself is Generate_Image, we expect a string result that often contains markdown.
+  const name = (toolName || "").trim();
+
+  const candidates: string[] = [];
+
+  // Most common shape in this app:
+  // message.content = { tool_call_id, name, content: <string|object> }
+  if (rawMessageContent && typeof rawMessageContent === "object") {
+    const c = (rawMessageContent as any).content;
+    if (typeof c === "string") candidates.push(c);
+  }
+
+  // Parsed tool result content computed in this component.
+  if (typeof toolResult === "string") candidates.push(toolResult);
+  if (toolResult && typeof toolResult === "object") {
+    if (typeof (toolResult as any).content === "string") candidates.push((toolResult as any).content);
+    if (typeof (toolResult as any).image_url === "string") candidates.push((toolResult as any).image_url);
+    if (typeof (toolResult as any).imageUrl === "string") candidates.push((toolResult as any).imageUrl);
+    if (typeof (toolResult as any).url === "string") candidates.push((toolResult as any).url);
+  }
+
+  // If tool is Generate_Image, be extra aggressive: stringify objects.
+  if (name === "Generate_Image" && toolResult && typeof toolResult === "object") {
+    try {
+      candidates.push(JSON.stringify(toolResult));
+    } catch {}
+  }
+
+  for (const c of candidates) {
+    const url = extractFirstImageUrlFromText(c);
+    if (url) return url;
+  }
+
+  return null;
+}
+
 interface ToolResult {
   content: string;
   name: string;
@@ -235,6 +290,10 @@ function ToolMessageRenderer({
 
   const callDetailsSizeInfo = useMemo(() => checkContentSize(toolCallInfo?.message?.content), [toolCallInfo]);
   const resultSizeInfo = useMemo(() => checkContentSize(parsedToolResultContent), [parsedToolResultContent]);
+  const generatedImageUrl = useMemo(() => {
+    const toolName = toolCallInfo?.toolName || (message.content as any)?.name;
+    return extractImageUrlFromToolResult(toolName, parsedToolResultContent, message.content);
+  }, [toolCallInfo?.toolName, message.content, parsedToolResultContent]);
 
   const [copiedCall, setCopiedCall] = useState(false);
   const [copiedResult, setCopiedResult] = useState(false);
@@ -340,6 +399,34 @@ function ToolMessageRenderer({
                   </svg>
                 </div>
               </button>
+
+              {/* Auto-render generated images even if the assistant doesn't output markdown. */}
+              {generatedImageUrl && (
+                <div className="px-3 pb-3 pt-2 border-t bg-gradient-to-b from-primary/5 to-transparent">
+                  <a
+                    href={generatedImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block"
+                    title="Open image in new tab"
+                  >
+                    <img
+                      src={generatedImageUrl}
+                      alt="Generated image"
+                      loading="lazy"
+                      className="max-h-[420px] w-auto rounded-md border shadow-sm"
+                      onError={(e) => {
+                        // If image fails to load, fall back to showing a broken image link in JSON section.
+                        try { (e.currentTarget as HTMLImageElement).style.display = "none"; } catch {}
+                      }}
+                    />
+                  </a>
+                  <div className="mt-2 text-xs text-muted-foreground break-all">
+                    {generatedImageUrl}
+                  </div>
+                </div>
+              )}
+
               <div
                 className="overflow-hidden transition-all duration-300 ease-in-out border-t-0 rounded-b-md bg-gradient-to-b from-primary/5 to-transparent shadow-sm"
                 style={{

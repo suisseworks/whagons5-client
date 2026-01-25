@@ -37,6 +37,11 @@ interface UseSpeechToTextOptions {
     minSpeechMs?: number;
     /** Require this many ms below stopThreshold before firing onSpeechEnd. */
     hangoverMs?: number;
+    /**
+     * Fail-safe: force a "speech end" after this many ms, even if the mic never drops below stopThreshold
+     * (e.g., noisy environments). Prevents the UI from getting stuck in "speaking" and permanently ducking TTS.
+     */
+    maxSpeechMs?: number;
   };
   /**
    * Two-letter language code (e.g., "en", "es") derived from the app's language setting.
@@ -61,6 +66,10 @@ export function useSpeechToText({
 }: UseSpeechToTextOptions) {
   const [isListening, setIsListening] = useState<boolean>(false);
   const isListeningRef = useRef<boolean>(false);
+  const [isStarting, setIsStarting] = useState<boolean>(false);
+  const isStartingRef = useRef<boolean>(false);
+  // Monotonic token to cancel an in-flight start when the user stops quickly or component unmounts.
+  const startSeqRef = useRef<number>(0);
   const [voiceLevel, setVoiceLevel] = useState<number>(0); // 0..1 (smoothed)
   const voiceLevelRef = useRef<number>(0);
   const lastLevelUpdateRef = useRef<number>(0);
@@ -158,6 +167,10 @@ export function useSpeechToText({
   }, []);
 
   const stopListening = useCallback(() => {
+    // Cancel any in-flight startListening() work.
+    startSeqRef.current++;
+    setIsStarting(false);
+    isStartingRef.current = false;
     setIsListening(false);
     isListeningRef.current = false;
     setVoiceLevel(0);
@@ -425,23 +438,21 @@ export function useSpeechToText({
   }, [conversationId, getSttWsBase, gettingResponse, stopListening]);
 
   const startListening = useCallback(async () => {
-    if (isListening) return;
+    if (isListeningRef.current || isStartingRef.current) return;
     if (!conversationId) return;
 
     try {
       // Close any previous session cleanly.
       stopListening();
-      setIsListening(true);
-      isListeningRef.current = true;
+      const mySeq = ++startSeqRef.current;
+      setIsStarting(true);
+      isStartingRef.current = true;
       setIsUserSpeaking(false);
 
       const lang = resolveLang();
       // IMPORTANT: Groq mode reads this ref when uploading the WAV.
       groqLangRef.current = lang;
 
-      if ((providerRef.current || provider) === "elevenlabs") {
-        await startListeningElevenlabs(lang);
-      }
       // Use built-in WebRTC audio processing. This is the "good" AEC most apps rely on.
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -450,6 +461,11 @@ export function useSpeechToText({
           autoGainControl: true,
         },
       });
+      if (startSeqRef.current !== mySeq) {
+        // User stopped before permission grant / device open finished.
+        try { stream.getTracks()?.forEach(t => t.stop()); } catch {}
+        return;
+      }
       sttStreamRef.current = stream;
 
       // MediaRecorder for visualization only (no persistence).
@@ -485,6 +501,7 @@ export function useSpeechToText({
         // In Groq mode we "prime" the recorder as soon as RMS crosses startTh,
         // so we don't cut off the first syllable while waiting minSpeechMs.
         primed: false,
+        speechStartedAt: 0,
       };
 
       processor.onaudioprocess = (event) => {
@@ -527,9 +544,11 @@ export function useSpeechToText({
         if (!enabled) return;
 
         const startTh = Number.isFinite(cfg.startThreshold) ? (cfg.startThreshold as number) : 0.02;
-        const stopTh = Number.isFinite(cfg.stopThreshold) ? (cfg.stopThreshold as number) : 0.012;
-        const minSpeechMs = Number.isFinite(cfg.minSpeechMs) ? (cfg.minSpeechMs as number) : 160;
-        const hangoverMs = Number.isFinite(cfg.hangoverMs) ? (cfg.hangoverMs as number) : 350;
+        // Slightly higher default stop threshold so we don't get stuck "speaking" in mild noise.
+        const stopTh = Number.isFinite(cfg.stopThreshold) ? (cfg.stopThreshold as number) : 0.015;
+        const minSpeechMs = Number.isFinite(cfg.minSpeechMs) ? (cfg.minSpeechMs as number) : 180;
+        const hangoverMs = Number.isFinite(cfg.hangoverMs) ? (cfg.hangoverMs as number) : 450;
+        const maxSpeechMs = Number.isFinite(cfg.maxSpeechMs) ? (cfg.maxSpeechMs as number) : 8000;
 
         if (!vadState.speaking) {
           if (rms >= startTh) {
@@ -545,6 +564,7 @@ export function useSpeechToText({
             if (nowMs - vadState.aboveSince >= minSpeechMs) {
               vadState.speaking = true;
               vadState.belowSince = 0;
+              vadState.speechStartedAt = nowMs;
               setIsUserSpeaking(true);
               try { onSpeechStartRef.current?.(); } catch {}
               // no-op for groq; utterance is already being buffered
@@ -560,12 +580,25 @@ export function useSpeechToText({
             vadState.aboveSince = 0;
           }
         } else {
-          if (rms <= stopTh) {
+          // Fail-safe: don't let VAD get stuck forever in noisy environments.
+          if (maxSpeechMs > 0 && vadState.speechStartedAt && nowMs - vadState.speechStartedAt >= maxSpeechMs) {
+            vadState.speaking = false;
+            vadState.aboveSince = 0;
+            vadState.belowSince = 0;
+            vadState.primed = false;
+            vadState.speechStartedAt = 0;
+            setIsUserSpeaking(false);
+            try { onSpeechEndRef.current?.(); } catch {}
+            if (p === "groq") {
+              finalizeGroqUtterance();
+            }
+          } else if (rms <= stopTh) {
             if (!vadState.belowSince) vadState.belowSince = nowMs;
             if (nowMs - vadState.belowSince >= hangoverMs) {
               vadState.speaking = false;
               vadState.aboveSince = 0;
               vadState.primed = false;
+              vadState.speechStartedAt = 0;
               setIsUserSpeaking(false);
               try { onSpeechEndRef.current?.(); } catch {}
               if (p === "groq") {
@@ -606,6 +639,19 @@ export function useSpeechToText({
       gain.connect(audioCtx.destination);
 
       // Groq mode: pre-roll is handled via the PCM ring buffer in `onaudioprocess`.
+
+      // If ElevenLabs streaming is selected, wait for the WS to be open *after* we have mic permission.
+      // This prevents the UI from saying "listening" while the browser is still prompting/connecting.
+      if ((providerRef.current || provider) === "elevenlabs") {
+        await startListeningElevenlabs(lang);
+        if (startSeqRef.current !== mySeq) return;
+      }
+
+      // Now we're actually ready to capture/stream audio.
+      setIsStarting(false);
+      isStartingRef.current = false;
+      setIsListening(true);
+      isListeningRef.current = true;
     } catch (err) {
       console.error("[STT] startListening failed:", err);
       stopListening();
@@ -642,6 +688,7 @@ export function useSpeechToText({
     voiceLevel,
     mediaRecorder,
     isUserSpeaking,
+    isStarting,
   };
 }
 

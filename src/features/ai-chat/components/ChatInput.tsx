@@ -10,6 +10,7 @@ interface ChatInputProps {
   gettingResponse: boolean;
   setIsListening?: (isListening: boolean) => void;
   isListening?: boolean;
+  isStarting?: boolean;
   voiceLevel?: number; // 0..1 (smoothed)
   mediaRecorder?: MediaRecorder | null;
   handleStopRequest: () => void;
@@ -393,7 +394,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               placeholder="Type your message here..."
               autoComplete="off"
               spellCheck={false}
-              disabled={isUploading() || props.isListening}
+              disabled={isUploading() || props.isListening || props.isStarting}
             />
 
             {props.isListening && props.mediaRecorder && (
@@ -480,6 +481,16 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
                       aria-label="Stop voice input"
                     >
                       <MicOff className="w-5 h-5" />
+                    </button>
+                  ) : props.isStarting ? (
+                    <button
+                      type="button"
+                      title="Starting microphone..."
+                      className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all opacity-80 cursor-not-allowed"
+                      disabled
+                      aria-label="Starting voice input"
+                    >
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-foreground/60 border-t-transparent" />
                     </button>
                   ) : textInput.trim() === "" && content.length === 0 ? (
                     <button
