@@ -4,23 +4,40 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 interface CheckboxFieldProps {
   options: string[];
   onOptionsChange: (options: string[]) => void;
   isEditing?: boolean;
+  // Controlled mode props for form filling - array of checked option values
+  value?: string[];
+  onChange?: (value: string[]) => void;
 }
 
-export function CheckboxField({ options, onOptionsChange, isEditing = true }: CheckboxFieldProps) {
+export function CheckboxField({ 
+  options, 
+  onOptionsChange, 
+  isEditing = true,
+  value: externalValue,
+  onChange
+}: CheckboxFieldProps) {
   // Ensure at least one empty option exists
   const currentOptions = options.length > 0 ? options : [''];
   
   // Check if "Other" option exists in the current options
   const hasOther = currentOptions.some(option => option.toLowerCase() === 'other');
   
-  // State for preview checkboxes
-  const [checkedValues, setCheckedValues] = useState<Record<string, boolean>>({});
+  // Internal state for uncontrolled mode (preview)
+  const [internalChecked, setInternalChecked] = useState<Record<string, boolean>>({});
+  
+  // Convert external array value to record format for internal use
+  const checkedValues = useMemo(() => {
+    if (externalValue !== undefined) {
+      return externalValue.reduce((acc, val) => ({ ...acc, [val]: true }), {} as Record<string, boolean>);
+    }
+    return internalChecked;
+  }, [externalValue, internalChecked]);
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...currentOptions];
@@ -46,10 +63,20 @@ export function CheckboxField({ options, onOptionsChange, isEditing = true }: Ch
   };
 
   const handleCheckboxChange = (option: string, checked: boolean) => {
-    setCheckedValues(prev => ({
-      ...prev,
-      [option]: checked
-    }));
+    if (onChange) {
+      // Controlled mode: update as array
+      const currentArray = externalValue || [];
+      const newArray = checked
+        ? [...currentArray, option]
+        : currentArray.filter(v => v !== option);
+      onChange(newArray);
+    } else {
+      // Uncontrolled mode: update internal record
+      setInternalChecked(prev => ({
+        ...prev,
+        [option]: checked
+      }));
+    }
   };
 
   // Rendered view - what users see when filling the form

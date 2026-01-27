@@ -6,13 +6,26 @@ import { Label } from "@/components/ui/label";
 
 interface NumberFieldProps {
   isEditing?: boolean;
+  // Controlled mode props for form filling
+  value?: number;
+  onChange?: (value: number) => void;
+  // Config from form field properties
+  allowDecimals?: boolean;
 }
 
-export function NumberField({ isEditing = true }: NumberFieldProps) {
-  // State for preview input value, default to 0
-  const [value, setValue] = useState<number>(0);
+export function NumberField({ 
+  isEditing = true,
+  value: externalValue,
+  onChange,
+  allowDecimals
+}: NumberFieldProps) {
+  // Internal state for uncontrolled mode (preview)
+  const [internalValue, setInternalValue] = useState<number>(0);
   // State for integer vs float mode (false = integer, true = float)
-  const [isFloat, setIsFloat] = useState<boolean>(false);
+  const [isFloat, setIsFloat] = useState<boolean>(allowDecimals ?? false);
+  
+  // Use external value if provided (controlled mode), otherwise internal
+  const value = externalValue !== undefined ? externalValue : internalValue;
 
   // Transform function to ensure values are always rounded to step increment
   const transformValue = (val: number): number => {
@@ -30,18 +43,24 @@ export function NumberField({ isEditing = true }: NumberFieldProps) {
     // NumberSelector now handles empty input internally, so we always get a valid number
     // If it's 0 from empty input, that's fine - user can type over it
     const transformed = transformValue(newValue);
-    setValue(transformed);
+    if (onChange) {
+      onChange(transformed);
+    } else {
+      setInternalValue(transformed);
+    }
   };
 
   // When switching modes, round the current value appropriately
   const handleModeChange = (checked: boolean) => {
     setIsFloat(checked);
-    if (checked) {
-      // Switching to float: round to 2 decimal places
-      setValue(Math.round(value * 100) / 100);
+    const newValue = checked 
+      ? Math.round(value * 100) / 100  // Switching to float: round to 2 decimal places
+      : Math.round(value);              // Switching to integer: round to nearest integer
+    
+    if (onChange) {
+      onChange(newValue);
     } else {
-      // Switching to integer: round to nearest integer
-      setValue(Math.round(value));
+      setInternalValue(newValue);
     }
   };
 

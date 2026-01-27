@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, lazy, Suspense, forwardRef, useCallback } from 'react';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
+import { FormFillDialog } from './formFillDialog';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { WorkspaceTableHandle } from './workspaceTable/types';
@@ -119,8 +120,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   );
 
   const handleRowClick = useCallback((e: any, onOpenTaskDialogCb?: (task: any) => void) => {
-    // Don't open dialog when clicking ID column, status cell, notes column, or config column
-    if (e?.column?.colId === 'id' || e?.column?.colId === 'status_id' || e?.column?.colId === 'notes' || e?.column?.colId === 'config') {
+    // Don't open dialog when clicking ID column, status cell, notes column, config column, or form column
+    if (e?.column?.colId === 'id' || e?.column?.colId === 'status_id' || e?.column?.colId === 'notes' || e?.column?.colId === 'config' || e?.column?.colId === 'form') {
       return;
     }
     
@@ -130,7 +131,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       const idCell = target.closest('.ag-cell[col-id="id"]');
       const notesCell = target.closest('.ag-cell[col-id="notes"]');
       const configCell = target.closest('.ag-cell[col-id="config"]');
-      if (statusCell || idCell || notesCell || configCell) return;
+      const formCell = target.closest('.ag-cell[col-id="form"]');
+      if (statusCell || idCell || notesCell || configCell || formCell) return;
     }
 
     if (onOpenTaskDialogCb && e?.data) onOpenTaskDialogCb(e.data);
@@ -172,6 +174,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     categories,
     templates,
     forms,
+    formVersions,
+    taskForms,
     statusTransitions,
     approvals,
     approvalApprovers,
@@ -204,6 +208,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     tagMap,
     templateMap,
     formMap,
+    formVersionMap,
+    taskFormsMap,
     taskTagsMap,
     categoryMap,
     workspaceCustomFields,
@@ -218,6 +224,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     categories,
     templates,
     forms,
+    formVersions,
+    taskForms,
     statusTransitions,
     slas,
     tags,
@@ -404,6 +412,36 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   // Use task deletion hook
   const { deleteDialogOpen, setDeleteDialogOpen, taskToDelete, handleDeleteTask, confirmDelete } = useTaskDeletion(gridRef, refreshGrid);
 
+  // Form fill dialog state
+  const [formDialogState, setFormDialogState] = useState<{
+    open: boolean;
+    taskId: number;
+    taskName?: string;
+    formId: number;
+    formVersionId: number;
+    existingTaskFormId?: number;
+    existingData?: Record<string, any>;
+  }>({
+    open: false,
+    taskId: 0,
+    formId: 0,
+    formVersionId: 0,
+  });
+
+  const handleOpenFormDialog = useCallback((params: {
+    taskId: number;
+    taskName?: string;
+    formId: number;
+    formVersionId: number;
+    existingTaskFormId?: number;
+    existingData?: Record<string, any>;
+  }) => {
+    setFormDialogState({
+      open: true,
+      ...params,
+    });
+  }, []);
+
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
     getStatusIcon,
@@ -446,15 +484,18 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     onDeleteTask: handleDeleteTask,
     onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
     slaMap,
+    taskFormsMap,
+    formVersionMap,
+    onOpenFormDialog: handleOpenFormDialog,
   } as any), [
-    statusMap, priorityMap, spotMap, userMap, tagMap, templateMap, formMap, taskTags, taskUsers,
+    statusMap, priorityMap, spotMap, userMap, tagMap, templateMap, formMap, formVersionMap, taskFormsMap, taskTags, taskUsers,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
     filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
     approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap,
     visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
-    getDoneStatusId,
+    getDoneStatusId, handleOpenFormDialog,
   ]);
 
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
@@ -620,6 +661,17 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         onOpenChange={setDeleteDialogOpen}
         onConfirm={confirmDelete}
         taskName={taskToDelete?.name}
+      />
+
+      <FormFillDialog
+        open={formDialogState.open}
+        onOpenChange={(open) => setFormDialogState(prev => ({ ...prev, open }))}
+        taskId={formDialogState.taskId}
+        taskName={formDialogState.taskName}
+        formId={formDialogState.formId}
+        formVersionId={formDialogState.formVersionId}
+        existingTaskFormId={formDialogState.existingTaskFormId}
+        existingData={formDialogState.existingData}
       />
     </Suspense>
   );

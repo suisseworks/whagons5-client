@@ -11,7 +11,7 @@ export const useColumnManagement = (workspaceId: string) => {
   }, [workspaceId]);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const allDefault = ['id', 'name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['id', 'name', 'config', 'form', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
@@ -61,7 +61,7 @@ export const useColumnManagement = (workspaceId: string) => {
       setColumnOrder([]);
     }
 
-    const allDefault = ['id', 'name', 'config', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
+    const allDefault = ['id', 'name', 'config', 'form', 'notes', 'status_id', 'priority_id', 'user_ids', 'due_date', 'spot_id', 'created_at'];
     try {
       const key = `wh_workspace_columns_${workspaceId || 'all'}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;

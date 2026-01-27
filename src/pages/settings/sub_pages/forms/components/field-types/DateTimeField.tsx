@@ -4,11 +4,29 @@ import { CalendarClock } from "lucide-react";
 
 interface DateTimeFieldProps {
   isEditing?: boolean;
+  // Controlled mode props for form filling
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
-export function DateTimeField({ isEditing = true }: DateTimeFieldProps) {
-  // State for preview input value
-  const [value, setValue] = useState<string>("");
+export function DateTimeField({ 
+  isEditing = true,
+  value: externalValue,
+  onChange
+}: DateTimeFieldProps) {
+  // Internal state for uncontrolled mode (preview)
+  const [internalValue, setInternalValue] = useState<string>("");
+  
+  // Use external value if provided (controlled mode), otherwise internal
+  const value = externalValue !== undefined ? externalValue : internalValue;
+  
+  const handleChange = (newValue: string) => {
+    if (onChange) {
+      onChange(newValue);
+    } else {
+      setInternalValue(newValue);
+    }
+  };
 
   // Show the actual datetime input in both edit and preview modes
   return (
@@ -17,7 +35,7 @@ export function DateTimeField({ isEditing = true }: DateTimeFieldProps) {
         <Input
           type="datetime-local"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           disabled={isEditing}
           className="pr-10"
           onClick={(e) => {
