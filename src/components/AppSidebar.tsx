@@ -536,12 +536,16 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
     ? workspaces as any
     : (initialWorkspaces || []);
 
+  const workspaceIconKey = displayWorkspaces
+    .map((workspace) => `${workspace.id}:${workspace.icon ?? ''}`)
+    .join('|');
+
   // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
   const uniqueWorkspaces = useMemo(() => {
     const map = new Map<string, Workspace>();
     for (const w of displayWorkspaces) map.set(String(w.id), w);
     return Array.from(map.values());
-  }, [displayWorkspaces]);
+  }, [displayWorkspaces, workspaceIconKey]);
 
 
   // Note: clearError action not available in generic slices
@@ -620,19 +624,23 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Load workspace icons when workspaces change
   useEffect(() => {
     const loadWorkspaceIcons = async () => {
-      const iconNames = uniqueWorkspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
-      if (iconNames.length > 0) {
-        try {
-          const icons = await iconService.loadIcons(iconNames);
-          setWorkspaceIcons(icons);
-        } catch (error) {
-          console.error('Error loading workspace icons:', error);
-        }
+      const iconNames = uniqueWorkspaces
+        .map((workspace: Workspace) => workspace.icon)
+        .filter((iconName): iconName is string => typeof iconName === 'string' && iconName.length > 0);
+      if (iconNames.length === 0) {
+        setWorkspaceIcons({});
+        return;
+      }
+      try {
+        const icons = await iconService.loadIcons(iconNames);
+        setWorkspaceIcons(icons);
+      } catch (error) {
+        console.error('Error loading workspace icons:', error);
       }
     };
 
     loadWorkspaceIcons();
-  }, [uniqueWorkspaces]);
+  }, [uniqueWorkspaces, workspaceIconKey]);
 
   // Preload common icons on component mount
   useEffect(() => {

@@ -1,20 +1,8 @@
 import { auth } from '@/firebase/firebaseConfig';
-import {
-  encryptRow,
-  decryptRow,
-  ensureCEK as workerEnsureCEK,
-  CryptoHandler,
-  WrappedKEKEnvelope,
-  rewrapCekBlobWithWrappedKEK,
-  rewrapCekBlobWithRawKEK,
-  hasKEK,
-} from '@/crypto/crypto';
-import { getCurrentTenant } from '@/api/whagonsApi';
-import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.14.0';
+const CURRENT_DB_VERSION = '1.15.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -28,9 +16,6 @@ export class DB {
   // Per-store operation queue to serialize actions over the same object store
   private static storeQueues: Map<string, Promise<any>> = new Map();
 
-  // Per-store encryption overrides (true = enabled, false = disabled)
-  private static storeEncryptionOverrides: Map<string, boolean> = new Map();
-
   private static runExclusive<T>(storeName: string, fn: () => Promise<T>): Promise<T> {
     const tail = DB.storeQueues.get(storeName) || Promise.resolve();
     const next = tail.catch(() => {}).then(fn);
@@ -39,29 +24,6 @@ export class DB {
     return next;
   }
 
-  // Allow callers to toggle encryption on a per-store basis (e.g., disable for 'tasks')
-  public static setEncryptionForStore(storeName: string, enabled: boolean): void {
-    DB.storeEncryptionOverrides.set(storeName, enabled);
-  }
-
-  public static getEncryptionForStore(storeName: string): boolean {
-    const override = DB.storeEncryptionOverrides.get(storeName);
-    if (override !== undefined) return override;
-    return DB.ENCRYPTION_ENABLED;
-  }
-
-  private static isEncryptionEnabledForStore(storeName: string): boolean {
-    // First check explicit runtime overrides
-    const override = DB.storeEncryptionOverrides.get(storeName);
-    if (override !== undefined) return override;
-    
-    // Then check static config from encryptionConfig.ts (synchronous fallback)
-    if (DISABLED_ENCRYPTION_STORES.includes(storeName)) {
-      return false;
-    }
-    
-    return DB.ENCRYPTION_ENABLED;
-  }
 
   static async init(uid?: string): Promise<boolean> {
     if (DB.inited) return true;
@@ -386,16 +348,6 @@ export class DB {
           if (!db.objectStoreNames.contains('tenant_availability')) {
             db.createObjectStore('tenant_availability', { keyPath: 'tenantName' });
           }
-          // Keys store for per-store Content Encryption Keys (CEKs)
-          if (!db.objectStoreNames.contains('cache_keys')) {
-            const ks = db.createObjectStore('cache_keys', { keyPath: 'store' });
-            ks.createIndex('store_idx', 'store', { unique: true });
-            // store -> { wrappedCEK: { iv, ct }, kid }
-          }
-          // Crypto provisioning metadata
-          if (!db.objectStoreNames.contains('crypto_meta')) {
-            db.createObjectStore('crypto_meta', { keyPath: 'key' });
-          }
         };
 
         request.onerror = () => {
@@ -428,7 +380,6 @@ export class DB {
     })();
 
     await DB.initPromise;
-    await CryptoHandler.init();
     return DB.inited;
   }
 
@@ -686,16 +637,6 @@ export class DB {
     return DB.db.transaction(name, mode).objectStore(name);
   }
 
-  // --- Encryption-aware convenience facade ---
-
-  private static get ENCRYPTION_ENABLED(): boolean {
-    // Allow explicit toggle via VITE_CACHE_ENCRYPTION, otherwise disable in development
-    const explicit = (import.meta as any).env?.VITE_CACHE_ENCRYPTION;
-    if (explicit === 'true') return true;
-    if (explicit === 'false') return false;
-    return (import.meta as any).env?.VITE_DEVELOPMENT !== 'true';
-  }
-
   private static toKey(key: number | string): number | string {
     // Most stores use numeric id; allow string keys for flexibility
     const n = Number(key);
@@ -768,47 +709,7 @@ export class DB {
         }
       }
       
-      // If any encrypted rows exist (even if encryption is currently disabled),
-      // attempt to decrypt for backward compatibility with previously-encrypted caches
-      const hasEncrypted = rows.some((r) => r && r.enc && r.enc.ct);
-      if (!hasEncrypted) {
-        return rows.filter((r) => r != null);
-      }
-      
-      // For encrypted rows, ensure crypto is initialized and CEK ready
-      if (hasEncrypted) {
-        if (!CryptoHandler.inited) await CryptoHandler.init();
-        try {
-          const ready = CryptoHandler.inited && !!CryptoHandler.kid;
-          if (ready) {
-            const cekReady = await DB.ensureCEKForStore(storeName);
-            if (!cekReady) {
-              console.log('CEK not ready for', storeName, '- cannot decrypt');
-              return [] as any[];
-            }
-          } else {
-            console.log('kek not ready', storeName);
-            return [] as any[];
-          }
-        } catch {
-          console.log('error', storeName);
-          /* proceed; decrypt will skip on failure */
-        }
-      }
-      const out: any[] = [];
-      for (const r of rows) {
-        try {
-          if (r && r.enc && r.enc.ct && r.enc.iv) {
-            const dec = await DB.decryptEnvelope(storeName, r);
-            if (dec != null) out.push(dec);
-          } else if (r != null) {
-            out.push(r);
-          }
-        } catch (_e) {
-          console.log('error decrypting', storeName);
-        }
-      }
-      return out;
+      return rows.filter((r) => r != null);
     });
   }
 
@@ -880,8 +781,7 @@ export class DB {
         }
       }
       if (!rec) return null;
-      if (!DB.isEncryptionEnabledForStore(storeName) || !(rec && rec.enc && rec.enc.ct)) return rec;
-      return await DB.decryptEnvelope(storeName, rec);
+      return rec;
     });
   }
 
@@ -929,31 +829,7 @@ export class DB {
         }
       } catch {}
 
-      // Use the defensive copy
-      let payload: any = rowCopy;
-      if (DB.isEncryptionEnabledForStore(storeName)) {
-        const env = await DB.encryptEnvelope(storeName, rowCopy);
-        if (!env) {
-          console.warn(`[DB] Storing ${storeName} row unencrypted due to encryption failure (CEK may not be ready yet)`);
-          payload = rowCopy; // Store unencrypted as fallback to prevent data loss
-        } else {
-          payload = env;
-        }
-        // Extra debug: post-encrypt envelope check
-        try {
-          const dbg = localStorage.getItem('wh-debug-cache') === 'true';
-          if (dbg) {
-            console.log('DB.put: post-encrypt envelope', {
-              storeName,
-              payloadType: typeof payload,
-              payloadHasId: payload && (payload.id !== undefined && payload.id !== null),
-              payloadId: payload?.id,
-              hasEnc: !!payload?.enc,
-              encKeys: payload?.enc ? Object.keys(payload.enc) : [],
-            });
-          }
-        } catch {}
-      }
+      const payload: any = rowCopy;
 
 
       // Catch InvalidStateError and retry once after ensuring DB is ready
@@ -1031,27 +907,7 @@ export class DB {
       }
       if (!DB.inited) await DB.init();
 
-      // Same rationale as put(): precompute all encryption material before opening
-      // the write transaction so it remains active for the duration of the puts.
-      let payloads: any[] = rows;
-      if (DB.isEncryptionEnabledForStore(storeName)) {
-        const envelopes: any[] = [];
-        let encryptionFailed = false;
-        for (const r of rows) {
-          const env = await DB.encryptEnvelope(storeName, r);
-          if (env !== null) {
-            envelopes.push(env);
-          } else {
-            // Encryption failed - store unencrypted as fallback to prevent data loss
-            envelopes.push(r);
-            encryptionFailed = true;
-          }
-        }
-        if (encryptionFailed) {
-          console.warn(`[DB] Some ${storeName} rows stored unencrypted due to encryption failures (CEK may not be ready yet)`);
-        }
-        payloads = envelopes;
-      }
+      const payloads: any[] = rows;
       // Catch InvalidStateError and retry once after ensuring DB is ready
       try {
         const tx = DB.db.transaction(storeName, 'readwrite');
@@ -1156,223 +1012,4 @@ export class DB {
     });
   }
 
-  public static async clearCryptoStores(): Promise<void> {
-    if (!DB.inited) await DB.init();
-    DB.getStoreWrite('cache_keys' as any).clear();
-    DB.getStoreWrite('crypto_meta' as any).clear();
-  }
-
-  // --- Encryption helpers ---
-  private static async encryptEnvelope(
-    storeName: string,
-    row: any
-  ): Promise<any | null> {
-    const cekReady = await DB.ensureCEKForStore(storeName);
-    if (!cekReady) {
-      console.warn(`[DB] Encryption failed for ${storeName}: CEK not ready, not storing`);
-      return null; // Don't store the data
-    }
-    const id = row?.id ?? row?.ID ?? row?.Id;
-    // Use worker for encryption for isolation
-    try {
-      const tenant = getCurrentTenant();
-      const overrides = tenant ? { tenant } : undefined;
-      return await encryptRow(storeName, id, row, overrides);
-    } catch (e) {
-      console.warn(`[DB] Encryption failed for ${storeName}: ${e}, not storing`);
-      return null; // Don't store the data
-    }
-  }
-
-  private static async decryptEnvelope(
-    storeName: string,
-    env: any
-  ): Promise<any> {
-
-    const cekReady = await DB.ensureCEKForStore(storeName);
-    if (!cekReady) {
-      console.warn(`[DB] Decryption skipped for ${storeName}: CEK not ready`);
-      return null;
-    }
-
-    try {
-      const row = await decryptRow(storeName, env);
-
-      return row;
-    } catch (e) {
-      // If CEK wasn't ready yet, try to ensure and retry once
-      if (String((e as any)?.message || e).includes('CEK not ready')) {
-        try {
-          const retryReady = await DB.ensureCEKForStore(storeName);
-          if (!retryReady) {
-            console.warn('[DB] decryptEnvelope retry failed: CEK not ready');
-            return null;
-          }
-          const row = await decryptRow(storeName, env);
-          return row;
-        } catch (e2) {
-          console.warn('[DB] decryptEnvelope retry failed', storeName, e2);
-          return null;
-        }
-      }
-      console.warn('[DB] decryptEnvelope failed', storeName, e);
-      return null;
-    }
-  }
-
-  public static async ensureCEKForStore(storeName: string): Promise<boolean> {
-    return DB.runExclusive('cache_keys', async () => {
-      if (DB.nuking) return false;
-      if (DB.deleting) {
-        // When DB is being deleted/closed, skip CEK work silently
-        return false;
-      }
-      if (!DB.inited) await DB.init();
-      if (CryptoHandler.kid == null || !CryptoHandler.inited) {
-        await CryptoHandler.init();
-      }
-
-      // Check if crypto is available at all
-      if (!CryptoHandler.kid) {
-        return false;
-      }
-
-      if (!DB.db) {
-        if (DB.deleting) {
-          // Transient during deletion/version change
-          return false;
-        }
-        console.warn('[DB] ensureCEKForStore: DB not ready');
-        return false;
-      }
-
-      let existingRec: any = null;
-      try {
-        // Read existing entry using explicit transaction and await completion
-        const rtx = DB.db.transaction('cache_keys', 'readonly');
-        const rstore = rtx.objectStore('cache_keys' as any);
-        const rreq = rstore.get(storeName);
-        const existing = await new Promise<any>((resolve) => {
-          rreq.onsuccess = () => resolve(rreq.result);
-          rreq.onerror = () => resolve(null);
-        });
-        existingRec = existing;
-        await new Promise<void>((resolve, reject) => {
-          rtx.oncomplete = () => resolve();
-          rtx.onerror = () => reject(rtx.error as any);
-          rtx.onabort = () => reject(rtx.error as any);
-        });
-
-        const result = await workerEnsureCEK(storeName, existing?.wrappedCEK ?? null);
-
-        // If workerEnsureCEK succeeds, CEK is ready for this store
-        if (result.ok) {
-          // Save the wrapped CEK if we generated a new one and don't have an existing entry
-          if (!existingRec && result.wrappedCEK) {
-            const wtx = DB.db.transaction('cache_keys', 'readwrite');
-            const wstore = wtx.objectStore('cache_keys' as any);
-            wstore.put({ store: storeName, wrappedCEK: result.wrappedCEK, kid: CryptoHandler.kid, createdAt: Date.now() });
-            await new Promise<void>((resolve, reject) => {
-              wtx.oncomplete = () => resolve();
-              wtx.onerror = () => reject(wtx.error as any);
-              wtx.onabort = () => reject(wtx.error as any);
-            });
-          }
-          return true;
-        } else {
-          console.warn(`[DB] ensureCEKForStore failed for ${storeName}:`, result.error);
-          const isUnwrap = String(result?.error || '').toLowerCase().includes('unwrap');
-          const kekReady = await hasKEK();
-          const hasWrapped = !!existingRec?.wrappedCEK;
-          if (isUnwrap && kekReady && CryptoHandler.kid && hasWrapped) {
-            await DB.handleCryptoMismatch(`ensureCEK-${storeName}`);
-          }
-          return false;
-        }
-      } catch (error) {
-        const msg = String((error as any)?.message || '');
-        const name = (error as any)?.name;
-        const isClosing =
-          name === 'InvalidStateError' ||
-          msg.includes('connection is closing') ||
-          msg.includes("Failed to execute 'transaction'");
-
-        if (isClosing || DB.deleting) {
-          // Transient DB closure during delete/version-change; skip CEK ensure without treating as crypto mismatch
-          console.warn(`[DB] ensureCEKForStore transient DB error for ${storeName} (connection closing); skipping`);
-          return false;
-        }
-
-        console.warn(`[DB] ensureCEKForStore error for ${storeName}:`, error);
-        const isUnwrap = String((error as any)?.message || error || '').toLowerCase().includes('unwrap');
-        const kekReady = await hasKEK();
-        const hasWrapped = !!existingRec?.wrappedCEK;
-        if (isUnwrap && kekReady && CryptoHandler.kid && hasWrapped) {
-          await DB.handleCryptoMismatch(`ensureCEK-exc-${storeName}`);
-        }
-        return false;
-      }
-    });
-  }
-
-  // --- Rotation helpers ---
-  public static async rewrapAllCEKs(params: {
-    newKid: string;
-    wrappedKEKEnvelope?: WrappedKEKEnvelope;
-    rawKEKBase64?: string;
-  }): Promise<void> {
-    if (!DB.inited) await DB.init();
-    const ksRead = DB.getStoreRead('cache_keys' as any);
-    const getAllReq = ksRead.getAll();
-    const entries = await new Promise<any[]>((resolve) => {
-      getAllReq.onsuccess = () => resolve(getAllReq.result || []);
-      getAllReq.onerror = () => resolve([]);
-    });
-    if (!entries.length) return;
-    const ksWrite = DB.getStoreWrite('cache_keys' as any);
-    for (const entry of entries) {
-      if (!entry?.wrappedCEK) continue;
-      try {
-        let newWrapped;
-        if (params.wrappedKEKEnvelope) {
-          newWrapped = await rewrapCekBlobWithWrappedKEK(
-            entry.wrappedCEK,
-            params.wrappedKEKEnvelope
-          );
-        } else if (params.rawKEKBase64) {
-          newWrapped = await rewrapCekBlobWithRawKEK(
-            entry.wrappedCEK,
-            params.rawKEKBase64
-          );
-        } else {
-          continue;
-        }
-        ksWrite.put({
-          store: entry.store,
-          wrappedCEK: newWrapped,
-          kid: params.newKid,
-          createdAt: entry.createdAt || Date.now(),
-        });
-      } catch (_e) {
-        // If rewrap fails for one store, skip and continue others
-      }
-    }
-  }
-
-  // --- Crypto mismatch recovery helpers ---
-  private static async handleCryptoMismatch(trigger: string): Promise<void> {
-    try {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
-      DB.nuking = true;
-      console.warn('Crypto mismatch detected, nuking IndexedDB and reloading...', trigger);
-      await DB.deleteDatabase(uid);
-      try { console.warn('Database delete requested; reloading'); } catch {}
-      try { DB.inited = false; DB.db = undefined as any; } catch {}
-      // Reload to re-onboard and reprovision fresh keys
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.reload();
-      }
-    } catch {}
-  }
 }

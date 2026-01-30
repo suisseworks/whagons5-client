@@ -33,10 +33,11 @@ import {
 import { useSpeechToText } from "./hooks/useSpeechToText";
 import "./styles.css";
 
-const { VITE_API_URL, VITE_CHAT_URL, VITE_DEVELOPMENT } = getEnvVariables();
+const { VITE_API_URL, VITE_CHAT_URL, VITE_DEVELOPMENT, VITE_CLIENT_ID } = getEnvVariables();
 // Use separate chat URL, fallback to API URL, then to current origin
 const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
 const IS_DEV = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
+const CLIENT_ID = VITE_CLIENT_ID || "";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -1140,6 +1141,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         },
         language_code: appLanguageCode,
       };
+      if (CLIENT_ID) {
+        messagePayload.client_id = CLIENT_ID;
+      }
       if (userContext) {
         messagePayload.user_context = userContext;
       }

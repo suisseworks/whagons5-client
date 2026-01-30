@@ -18,11 +18,7 @@ import {store } from './store';
 // import { DB } from './store/indexedDB/DB';
 // import * as CryptoAPI from './crypto/crypto';
 // import { genericActions } from './store/genericSlices';
-import { applyEncryptionConfig } from './config/encryptionConfig';
 import { initFontStyle } from './utils/fontStyle';
-
-// Initialize encryption configuration
-applyEncryptionConfig();
 
 // Initialize font style
 initFontStyle();

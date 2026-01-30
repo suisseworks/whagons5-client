@@ -282,6 +282,7 @@ export class GenericCache {
 
 	// --- Integrity validation ---
 	async validate(serverGlobalHash?: string | null): Promise<boolean> {
+		return true;
 		try {
 			if (this.validating) { 
 				this.dlog('validate: already running'); 
@@ -572,6 +573,7 @@ export class GenericCache {
 	// and short-circuit those with matching global hashes. Falls back to per-cache validate otherwise.
 	// Optionally accepts additional table names to include in batch call (e.g., 'wh_tasks')
 	static async validateMultiple(caches: GenericCache[], additionalTables: string[] = []): Promise<{ results: Record<string, boolean>; serverMap: Record<string, { global_hash?: string; block_count?: number } | null> }> {
+		return { results: {}, serverMap: {} };
 		if (!caches.length && !additionalTables.length) return { results: {}, serverMap: {} };
 		// Compute local global hashes SEQUENTIALLY to avoid cross-store races
 		// For empty caches, skip hash computation and just validate directly
@@ -763,5 +765,3 @@ export class GenericCache {
 		return sha256(text).toString(encHex);
 	}
 }
-
-

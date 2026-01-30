@@ -44,29 +44,9 @@ export function useWorkspaceChange(opts: {
         
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const taskCount = countResp?.rowCount ?? 0;
-        
-        // If no tasks found and we're viewing a specific workspace (not 'all'), 
-        // try fetching from API to ensure cache is up to date
-        if (taskCount === 0 && workspaceId !== 'all' && workspaceId !== 'shared') {
-          try {
-            await TasksCache.fetchTasks();
-          } catch (fetchError: any) {
-            const errorMessage = `[useWorkspaceChange] Failed to fetch tasks for workspace ${workspaceId}`;
-            const errorDetails = fetchError?.message || fetchError?.toString() || 'Unknown error';
-            
-            console.error(errorMessage, {
-              workspaceId,
-              error: errorDetails,
-              stack: fetchError?.stack,
-              response: fetchError?.response?.data,
-            });
-            
-            setError(errorMessage);
-            // Cache will be updated on next validation
-          }
-        }
-        
-        // Refresh grid after checking/fetching
+
+        // Refresh grid after checking
+        // Note: Sync stream (DataManager) handles task cache updates automatically
         if (gridRef.current?.api) {
           refreshGrid();
         }
