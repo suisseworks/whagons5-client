@@ -6,6 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SchedulerEvent, SchedulerResource } from "../types/scheduler";
+import {
+  combineLocalDateAndTime,
+  formatLocalDateInput,
+  formatLocalTimeInput,
+  snapDateToInterval,
+} from "../utils/dateTime";
 
 interface EventEditorProps {
   event: SchedulerEvent | null;
@@ -46,33 +52,31 @@ export default function EventEditor({
       setName(event.name);
       const start = new Date(event.startDate);
       const end = new Date(event.endDate);
-      setStartDate(start.toISOString().split("T")[0]);
-      setStartTime(start.toTimeString().slice(0, 5));
-      setEndDate(end.toISOString().split("T")[0]);
-      setEndTime(end.toTimeString().slice(0, 5));
+      setStartDate(formatLocalDateInput(start));
+      setStartTime(formatLocalTimeInput(start));
+      setEndDate(formatLocalDateInput(end));
+      setEndTime(formatLocalTimeInput(end));
       setSelectedResourceIds([event.resourceId]);
     } else if (mode === "create") {
       if (createEventData) {
         // Use clicked position for new event
         const start = new Date(createEventData.date);
-        // Round to nearest 15 minutes
-        const minutes = Math.round(start.getMinutes() / 15) * 15;
-        start.setMinutes(minutes, 0, 0);
+        const snappedStart = snapDateToInterval(start, 15 * 60 * 1000);
         
-        const end = new Date(start);
+        const end = new Date(snappedStart);
         end.setHours(end.getHours() + 1); // Default 1 hour duration
         
-        setStartDate(start.toISOString().split("T")[0]);
-        setStartTime(start.toTimeString().slice(0, 5));
-        setEndDate(end.toISOString().split("T")[0]);
-        setEndTime(end.toTimeString().slice(0, 5));
+        setStartDate(formatLocalDateInput(snappedStart));
+        setStartTime(formatLocalTimeInput(snappedStart));
+        setEndDate(formatLocalDateInput(end));
+        setEndTime(formatLocalTimeInput(end));
         setSelectedResourceIds([resources[createEventData.resourceIndex]?.id].filter(Boolean) as number[]);
       } else {
         // Default to today, 9 AM - 10 AM
         const now = new Date();
-        setStartDate(now.toISOString().split("T")[0]);
+        setStartDate(formatLocalDateInput(now));
         setStartTime("09:00");
-        setEndDate(now.toISOString().split("T")[0]);
+        setEndDate(formatLocalDateInput(now));
         setEndTime("10:00");
         setSelectedResourceIds([]);
       }
@@ -94,8 +98,8 @@ export default function EventEditor({
 
     setIsSaving(true);
     try {
-      const start = new Date(`${startDate}T${startTime}`);
-      const end = new Date(`${endDate}T${endTime}`);
+      const start = combineLocalDateAndTime(startDate, startTime);
+      const end = combineLocalDateAndTime(endDate, endTime);
 
       if (end <= start) {
         alert("End date/time must be after start date/time");

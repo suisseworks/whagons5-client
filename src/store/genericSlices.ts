@@ -64,14 +64,14 @@ const genericSliceConfigs = [
     // File Management
     { name: 'taskAttachments', table: 'wh_task_attachments', endpoint: '/task-attachments', store: 'task_attachments', hashFields: ['id','uuid','task_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
     { name: 'taskNotes', table: 'wh_task_notes', endpoint: '/task-notes', store: 'task_notes', hashFields: ['id','uuid','task_id','note','user_id','updated_at'] },
-    { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','updated_at'] },
+    { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','rrule','dtstart','duration_minutes','name','description','workspace_id','category_id','team_id','template_id','priority_id','status_id','user_ids','created_by','is_active','last_generated_at','count','occurrences_generated','custom_field_values','updated_at'] },
     { name: 'workspaceChat', table: 'wh_workspace_chat', endpoint: '/workspace-chat', store: 'workspace_chat', hashFields: ['id','uuid','workspace_id','message','user_id','updated_at'] },
 
     // Error Tracking
     { name: 'exceptions', table: 'wh_exceptions', endpoint: '/exceptions', store: 'exceptions', hashFields: ['id','workspace_id','user_id','role_id','updated_at'] },
 
     // Core Entities (converted from custom to generic)
-    { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','approval_id','team_id','workspace_id','updated_at'] },
+    { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','reporting_team_ids','celebration_effect','dialog_layout','updated_at'] },
     { name: 'categoryCustomFields', table: 'wh_category_custom_field', endpoint: '/category-custom-fields', store: 'category_custom_fields', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },

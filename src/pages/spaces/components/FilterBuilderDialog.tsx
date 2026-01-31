@@ -198,56 +198,60 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t('workspace.filters.title', 'Filters')}</DialogTitle>
-          <DialogDescription>{t('workspace.filters.description', 'Build a custom filter and optionally save it for reuse.')}</DialogDescription>
+          <DialogDescription className="text-muted-foreground/80">{t('workspace.filters.description', 'Build a custom filter and optionally save it for reuse.')}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>{t('workspace.filters.status', 'Status')}</Label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.status', 'Status')}</Label>
             <MultiSelectCombobox
               options={statusSelectOptions}
               value={selectedStatuses.map(String)}
               onValueChange={(vals) => setSelectedStatuses(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
               placeholder={t('workspace.filters.anyStatus', 'Any status')}
               searchPlaceholder={t('workspace.filters.searchStatuses', 'Search statuses...')}
+              className="font-normal"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>{t('workspace.filters.priority', 'Priority')}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.priority', 'Priority')}</Label>
             <MultiSelectCombobox
               options={prioritySelectOptions}
               value={selectedPriorities.map(String)}
               onValueChange={(vals) => setSelectedPriorities(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
               placeholder={t('workspace.filters.anyPriority', 'Any priority')}
               searchPlaceholder={t('workspace.filters.searchPriorities', 'Search priorities...')}
+              className="font-normal"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>{t('workspace.filters.location', 'Location')}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.location', 'Location')}</Label>
             <MultiSelectCombobox
               options={spotSelectOptions}
               value={selectedSpots.map(String)}
               onValueChange={(vals) => setSelectedSpots(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
               placeholder={t('workspace.filters.anyLocation', 'Any location')}
               searchPlaceholder={t('workspace.filters.searchLocations', 'Search locations...')}
+              className="font-normal"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>{t('workspace.filters.owner', 'Owner')}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.owner', 'Owner')}</Label>
             <MultiSelectCombobox
               options={ownerSelectOptions}
               value={selectedOwners.map(String)}
               onValueChange={(vals) => setSelectedOwners(vals.map(v => Number(v)).filter((n) => Number.isFinite(n)))}
               placeholder={t('workspace.filters.anyOwner', 'Any owner')}
               searchPlaceholder={t('workspace.filters.searchOwners', 'Search owners...')}
+              className="font-normal"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>{t('workspace.filters.tags', 'Tags')}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.tags', 'Tags')}</Label>
             <TagMultiSelect
               tags={tagOptions}
               value={selectedTags}
@@ -257,10 +261,10 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>{t('workspace.filters.due', 'Due')}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.due', 'Due')}</Label>
             <Select value={dueQuick} onValueChange={(v) => setDueQuick(v as DueQuick)}>
-              <SelectTrigger>
+              <SelectTrigger className="font-normal">
                 <SelectValue placeholder={t('workspace.filters.any', 'Any')} />
               </SelectTrigger>
               <SelectContent>
@@ -272,16 +276,21 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
             </Select>
           </div>
 
-          <div className="space-y-2 md:col-span-2">
-            <Label>{t('workspace.filters.textContains', 'Text contains (name or description)')}</Label>
-            <Input placeholder={t('workspace.filters.textContainsPlaceholder', 'e.g. leak, HVAC, meeting')} value={textContains} onChange={(e) => setTextContains(e.target.value)} />
+          <div className="space-y-1.5 md:col-span-2">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.textContains', 'Text contains (name or description)')}</Label>
+            <Input 
+              placeholder={t('workspace.filters.textContainsPlaceholder', 'e.g. leak, HVAC, meeting')} 
+              value={textContains} 
+              onChange={(e) => setTextContains(e.target.value)} 
+              className="font-normal"
+            />
           </div>
 
-          <div className="space-y-2 md:col-span-2">
-            <Label>{t('workspace.filters.savedPresets', 'Saved presets')}</Label>
-            <div className="flex gap-2 items-center">
+          <div className="space-y-2 md:col-span-2 pt-2 border-t border-border/50">
+            <Label className="text-xs font-normal text-muted-foreground">{t('workspace.filters.savedPresets', 'Saved presets')}</Label>
+            <div className="flex gap-2 items-center flex-wrap">
               <Select value={selectedPresetId} onValueChange={onLoadPreset}>
-                <SelectTrigger className="min-w-[220px]">
+                <SelectTrigger className="min-w-[180px] flex-1 max-w-[220px] font-normal">
                   <SelectValue placeholder={presets.length ? t('workspace.filters.choosePreset', 'Choose a preset...') : t('workspace.filters.noPresetsYet', 'No presets yet')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -290,14 +299,19 @@ export default function FilterBuilderDialog(props: FilterBuilderDialogProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <Input placeholder={t('workspace.filters.presetName', 'Preset name')} value={presetName} onChange={(e) => setPresetName(e.target.value)} className="max-w-xs" />
-              <Button variant="outline" onClick={onSavePreset}>{t('workspace.filters.save', 'Save')}</Button>
-              <Button variant="ghost" onClick={onDeletePreset} disabled={!selectedPresetId}>{t('workspace.filters.delete', 'Delete')}</Button>
+              <Input 
+                placeholder={t('workspace.filters.presetName', 'Preset name')} 
+                value={presetName} 
+                onChange={(e) => setPresetName(e.target.value)} 
+                className="flex-1 min-w-[140px] max-w-[180px] font-normal" 
+              />
+              <Button variant="outline" size="sm" onClick={onSavePreset}>{t('workspace.filters.save', 'Save')}</Button>
+              <Button variant="ghost" size="sm" onClick={onDeletePreset} disabled={!selectedPresetId} className="text-muted-foreground">{t('workspace.filters.delete', 'Delete')}</Button>
             </div>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="pt-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('workspace.filters.cancel', 'Cancel')}</Button>
           <Button onClick={apply}>{t('workspace.filters.applyFilters', 'Apply filters')}</Button>
         </DialogFooter>

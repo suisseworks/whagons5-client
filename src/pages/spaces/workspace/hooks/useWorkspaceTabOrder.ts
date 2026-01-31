@@ -15,6 +15,20 @@ function buildTabSequence(order: WorkspaceTabKey[]) {
   return sequence;
 }
 
+function mergeWithDefaults(order: WorkspaceTabKey[]) {
+  const merged: WorkspaceTabKey[] = [];
+  const seen = new Set<WorkspaceTabKey>();
+  const pushUnique = (key: WorkspaceTabKey) => {
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(key);
+    }
+  };
+  order.forEach(pushUnique);
+  DEFAULT_TAB_SEQUENCE.forEach(pushUnique);
+  return merged;
+}
+
 export function useWorkspaceTabOrder(workspaceKey: string) {
   // Ensure 'grid' (tasks) is always first
   const [customTabOrder, setCustomTabOrder] = useState<WorkspaceTabKey[]>(() => {
@@ -27,9 +41,9 @@ export function useWorkspaceTabOrder(workspaceKey: string) {
           const order = parsed as WorkspaceTabKey[];
           if (order[0] !== 'grid') {
             const filtered = order.filter((tab) => tab !== 'grid');
-            return ['grid', ...filtered] as WorkspaceTabKey[];
+            return mergeWithDefaults(['grid', ...filtered] as WorkspaceTabKey[]);
           }
-          return order;
+          return mergeWithDefaults(order);
         }
       }
     } catch {}
@@ -47,9 +61,9 @@ export function useWorkspaceTabOrder(workspaceKey: string) {
           const order = parsed as WorkspaceTabKey[];
           if (order[0] !== 'grid') {
             const filtered = order.filter((tab) => tab !== 'grid');
-            setCustomTabOrder(['grid', ...filtered] as WorkspaceTabKey[]);
+            setCustomTabOrder(mergeWithDefaults(['grid', ...filtered] as WorkspaceTabKey[]));
           } else {
-            setCustomTabOrder(order);
+            setCustomTabOrder(mergeWithDefaults(order));
           }
           return;
         }

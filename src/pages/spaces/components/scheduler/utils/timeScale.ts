@@ -53,7 +53,8 @@ export function getTimeScaleConfig(
 
   switch (preset) {
     case "hourAndDay":
-      startDate = new Date(baseDate);
+      // Normalize baseDate to local calendar day (ignore time portion)
+      startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + 1);

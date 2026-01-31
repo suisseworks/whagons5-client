@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -194,10 +194,10 @@ function PluginCardDisplay({
 			costs: 'hover:border-amber-500/40 hover:shadow-amber-500/20',
 			inventory: 'hover:border-teal-500/40 hover:shadow-teal-500/20',
 			tools: 'hover:border-orange-500/40 hover:shadow-orange-500/20',
-			integrations: 'hover:border-indigo-500/40 hover:shadow-indigo-500/20',
 			gamification: 'hover:border-purple-500/40 hover:shadow-purple-500/20',
 			analytics: 'hover:border-blue-500/40 hover:shadow-blue-500/20',
 			motivation: 'hover:border-yellow-500/40 hover:shadow-yellow-500/20',
+			'hotel-analytics': 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
 		};
 		
 		return borderColors[pluginId] || 'hover:border-gray-500/40 hover:shadow-gray-500/20';
@@ -228,7 +228,7 @@ function PluginCardDisplay({
 				transition-all duration-300
 				${isDragging ? '' : 'hover:shadow-2xl hover:scale-105'}
 				${isEnabled ? borderColor : 'opacity-70'}
-				h-[180px]
+				h-[140px]
 			`}>
 				{/* Top corner badges */}
 				<div className="absolute top-2 right-2 flex items-center gap-2 z-20">
@@ -278,12 +278,12 @@ function PluginCardDisplay({
 				)}
 
 				{/* Content container */}
-				<div className="relative z-10 h-full flex flex-col items-center justify-center p-4">
+				<div className="relative z-10 h-full flex flex-col items-center justify-center p-3">
 					{/* Large icon - protagonist */}
 					<div className={`
 						${plugin.color} 
-						text-[3.5rem]
-						mb-3
+						text-[2.5rem]
+						mb-2
 						drop-shadow-2xl
 						transition-all duration-300
 						group-hover:scale-110 
@@ -295,9 +295,9 @@ function PluginCardDisplay({
 
 					{/* Title */}
 					<h3 className={`
-						font-bold text-center mb-1.5
+						font-bold text-center mb-1
 						transition-all duration-300
-						${plugin.id === 'cleaning' ? 'text-lg' : 'text-base'}
+						${plugin.id === 'cleaning' ? 'text-base' : 'text-sm'}
 					`}>
 						{plugin.title}
 					</h3>
@@ -821,21 +821,6 @@ function Plugins() {
 					'Ensure tools are maintained and returned on time'
 				]
 			},
-			integrations: {
-				features: [
-					'Configure webhooks to receive real-time notifications',
-					'Manage API keys for programmatic access',
-					'Connect with external systems and services',
-					'Customize payloads and headers for webhooks',
-					'Test webhooks before going live'
-				],
-				benefits: [
-					'Integrate with your existing tools and workflows',
-					'Automate data synchronization across platforms',
-					'Receive instant notifications for important events',
-					'Build custom integrations with API access'
-				]
-			},
 			gamification: {
 				features: [
 					'Set up gamification elements and rewards',
@@ -881,6 +866,25 @@ function Plugins() {
 					'Create a positive and motivating work environment'
 				]
 			},
+			'hotel-analytics': {
+				features: [
+					'Comprehensive reports across 8 hotel operation categories',
+					'Real-time room status dashboards and occupancy tracking',
+					'Housekeeping productivity and turnover analysis',
+					'Maintenance work orders and equipment failure tracking',
+					'Guest request volume and response time monitoring',
+					'Lost & found inventory management',
+					'Staff performance and SLA compliance reports',
+					'Executive summaries and department comparisons'
+				],
+				benefits: [
+					'Get complete visibility into hotel operations',
+					'Identify bottlenecks and optimize workflows',
+					'Track SLA compliance and staff productivity',
+					'Make data-driven decisions with executive reports',
+					'Improve guest satisfaction through faster response times'
+				]
+			},
 		};
 
 		return {
@@ -895,10 +899,6 @@ function Plugins() {
 	};
 
 	const handlePluginClick = (pluginId: string, isEnabled: boolean) => {
-		if (pluginId === 'integrations') {
-			navigate('/integrations');
-			return;
-		}
 		if (pluginId === 'kpi-cards') {
 			navigate('/settings/kpi-cards');
 			return;
@@ -913,6 +913,10 @@ function Plugins() {
 		}
 		if (pluginId === 'motivation') {
 			navigate('/settings/motivation');
+			return;
+		}
+		if (pluginId === 'hotel-analytics') {
+			navigate('/settings/hotel-analytics');
 			return;
 		}
 		if (isEnabled) {
@@ -1001,8 +1005,8 @@ function Plugins() {
 			},
 			{
 				id: 'compliance',
-				title: t('plugins.compliance.title', 'Compliance'),
-				description: t('plugins.compliance.description', 'Compliance standards, audits and documentation'),
+				title: t('plugins.compliance.title', 'Standards and Norms'),
+				description: t('plugins.compliance.description', 'Standards and norms, audits and documentation'),
 				icon: faFileAlt,
 				color: 'text-emerald-500',
 				configurable: true,
@@ -1048,14 +1052,6 @@ function Plugins() {
 				configurable: true,
 			},
 			{
-				id: 'integrations',
-				title: t('plugins.integrations.title', 'Integrations'),
-				description: t('plugins.integrations.description', 'Manage webhooks, API keys, and external integrations'),
-				icon: faLink,
-				color: 'text-indigo-500',
-				configurable: true,
-			},
-			{
 				id: 'kpi-cards',
 				title: t('plugins.kpiCards.title', 'Custom KPI Cards'),
 				description: t('plugins.kpiCards.description', 'Create custom metrics cards for workspaces'),
@@ -1077,6 +1073,14 @@ function Plugins() {
 				description: t('plugins.motivation.description', 'Configure motivation and engagement settings'),
 				icon: faRocket,
 				color: 'text-yellow-500',
+				configurable: true,
+			},
+			{
+				id: 'hotel-analytics',
+				title: t('plugins.hotelAnalytics.title', 'Hotel Analytics'),
+				description: t('plugins.hotelAnalytics.description', 'Comprehensive reports for hotel operations'),
+				icon: faHotel,
+				color: 'text-emerald-500',
 				configurable: true,
 			},
 		];
@@ -1215,7 +1219,7 @@ function Plugins() {
 
 	return (
 		<>
-			<div className="p-6 space-y-6 max-w-screen-2xl mx-auto">
+			<div className="p-6 space-y-6 max-w-5xl mx-auto">
 				<div className="flex items-center justify-between">
 					<h1 className="text-2xl font-bold">{t('plugins.title', 'Plugins')}</h1>
 					<div className="flex items-center gap-3">
@@ -1240,7 +1244,7 @@ function Plugins() {
 						onDragEnd={handleDragEnd}
 					>
 						<SortableContext items={pluginIds} strategy={rectSortingStrategy}>
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 								{orderedPlugins.map((plugin) => (
 									<SortablePluginCard
 										key={plugin.id}
@@ -1265,16 +1269,16 @@ function Plugins() {
 										border-2 border-dashed border-border/60
 										transition-all duration-300
 										hover:shadow-2xl hover:border-primary/50
-										h-[180px]
+										h-[140px]
 										flex flex-col items-center justify-center
 									">
-										<div className="text-muted-foreground/50 group-hover:text-primary transition-colors text-5xl mb-3">
+										<div className="text-muted-foreground/50 group-hover:text-primary transition-colors text-4xl mb-2">
 											<FontAwesomeIcon icon={faPlus} />
 										</div>
-										<h3 className="font-semibold text-base text-center mb-1">
+										<h3 className="font-semibold text-sm text-center mb-1">
 											{t('plugins.addCustomPlugin', 'Add Custom Plugin')}
 										</h3>
-										<p className="text-xs text-center text-muted-foreground px-4">
+										<p className="text-xs text-center text-muted-foreground px-3">
 											{t('plugins.addCustomPluginDescription', 'Create a custom plugin for your needs')}
 										</p>
 									</div>

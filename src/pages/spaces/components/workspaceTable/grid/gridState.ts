@@ -37,6 +37,7 @@ export const useGridReduxState = () => {
   const taskCustomFieldValues = useSelector((s: RootState) => (s as any).taskCustomFieldValues?.value as any[] || []);
   const taskNotes = useSelector((s: RootState) => (s as any).taskNotes?.value as any[] || []);
   const taskAttachments = useSelector((s: RootState) => (s as any).taskAttachments?.value as any[] || []);
+  const roles = useSelector((s: RootState) => (s as any).roles?.value as any[] || []);
 
   return {
     statuses,
@@ -60,6 +61,7 @@ export const useGridReduxState = () => {
     taskCustomFieldValues,
     taskNotes,
     taskAttachments,
+    roles,
   };
 };
 

@@ -107,7 +107,7 @@ export function TagMultiSelect({
                 ))}
               </div>
             ) : (
-              <span className="text-muted-foreground text-sm">{placeholder}</span>
+              <span className="text-muted-foreground/70 text-sm font-normal">{placeholder}</span>
             )}
           </div>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />

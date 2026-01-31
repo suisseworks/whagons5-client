@@ -189,6 +189,19 @@ export const tasksSlice = createSlice({
         // Clear any stored error
         clearError: (state) => {
             state.error = null;
+        },
+        // Update a task locally in Redux state (no API call)
+        // Use this for optimistic updates when you're handling API calls separately
+        updateTaskLocally: (state, action: { payload: { id: number; updates: Partial<Task> } }) => {
+            const { id, updates } = action.payload;
+            const index = state.value.findIndex(task => task.id === id);
+            if (index !== -1) {
+                state.value[index] = ensureTaskDefaults({
+                    ...state.value[index],
+                    ...updates,
+                    updated_at: new Date().toISOString()
+                });
+            }
         }
     },
     extraReducers: (builder) => {
@@ -314,5 +327,5 @@ export const tasksSlice = createSlice({
     }
 });
 
-export const { getTasks, getTasksSuccess, getTasksFailure, clearError } = tasksSlice.actions;
+export const { getTasks, getTasksSuccess, getTasksFailure, clearError, updateTaskLocally } = tasksSlice.actions;
 export default tasksSlice.reducer;

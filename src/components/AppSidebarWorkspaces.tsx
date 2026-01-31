@@ -153,16 +153,16 @@ const WorkspaceLink = ({
       <Link
         to={to}
         className={`${baseClasses} ${activeClasses} justify-center`}
-        style={{ 
-          width: '32px', 
-          height: '32px',
+        style={{
+          width: '28px',
+          height: '28px',
           fontWeight: isActive ? 600 : 500,
-          boxShadow: isActive ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+          boxShadow: isActive ? 'inset 2px 0 0 var(--sidebar-primary)' : undefined,
         }}
         title={label}
       >
-        <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
-          <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+        <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'} size={18}>
+          <Icon className="w-[11px] h-[11px]" style={{ color: '#ffffff' }} />
         </WorkspaceIconBadge>
         <span className="sr-only">{label}</span>
       </Link>
@@ -174,16 +174,16 @@ const WorkspaceLink = ({
       to={to}
       className={`${baseClasses} ${activeClasses} overflow-hidden`}
       style={{
-        height: '36px',
-        padding: '8px 12px',
-        gap: '10px',
+        height: '28px',
+        padding: '4px 8px',
+        gap: '6px',
         fontWeight: isActive ? 600 : 500,
-        fontSize: '15px',
-        boxShadow: isActive ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+        fontSize: '13px',
+        boxShadow: isActive ? 'inset 2px 0 0 var(--sidebar-primary)' : undefined,
       }}
     >
-      <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
-        <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
+      <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'} size={18}>
+        <Icon className="w-[11px] h-[11px]" style={{ color: '#ffffff' }} />
       </WorkspaceIconBadge>
       <span>{label}</span>
     </Link>
@@ -547,7 +547,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     <Collapsible defaultOpen className="group/collapsible">
       {/* Virtual workspaces */}
       {showEverythingButton && (
-        <div className={collapsed ? 'px-2 flex flex-col items-center gap-2 mb-2' : 'space-y-2 mb-2'}>
+        <div className={collapsed ? 'px-2 flex flex-col items-center gap-1 mb-1' : 'space-y-0.5 mb-1'}>
           <WorkspaceLink 
             to="/activity" 
             icon={Activity} 

@@ -6,8 +6,10 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
 import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 // Import visualization components
+import ActivityCosmos from './visualizations/ActivityCosmos';
 import ActivityRiver from './visualizations/ActivityRiver';
 import AnimatedKanban from './visualizations/AnimatedKanban';
 import NetworkGraph from './visualizations/NetworkGraph';
@@ -35,6 +37,7 @@ export interface ActivityEvent {
 }
 
 type VisualizationType = 
+  | 'cosmos'
   | 'river' 
   | 'kanban' 
   | 'network' 
@@ -46,18 +49,10 @@ type VisualizationType =
   | 'visualizer' 
   | 'physics';
 
-const visualizationOptions = [
-  { value: 'river', label: 'Activity River', description: 'Flowing cards showing live activity' },
-  { value: 'kanban', label: 'Animated Kanban', description: 'Cards moving between activity lanes' },
-  { value: 'network', label: 'Network Graph', description: 'Users connected by their actions' },
-  { value: 'timeline', label: 'Timeline Swim Lanes', description: 'Horizontal timeline with user lanes' },
-  { value: 'carousel', label: '3D Card Carousel', description: 'Rotating 3D activity cards' },
-  { value: 'heatmap', label: 'Activity Heat Map', description: 'Visual intensity grid of activity' },
-  { value: 'galaxy', label: 'Particle Galaxy', description: 'Beautiful space-themed activity view' },
-  { value: 'metro', label: 'Metro Map', description: 'Transit-style activity flow' },
-  { value: 'visualizer', label: 'Music Visualizer', description: 'Audio-reactive activity bars' },
-  { value: 'physics', label: 'Physics Card Wall', description: 'Cards with physics falling and stacking' },
-];
+const visualizationKeys = [
+  'cosmos', 'river', 'kanban', 'network', 'timeline', 
+  'carousel', 'heatmap', 'galaxy', 'metro', 'visualizer', 'physics'
+] as const;
 
 interface RTLMessage {
   type: 'ping' | 'system' | 'error' | 'echo' | 'database';
@@ -74,12 +69,23 @@ interface RTLMessage {
 }
 
 export default function ActivityMonitor() {
-  const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('river');
+  const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('cosmos');
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useAuth();
+  const { t } = useLanguage();
   const users = useSelector((s: RootState) => (s as any).users?.value as any[] || []);
   const priorities = useSelector((s: RootState) => (s as any).priorities?.value as any[] || []);
+
+  // Build visualization options with translations
+  const visualizationOptions = useMemo(() => 
+    visualizationKeys.map(key => ({
+      value: key,
+      label: t(`activity.visualizations.${key}.label`, key),
+      description: t(`activity.visualizations.${key}.description`, '')
+    })),
+    [t]
+  );
 
   // Convert RTL publication message to ActivityEvent
   const convertPublicationToActivity = useCallback((data: RTLMessage): ActivityEvent | null => {
@@ -305,6 +311,8 @@ export default function ActivityMonitor() {
 
   const renderVisualization = () => {
     switch (selectedVisualization) {
+      case 'cosmos':
+        return <ActivityCosmos activities={activities} />;
       case 'river':
         return <ActivityRiver activities={activities} />;
       case 'kanban':
@@ -326,20 +334,20 @@ export default function ActivityMonitor() {
       case 'physics':
         return <CardWallPhysics activities={activities} />;
       default:
-        return <ActivityRiver activities={activities} />;
+        return <ActivityCosmos activities={activities} />;
     }
   };
 
-  return (
+return (
     <div className="flex flex-col h-full bg-background">
       {/* Header with Visualization Selector */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <ActivityIcon className="w-6 h-6 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Activity Monitor</h1>
+            <h1 className="text-2xl font-bold">{t('activity.monitor.title', 'Activity Monitor')}</h1>
             <p className="text-sm text-muted-foreground">
-              Live view of what's happening • {activities.length} recent activities
+              {t('activity.monitor.subtitle', 'Live view of what\'s happening')} • {activities.length} {t('activity.monitor.recentActivities', 'recent activities')}
             </p>
           </div>
         </div>
@@ -349,18 +357,18 @@ export default function ActivityMonitor() {
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             <span className="text-sm text-muted-foreground">
-              {isConnected ? 'Live' : 'Disconnected'}
+              {isConnected ? t('activity.monitor.live', 'Live') : t('activity.monitor.disconnected', 'Disconnected')}
             </span>
           </div>
 
           {/* Visualization selector */}
           <div className="flex items-center gap-3 pl-4 border-l border-border/40">
             <Label htmlFor="visualization-select" className="text-sm font-medium whitespace-nowrap">
-              View Style:
+              {t('activity.monitor.viewStyle', 'View Style:')}
             </Label>
             <Select value={selectedVisualization} onValueChange={(v) => setSelectedVisualization(v as VisualizationType)}>
               <SelectTrigger id="visualization-select" className="w-[280px]">
-                <SelectValue placeholder="Select visualization" />
+                <SelectValue placeholder={t('activity.monitor.selectVisualization', 'Select visualization')} />
               </SelectTrigger>
               <SelectContent>
                 {visualizationOptions.map((option) => (

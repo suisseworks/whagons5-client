@@ -2,6 +2,12 @@
 @plugin "tailwindcss-animate";
 @import "./starwars-fonts.css";
 
+/* FullCalendar custom styles (v6+ doesn't ship CSS files) */
+@import './styles/fullcalendar-custom.css';
+
+/* Scheduler custom styles (Bryntum-inspired) */
+@import './styles/scheduler.css';
+
 /* 
   Add this to your HTML head instead of importing here:
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1114,6 +1120,20 @@
 .wh-workspace-grid .ag-header-row > .ag-header-cell:first-child,
 .wh-modern-grid .ag-header-row > .ag-header-cell:first-child {
   padding-left: 4px !important;
+}
+
+/* Task selection checkbox - hidden by default, visible on row hover */
+.wh-workspace-grid .ag-row .wh-task-checkbox,
+.wh-modern-grid .ag-row .wh-task-checkbox {
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.wh-workspace-grid .ag-row:hover .wh-task-checkbox,
+.wh-modern-grid .ag-row:hover .wh-task-checkbox,
+.wh-workspace-grid .ag-row-selected .wh-task-checkbox,
+.wh-modern-grid .ag-row-selected .wh-task-checkbox {
+  opacity: 1;
 }
 
 

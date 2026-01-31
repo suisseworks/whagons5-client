@@ -35,6 +35,8 @@ import AnalyticsSettings from '@/pages/settings/sub_pages/analytics/AnalyticsSet
 import AnalyticsComingSoon from '@/pages/analytics/AnalyticsComingSoon';
 import MotivationSettings from '@/pages/settings/sub_pages/motivation/MotivationSettings';
 import MotivationComingSoon from '@/pages/motivation/MotivationComingSoon';
+import HotelAnalytics from '@/pages/hotel-analytics/HotelAnalytics';
+import HotelAnalyticsSettings from '@/pages/settings/sub_pages/HotelAnalyticsSettings';
 import Boards from '@/pages/boards/Boards';
 import Home from '@/pages/home/Home';
 // Messages removed
@@ -102,6 +104,7 @@ export const HomeRoutes = () => {
           <Route path="/gamification" element={<GamificationComingSoon />} />
           <Route path="/analytics" element={<AnalyticsComingSoon />} />
           <Route path="/motivation" element={<MotivationComingSoon />} />
+          <Route path="/hotel-analytics" element={<HotelAnalytics />} />
           <Route path="/settings/categories" element={<Categories />} />
           <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
           <Route path="/settings/templates" element={<Templates />} />
@@ -126,6 +129,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/gamification" element={<GamificationSettings />} />
           <Route path="/settings/analytics" element={<AnalyticsSettings />} />
           <Route path="/settings/motivation" element={<MotivationSettings />} />
+          <Route path="/settings/hotel-analytics" element={<HotelAnalyticsSettings />} />
           <Route path="/settings/test" element={<TestPage />} />
           
           {/* Compliance Routes */}

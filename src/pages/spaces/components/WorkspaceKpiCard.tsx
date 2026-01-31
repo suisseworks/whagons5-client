@@ -38,6 +38,7 @@ export type WorkspaceKpiCardProps = {
   helperText?: string;
   right?: React.ReactNode;
   onClick?: () => void;
+  isSelected?: boolean;
 };
 
 export function WorkspaceKpiCard({
@@ -48,6 +49,7 @@ export function WorkspaceKpiCard({
   helperText,
   right,
   onClick,
+  isSelected = false,
 }: WorkspaceKpiCardProps) {
   const a = accentClasses[accent];
 
@@ -60,7 +62,12 @@ export function WorkspaceKpiCard({
         "border-border/60 hover:-translate-y-0.5",
         "h-full min-h-[100px]",
         a.glow,
-        onClick && "cursor-pointer"
+        onClick && "cursor-pointer",
+        isSelected && "ring-2 ring-offset-2",
+        isSelected && accent === "indigo" && "ring-indigo-500",
+        isSelected && accent === "amber" && "ring-amber-500",
+        isSelected && accent === "emerald" && "ring-emerald-500",
+        isSelected && accent === "purple" && "ring-purple-500"
       )}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}

@@ -29,6 +29,47 @@ export interface Team {
     deleted_at: Date | null;
 }
 
+// Dialog Layout Types for per-category task dialog customization
+export type StandardFieldId = 
+    | 'template'
+    | 'description'
+    | 'spot'
+    | 'responsible'
+    | 'priority'
+    | 'tags'
+    | 'start_date'
+    | 'due_date'
+    | 'recurrence'
+    | 'sla'
+    | 'approval';
+
+// Built-in tab IDs
+export type BuiltInTabId = 'basic' | 'dates' | 'additional';
+
+// Tab ID can be built-in or custom (custom tabs use string IDs like 'custom_1', 'custom_2', etc.)
+export type DialogTabId = BuiltInTabId | string;
+
+export interface DialogFieldConfig {
+    type: 'standard' | 'custom';
+    id: StandardFieldId | number; // StandardFieldId for standard, number for custom field ID
+}
+
+export interface DialogTabConfig {
+    enabled: boolean;
+    order: number;
+    label?: string; // Custom label for the tab (required for custom tabs)
+    isCustom?: boolean; // Whether this is a user-created custom tab
+}
+
+export interface DialogLayout {
+    tabs: {
+        [key: string]: DialogTabConfig | undefined;
+    };
+    fields: {
+        [key: string]: DialogFieldConfig[] | undefined;
+    };
+}
+
 export interface Category {
     id: number;
     name: string;
@@ -43,6 +84,7 @@ export interface Category {
     status_transition_group_id: number;
     reporting_team_ids: number[];
     celebration_effect?: string | null;
+    dialog_layout?: DialogLayout | null;
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -96,6 +138,10 @@ export interface Task {
     // Store responsible user IDs as JSON array for efficient storage
     // Most tasks have few responsible users, so this avoids a large junction table
     user_ids: number[] | null;
+    
+    // Recurrence fields
+    recurrence_id: number | null;
+    recurrence_instance_number: number | null;
     
     created_at: string;
     updated_at: string;
@@ -518,10 +564,43 @@ export interface TaskAttachment {
 
 export interface TaskRecurrence {
     id: number;
-    task_id: number;
-    recurrence_pattern: string; // 'daily', 'weekly', 'monthly', etc.
-    interval: number; // every N days/weeks/months
-    end_date?: string | null;
+    
+    // RRule definition (iCal format, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR")
+    rrule: string;
+    dtstart: string; // Original start date/time (wall clock time)
+    duration_minutes: number;
+    
+    // Human-readable description (from API)
+    human_readable?: string | null;
+    next_occurrences?: string[]; // Preview of next dates
+    
+    // Task template fields
+    name: string;
+    description?: string | null;
+    
+    // Foreign keys
+    workspace_id: number;
+    category_id: number;
+    team_id: number;
+    template_id?: number | null;
+    priority_id: number;
+    status_id: number;
+    
+    // Assigned users
+    user_ids: number[];
+    
+    // Creator
+    created_by?: number | null;
+    
+    // Recurrence state
+    is_active: boolean;
+    last_generated_at?: string | null;
+    count?: number | null; // Total occurrences limit (RRule COUNT)
+    occurrences_generated: number;
+    
+    // Custom field values
+    custom_field_values?: Record<string, any> | null;
+    
     created_at: string;
     updated_at: string;
 }

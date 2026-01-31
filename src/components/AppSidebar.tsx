@@ -24,6 +24,7 @@ import {
   BarChart3, // Add BarChart3 icon for KPI Cards
   Trophy, // Add Trophy icon for gamification
   LineChart, // Add LineChart icon for analytics
+  Hotel, // Add Hotel icon for hotel analytics
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -128,7 +129,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     id: 'compliance',
     enabled: true,
     pinned: false,
-    name: 'Compliance',
+    name: 'Standards and Norms',
     icon: FileText,
     iconColor: '#10b981', // emerald-500 to match plugin card
     route: '/compliance/standards',
@@ -168,6 +169,15 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     icon: Sparkles,
     iconColor: '#eab308', // yellow-500
     route: '/motivation',
+  },
+  {
+    id: 'hotel-analytics',
+    enabled: true,
+    pinned: false,
+    name: 'Hotel Analytics',
+    icon: Hotel,
+    iconColor: '#10b981', // emerald-500
+    route: '/hotel-analytics',
   },
 ];
 
@@ -1057,7 +1067,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
 
         {showExpandedContent && (
           <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
-            Version 5.0.0
+            Version 5.0.0 <i>(beta)</i>
           </div>
         )}
       </SidebarFooter>

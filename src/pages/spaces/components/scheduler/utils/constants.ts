@@ -1,0 +1,1 @@
+export const TIMELINE_GUTTER_WIDTH = 40;

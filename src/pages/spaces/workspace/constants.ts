@@ -4,6 +4,7 @@ export const WORKSPACE_TAB_PATHS = {
   scheduler: '/scheduler',
   map: '/map',
   board: '/board',
+  whiteboard: '/whiteboard',
   settings: '/settings',
   statistics: '/statistics',
 } as const;
@@ -16,6 +17,7 @@ export const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = [
   'scheduler',
   'map',
   'board',
+  'whiteboard',
   'statistics',
   'settings',
 ];

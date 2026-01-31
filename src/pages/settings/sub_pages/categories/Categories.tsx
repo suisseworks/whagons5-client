@@ -10,7 +10,9 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
+import { Category, Task, Team, StatusTransitionGroup, Sla, Approval, DialogLayout } from "@/store/types";
+import { DialogLayoutEditorDialog } from "@/components/dialogLayout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import {
@@ -28,9 +30,91 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { celebrateTaskCompletion } from "@/utils/confetti";
-import { CategoryFormData } from "./types";
-import { useCategoryColumnDefs } from "./utils/columnDefs";
-import { StatisticsTab, CategoryPreview } from "./components";
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
+import dayjs from 'dayjs';
+import { iconService } from '@/database/iconService';
+import { CategoryPreview } from './components/CategoryPreview';
+import { StatisticsTab } from './components/StatisticsTab';
+
+// Form data interface for edit form
+interface CategoryFormData {
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  enabled: boolean;
+  team_id: string;
+  workspace_id: string;
+  sla_id: string;
+  approval_id: string;
+  status_transition_group_id: string;
+  celebration_effect: string;
+}
+
+// Custom cell renderer for category name with icon
+const CategoryNameCellRenderer = (props: ICellRendererParams) => {
+  const [icon, setIcon] = useState<any>(faTags);
+  const categoryIcon = props.data?.icon;
+  const categoryColor = props.data?.color || '#6B7280';
+  const categoryName = props.value;
+
+  useEffect(() => {
+    const loadIcon = async () => {
+      if (!categoryIcon) {
+        setIcon(faTags);
+        return;
+      }
+
+      try {
+        // Parse FontAwesome icon class (e.g., "fas fa-hat-wizard")
+        const iconClasses = categoryIcon.split(' ');
+        const iconName = iconClasses[iconClasses.length - 1]; // Get the last part (hat-wizard)
+
+        // Use iconService to load the icon dynamically
+        const loadedIcon = await iconService.getIcon(iconName);
+        setIcon(loadedIcon || faTags);
+      } catch (error) {
+        console.error('Error loading category icon:', error);
+        setIcon(faTags);
+      }
+    };
+
+    loadIcon();
+  }, [categoryIcon]);
+
+  return (
+    <div className="flex items-center space-x-3 h-full">
+      <FontAwesomeIcon
+        icon={icon}
+        className="w-4 h-4"
+        style={{ color: categoryColor }}
+      />
+      <div className="flex flex-col leading-tight">
+        <span className={!props.data?.enabled ? "line-through text-muted-foreground" : undefined}>{categoryName}</span>
+        {props.data?.description ? (
+          <span className={`text-xs truncate ${!props.data?.enabled ? "line-through text-muted-foreground" : "text-muted-foreground"}`}>{props.data.description}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
+// Simple badge renderer to show whether a category is enabled
+const EnabledCellRenderer = ({ value }: ICellRendererParams & { t: (key: string, fallback: string) => string }) => {
+  const isEnabled = Boolean(value);
+  const { t } = useLanguage();
+  const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
+
+  return (
+    <Badge
+      variant={isEnabled ? "default" : "secondary"}
+      className={`text-xs ${isEnabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
+    >
+      {isEnabled ? tc('grid.values.enabled', 'Enabled') : tc('grid.values.disabled', 'Disabled')}
+    </Badge>
+  );
+};
+
 
 function Categories() {
   const dispatch = useDispatch<AppDispatch>();
@@ -120,6 +204,9 @@ function Categories() {
   const [isReportingTeamsDialogOpen, setIsReportingTeamsDialogOpen] = useState(false);
   const [reportingTeamsCategory, setReportingTeamsCategory] = useState<Category | null>(null);
 
+  // Dialog layout state for customizing task dialog per category
+  const [dialogLayout, setDialogLayout] = useState<DialogLayout | null>(null);
+
   // Load reporting teams from category directly
   const loadReportingTeamsForEdit = useCallback(() => {
     if (!editingCategory) return;
@@ -143,47 +230,12 @@ function Categories() {
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || '',
         celebration_effect: editingCategory.celebration_effect || ''
       });
+      // Load dialog layout when editing category changes
+      setDialogLayout(editingCategory.dialog_layout ?? null);
+      // Load reporting teams when editing category changes - dispatch Redux action
       loadReportingTeamsForEdit();
     }
   }, [editingCategory, loadReportingTeamsForEdit]);
-
-  // Sync selectedReportingTeamIds when editingCategory changes
-  useEffect(() => {
-    if (editingCategory) {
-      setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
-      setReportingTeamsError(null);
-    }
-  }, [editingCategory]);
-
-  const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
-    const map: Record<number, number> = {};
-    (categoryCustomFields as any[]).forEach((a) => {
-      const cid = Number((a as any)?.category_id ?? (a as any)?.categoryId);
-      if (!Number.isFinite(cid)) return;
-      map[cid] = (map[cid] || 0) + 1;
-    });
-    return map;
-  }, [categoryCustomFields]);
-
-  const openManageFields = (category: Category) => {
-    setFieldsCategory(category);
-    setIsFieldsDialogOpen(true);
-  };
-
-  const closeManageFields = () => {
-    setIsFieldsDialogOpen(false);
-    setFieldsCategory(null);
-  };
-
-  const openManageReportingTeams = (category: Category) => {
-    setReportingTeamsCategory(category);
-    setIsReportingTeamsDialogOpen(true);
-  };
-
-  const closeManageReportingTeams = () => {
-    setIsReportingTeamsDialogOpen(false);
-    setReportingTeamsCategory(null);
-  };
 
   // Handle toggle team for reporting teams
   const handleToggleReportingTeam = (teamId: number) => {
@@ -196,7 +248,7 @@ function Categories() {
     });
   };
 
-  // Save reporting teams
+  // Save reporting teams - uses category update
   const handleSaveReportingTeams = async () => {
     if (!editingCategory) return;
     setSavingReportingTeams(true);
@@ -212,6 +264,16 @@ function Categories() {
     } finally {
       setSavingReportingTeams(false);
     }
+  };
+
+  const openManageReportingTeams = (category: Category) => {
+    setReportingTeamsCategory(category);
+    setIsReportingTeamsDialogOpen(true);
+  };
+
+  const closeManageReportingTeams = () => {
+    setIsReportingTeamsDialogOpen(false);
+    setReportingTeamsCategory(null);
   };
 
   // Get task count for a category
@@ -237,16 +299,167 @@ function Categories() {
     handleDeleteCategory(editingCategory);
   };
 
-  // Column definitions
-  const colDefs = useCategoryColumnDefs({
-    teams,
-    slas,
-    approvals,
-    statusTransitionGroups,
-    assignmentCountByCategory,
-    onManageFields: openManageFields,
-    translate: tc
-  });
+  // Derived statistics for charts
+  const enabledCategoriesCount = useMemo(
+    () => categories.filter((cat: Category) => cat.enabled).length,
+    [categories]
+  );
+
+  const disabledCategoriesCount = useMemo(
+    () => categories.filter((cat: Category) => !cat.enabled).length,
+    [categories]
+  );
+
+  const tasksByCategory = useMemo(() => {
+    const counts = new Map<number, number>();
+    (tasks as Task[]).forEach((task: Task) => {
+      const cid = task.category_id;
+      if (!cid) return;
+      counts.set(cid, (counts.get(cid) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([categoryId, count]) => {
+        const category = categories.find((c: Category) => c.id === categoryId);
+        return category ? { category, count } : null;
+      })
+      .filter(
+        (item): item is { category: Category; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [tasks, categories]);
+
+  const categoriesByTeam = useMemo(() => {
+    const counts = new Map<number, number>();
+    categories.forEach((cat: Category) => {
+      const tid = (cat as any).team_id as number | null | undefined;
+      if (!tid) return;
+      counts.set(tid, (counts.get(tid) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([teamId, count]) => {
+        const team = teams.find((t: Team) => t.id === teamId);
+        return team ? { team, count } : null;
+      })
+      .filter(
+        (item): item is { team: Team; count: number } => !!item
+      )
+      .sort((a, b) => b.count - a.count);
+  }, [categories, teams]);
+
+  const tasksOverTime = useMemo(() => {
+    const map = new Map<string, number>();
+    (tasks as Task[]).forEach((task: Task) => {
+      if (!task.created_at) return;
+      const date = dayjs(task.created_at).format("YYYY-MM-DD");
+      map.set(date, (map.get(date) || 0) + 1);
+    });
+
+    return Array.from(map.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+  }, [tasks]);
+
+  // Column definitions for AG Grid
+  const colDefs = useMemo<ColDef[]>(() => [
+    { 
+      field: 'name', 
+      headerName: tc('grid.columns.categoryName', 'Category Name'),
+      flex: 4,
+      minWidth: 350,
+      cellRenderer: CategoryNameCellRenderer
+    },
+    // Description column removed; description now shown under name
+    // Fields column removed per request
+    {
+      field: 'team_id',
+      headerName: tc('grid.columns.team', 'Team'),
+      flex: 1.5,
+      minWidth: 200,
+      cellRenderer: (params: ICellRendererParams) => {
+        const teamId = params.value;
+
+        if (!teamId) {
+          return <span className="text-muted-foreground">{tc('grid.values.noTeam', 'No Team')}</span>;
+        }
+
+        const team = teams.find((t: any) => t.id === teamId);
+
+        return (
+          <div className="flex items-center space-x-2">
+            <div 
+              className="w-6 h-6 min-w-[1.5rem] text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+              style={{ backgroundColor: team?.color ?? '#6B7280' }}
+            >
+              {team?.name ? team.name.charAt(0).toUpperCase() : 'T'}
+            </div>
+            <span>{team?.name || `Team ${teamId}`}</span>
+          </div>
+        );
+      },
+      sortable: true,
+      filter: true
+    },
+    {
+      field: 'sla_id',
+      headerName: tc('grid.columns.sla', 'SLA'),
+      flex: 1.2,
+      minWidth: 180,
+      cellRenderer: (params: ICellRendererParams) => {
+        const slaId = params.value as number | null | undefined;
+        if (!slaId) {
+          return '' as any;
+        }
+        const sla = slas.find((s: Sla) => s.id === Number(slaId));
+        return <span>{sla?.name || `SLA ${slaId}`}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
+      field: 'approval_id',
+      headerName: tc('grid.columns.approval', 'Approval'),
+      flex: 1.2,
+      minWidth: 180,
+      cellRenderer: (params: ICellRendererParams) => {
+        const approvalId = params.value as number | null | undefined;
+        if (!approvalId) {
+          return '' as any;
+        }
+        const approval = approvals.find((a: Approval) => a.id === Number(approvalId));
+        return <span>{approval?.name || `Approval ${approvalId}`}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
+      field: 'status_transition_group_id',
+      headerName: tc('grid.columns.statusTransitionGroup', 'Status Transition Group'),
+      flex: 1.5,
+      minWidth: 200,
+      cellRenderer: (params: ICellRendererParams) => {
+        const groupId = params.value as number | null | undefined;
+        if (!groupId) {
+          return <span className="text-muted-foreground">{tc('grid.values.unassigned', 'Unassigned')}</span>;
+        }
+        const group = statusTransitionGroups.find((g: any) => g.id === Number(groupId));
+        return <span>{group?.name || `Group ${groupId}`}</span>;
+      },
+      sortable: true,
+      filter: true
+    },
+    {
+      field: 'enabled',
+      headerName: tc('grid.columns.status', 'Status'),
+      flex: 0.8,
+      minWidth: 120,
+      cellRenderer: (params: ICellRendererParams) => <EnabledCellRenderer {...params} t={t} />,
+      sortable: true,
+      filter: true
+    },
+  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, tc, t]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -287,6 +500,7 @@ function Categories() {
         approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
         status_transition_group_id: statusTransitionGroupId,
         celebration_effect: createFormData.celebration_effect || null,
+        reporting_team_ids: [],
         deleted_at: null
       };
       await createItem(categoryData);
@@ -327,7 +541,8 @@ function Categories() {
       approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
       status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined,
       reporting_team_ids: selectedReportingTeamIds,
-      celebration_effect: editFormData.celebration_effect || null
+      celebration_effect: editFormData.celebration_effect || null,
+      dialog_layout: dialogLayout
     };
     await updateItem(editingCategory.id, updates);
   };
@@ -636,6 +851,8 @@ function Categories() {
           <TabsList>
             <TabsTrigger value="general">{tc('dialogs.edit.tabs.general', 'General')}</TabsTrigger>
             <TabsTrigger value="rules">{tc('dialogs.edit.tabs.rules', 'Rules')}</TabsTrigger>
+            <TabsTrigger value="fields">{tc('dialogs.edit.tabs.fields', 'Fields')}</TabsTrigger>
+            <TabsTrigger value="dialog-layout">{tc('dialogs.edit.tabs.dialogLayout', 'Dialog Layout')}</TabsTrigger>
             <TabsTrigger value="reporting-teams">{tc('dialogs.edit.tabs.reportingTeams', 'Reporting Teams')}</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
@@ -758,6 +975,34 @@ function Categories() {
               />
             </div>
           </TabsContent>
+          <TabsContent value="fields">
+            <CategoryFieldsManager
+              variant="inline"
+              category={editingCategory}
+            />
+          </TabsContent>
+          <TabsContent value="dialog-layout">
+            <div className="min-h-[200px] space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Customize how the task create/edit dialog appears for tasks in this category.
+                You can rearrange fields, add custom tabs, and control which fields are shown.
+              </p>
+              {editingCategory && (
+                <DialogLayoutEditorDialog
+                  categoryId={editingCategory.id}
+                  categoryName={editingCategory.name}
+                  value={dialogLayout}
+                  onChange={setDialogLayout}
+                />
+              )}
+              {dialogLayout && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">Current layout:</span>{' '}
+                  {Object.keys(dialogLayout.tabs || {}).length} tabs configured
+                </div>
+              )}
+            </div>
+          </TabsContent>
           <TabsContent value="reporting-teams">
             <CategoryReportingTeamsManager
               variant="inline"
@@ -812,12 +1057,6 @@ function Categories() {
         renderEntityPreview={renderCategoryPreview}
       />
 
-      {/* Manage Fields Dialog */}
-      <CategoryFieldsManager
-        open={isFieldsDialogOpen}
-        onOpenChange={(open) => { if (!open) closeManageFields(); }}
-        category={fieldsCategory}
-      />
       <CategoryReportingTeamsManager
         open={isReportingTeamsDialogOpen}
         onOpenChange={(open) => { if (!open) closeManageReportingTeams(); }}
