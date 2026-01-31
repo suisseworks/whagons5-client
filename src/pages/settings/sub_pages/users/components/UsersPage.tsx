@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildInvitationLink } from "@/lib/invitationLink";
 import type { UserData } from "../types";
 import { getUserTeamRoleId } from "../utils/getUserTeamRoleId";
-import { useInvitationsColumnDefs, useUsersColumnDefs } from "../utils/columnDefs";
 import { UserStatistics } from "./UserStatistics";
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
 
 import {
   SettingsLayout,
@@ -29,7 +29,8 @@ import {
   useSettingsState,
   TextField,
   SelectField,
-  CheckboxField
+  CheckboxField,
+  AvatarCellRenderer
 } from "../../../components";
 
 function Users() {
@@ -520,8 +521,9 @@ function Users() {
           </div>
         );
       }
-    },
-  });
+    }
+  ];
+}, [teams, t]);
 
   // Handle invitation deletion
   const handleDeleteInvitation = async () => {

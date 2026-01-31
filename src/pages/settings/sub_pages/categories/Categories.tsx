@@ -30,6 +30,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { celebrateTaskCompletion } from "@/utils/confetti";
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
+import dayjs from 'dayjs';
+import { iconService } from '@/database/iconService';
+import { CategoryPreview } from './components/CategoryPreview';
+import { StatisticsTab } from './components/StatisticsTab';
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -261,21 +266,6 @@ function Categories() {
     }
   };
 
-  // Manage Reporting Teams dialog state
-  const [isReportingTeamsDialogOpen, setIsReportingTeamsDialogOpen] = useState(false);
-  const [reportingTeamsCategory, setReportingTeamsCategory] = useState<Category | null>(null);
-  
-  // Reporting teams state for inline tab (temporary UI state synced with Redux)
-  const [selectedReportingTeamIds, setSelectedReportingTeamIds] = useState<number[]>([]);
-
-  // Sync selectedReportingTeamIds when editingCategory changes
-  useEffect(() => {
-    if (editingCategory) {
-      setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
-      setReportingTeamsError(null);
-    }
-  }, [editingCategory]);
-
   const openManageReportingTeams = (category: Category) => {
     setReportingTeamsCategory(category);
     setIsReportingTeamsDialogOpen(true);
@@ -284,35 +274,6 @@ function Categories() {
   const closeManageReportingTeams = () => {
     setIsReportingTeamsDialogOpen(false);
     setReportingTeamsCategory(null);
-  };
-
-  // Handle toggle team for reporting teams
-  const handleToggleReportingTeam = (teamId: number) => {
-    setSelectedReportingTeamIds(prev => {
-      if (prev.includes(teamId)) {
-        return prev.filter(id => id !== teamId);
-      } else {
-        return [...prev, teamId];
-      }
-    });
-  };
-
-  // Save reporting teams
-  const handleSaveReportingTeams = async () => {
-    if (!editingCategory) return;
-    setSavingReportingTeams(true);
-    setReportingTeamsError(null);
-    try {
-      await dispatch(genericActions.categories.updateAsync({
-        id: editingCategory.id,
-        updates: { reporting_team_ids: selectedReportingTeamIds }
-      })).unwrap();
-    } catch (e: any) {
-      console.error('Error saving reporting teams', e);
-      setReportingTeamsError(e?.message || 'Failed to save reporting teams');
-    } finally {
-      setSavingReportingTeams(false);
-    }
   };
 
   // Get task count for a category
@@ -539,6 +500,7 @@ function Categories() {
         approval_id: createFormData.approval_id ? parseInt(createFormData.approval_id) : null,
         status_transition_group_id: statusTransitionGroupId,
         celebration_effect: createFormData.celebration_effect || null,
+        reporting_team_ids: [],
         deleted_at: null
       };
       await createItem(categoryData);

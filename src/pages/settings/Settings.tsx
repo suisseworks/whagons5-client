@@ -1097,13 +1097,13 @@ function Settings() {
     return {
       total,
       topCategories: [
-        { name: 'Teams', count: counts.teams },
-        { name: 'Users', count: counts.users },
-        { name: 'Tags', count: counts.tags },
-        { name: 'Categories', count: counts.categories },
+        { name: t('settings.stats.teams', 'Teams'), count: counts.teams },
+        { name: t('settings.stats.users', 'Users'), count: counts.users },
+        { name: t('settings.stats.tags', 'Tags'), count: counts.tags },
+        { name: t('settings.stats.categories', 'Categories'), count: counts.categories },
       ].filter(item => item.count > 0).slice(0, 3)
     };
-  }, [counts]);
+  }, [counts, t]);
 
   const handleSettingClick = (settingId: string) => {
     // Track access
@@ -1245,7 +1245,7 @@ function Settings() {
             {filteredBasicSettings.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
                 <FontAwesomeIcon icon={faCog} className="mb-3 text-4xl" />
-                <p className="font-medium">No basic settings</p>
+                <p className="font-medium">{t('settings.tabs.basics.empty', 'No basic settings')}</p>
               </div>
             ) : (
               <DndContext
@@ -1294,8 +1294,8 @@ function Settings() {
             {filteredAdvancedSettings.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
                 <Search className="mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="font-medium">No advanced settings match your search</p>
-                <p className="text-sm">Try a different search term</p>
+                <p className="font-medium">{t('settings.tabs.advanced.empty', 'No advanced settings match your search')}</p>
+                <p className="text-sm">{t('settings.tabs.advanced.emptyTryDifferent', 'Try a different search term')}</p>
               </div>
             ) : (
               <DndContext
@@ -1341,15 +1341,15 @@ function Settings() {
               className="text-4xl text-primary flex-shrink-0 mt-1"
             />
             <div className="flex flex-col flex-1 min-w-0">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground leading-tight">Settings</h1>
+              <h1 className="text-4xl font-extrabold tracking-tight text-foreground leading-tight">{t('settings.title', 'Settings')}</h1>
               <p className="text-sm text-muted-foreground/80 leading-relaxed mt-2">
-                Configure and manage your workspace settings
+                {t('settings.subtitle', 'Configure and manage your workspace settings')}
               </p>
               {/* Quick Stats */}
               {totalStats.total > 0 && (
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
                   <Badge variant="outline" className="text-xs font-semibold">
-                    {totalStats.total.toLocaleString()} Total Items
+                    {totalStats.total.toLocaleString()} {t('settings.stats.totalItems', 'Total Items')}
                   </Badge>
                   {totalStats.topCategories.map((item) => (
                     <Badge key={item.name} variant="secondary" className="text-xs">
@@ -1367,7 +1367,7 @@ function Settings() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
               <Input
                 ref={searchInputRef}
-                placeholder="Search settings & models... (Press /)"
+                placeholder={t('settings.search.placeholder', 'Search settings & models... (Press /)')}
                 value={searchQuery}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -1405,7 +1405,7 @@ function Settings() {
                     searchInputRef.current?.focus();
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-10"
-                  aria-label="Clear search"
+                  aria-label={t('settings.search.clear', 'Clear search')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1460,9 +1460,9 @@ function Settings() {
                 ) : (
                   <div className="p-8 text-center">
                     <Search className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm font-medium text-foreground">No results found</p>
+                    <p className="text-sm font-medium text-foreground">{t('settings.search.noResults', 'No results found')}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Try searching for templates, categories, users, teams, etc.
+                      {t('settings.search.noResultsDescription', 'Try searching for templates, categories, users, teams, etc.')}
                     </p>
                   </div>
                 )}
@@ -1475,7 +1475,7 @@ function Settings() {
         {recentSettings.length > 0 && !searchQuery && (
           <div className="flex items-center gap-2 pt-2 border-t border-border/20">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">Recently accessed:</span>
+            <span className="text-xs font-medium text-muted-foreground">{t('settings.recentlyAccessed', 'Recently accessed:')}</span>
             <div className="flex items-center gap-2 flex-wrap">
               {recentSettings.map((setting) => (
                 <button

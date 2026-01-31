@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash, faEye, faEyeSlash, faGaugeHigh } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Workspace, Task, Category } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
@@ -343,7 +343,9 @@ function Workspaces() {
   const getActiveTabFromUrl = useCallback(() => {
     const urlParams = new URLSearchParams(location.search);
     const tabFromUrl = urlParams.get('tab');
-    return tabFromUrl === 'statistics' ? 'statistics' : 'workspaces';
+    if (tabFromUrl === 'statistics') return 'statistics';
+    if (tabFromUrl === 'dashboard') return 'dashboard';
+    return 'workspaces';
   }, [location.search]);
   
   const [activeTab, setActiveTab] = useState<string>(getActiveTabFromUrl());
@@ -706,22 +708,6 @@ function Workspaces() {
             ),
             content: (
               <div className="flex h-full flex-col">
-                {/* Dashboard Card */}
-                <div className="mb-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{tw('dashboard.title', 'Dashboard')}</CardTitle>
-                      <CardDescription>{tw('dashboard.comingSoon', 'Coming Soon')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-center py-8">
-                        <p className="text-muted-foreground text-sm">
-                          {tw('dashboard.description', 'Dashboard features will be available soon.')}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
                     rowData={filteredItems}
@@ -734,6 +720,32 @@ function Workspaces() {
                     }}
                   />
                 </div>
+              </div>
+            )
+          },
+          {
+            value: "dashboard",
+            label: (
+              <div className="flex items-center gap-2">
+                <FontAwesomeIcon icon={faGaugeHigh} className="w-4 h-4" />
+                <span>{tw('tabs.dashboard', 'Dashboard')}</span>
+              </div>
+            ),
+            content: (
+              <div className="flex-1 min-h-0 overflow-auto p-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{tw('dashboard.title', 'Dashboard')}</CardTitle>
+                    <CardDescription>{tw('dashboard.comingSoon', 'Coming Soon')}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-muted-foreground text-sm">
+                        {tw('dashboard.description', 'Dashboard features will be available soon.')}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )
           },

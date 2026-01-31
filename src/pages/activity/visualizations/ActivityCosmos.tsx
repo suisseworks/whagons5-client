@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActivityEvent } from '../ActivityMonitor';
 import { Clock, User, ArrowRight } from 'lucide-react';
+import { useLanguage } from '@/providers/LanguageProvider';
 
 interface ActivityCosmosProps {
   activities: ActivityEvent[];
@@ -65,13 +66,7 @@ const typeIcons: Record<ActivityEvent['type'], string> = {
 
 const userColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
 
-function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+// formatTimeAgo is now handled inside the component with translations
 
 export default function ActivityCosmos({ activities }: ActivityCosmosProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -85,6 +80,23 @@ export default function ActivityCosmos({ activities }: ActivityCosmosProps) {
   
   const [hoveredParticle, setHoveredParticle] = useState<ActivityParticle | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const { t } = useLanguage();
+
+  // Format time ago with translations
+  const formatTimeAgo = useCallback((date: Date): string => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return t('activity.time.justNow', 'just now');
+    if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      return t('activity.time.minutesAgo', '{count}m ago').replace('{count}', String(minutes));
+    }
+    if (seconds < 86400) {
+      const hours = Math.floor(seconds / 3600);
+      return t('activity.time.hoursAgo', '{count}h ago').replace('{count}', String(hours));
+    }
+    const days = Math.floor(seconds / 86400);
+    return t('activity.time.daysAgo', '{count}d ago').replace('{count}', String(days));
+  }, [t]);
 
   // Generate star field once
   useEffect(() => {
@@ -496,20 +508,20 @@ export default function ActivityCosmos({ activities }: ActivityCosmosProps) {
       >
         <div className="text-lg font-bold mb-2 flex items-center gap-2">
           <span className="text-2xl">🌌</span>
-          Activity Cosmos
+          {t('activity.cosmos.title', 'Activity Cosmos')}
         </div>
         <div className="text-sm space-y-1 text-slate-300">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span>Users: {userNodesRef.current.size}</span>
+            <span>{t('activity.cosmos.users', 'Users')}: {userNodesRef.current.size}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Activities: {activities.length}</span>
+            <span>{t('activity.cosmos.activities', 'Activities')}: {activities.length}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <span>Connections: {connectionsRef.current.length}</span>
+            <span>{t('activity.cosmos.connections', 'Connections')}: {connectionsRef.current.length}</span>
           </div>
         </div>
       </motion.div>
@@ -520,12 +532,12 @@ export default function ActivityCosmos({ activities }: ActivityCosmosProps) {
         animate={{ opacity: 1, y: 0 }}
         className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md rounded-xl p-3 text-white border border-white/10"
       >
-        <div className="text-xs font-semibold mb-2 text-slate-400">Activity Types</div>
+        <div className="text-xs font-semibold mb-2 text-slate-400">{t('activity.types.title', 'Activity Types')}</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
           {Object.entries(typeColors).slice(0, 8).map(([type, color]) => (
             <div key={type} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-              <span className="text-slate-300">{type.split('_').join(' ')}</span>
+              <span className="text-slate-300">{t(`activity.types.${type}`, type.split('_').join(' '))}</span>
             </div>
           ))}
         </div>
