@@ -2,7 +2,7 @@ export class StreamingTtsPlayer {
   private audioCtx: AudioContext | null = null;
   private compressor: DynamicsCompressorNode | null = null;
   private gain: GainNode | null = null;
-  private baseVolume = 0.65;
+  private baseVolume = 0.55;
   private ducked = false;
   private playheadTime = 0;
   private decodeChain: Promise<void> = Promise.resolve();
@@ -20,17 +20,18 @@ export class StreamingTtsPlayer {
       this.audioCtx = new Ctx();
       // Light limiter/compressor to prevent "yelling" / clipping on hot TTS outputs.
       this.compressor = this.audioCtx.createDynamicsCompressor();
-      // Conservative settings: tame peaks without sounding pumpy.
-      this.compressor.threshold.value = -14; // dB
-      this.compressor.knee.value = 18; // dB
-      this.compressor.ratio.value = 4; // :1
-      this.compressor.attack.value = 0.003; // seconds
-      this.compressor.release.value = 0.25; // seconds
+      // Slightly stronger settings: tame sudden hot chunks without sounding too pumpy.
+      // This is a "safety net" on top of per-chunk normalization below.
+      this.compressor.threshold.value = -18; // dB
+      this.compressor.knee.value = 12; // dB
+      this.compressor.ratio.value = 8; // :1
+      this.compressor.attack.value = 0.001; // seconds
+      this.compressor.release.value = 0.2; // seconds
 
       this.gain = this.audioCtx.createGain();
       // Default lower than 1.0 to avoid "too loud" output; allow override via localStorage.
       // Set localStorage key `assistant:tts-volume` to a number in [0.0, 1.25].
-      let vol = 0.65;
+      let vol = 0.55;
       try {
         const raw = localStorage.getItem("assistant:tts-volume");
         if (raw != null) {
@@ -91,12 +92,24 @@ export class StreamingTtsPlayer {
 
       const src = this.audioCtx.createBufferSource();
       src.buffer = decoded;
-      // Route through compressor+gain chain.
+      // Per-chunk peak normalization (downward only).
+      // ElevenLabs occasionally emits "hot" chunks; scaling just those chunks prevents perceived yelling
+      // without forcing the whole session to be quiet.
+      const peak = estimatePeak(decoded);
+      const targetPeak = 0.75; // keep some headroom for compressor + system volume
+      const scale = peak > targetPeak && peak > 0 ? targetPeak / peak : 1;
+
+      const preGain = this.audioCtx.createGain();
+      preGain.gain.value = Math.min(1, Math.max(0.05, scale));
+
+      // Route: src -> preGain -> compressor -> gain -> destination
       if (this.compressor) {
-        src.connect(this.compressor);
+        src.connect(preGain);
+        preGain.connect(this.compressor);
       } else if (this.gain) {
-        // Fallback (shouldn't happen): connect directly to gain.
-        src.connect(this.gain);
+        // Fallback (shouldn't happen): src -> preGain -> gain
+        src.connect(preGain);
+        preGain.connect(this.gain);
       }
       this.activeSources.add(src);
 
@@ -181,3 +194,20 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function estimatePeak(buf: AudioBuffer): number {
+  // Fast-ish peak estimate: cap work to ~5k samples/channel by striding.
+  let peak = 0;
+  const channels = Math.max(1, buf.numberOfChannels || 1);
+  for (let ch = 0; ch < channels; ch++) {
+    const data = buf.getChannelData(ch);
+    const n = data.length;
+    if (n === 0) continue;
+    const stride = Math.max(1, Math.floor(n / 5000));
+    for (let i = 0; i < n; i += stride) {
+      const v = Math.abs(data[i] || 0);
+      if (v > peak) peak = v;
+      if (peak >= 1) return 1;
+    }
+  }
+  return peak;
+}

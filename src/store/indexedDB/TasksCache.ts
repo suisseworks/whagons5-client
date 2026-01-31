@@ -3,34 +3,8 @@ import { Task } from "../types";
 import { DB } from "./DB";
 import { api } from "@/store/api/internalApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
-import sha256 from "crypto-js/sha256";
-import encHex from "crypto-js/enc-hex";
-import { applyEncryptionConfig, shouldEncryptStore } from "@/config/encryptionConfig";
 
 export class TasksCache {
-
-    // Use configuration-based encryption setting instead of hardcoded flag
-    public static get TASKS_ENCRYPTION_ENABLED(): boolean {
-        return shouldEncryptStore('tasks');
-    }
-
-    // Toggle to disable encryption specifically for the 'tasks' store
-    public static async setEncryptionEnabled(enabled: boolean) {
-        const prev = DB.getEncryptionForStore('tasks');
-        DB.setEncryptionForStore('tasks', enabled);
-        // If we are disabling encryption after it had been enabled, clear old encrypted rows
-        if (prev && !enabled) {
-            try {
-                await DB.clear('tasks');
-                this._memTasks = null;
-                this._memTasksStamp = 0;
-            } catch {}
-        }
-    }
-
-    public static isEncryptionEnabled(): boolean {
-        return DB.getEncryptionForStore('tasks');
-    }
 
     private static initPromise: Promise<boolean> | null = null;
     private static authListener: (() => void) | null = null;
@@ -44,11 +18,10 @@ export class TasksCache {
 
     private static _memTasks: Task[] | null = null;
     private static _memTasksStamp = 0;
-    private static readonly MEM_TTL_MS = 10000; // 10s TTL for in-memory decrypted cache
+    private static readonly MEM_TTL_MS = 10000; // 10s TTL for in-memory cache
 
     private static _memSharedTasks: Task[] | null = null;
     private static _memSharedTasksStamp = 0;
-    private static _fetchingSharedTasks = false;
 
     public static async init(): Promise<boolean> {
         // Prevent multiple simultaneous initializations
@@ -66,9 +39,6 @@ export class TasksCache {
 
     private static async _doInit(): Promise<boolean> {
         await DB.init();
-        // Apply encryption configuration for all stores
-        applyEncryptionConfig();
-        
         if (!auth.currentUser) {
             return new Promise((resolve) => {
                 // Clean up any existing listener
@@ -125,6 +95,24 @@ export class TasksCache {
         // Note: shared_tasks are managed separately
         
         // Emit cache invalidate event to refresh table
+        TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
+    }
+
+    public static async deleteTasksBulk(taskIds: Array<string | number>) {
+        if (!DB.inited) await DB.init();
+        for (const taskId of taskIds) {
+            try {
+                await DB.delete('tasks', taskId as any);
+                await DB.delete('shared_tasks', taskId as any);
+            } catch {
+                // Ignore missing rows
+            }
+        }
+        this._memTasks = null;
+        this._memTasksStamp = 0;
+        this._memSharedTasks = null;
+        this._memSharedTasksStamp = 0;
+
         TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
     }
 
@@ -232,449 +220,8 @@ export class TasksCache {
     public static get lastUpdated(): Date { return new Date(0); }
     public static set lastUpdated(_: Date) { /* no-op */ }
 
-    public static async fetchTasks() {
-        let allTasks: Task[] = [];
-        let currentPage = 1;
-        let totalApiCalls = 0;
-        
-        try {
-            let hasNextPage = true;
-            // const totalPagesExpected = 0; // unused
-            
-            // console.log("🚀 Starting to fetch all tasks with pagination...");
-            
-            // Do NOT clear existing tasks at the start.
-            // Clearing triggers UI refresh events and causes the grid to “blink”.
-            // We'll replace the store atomically at the end of the fetch.
-            
-            // Loop through all pages
-            while (hasNextPage) {
-                totalApiCalls++;
-                const apiParams = {
-                    page: currentPage,
-                    per_page: 500, // Maximum allowed per page
-                    sort_by: 'id',
-                    sort_direction: 'asc'
-                };
-                // console.log(`📡 API Call #${totalApiCalls} - Fetching tasks page ${currentPage}...`);
-                // console.log(`🔗 API URL: GET /api/tasks?${new URLSearchParams({
-                //     page: currentPage.toString(),
-                //     per_page: '500',
-                //     sort_by: 'id',
-                //     sort_direction: 'asc'
-                // }).toString()}`);
-                
-                const response = await api.get("/tasks", {
-                    params: apiParams
-                });
-                
-                // Handle the new API response structure
-                const pageData = response.data.data as Task[];
-                const pagination = response.data.pagination;
-                
-                // Debug pagination info
-                // console.log(`📊 Pagination Info for Page ${currentPage}:`, {
-                //     current_page: pagination?.current_page,
-                //     per_page: pagination?.per_page,
-                //     total: pagination?.total,
-                //     last_page: pagination?.last_page,
-                //     from: pagination?.from,
-                //     to: pagination?.to,
-                //     has_next_page: pagination?.has_next_page,
-                //     next_page: pagination?.next_page,
-                //     tasks_in_response: pageData?.length || 0
-                // });
-                
-                // Set expected total pages from first response
-                // if (currentPage === 1 && pagination?.last_page) {
-                //     const totalPagesExpected = pagination.last_page;
-                //     console.log(`📈 Expected total pages: ${totalPagesExpected}, Expected total tasks: ${pagination.total}`);
-                // }
-                
-                if (pageData && pageData.length > 0) {
-                    // keep position; avoid unused var
-                    
-                    // Get ID range for this page
-                    // const pageIds = pageData.map(task => task.id);
-                    // const minId = Math.min(...pageIds);
-                    // const maxId = Math.max(...pageIds);
-                    
-                    // console.log(`📋 Page ${currentPage} ID range: ${minId} to ${maxId}`);
-                    
-                    // DEDUPLICATION: Only add tasks that we don't already have
-                    const existingIds = new Set(allTasks.map(task => task.id));
-                    const newTasks = pageData.filter(task => !existingIds.has(task.id));
-                    const duplicatesSkipped = pageData.length - newTasks.length;
-                    
-                    if (duplicatesSkipped > 0) {
-                        console.warn(`⚠️  Page ${currentPage}: Skipped ${duplicatesSkipped} duplicate tasks (backend pagination issue)`);
-                    }
-                    
-                    allTasks = [...allTasks, ...newTasks];
-                     console.log(`✅ Page ${currentPage}: fetched ${pageData.length} tasks, added ${newTasks.length} new tasks (total unique: ${allTasks.length})`);
-                } else {
-                        console.warn(`⚠️  Page ${currentPage}: No tasks returned or empty response`);
-                }
-                
-                // Check if there's a next page
-                hasNextPage = pagination?.has_next_page || false;
-                if (hasNextPage) {
-                    currentPage = pagination.next_page || currentPage + 1;
-                    // console.log(`➡️  Moving to next page: ${currentPage}`);
-                } else {
-                    //  console.log(`🏁 Completed fetching all tasks!`);
-                    // console.log(`📊 Final Summary:`);
-                    // console.log(`   - Total API calls made: ${totalApiCalls}`);
-                    // console.log(`   - Expected pages: ${totalPagesExpected}`);
-                    // console.log(`   - Last page processed: ${currentPage}`);
-                    // console.log(`   - Unique tasks collected: ${allTasks.length}`);
-                    // console.log(`   - Expected total (from API): ${pagination?.total || 'unknown'}`);
-                    
-                    if (pagination?.total && allTasks.length < pagination.total) {
-                        const expectedDuplicates = pagination.total - allTasks.length;
-                        console.warn(`⚠️  Backend pagination issue: Expected ${pagination.total} tasks, got ${allTasks.length} unique tasks`);
-                        console.warn(`⚠️  This suggests ${expectedDuplicates} duplicates were filtered out due to overlapping pagination`);
-                        console.warn(`💡 Recommendation: Fix backend pagination to return sequential, non-overlapping pages`);
-                    } else if (allTasks.length === pagination?.total) {
-                        console.log(`✅ Perfect! All tasks fetched with no duplicates`);
-                    }
-                }
-            }
-            
-            // Replace the tasks store once (single refresh)
-            await DB.clear('tasks');
-            this._memTasks = null;
-            this._memTasksStamp = 0;
-
-            if (allTasks.length > 0) {
-                await DB.bulkPut('tasks', allTasks as any[]);
-                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
-            } else {
-                // Ensure stale tasks disappear if server returns none
-                TaskEvents.emit(TaskEvents.EVENTS.CACHE_INVALIDATE);
-            }
-            
-            return true;
-        } catch (error) {
-            console.error("❌ fetchTasks error:", error);
-            console.error("Error details:", {
-                message: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined,
-                currentPage,
-                totalTasksCollected: allTasks?.length || 0
-            });
-            return false;
-        }
-    }
-
-    public static async fetchSharedTasks() {
-        let allTasks: Task[] = [];
-        let currentPage = 1;
-        let totalApiCalls = 0;
-
-        try {
-            let hasNextPage = true;
-
-            // Do NOT clear at start to avoid UI blinking; replace at end.
-
-            while (hasNextPage) {
-                totalApiCalls++;
-                const apiParams = {
-                    page: currentPage,
-                    per_page: 500,
-                    sort_by: 'id',
-                    sort_direction: 'asc',
-                    shared_with_me: 1,
-                };
-
-                const response = await api.get('/tasks', { params: apiParams });
-                const pageData = response.data.data as Task[];
-                const pagination = response.data.pagination;
-
-                if (pageData && pageData.length > 0) {
-                    const existingIds = new Set(allTasks.map(task => task.id));
-                    const newTasks = pageData.filter(task => !existingIds.has(task.id));
-                    allTasks = [...allTasks, ...newTasks];
-                }
-
-                hasNextPage = pagination?.has_next_page || false;
-                currentPage = pagination?.next_page || currentPage + 1;
-                if (!hasNextPage) break;
-            }
-
-            if (allTasks.length > 0) {
-                await DB.clear('shared_tasks');
-                await DB.bulkPut('shared_tasks', allTasks as any[]);
-                // Populate memory cache immediately to prevent repeated queries
-                this._memSharedTasks = allTasks;
-                this._memSharedTasksStamp = Date.now();
-                // Emit event to refresh grid - event handler will check workspaceId
-                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, allTasks);
-            } else {
-                await DB.clear('shared_tasks');
-                // Set empty array in memory cache to prevent repeated fetches
-                this._memSharedTasks = [];
-                this._memSharedTasksStamp = Date.now();
-                // Emit event with empty array - event handler will check workspaceId
-                TaskEvents.emit(TaskEvents.EVENTS.TASKS_BULK_UPDATE, []);
-            }
-
-            return true;
-        } catch (error) {
-            console.error('❌ fetchSharedTasks error:', error, { currentPage, totalApiCalls });
-            return false;
-        }
-    }
-
-    public static async validateTasks(serverGlobalHash?: string | null, serverBlockCount?: number | null) {
-        // Integrity validation for tasks should always run. We rely on the server's integrity endpoints
-        // (global/block/row hashes) to detect changes like status_id updates and selectively refetch.
-        try {
-            if (this.validating) {
-                this.dlog('validateTasks: already running, skipping re-entry');
-                return true;
-            }
-            this.validating = true;
-            const t0 = performance.now();
-            
-            // Bootstrap: If cache is empty, fetch tasks once before integrity validation
-            const existingTasks = await this.getTasks();
-            console.log(`[TasksCache] validateTasks: existingTasks count=${existingTasks.length}`);
-            
-            if (existingTasks.length === 0) {
-                this.dlog('validateTasks: cache empty, bootstrap fetching tasks');
-                try {
-                    const fetchSuccess = await this.fetchTasks();
-                    if (fetchSuccess) {
-                        this.dlog('validateTasks: bootstrap fetch completed');
-                        // After bootstrap, continue with integrity validation to verify
-                        // (or return early if you prefer to skip validation on first sync)
-                    } else {
-                        this.dlog('validateTasks: bootstrap fetch failed, continuing with validation');
-                    }
-                } catch (e) {
-                    console.warn('TasksCache: bootstrap fetch error', e);
-                    // Continue with validation even if bootstrap fails
-                }
-            } else {
-                console.log('[TasksCache] validateTasks: cache not empty, skipping bootstrap fetch');
-            }
-            
-            // 0) Quick global-hash short-circuit (use batch result if provided, otherwise fetch)
-            const localBlocks = await this.computeLocalTaskBlockHashes();
-            const localGlobalConcat = localBlocks.map(b => b.block_hash).join('');
-            const localGlobalHash = sha256(localGlobalConcat).toString(encHex);
-            
-            let serverGlobal: string | undefined = serverGlobalHash ?? undefined;
-            let serverBlockCountFromServer: number | null = serverBlockCount ?? null;
-            
-            // Only make API call if batch result wasn't provided
-            if (serverGlobalHash === undefined) {
-                try {
-                    const globalResp = await api.get('/integrity/global', { params: { table: 'wh_tasks' } });
-                    serverGlobal = globalResp.data?.data?.global_hash;
-                    serverBlockCountFromServer = globalResp.data?.data?.block_count ?? null;
-                } catch (_) {
-                    // ignore and continue with block-level comparison
-                }
-            }
-            
-            if (serverGlobal) {
-                this.dlog('global compare', { localBlocks: localBlocks.length, serverBlockCount: serverBlockCountFromServer, equal: serverGlobal === localGlobalHash });
-                if (serverGlobal === localGlobalHash && (serverBlockCountFromServer === null || serverBlockCountFromServer === localBlocks.length)) {
-                    this.dlog('global hash match; skipping block compare');
-                    this.validating = false;
-                    // Perfect match – nothing to do
-                    return true;
-                }
-            }
-
-            // 1) Integrity blocks comparison (cheap): compare local block hashes vs server
-            let serverBlocksResp = await api.get('/integrity/blocks', { params: { table: 'wh_tasks' } });
-            let serverBlocks: Array<{ block_id: number; block_hash: string; min_row_id: number; max_row_id: number; row_count: number }> = serverBlocksResp.data.data || [];
-
-            // If server has no hashes yet, trigger a rebuild once and retry
-            if (serverBlocks.length === 0 && localBlocks.length > 0) {
-                try {
-                    await api.post('/integrity/rebuild', { table: 'wh_tasks' });
-                    serverBlocksResp = await api.get('/integrity/blocks', { params: { table: 'wh_tasks' } });
-                    serverBlocks = serverBlocksResp.data.data || [];
-                    if (serverBlocks.length === 0) { this.validating = false; return true; } // nothing to compare, avoid refetching all
-                } catch (_) {
-                    this.validating = false; return true; // avoid heavy refetch
-                }
-            }
-
-            const serverMap = new Map(serverBlocks.map(b => [b.block_id, b]));
-            const mismatchedBlocks: number[] = [];
-            for (const lb of localBlocks) {
-                const sb = serverMap.get(lb.block_id);
-                if (!sb || sb.block_hash !== lb.block_hash || sb.row_count !== lb.row_count) {
-                    this.dlog('mismatch block', { block: lb.block_id, reason: !sb ? 'missing' : (sb.block_hash !== lb.block_hash ? 'hash' : 'count') });
-                    mismatchedBlocks.push(lb.block_id);
-                }
-            }
-            // Also consider server blocks we don't have locally
-            for (const sb of serverBlocks) {
-                if (!localBlocks.find(b => b.block_id === sb.block_id)) {
-                    mismatchedBlocks.push(sb.block_id);
-                }
-            }
-
-            if (mismatchedBlocks.length === 0) {
-                this.dlog('blocks equal; finishing', { ms: Math.round(performance.now() - t0) });
-                this.validating = false;
-                console.log('validateTasks: hashes match. No changes needed.');
-                return true;
-            }
-
-            // 2) For mismatched blocks, fetch server row hashes and refetch rows that differ
-            for (const blockId of Array.from(new Set(mismatchedBlocks))) {
-                const serverRowsResp = await api.get(`/integrity/blocks/${blockId}/rows`, { params: { table: 'wh_tasks' } });
-                const serverRows: Array<{ row_id: number; row_hash: string }> = serverRowsResp.data.data || [];
-                const serverRowMap = new Map(serverRows.map(r => [r.row_id, r.row_hash]));
-
-                // Build local row hash map for this block
-                const localRowsInBlock = await this.getTasksInBlock(blockId);
-                const localRowMap = new Map<number, string>();
-                for (const r of localRowsInBlock) {
-                    localRowMap.set(r.id, this.hashTask(r));
-                }
-
-                const toRefetch: number[] = [];
-                // Rows present locally: compare
-                for (const [rowId, localHash] of localRowMap.entries()) {
-                    const sh = serverRowMap.get(rowId);
-                    if (!sh || sh !== localHash) toRefetch.push(rowId);
-                }
-                // Rows present on server but not locally
-                for (const [rowId] of serverRowMap.entries()) {
-                    if (!localRowMap.has(rowId)) toRefetch.push(rowId);
-                }
-
-                if (toRefetch.length > 0) {
-                    this.dlog('refetch ids', { blockId, count: toRefetch.length });
-                    const chunk = 200;
-                    for (let i = 0; i < toRefetch.length; i += chunk) {
-                        const ids = toRefetch.slice(i, i + chunk);
-                        try {
-                            const resp = await api.get('/tasks', { params: { ids: ids.join(','), per_page: ids.length, page: 1 } });
-                            const rows = (resp.data.data || resp.data.rows) as Task[];
-                            if (rows?.length) {
-                                // Attach server-provided row hash so subsequent local hashing can short-circuit
-                                const rowsWithHash = rows.map(r => {
-                                    const h = serverRowMap.get(r.id);
-                                    return h ? { ...(r as any), __h: h } : r;
-                                });
-                                await this.addTasks(rowsWithHash as unknown as Task[]);
-                            }
-                        } catch (e) {
-                            console.warn('validateTasks: batch fetch failed', e);
-                        }
-                    }
-                }
-
-                // Cleanup: delete local tasks not present in server block rows
-                const serverIds = new Set<number>(serverRows.map(r => r.row_id));
-                for (const localId of Array.from(localRowMap.keys())) {
-                    if (!serverIds.has(localId)) {
-                        await this.deleteTask(String(localId));
-                    }
-                }
-            }
-
-            // Refresh watermark
-            this.lastUpdated = await this.getLastUpdated();
-            this.dlog('validateTasks finished', { ms: Math.round(performance.now() - t0) });
-            this.validating = false;
-            return true;
-        } catch (error) {
-            console.error('validateTasks', error);
-            this.validating = false;
-            return false;
-        }
-    }
-
-    // --- Integrity helpers ---
-    private static hashTask(task: Task): string {
-        // Prefer server-provided hash when available (attached during validation)
-        if ((task as any) && typeof (task as any).__h === 'string' && (task as any).__h.length) {
-            return (task as any).__h as string;
-        }
-
-        // Match backend canonicalization exactly (must mirror wh_tasks hash trigger SQL)
-
-        // Normalize all numeric fields to ensure type consistency with backend (which uses direct values)
-        // Backend hash trigger order: id, name, description, workspace_id, category_id, team_id, template_id, spot_id, status_id, priority_id, approval_id, dates, durations, updated_at
-        const row = [
-            Number(task.id) || 0,
-            (task as any).name || '',
-            (task as any).description || '',
-            Number((task as any).workspace_id) || 0,
-            Number((task as any).category_id) || 0,
-            Number((task as any).team_id) || 0,
-            Number((task as any).template_id) || 0,
-            Number((task as any).spot_id) || 0,
-            Number((task as any).status_id) || 0, // Ensure number for hash consistency
-            Number((task as any).priority_id) || 0, // Ensure number for hash consistency
-            Number((task as any).approval_id) || 0,
-            // Timestamps normalized to UTC epoch ms (empty string when falsy)
-            this.toUtcEpochMs((task as any).start_date),
-            this.toUtcEpochMs((task as any).due_date),
-            Number((task as any).expected_duration) || 0,
-            this.toUtcEpochMs((task as any).response_date),
-            this.toUtcEpochMs((task as any).resolution_date),
-            Number((task as any).work_duration) || 0,
-            Number((task as any).pause_duration) || 0,
-            this.toUtcEpochMs((task as any).updated_at)
-        ].join('|');
-        return sha256(row).toString(encHex);
-    }
-
-    // Normalize various timestamp inputs to UTC epoch ms string to match backend hashing
-    private static toUtcEpochMs(value: any): string {
-        if (!value) return '';
-        let vStr = String(value);
-        // If it looks like 'YYYY-MM-DD HH:mm:ss(.sss)?' without timezone, assume UTC
-        if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(vStr) && !/[zZ]|[+\-]\d{2}:?\d{2}$/.test(vStr)) {
-            vStr = vStr.replace(' ', 'T') + 'Z';
-        }
-        const dt = new Date(vStr);
-        const t = dt.getTime();
-        return Number.isFinite(t) ? String(t) : '';
-    }
-
-    private static async computeLocalTaskBlockHashes() {
-        const tasks = (await this.getTasks()).filter(t => t && Number.isFinite(Number(t.id)));
-        const BLOCK_SIZE = 1024;
-        const byBlock = new Map<number, Array<{ id: number; hash: string }>>();
-        for (const t of tasks) {
-            const blk = Math.floor(t.id / BLOCK_SIZE);
-            if (!byBlock.has(blk)) byBlock.set(blk, []);
-            byBlock.get(blk)!.push({ id: t.id, hash: this.hashTask(t) });
-        }
-        const blocks: Array<{ block_id: number; min_row_id: number; max_row_id: number; row_count: number; block_hash: string }> = [];
-        for (const [blk, arr] of byBlock.entries()) {
-            arr.sort((a,b) => a.id - b.id);
-            const concat = arr.map(x => x.hash).join('');
-            const hash = sha256(concat).toString(encHex);
-            blocks.push({ block_id: blk, min_row_id: arr[0].id, max_row_id: arr[arr.length-1].id, row_count: arr.length, block_hash: hash });
-        }
-        blocks.sort((a,b) => a.block_id - b.block_id);
-        return blocks;
-    }
-
-    private static async getTasksInBlock(blockId: number) {
-        const BLOCK_SIZE = 1024;
-        const minId = blockId * BLOCK_SIZE;
-        const maxId = minId + BLOCK_SIZE - 1;
-        const tasks = await this.getTasks();
-        return tasks.filter(t => t.id >= minId && t.id <= maxId);
-    }
-
-    // Exposed for hashing self-tests
-    public static computeHashForTest(task: Task): string {
-        return this.hashTask(task);
+    public static async validateTasks(): Promise<void> {
+        return;
     }
 
     /**
@@ -687,7 +234,7 @@ export class TasksCache {
             
             const sharedWithMe = !!params.shared_with_me;
 
-            // Get tasks from the appropriate store (tasks vs shared_tasks)
+            // Get tasks from appropriate store (tasks vs shared_tasks)
             let tasks: Task[];
             const now = Date.now();
             if (sharedWithMe) {
@@ -701,23 +248,7 @@ export class TasksCache {
                     if (localStorage.getItem('wh-debug-shared') === 'true') {
                         console.log('[TasksCache] Loaded shared tasks from DB:', tasks.length, 'tasks');
                     }
-                    // Bootstrap fetch if empty - fire and forget to avoid blocking the UI
-                    // Only fetch if cache is truly empty AND we're not already fetching
-                    if (tasks.length === 0 && !this._fetchingSharedTasks) {
-                        // Prevent multiple simultaneous fetches
-                        this._fetchingSharedTasks = true;
-                        // Trigger fetch in background without blocking
-                        this.fetchSharedTasks()
-                            .catch(err => {
-                                console.error('Background fetchSharedTasks failed:', err);
-                            })
-                            .finally(() => {
-                                this._fetchingSharedTasks = false;
-                            });
-                        // Return empty results immediately - grid will refresh when fetch completes
-                    }
                     // Always update memory cache with current results (even if empty)
-                    // This prevents repeated fetches when refreshGrid is called multiple times
                     this._memSharedTasks = tasks;
                     this._memSharedTasksStamp = now;
                 }

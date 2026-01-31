@@ -267,10 +267,6 @@ api.interceptors.request.use(
     // Override the baseURL for this specific request to ensure correct tenant routing
     config.baseURL = correctBaseURL;
     
-    // Track GET requests for syncing indicator
-    if (config.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.increment();
-    }
     
     // Debug logging for invitation signup requests
     if (config.url?.includes('/invitations/signup/')) {
@@ -285,10 +281,6 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    // Decrement on request error for GET requests
-    if (error.config?.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.decrement();
-    }
     return Promise.reject(error);
   }
 );
@@ -296,10 +288,6 @@ api.interceptors.request.use(
 // Add response interceptor
 api.interceptors.response.use(
   (response) => {
-    // Decrement GET request counter on successful response
-    if (response.config.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.decrement();
-    }
     
     // Handle 225 responses for tenant switching
     if (response.status === 225) {
@@ -321,11 +309,6 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    // Decrement GET request counter on error
-    if (error.config?.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.decrement();
-    }
-    
     console.log('error interceptor triggered:', error.response?.status, error.config?.url);
     const originalRequest = error.config;
 

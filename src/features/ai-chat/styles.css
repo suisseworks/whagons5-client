@@ -4,6 +4,20 @@
   width: 100% !important;
 }
 
+/* Tailwind preflight resets <p> margins to 0; restore readable paragraph spacing
+   for assistant markdown so blank lines/stanzas "breathe". */
+.message.assistant p {
+  margin: 0.75rem 0;
+}
+
+.message.assistant p:first-child {
+  margin-top: 0;
+}
+
+.message.assistant p:last-child {
+  margin-bottom: 0;
+}
+
 .message.assistant code:not(pre code) {
   background-color: hsl(var(--muted));
   border-radius: 5px;

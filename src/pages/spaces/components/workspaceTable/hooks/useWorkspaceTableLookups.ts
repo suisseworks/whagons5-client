@@ -18,6 +18,8 @@ export interface WorkspaceTableLookupsParams {
   categories: any[];
   templates: any[];
   forms: any[];
+  formVersions: any[];
+  taskForms: any[];
   statusTransitions: any[];
   slas: any[];
   tags: any[];
@@ -73,6 +75,31 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     }
     return m;
   }, [p.forms]);
+
+  const formVersionMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const v of p.formVersions || []) {
+      const id = Number((v as any)?.id);
+      if (!Number.isFinite(id)) continue;
+      m[id] = v;
+    }
+    return m;
+  }, [p.formVersions]);
+
+  // Map task_id -> TaskForm (for form fill status)
+  const taskFormsMap = useMemo(() => {
+    const m = new Map<number, any>();
+    for (const tf of p.taskForms || []) {
+      const taskId = Number((tf as any)?.task_id);
+      if (!Number.isFinite(taskId)) continue;
+      // If multiple forms per task exist, keep the most recent one
+      const existing = m.get(taskId);
+      if (!existing || (tf as any).updated_at > existing.updated_at) {
+        m.set(taskId, tf);
+      }
+    }
+    return m;
+  }, [p.taskForms]);
 
   const taskTagsMap = useMemo(() => {
     const m = new Map<number, number[]>();
@@ -182,6 +209,8 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     tagMap,
     templateMap,
     formMap,
+    formVersionMap,
+    taskFormsMap,
     taskTagsMap,
     categoryMap,
     workspaceCustomFields,

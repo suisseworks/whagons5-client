@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:check": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "extract-routes": "tsx scripts/extract-routes.ts",
+    "sync-routes": "npm run extract-routes && cd ../whagons_assistant && go run scripts/generate-browser-navigate.go && make gen-schemas"
   },
   "dependencies": {
     "@base-ui-components/react": "1.0.0-beta.3",
@@ -112,12 +114,14 @@
     "tailwindcss": "^4.0.12",
     "tailwindcss-animate": "^1.0.7",
     "vite": "^6.3.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.76",
+    "quickjs-emscripten-core": "^0.31.0",
+    "@jitl/quickjs-singlefile-cjs-release-sync": "^0.31.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.4",
     "@types/color": "^4.2.0",
-    "@types/crypto-js": "^4.2.2",
     "@types/jspdf": "^1.3.3",
     "@types/prismjs": "^1.26.5",
     "@types/react": "^18.2.64",
@@ -128,8 +132,10 @@
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
     "cypress": "^15.5.0",
+    "glob": "^11.0.0",
     "javascript-obfuscator": "^4.1.1",
     "rollup-plugin-visualizer": "^6.0.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.8.3",
     "vite-plugin-obfuscator": "^1.0.5",
     "vite-plugin-pwa": "^1.0.3",

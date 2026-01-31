@@ -18,11 +18,7 @@ import {store } from './store';
 // import { DB } from './store/indexedDB/DB';
 // import * as CryptoAPI from './crypto/crypto';
 // import { genericActions } from './store/genericSlices';
-import { applyEncryptionConfig } from './config/encryptionConfig';
 import { initFontStyle } from './utils/fontStyle';
-
-// Initialize encryption configuration
-applyEncryptionConfig();
 
 // Initialize font style
 initFontStyle();
@@ -70,6 +66,15 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </Provider>
   // {/* </React.StrictMode>, */}
 );
+
+// Dev-only: expose the sandbox so you can test from the console quickly.
+if (import.meta.env.DEV) {
+  import('./sandbox/devExpose')
+    .then((m) => m.exposeSandboxToWindow())
+    .catch(() => {
+      // ignore
+    });
+}
 
 
 

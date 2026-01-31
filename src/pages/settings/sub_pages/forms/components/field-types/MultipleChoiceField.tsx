@@ -9,14 +9,34 @@ interface MultipleChoiceFieldProps {
   options: string[];
   onOptionsChange: (options: string[]) => void;
   isEditing?: boolean;
+  // Controlled mode props for form filling
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
-export function MultipleChoiceField({ options, onOptionsChange, isEditing = true }: MultipleChoiceFieldProps) {
+export function MultipleChoiceField({ 
+  options, 
+  onOptionsChange, 
+  isEditing = true,
+  value: externalValue,
+  onChange
+}: MultipleChoiceFieldProps) {
   // Ensure at least one empty option exists
   const currentOptions = options.length > 0 ? options : [''];
   
-  // State for preview select value
-  const [selectedValue, setSelectedValue] = useState<string>("");
+  // Internal state for uncontrolled mode (preview)
+  const [internalValue, setInternalValue] = useState<string>("");
+  
+  // Use external value if provided (controlled mode), otherwise internal
+  const selectedValue = externalValue !== undefined ? externalValue : internalValue;
+  
+  const handleValueChange = (newValue: string) => {
+    if (onChange) {
+      onChange(newValue);
+    } else {
+      setInternalValue(newValue);
+    }
+  };
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...currentOptions];
@@ -41,7 +61,7 @@ export function MultipleChoiceField({ options, onOptionsChange, isEditing = true
   if (!isEditing) {
     return (
       <div className="py-2">
-        <Select value={selectedValue} onValueChange={setSelectedValue}>
+        <Select value={selectedValue} onValueChange={handleValueChange}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select an option" />
           </SelectTrigger>

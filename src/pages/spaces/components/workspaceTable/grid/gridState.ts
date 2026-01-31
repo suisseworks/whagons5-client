@@ -24,6 +24,8 @@ export const useGridReduxState = () => {
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
   const templates = useSelector((s: RootState) => (s as any).templates?.value as any[] || []);
   const forms = useSelector((s: RootState) => (s as any).forms?.value as any[] || []);
+  const formVersions = useSelector((s: RootState) => (s as any).formVersions?.value as any[] || []);
+  const taskForms = useSelector((s: RootState) => (s as any).taskForms?.value as any[] || []);
   const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
   const approvals = useSelector((s: RootState) => (s as any).approvals?.value as any[] || []);
   const approvalApprovers = useSelector((s: RootState) => (s as any).approvalApprovers?.value as any[] || []);
@@ -48,6 +50,8 @@ export const useGridReduxState = () => {
     categories,
     templates,
     forms,
+    formVersions,
+    taskForms,
     statusTransitions,
     approvals,
     approvalApprovers,

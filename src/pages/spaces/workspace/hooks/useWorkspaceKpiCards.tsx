@@ -5,6 +5,7 @@ import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { BarChart3, Activity, TrendingUp } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { WorkspaceStats } from './useWorkspaceStats';
+import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 
 type KpiCardEntity = {
   id: number;
@@ -106,12 +107,31 @@ export function useWorkspaceKpiCards(params: {
   const completedLast7Days = stats.trend.reduce((sum, val) => sum + val, 0);
   const trendDelta = stats.trend.length >= 2 ? stats.trend[stats.trend.length - 1] - stats.trend[stats.trend.length - 2] : 0;
 
-  const inferAccent = (displayConfig: any): WorkspaceHeaderCard['accent'] => {
-    const c = String(displayConfig?.color || '').toLowerCase();
+  const normalizeDisplayConfig = (input: any): any => {
+    if (!input) return {};
+    if (typeof input === 'string') {
+      try {
+        return JSON.parse(input);
+      } catch {
+        return {};
+      }
+    }
+    return input;
+  };
+
+  const inferAccent = (displayConfigInput: any, cardId?: number): WorkspaceHeaderCard['accent'] => {
+    const displayConfig = normalizeDisplayConfig(displayConfigInput);
+    const c = String(displayConfig?.color || displayConfig?.badgeClass || displayConfig?.barClass || '').toLowerCase();
     if (c.includes('amber') || c.includes('orange') || c.includes('yellow')) return 'amber';
     if (c.includes('emerald') || c.includes('green')) return 'emerald';
     if (c.includes('indigo') || c.includes('blue') || c.includes('sky') || c.includes('cyan')) return 'indigo';
-    return 'purple';
+    if (c.includes('purple') || c.includes('violet')) return 'purple';
+
+    const palette: WorkspaceHeaderCard['accent'][] = ['indigo', 'amber', 'emerald', 'purple'];
+    if (typeof cardId === 'number' && Number.isFinite(cardId)) {
+      return palette[Math.abs(cardId) % palette.length];
+    }
+    return 'indigo';
   };
 
   const getDefaultLabel = (defaultKey?: string) => {
@@ -208,18 +228,21 @@ export function useWorkspaceKpiCards(params: {
   ]);
 
   const [customComputed, setCustomComputed] = useState<Map<number, Omit<WorkspaceHeaderCard, 'id'>>>(new Map());
+  const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
 
-  // Stable key for headerKpiCards to avoid re-running effect when only reference changes
-  const headerKpiCardsKey = useMemo(() => {
-    return headerKpiCards
-      .filter((c) => c && !c.query_config?.is_default)
-      .map((c) => `${c.id}:${c.type}:${c.is_enabled}`)
-      .join('|');
-  }, [headerKpiCards]);
-
-  // Store headerKpiCards in a ref so we can access latest value without triggering effect
-  const headerKpiCardsRef = useRef(headerKpiCards);
-  headerKpiCardsRef.current = headerKpiCards;
+  useEffect(() => {
+    const bump = () => setTasksRefreshKey((prev) => prev + 1);
+    const unsubscribers = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, bump),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, bump),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, bump),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, bump),
+      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, bump),
+    ];
+    return () => {
+      unsubscribers.forEach((u) => u());
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -259,8 +282,8 @@ export function useWorkspaceKpiCards(params: {
           if (!card || card.is_enabled === false) continue;
           if (card.query_config?.is_default) continue;
 
-          const display = card.display_config || {};
-          const accent = inferAccent(display);
+          const display = normalizeDisplayConfig(card.display_config);
+          const accent = inferAccent(display, card.id);
           const helperText = display?.helperText ? String(display.helperText) : undefined;
 
           if (card.type === 'task_count') {
@@ -425,9 +448,7 @@ export function useWorkspaceKpiCards(params: {
     return () => {
       cancelled = true;
     };
-    // Note: workingStatusIds is intentionally not in deps - it's only used in defaultComputed memo, not in compute()
-    // Using headerKpiCardsKey for stable comparison, actual cards accessed via ref
-  }, [headerKpiCardsKey, workspaceIdNum, doneStatusId, statsArePending, t]);
+  }, [headerKpiCards, workspaceIdNum, doneStatusId, statsArePending, t, tasksRefreshKey]);
 
   const headerCardsForRender = useMemo(() => {
     const out: WorkspaceHeaderCard[] = [];
@@ -455,4 +476,3 @@ export function useWorkspaceKpiCards(params: {
     canReorderHeaderKpis: headerKpiCards.length > 0,
   };
 }
-

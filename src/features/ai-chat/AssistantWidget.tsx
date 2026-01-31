@@ -20,6 +20,7 @@ import { getPreferredModel } from "./config";
 import { StreamingTtsPlayer } from "./utils/StreamingTtsPlayer";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { useAuthUser } from "@/providers/AuthProvider";
+import { auth } from "@/firebase/firebaseConfig";
 import { useSelector, shallowEqual } from "react-redux";
 import type { RootState } from "@/store/store";
 import { 
@@ -32,10 +33,11 @@ import {
 import { useSpeechToText } from "./hooks/useSpeechToText";
 import "./styles.css";
 
-const { VITE_API_URL, VITE_CHAT_URL, VITE_DEVELOPMENT } = getEnvVariables();
+const { VITE_API_URL, VITE_CHAT_URL, VITE_DEVELOPMENT, VITE_CLIENT_ID } = getEnvVariables();
 // Use separate chat URL, fallback to API URL, then to current origin
 const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
 const IS_DEV = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
+const CLIENT_ID = VITE_CLIENT_ID || "";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -1038,7 +1040,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     // Ensure the stable subscription always uses the latest handler closure for this submit.
     wsEventHandlerRef.current = handleWebSocketEvent;
 
-    const ensureSubscription = () => {
+    const ensureSubscription = async () => {
       // If we're already subscribed AND the underlying socket is alive, keep it.
       // If the socket was closed by the server between turns (common in voice mode),
       // re-subscribe to force `wsManager.connect(...)` to run again.
@@ -1053,7 +1055,18 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       }
 
       const selectedModel = getPreferredModel();
-      unsubscribeWSRef.current = wsManager.subscribe(conversationId, stableWsHandlerRef.current!, selectedModel);
+      
+      // Get Firebase ID token for authentication
+      let token: string | undefined;
+      try {
+        if (auth.currentUser) {
+          token = await auth.currentUser.getIdToken();
+        }
+      } catch (error) {
+        console.warn('[WS] Failed to get Firebase token:', error);
+      }
+      
+      unsubscribeWSRef.current = wsManager.subscribe(conversationId, stableWsHandlerRef.current!, selectedModel, token);
     };
 
     try {
@@ -1068,7 +1081,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         if (wsIdleCloseTimerRef.current) window.clearTimeout(wsIdleCloseTimerRef.current);
         wsIdleCloseTimerRef.current = null;
       } catch {}
-      ensureSubscription();
+      await ensureSubscription();
 
       // Increased timeout for voice chat scenarios where server might be processing previous requests
       // Also allow CONNECTING state since the connection might be establishing
@@ -1095,7 +1108,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
             reconnectBudget--;
             try {
               // Force a re-subscribe attempt (common in prod when the server/proxy closes idle sockets).
-              ensureSubscription();
+              await ensureSubscription();
             } catch {}
             await new Promise(resolve => setTimeout(resolve, 250));
             continue;
@@ -1128,6 +1141,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         },
         language_code: appLanguageCode,
       };
+      if (CLIENT_ID) {
+        messagePayload.client_id = CLIENT_ID;
+      }
       if (userContext) {
         messagePayload.user_context = userContext;
       }

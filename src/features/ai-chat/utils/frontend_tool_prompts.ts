@@ -6,6 +6,8 @@ export type FrontendToolPromptMessage = {
     message?: string;
     default_value?: string;
     path?: string;
+    code?: string;
+    timeout_ms?: number;
     [key: string]: any;
   };
   [key: string]: any;
@@ -145,6 +147,69 @@ export function handleFrontendToolPromptMessage(
       window.location.href = path;
     }
     send({ type: "frontend_tool_response", tool: data?.tool, response: "ok" });
+    return true;
+  }
+
+  if (action === "sandbox_run") {
+    // Zod-validate the prompt payload shape and run inside QuickJS sandbox.
+    // Note: the sandbox can only call explicitly exposed `api.*` capabilities.
+    // For now, that's just api.addUser({email,name?}) which is stubbed.
+    import('zod')
+      .then(async ({ z }) => {
+        const schema = z.object({
+          code: z.string().min(1),
+          timeout_ms: z.number().int().positive().optional(),
+        });
+
+        const parsed = schema.safeParse({
+          code: data?.data?.code,
+          timeout_ms: data?.data?.timeout_ms,
+        });
+
+        if (!parsed.success) {
+          send({
+            type: "frontend_tool_response",
+            tool: data?.tool,
+            response: JSON.stringify({
+              ok: false,
+              error: { code: "VALIDATION_ERROR", message: "Invalid sandbox_run payload", details: parsed.error.flatten() },
+            }),
+          });
+          return;
+        }
+
+        const timeoutMs = parsed.data.timeout_ms ?? 15000;
+        const { SandboxClient } = await import('@/sandbox/SandboxClient');
+        const client = new SandboxClient();
+
+        try {
+          const result = await Promise.race([
+            client.run(parsed.data.code),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Sandbox_Run timeout")), timeoutMs)),
+          ]);
+          send({
+            type: "frontend_tool_response",
+            tool: data?.tool,
+            response: JSON.stringify({ ok: true, result }),
+          });
+        } catch (e: any) {
+          send({
+            type: "frontend_tool_response",
+            tool: data?.tool,
+            response: JSON.stringify({ ok: false, error: { code: "SANDBOX_ERROR", message: String(e?.message || e) } }),
+          });
+        } finally {
+          try { client.terminate(); } catch {}
+        }
+      })
+      .catch((e) => {
+        send({
+          type: "frontend_tool_response",
+          tool: data?.tool,
+          response: JSON.stringify({ ok: false, error: { code: "SANDBOX_ERROR", message: String((e as any)?.message || e) } }),
+        });
+      });
+
     return true;
   }
 

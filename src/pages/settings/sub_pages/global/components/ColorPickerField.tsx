@@ -9,6 +9,7 @@ import {
   ColorPicker,
   ColorPickerSelection,
   ColorPickerHue,
+  ColorPickerAlpha,
   ColorPickerEyeDropper,
   ColorPickerFormat,
   ColorPickerOutput,

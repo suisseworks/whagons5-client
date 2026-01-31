@@ -4,11 +4,29 @@ import { Clock } from "lucide-react";
 
 interface TimeFieldProps {
   isEditing?: boolean;
+  // Controlled mode props for form filling
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
-export function TimeField({ isEditing = true }: TimeFieldProps) {
-  // State for preview input value
-  const [value, setValue] = useState<string>("");
+export function TimeField({ 
+  isEditing = true,
+  value: externalValue,
+  onChange
+}: TimeFieldProps) {
+  // Internal state for uncontrolled mode (preview)
+  const [internalValue, setInternalValue] = useState<string>("");
+  
+  // Use external value if provided (controlled mode), otherwise internal
+  const value = externalValue !== undefined ? externalValue : internalValue;
+  
+  const handleChange = (newValue: string) => {
+    if (onChange) {
+      onChange(newValue);
+    } else {
+      setInternalValue(newValue);
+    }
+  };
 
   // Show the actual time input in both edit and preview modes
   return (
@@ -17,7 +35,7 @@ export function TimeField({ isEditing = true }: TimeFieldProps) {
         <Input
           type="time"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           disabled={isEditing}
           className="pr-10"
         />

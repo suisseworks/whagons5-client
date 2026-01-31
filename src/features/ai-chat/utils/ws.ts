@@ -11,6 +11,7 @@ class SessionWSManager {
   private reconnectTimers: Map<string, number> = new Map();
   private shouldReconnect: Map<string, boolean> = new Map();
   private sessionModels: Map<string, string> = new Map();
+  private sessionTokens: Map<string, string> = new Map();
   private lastUrlBySession: Map<string, string> = new Map();
   private lastCloseBySession: Map<
     string,
@@ -36,7 +37,7 @@ class SessionWSManager {
     }
   }
 
-  private buildWsUrl(sessionId: string, modelId?: string): string {
+  private buildWsUrl(sessionId: string, modelId?: string, token?: string): string {
     // Support either:
     // - host only: "localhost:8080" => ws://localhost:8080/api/v1/chat/ws/{id}
     // - full base including /api/v1: "https://example.com/api/v1" => wss://example.com/api/v1/chat/ws/{id}
@@ -45,22 +46,29 @@ class SessionWSManager {
       ? `${this.urlBase.replace(/\/+$/, "")}/chat/ws/${sessionId}`
       : `${this.urlBase.replace(/\/+$/, "")}/api/v1/chat/ws/${sessionId}`;
 
+    const params = [];
+    if (token) {
+      params.push(`token=${encodeURIComponent(token)}`);
+    }
     if (modelId) {
-      wsUrl += `?model=${encodeURIComponent(modelId)}`;
+      params.push(`model=${encodeURIComponent(modelId)}`);
+    }
+    if (params.length > 0) {
+      wsUrl += `?${params.join('&')}`;
     }
     return wsUrl;
   }
 
-  private connect(sessionId: string, modelId?: string): WebSocket {
+  private connect(sessionId: string, modelId?: string, token?: string): WebSocket {
     const existing = this.connections.get(sessionId);
     if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
       return existing;
     }
 
-    const wsUrl = this.buildWsUrl(sessionId, modelId);
+    const wsUrl = this.buildWsUrl(sessionId, modelId, token);
     this.lastUrlBySession.set(sessionId, wsUrl);
     
-    console.log(`[WS] Connecting to: ${wsUrl}`);
+    console.log(`[WS] Connecting to: ${wsUrl.replace(/token=[^&]+/, 'token=***')}`); // Hide token in logs
     
     const ws = new WebSocket(wsUrl);
     this.connections.set(sessionId, ws);
@@ -151,7 +159,8 @@ class SessionWSManager {
         const timer = window.setTimeout(() => {
           this.reconnectTimers.delete(sessionId);
           const model = this.sessionModels.get(sessionId);
-          this.connect(sessionId, model);
+          const token = this.sessionTokens.get(sessionId);
+          this.connect(sessionId, model, token);
         }, 2000);
         this.reconnectTimers.set(sessionId, timer);
       }
@@ -170,7 +179,7 @@ class SessionWSManager {
     return ws;
   }
 
-  subscribe(sessionId: string, handler: EventHandler, modelId?: string): () => void {
+  subscribe(sessionId: string, handler: EventHandler, modelId?: string, token?: string): () => void {
     if (!sessionId) {
       console.warn('[WS] Cannot subscribe without session ID');
       return () => {};
@@ -185,8 +194,11 @@ class SessionWSManager {
     if (modelId) {
       this.sessionModels.set(sessionId, modelId);
     }
+    if (token) {
+      this.sessionTokens.set(sessionId, token);
+    }
 
-    this.connect(sessionId, modelId);
+    this.connect(sessionId, modelId, token);
 
     return () => {
       const listeners = this.handlers.get(sessionId);
@@ -199,6 +211,7 @@ class SessionWSManager {
         this.handlers.delete(sessionId);
         this.shouldReconnect.set(sessionId, false);
         this.sessionModels.delete(sessionId);
+        this.sessionTokens.delete(sessionId);
         
         const ws = this.connections.get(sessionId);
         // Close even if still CONNECTING to avoid stray sockets and reconnect races.
@@ -243,6 +256,7 @@ class SessionWSManager {
     }
     this.handlers.delete(sessionId);
     this.sessionModels.delete(sessionId);
+    this.sessionTokens.delete(sessionId);
     // Keep lastUrl/close/error for debug after close.
     
     const timer = this.reconnectTimers.get(sessionId);

@@ -44,4 +44,15 @@ export interface ColumnBuilderOptions {
   getDoneStatusId: () => number | undefined;
   formatDueDate: (date: string | null) => string;
   t?: (key: string, fallback?: string) => string;
+  // Form filling props
+  taskFormsMap: Map<number, any>;  // Map<task_id, TaskForm>
+  formVersionMap: Record<number, any>;
+  onOpenFormDialog?: (params: {
+    taskId: number;
+    taskName?: string;
+    formId: number;
+    formVersionId: number;
+    existingTaskFormId?: number;
+    existingData?: Record<string, any>;
+  }) => void;
 }
