@@ -21,6 +21,8 @@ export interface ColumnBuilderOptions {
   showDescriptions: boolean;
   density?: 'compact' | 'comfortable' | 'spacious';
   tagMap: Record<number, any>;
+  templateMap: Record<number, any>;
+  formMap: Record<number, any>;
   taskTagsMap: Map<number, number[]>;
   taskUsers: any[];
   tagDisplayMode?: 'icon' | 'icon-text';

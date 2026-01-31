@@ -12,6 +12,7 @@ import { createStatusColumn } from './statusColumn';
 import { createPriorityColumn } from './priorityColumn';
 import { createOwnerColumn } from './ownerColumn';
 import { createConfigColumn } from './configColumnApprovalSla';
+import { createFormColumn } from './formColumn';
 import { createCustomFieldColumns } from './customFieldColumns';
 import { createVisibilityChecker } from './shared/utils';
 
@@ -50,7 +51,7 @@ export function buildWorkspaceColumns(opts: ColumnBuilderOptions) {
   };
 
   // Build all columns in the correct order
-  // Order: id, name, config, notes, status, priority, owner, due_date, location, last_modified, tag_ids (hidden), custom_fields
+  // Order: id, name, config, form, notes, status, priority, owner, due_date, location, last_modified, tag_ids (hidden), custom_fields
   const baseCols = createBaseColumns(opts);
   
   // Extract individual columns from baseColumns array
@@ -65,6 +66,7 @@ export function buildWorkspaceColumns(opts: ColumnBuilderOptions) {
     idCol,
     createNameColumn(opts, latestNoteByTaskId),
     createConfigColumn(opts),
+    createFormColumn(opts),
     notesCol,
     createStatusColumn(opts),
     createPriorityColumn(opts),

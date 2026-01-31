@@ -2,7 +2,7 @@ import { useMemo, useCallback, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClipboardList, faEye, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faClipboardList, faEdit, faEye, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Form, FormVersion } from "@/store/types";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -101,21 +101,66 @@ function Forms() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [publishStatus, setPublishStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
 
-  // Builder state (per-session draft) - persisted to localStorage
+  /**
+   * Draft persistence (local-only)
+   * - New form drafts:  formBuilderDraft:new
+   * - Edit drafts:      formBuilderDraft:form:<id>
+   *
+   * Goal: if you leave the builder before publishing/saving, you should come back to your changes.
+   */
+  const draftKeyFor = useCallback((formId: number | null) => {
+    return formId ? `formBuilderDraft:form:${formId}` : `formBuilderDraft:new`;
+  }, []);
+
+  const readDraft = useCallback((formId: number | null) => {
+    try {
+      // Back-compat: older single-key draft (new-form only)
+      const legacy = !formId ? localStorage.getItem('formBuilderDraft') : null;
+      const raw = localStorage.getItem(draftKeyFor(formId)) ?? legacy;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed) return null;
+      // New format: { schema, updatedAt }
+      if (parsed?.schema && Array.isArray(parsed.schema.fields)) return parsed.schema as FormBuilderSchema;
+      // Old format: schema directly
+      if (Array.isArray(parsed.fields)) return parsed as FormBuilderSchema;
+      return null;
+    } catch {
+      return null;
+    }
+  }, [draftKeyFor]);
+
+  const writeDraft = useCallback((formId: number | null, schema: FormBuilderSchema) => {
+    try {
+      localStorage.setItem(draftKeyFor(formId), JSON.stringify({ schema, updatedAt: Date.now() }));
+      // Back-compat: keep legacy key updated for new-form mode until fully migrated
+      if (!formId) localStorage.setItem('formBuilderDraft', JSON.stringify(schema));
+    } catch {
+      // ignore storage failures (quota/private mode)
+    }
+  }, [draftKeyFor]);
+
+  const clearDraft = useCallback((formId: number | null) => {
+    try {
+      localStorage.removeItem(draftKeyFor(formId));
+      if (!formId) localStorage.removeItem('formBuilderDraft'); // back-compat
+    } catch {}
+  }, [draftKeyFor]);
+
+  // Builder state (draft-aware)
   const [builderSchema, setBuilderSchema] = useState<FormBuilderSchema>(() => {
-    const saved = localStorage.getItem('formBuilderDraft');
-    return saved ? JSON.parse(saved) : { fields: [], title: '', description: '' };
+    const savedNew = readDraft(null);
+    return savedNew ?? { fields: [], title: '', description: '' };
   });
 
   const [currentVersionId, setCurrentVersionId] = useState<number | null>(null);
   const [isVersionUsed, setIsVersionUsed] = useState(false);
 
-  // Auto-save to localStorage whenever builder schema changes (new-form mode only)
+  // Auto-save draft whenever builder schema changes (new + edit modes)
   useEffect(() => {
-    if (isNewForm) {
-      localStorage.setItem('formBuilderDraft', JSON.stringify(builderSchema));
-    }
-  }, [builderSchema, isNewForm]);
+    const formId = isNewForm ? null : selectedFormId;
+    writeDraft(formId ?? null, builderSchema);
+  }, [builderSchema, isNewForm, selectedFormId, writeDraft]);
 
   // Clear function for the red clear button
   const clearBuilder = useCallback(() => {
@@ -123,8 +168,8 @@ function Forms() {
     setBuilderMeta({ name: '', description: '' });
     setIsNewForm(true);
     setSelectedFormId(null);
-    localStorage.removeItem('formBuilderDraft');
-  }, []);
+    clearDraft(null);
+  }, [clearDraft]);
 
   // Helper: create a form version (draft or active)
   const createFormVersion = useCallback(async (formId: number) => {
@@ -151,6 +196,26 @@ function Forms() {
   // Function to load form for editing
   const loadFormForEditing = useCallback(async (formId: number) => {
     try {
+      // Prefer a local draft if present (user left builder before saving/publishing)
+      const localDraft = readDraft(formId);
+      if (localDraft) {
+        setCurrentVersionId(null);
+        setIsVersionUsed(false);
+        setBuilderSchema({
+          ...localDraft,
+          form_id: formId,
+          isDraft: true
+        });
+        setBuilderMeta({
+          name: localDraft.title || '',
+          description: localDraft.description || ''
+        });
+        setSelectedFormId(formId);
+        setIsNewForm(false);
+        setSkipBuilderClearOnce(true);
+        return;
+      }
+
       // Load latest version (active or draft) for this form from backend cache
       const form = forms.find(f => f.id === formId) as ExtendedForm | undefined;
       const latest = [...formVersions]
@@ -199,7 +264,7 @@ function Forms() {
     } catch (error) {
       console.error('Error loading form for editing:', error);
     }
-  }, [formVersions, forms]);
+  }, [formVersions, forms, readDraft]);
 
   // Function to load form schema for preview (always shows published version)
   const loadFormForPreview = useCallback(async (formId: number) => {
@@ -247,10 +312,18 @@ function Forms() {
         description: (selectedForm as ExtendedForm).description || ''
       });
     } else {
-      setBuilderSchema({ fields: [], title: '', description: '' });
-      setBuilderMeta({ name: '', description: '' });
+      // Not editing a form → restore new-form draft if present (so leaving builder preserves changes)
+      const draft = readDraft(null);
+      if (draft) {
+        setBuilderSchema(draft);
+        setBuilderMeta({ name: draft.title || '', description: draft.description || '' });
+      } else {
+        setBuilderSchema({ fields: [], title: '', description: '' });
+        setBuilderMeta({ name: '', description: '' });
+      }
+      setIsNewForm(true);
     }
-  }, [selectedForm]);
+  }, [selectedForm, readDraft]);
 
   useEffect(() => {
     // Support both correct and misspelled param to be forgiving
@@ -263,8 +336,17 @@ function Forms() {
       // Open in edit mode for this form
       setSkipBuilderClearOnce(true);
       loadFormForEditing(editId).catch(console.error);
+    } else if (builderTab === 'builder') {
+      // Builder tab without an edit id → new form mode (restore draft if present)
+      const draft = readDraft(null);
+      if (draft) {
+        setBuilderSchema(draft);
+        setBuilderMeta({ name: draft.title || '', description: draft.description || '' });
+      }
+      setSelectedFormId(null);
+      setIsNewForm(true);
     }
-  }, [location.search, loadFormForEditing]);
+  }, [location.search, loadFormForEditing, readDraft]);
 
   const saveDraft = useCallback(() => {
     // Placeholder: in future, create or update a draft formVersion with schema_data
@@ -323,6 +405,15 @@ function Forms() {
       cellRenderer: createActionsCellRenderer({
         customActions: [
           {
+            icon: faEdit,
+            label: 'Edit',
+            variant: 'outline',
+            onClick: async (item: any) => {
+              await loadFormForEditing(item.id);
+              navigate(`/settings/forms?tab=builder&editing_form=${item.id}`, { replace: true });
+            }
+          },
+          {
             icon: faEye,
             label: 'Preview',
             variant: 'outline',
@@ -333,7 +424,7 @@ function Forms() {
           },
         ]
       }),
-      // Note: Edit is handled via row click, Delete is handled via the delete dialog
+      // Note: Delete is handled via the delete dialog
       sortable: false,
       filter: false,
       resizable: false,
@@ -352,7 +443,12 @@ function Forms() {
             rowData={filteredItems}
             columnDefs={colDefs}
             noRowsMessage="No forms found"
-            onRowDoubleClicked={(event: any) => { if (!event?.data) return; loadFormForEditing(event.data.id).then(() => { navigate(`/settings/forms?tab=builder&editing_form=${event.data.id}`, { replace: true }); }); }}
+            onRowDoubleClicked={(row: any) => {
+              if (!row?.id) return;
+              loadFormForEditing(row.id).then(() => {
+                navigate(`/settings/forms?tab=builder&editing_form=${row.id}`, { replace: true });
+              });
+            }}
             onGridReady={(params: any) => {
               params.api.setGridOption('context', { formVersions });
             }}
@@ -428,6 +524,8 @@ function Forms() {
                         // Update current
                         await dispatch(genericActions.formVersions.updateAsync({ id: currentVersionId, updates: { fields: schemaData } })).unwrap();
                       }
+                      // Saved to backend → clear local edit draft so it won't override next time
+                      clearDraft(selectedForm.id);
                       setSaveStatus("success");
                       setTimeout(() => setSaveStatus("idle"), 900);
                     } catch (e) {
@@ -480,7 +578,8 @@ function Forms() {
                           await updateItem(newFormId, { current_version_id: version.id } as any);
                         }
                       }
-                      localStorage.removeItem('formBuilderDraft');
+                      // Published new form → clear the new-form draft
+                      clearDraft(null);
                       await loadFormForEditing(formId);
                       setPublishStatus("success");
                       setTimeout(() => setPublishStatus("idle"), 900);
@@ -511,10 +610,7 @@ function Forms() {
                 if (newSchema.description !== undefined) {
                   setBuilderMeta(prev => ({ ...prev, description: newSchema.description || '' }));
                 }
-                // Persist draft ONLY for new form mode
-                if (isNewForm) {
-                  try { localStorage.setItem('formBuilderDraft', JSON.stringify(newSchema)); } catch {}
-                }
+                // Draft persistence handled by the auto-save effect above
               }}
               onSaveDraft={saveDraft}
               onPreview={() => setIsPreviewOpen(true)}
@@ -554,8 +650,17 @@ function Forms() {
               // Coming from Edit → Builder programmatically; do not clear
               setSkipBuilderClearOnce(false);
             } else {
-              // User switched to Builder manually → always new form mode
-              clearBuilder();
+              // User switched to Builder manually → new form mode; restore draft if present
+              const draft = readDraft(null);
+              if (draft) {
+                setBuilderSchema(draft);
+                setBuilderMeta({ name: draft.title || '', description: draft.description || '' });
+              } else {
+                setBuilderSchema({ fields: [], title: '', description: '' });
+                setBuilderMeta({ name: '', description: '' });
+              }
+              setSelectedFormId(null);
+              setIsNewForm(true);
             }
           }
         }}

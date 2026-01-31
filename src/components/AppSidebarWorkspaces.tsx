@@ -415,9 +415,12 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const stableWorkspacesRef = useRef<Workspace[]>([]);
 
   const localWorkspaces = useMemo(() => {
-    // If workspaces prop is empty but we have stable workspaces, use stable workspaces
-    // This prevents workspaces from disappearing during animation transitions
-    const sourceWorkspaces = visibleWorkspaces.length > 0 ? visibleWorkspaces : stableWorkspacesRef.current;
+    // Only fall back to stable workspaces if the workspaces prop itself is empty (data not loaded yet)
+    // If workspaces prop has data but visibleWorkspaces is empty (all hidden), use empty array
+    // This prevents hidden workspaces from reappearing when visibility is toggled
+    const sourceWorkspaces = workspaces.length > 0 
+      ? visibleWorkspaces  // Always use filtered visibleWorkspaces when we have workspace data
+      : stableWorkspacesRef.current; // Only fall back when data hasn't loaded yet
     
     const normalized = sourceWorkspaces.map((w) => ({ ...w, id: String(w.id) }));
     const savedOrder = loadWorkspaceOrder();
@@ -431,13 +434,14 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       if (workspace) ordered.push(workspace as unknown as Workspace);
     });
     
-    // Update stable workspaces when we have valid data
-    if (ordered.length > 0) {
+    // Update stable workspaces when we have valid data from the workspaces prop
+    // This ensures stable ref reflects the actual loaded data, not filtered state
+    if (workspaces.length > 0 && ordered.length > 0) {
       stableWorkspacesRef.current = ordered;
     }
     
     return ordered;
-  }, [visibleWorkspaces, orderKey]);
+  }, [visibleWorkspaces, workspaces, orderKey]);
 
   const workspaceIds = useMemo(() => localWorkspaces.map((w) => String(w.id)), [localWorkspaces]);
 
