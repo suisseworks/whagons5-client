@@ -121,8 +121,12 @@ export const Workspace = () => {
     workspaceIdNum,
     currentUserId,
     doneStatusId,
+    workingStatusIds,
     stats,
   });
+
+  // Track selected KPI card for filtering
+  const [selectedKpiCardId, setSelectedKpiCardId] = useState<number | null>(null);
 
   // Task actions
   const {
@@ -279,6 +283,72 @@ export const Workspace = () => {
 
   const [showClearFilters, setShowClearFilters] = useState(false);
 
+  // Handle KPI card click to apply filters
+  const handleKpiCardClick = (cardId: number) => {
+    const card = headerCards.find((c: any) => c.id === cardId);
+    if (!card || !card.filterModel) {
+      // If no filter model, clear selection and filters
+      setSelectedKpiCardId(null);
+      tableRef.current?.setFilterModel?.(null);
+      dispatch(setFilterModel(null));
+      try {
+        localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`);
+      } catch {}
+      return;
+    }
+
+    // Toggle: if already selected, deselect and clear filters
+    if (selectedKpiCardId === cardId) {
+      setSelectedKpiCardId(null);
+      tableRef.current?.setFilterModel?.(null);
+      dispatch(setFilterModel(null));
+      try {
+        localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`);
+      } catch {}
+    } else {
+      // Apply filter from card
+      setSelectedKpiCardId(cardId);
+      tableRef.current?.setFilterModel?.(card.filterModel);
+      dispatch(setFilterModel(card.filterModel));
+      try {
+        localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(card.filterModel));
+      } catch {}
+      dispatch(setSearchText(''));
+    }
+  };
+
+  // Clear KPI selection when filters are cleared externally
+  useEffect(() => {
+    const handleClearFilters = () => {
+      setSelectedKpiCardId(null);
+    };
+    window.addEventListener('workspace-filter-clear', handleClearFilters as EventListener);
+    return () => {
+      window.removeEventListener('workspace-filter-clear', handleClearFilters as EventListener);
+    };
+  }, []);
+
+  // Sync selected KPI card when filters are loaded from localStorage
+  useEffect(() => {
+    if (!id && !isAllWorkspaces) return;
+    const workspaceId = id || 'all';
+    try {
+      const key = `wh_workspace_filters_${workspaceId}`;
+      const saved = localStorage.getItem(key);
+      if (saved && headerCards.length > 0) {
+        const filterModel = JSON.parse(saved);
+        // Try to find a matching card
+        const matchingCard = headerCards.find((card: any) => {
+          if (!card.filterModel) return false;
+          return JSON.stringify(card.filterModel) === JSON.stringify(filterModel);
+        });
+        if (matchingCard) {
+          setSelectedKpiCardId(matchingCard.id);
+        }
+      }
+    } catch {}
+  }, [id, isAllWorkspaces, headerCards]);
+
   if (invalidWorkspaceRoute) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -303,7 +373,7 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-start gap-3 -mt-1 mb-3">
+      <div className="flex-shrink-0 flex items-start gap-3 -mt-1 mb-3">
         {showHeaderKpis && (
           <div className="flex-1 min-w-0">
             <DndContext
@@ -324,6 +394,8 @@ export const Workspace = () => {
                           key={card.id}
                           id={card.id}
                           card={card}
+                          isSelected={selectedKpiCardId === card.id}
+                          onClick={() => handleKpiCardClick(card.id)}
                         />
                       ))}
                     </div>
@@ -358,6 +430,8 @@ export const Workspace = () => {
                       accent={card.accent}
                       helperText={card.helperText}
                       right={card.sparkline}
+                      isSelected={selectedKpiCardId === card.id}
+                      onClick={() => handleKpiCardClick(card.id)}
                     />
                   ))}
                 </div>
@@ -445,8 +519,8 @@ export const Workspace = () => {
         </div>
       )}
 
-      <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
-        <div className='flex-1 min-w-0'>
+      <div className={`flex flex-1 min-h-0 ${isResizing ? 'select-none' : ''}`}>
+        <div className='flex-1 min-w-0 h-full'>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -468,7 +542,11 @@ export const Workspace = () => {
                   }
                 }}
                 showClearFilters={showClearFilters}
-                onClearFilters={() => tableRef.current?.clearFilters()}
+                onClearFilters={() => {
+                  tableRef.current?.clearFilters();
+                  setSelectedKpiCardId(null);
+                  window.dispatchEvent(new CustomEvent('workspace-filter-clear'));
+                }}
                 sortable={true}
                 sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
                 renderSortableTab={(tab, isFixed) => (
@@ -547,6 +625,23 @@ export const Workspace = () => {
           dispatch(setFilterModel(filterModel));
           try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(filterModel)); } catch {}
           dispatch(setSearchText(''));
+          
+          // Check if the applied filter matches any KPI card
+          if (!filterModel) {
+            setSelectedKpiCardId(null);
+          } else {
+            // Try to find a matching card
+            const matchingCard = headerCards.find((card: any) => {
+              if (!card.filterModel) return false;
+              // Simple comparison - check if filter models match
+              return JSON.stringify(card.filterModel) === JSON.stringify(filterModel);
+            });
+            if (matchingCard) {
+              setSelectedKpiCardId(matchingCard.id);
+            } else {
+              setSelectedKpiCardId(null);
+            }
+          }
         }}
       />
 

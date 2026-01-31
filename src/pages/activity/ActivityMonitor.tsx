@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Activity as ActivityIcon } from 'lucide-react';
 
 // Import visualization components
+import ActivityCosmos from './visualizations/ActivityCosmos';
 import ActivityRiver from './visualizations/ActivityRiver';
 import AnimatedKanban from './visualizations/AnimatedKanban';
 import NetworkGraph from './visualizations/NetworkGraph';
@@ -31,6 +32,7 @@ export interface ActivityEvent {
 }
 
 type VisualizationType = 
+  | 'cosmos'
   | 'river' 
   | 'kanban' 
   | 'network' 
@@ -43,6 +45,7 @@ type VisualizationType =
   | 'physics';
 
 const visualizationOptions = [
+  { value: 'cosmos', label: 'Activity Cosmos', description: 'Dynamic orbital view with user galaxies and hover details' },
   { value: 'river', label: 'Activity River', description: 'Flowing cards showing live activity' },
   { value: 'kanban', label: 'Animated Kanban', description: 'Cards moving between activity lanes' },
   { value: 'network', label: 'Network Graph', description: 'Users connected by their actions' },
@@ -56,7 +59,7 @@ const visualizationOptions = [
 ];
 
 export default function ActivityMonitor() {
-  const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('river');
+  const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('cosmos');
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -154,6 +157,8 @@ export default function ActivityMonitor() {
 
   const renderVisualization = () => {
     switch (selectedVisualization) {
+      case 'cosmos':
+        return <ActivityCosmos activities={activities} />;
       case 'river':
         return <ActivityRiver activities={activities} />;
       case 'kanban':
@@ -175,7 +180,7 @@ export default function ActivityMonitor() {
       case 'physics':
         return <CardWallPhysics activities={activities} />;
       default:
-        return <ActivityRiver activities={activities} />;
+        return <ActivityCosmos activities={activities} />;
     }
   };
 

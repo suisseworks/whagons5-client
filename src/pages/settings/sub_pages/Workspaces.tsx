@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
@@ -53,6 +54,7 @@ function Workspaces() {
   const { t } = useLanguage();
   const tw = (key: string, fallback: string) => t(`settings.workspaces.${key}`, fallback);
   const { user, refetchUser, updateUser } = useAuth();
+  const location = useLocation();
   
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
@@ -337,13 +339,44 @@ function Workspaces() {
   };
 
   // Track active tab to calculate stats when statistics tab is selected
-  const [activeTab, setActiveTab] = useState<string>('workspaces');
+  // Read from URL to ensure proper sync
+  const getActiveTabFromUrl = useCallback(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tabFromUrl = urlParams.get('tab');
+    return tabFromUrl === 'statistics' ? 'statistics' : 'workspaces';
+  }, [location.search]);
+  
+  const [activeTab, setActiveTab] = useState<string>(getActiveTabFromUrl());
   const isCalculatingRef = useRef(false);
+
+  // Update activeTab when URL changes
+  useEffect(() => {
+    const tabFromUrl = getActiveTabFromUrl();
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.search, getActiveTabFromUrl, activeTab]);
 
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {
     // Prevent concurrent calculations
-    if (isCalculatingRef.current) return;
+    if (isCalculatingRef.current) {
+      console.log('Statistics calculation already in progress, skipping...');
+      return;
+    }
+    
+    // Ensure we have data arrays (they might be undefined initially)
+    const workspacesArray = Array.isArray(workspaces) ? workspaces : [];
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    const categoriesArray = Array.isArray(categories) ? categories : [];
+    const teamsArray = Array.isArray(teams) ? teams : [];
+    
+    console.log('Starting statistics calculation...', {
+      workspacesCount: workspacesArray.length,
+      tasksCount: tasksArray.length,
+      categoriesCount: categoriesArray.length,
+      teamsCount: teamsArray.length
+    });
     
     isCalculatingRef.current = true;
     setStatsLoading(true);
@@ -353,11 +386,17 @@ function Workspaces() {
 
     try {
       // Most active workspaces (by task count)
-      const workspaceStats = workspaces.map((workspace: Workspace) => ({
+      const workspaceStats = workspacesArray.map((workspace: Workspace) => ({
         workspace,
-        taskCount: getWorkspaceTaskCount(workspace.id),
-        categoryCount: getWorkspaceCategoryCount(workspace.id),
-        teamCount: getWorkspaceTeamCount(workspace.id)
+        taskCount: tasksArray.filter((task: Task) => task.workspace_id === workspace.id).length,
+        categoryCount: categoriesArray.filter((category: Category) => category.workspace_id === workspace.id).length,
+        teamCount: (() => {
+          const workspaceObj = workspacesArray.find((w: Workspace) => w.id === workspace.id);
+          if (workspaceObj && Array.isArray((workspaceObj as any).teams)) {
+            return (workspaceObj as any).teams.length;
+          }
+          return 0;
+        })()
       }));
 
       const mostActiveWorkspaces = [...workspaceStats]
@@ -365,7 +404,7 @@ function Workspaces() {
         .slice(0, 10);
 
       // Urgent tasks across all workspaces
-      const urgentTasksCount = (tasks as Task[]).filter((task: Task) => {
+      const urgentTasksCount = tasksArray.filter((task: Task) => {
         // Check if task is urgent based on priority or due date
         const dueDate = task.due_date ? new Date(task.due_date) : null;
         const now = new Date();
@@ -377,18 +416,18 @@ function Workspaces() {
       }).length;
 
       // Tasks with approvals
-      const tasksWithApprovalsCount = (tasks as Task[]).filter((task: Task) => 
+      const tasksWithApprovalsCount = tasksArray.filter((task: Task) => 
         task.approval_id !== null && task.approval_id !== undefined
       ).length;
 
       // Latest tasks (last 10)
-      const latestTasks = [...(tasks as Task[])]
+      const latestTasks = [...tasksArray]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 10);
 
       // Workspaces by type
       const typeCounts = new Map<string, number>();
-      workspaces.forEach((workspace: Workspace) => {
+      workspacesArray.forEach((workspace: Workspace) => {
         const type = (workspace as any).type || 'standard';
         typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
       });
@@ -400,7 +439,7 @@ function Workspaces() {
       // Tasks over time (last 30 days)
       const tasksOverTimeMap = new Map<string, number>();
       
-      (tasks as Task[]).forEach((task: Task) => {
+      tasksArray.forEach((task: Task) => {
         const date = dayjs(task.created_at).format('YYYY-MM-DD');
         tasksOverTimeMap.set(date, (tasksOverTimeMap.get(date) || 0) + 1);
       });
@@ -410,20 +449,25 @@ function Workspaces() {
         .sort((a, b) => a.date.localeCompare(b.date))
         .slice(-30); // Last 30 days
 
-      setStatistics({
-        totalWorkspaces: workspaces.length,
-        totalTasks: (tasks as Task[]).length,
-        totalCategories: categories.length,
-        totalTeams: teams.length,
+      const statsData = {
+        totalWorkspaces: workspacesArray.length,
+        totalTasks: tasksArray.length,
+        totalCategories: categoriesArray.length,
+        totalTeams: teamsArray.length,
         mostActiveWorkspaces,
         urgentTasksCount,
         tasksWithApprovalsCount,
         latestTasks,
         workspacesByType,
         tasksOverTime
-      });
+      };
+      
+      console.log('Statistics calculated successfully:', statsData);
+      setStatistics(statsData);
     } catch (error) {
       console.error('Error calculating statistics:', error);
+      setStatsLoading(false);
+      isCalculatingRef.current = false;
     } finally {
       setStatsLoading(false);
       isCalculatingRef.current = false;
@@ -431,6 +475,8 @@ function Workspaces() {
   }, [workspaces, tasks, categories, teams]);
 
   useEffect(() => {
+    console.log('Tab change detected:', { activeTab, loading, isCalculating: isCalculatingRef.current });
+    
     // Reset statistics when switching away from statistics tab
     if (activeTab !== 'statistics') {
       setStatistics(null);
@@ -438,11 +484,17 @@ function Workspaces() {
     }
     
     // Calculate statistics when switching to statistics tab
-    if (activeTab === 'statistics' && !isCalculatingRef.current) {
+    // Only calculate if not already loading and data is available
+    if (activeTab === 'statistics' && !isCalculatingRef.current && !loading) {
+      console.log('Triggering statistics calculation...');
       setStatistics(null); // Clear old stats first
       calculateStatistics();
+    } else if (activeTab === 'statistics' && loading) {
+      console.log('Waiting for data to load before calculating statistics...');
+    } else if (activeTab === 'statistics' && isCalculatingRef.current) {
+      console.log('Statistics calculation already in progress...');
     }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, calculateStatistics, loading]);
 
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
@@ -528,18 +580,8 @@ function Workspaces() {
       pinned: 'right',
       suppressMovable: true,
       cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' }
-    },
-    {
-      field: 'actions',
-      headerName: tw('grid.columns.actions', 'Actions'),
-      width: 100,
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
     }
-  ], [categories, handleEdit, handleDeleteWorkspace, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
+  ], [categories, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -664,6 +706,22 @@ function Workspaces() {
             ),
             content: (
               <div className="flex h-full flex-col">
+                {/* Dashboard Card */}
+                <div className="mb-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">{tw('dashboard.title', 'Dashboard')}</CardTitle>
+                      <CardDescription>{tw('dashboard.comingSoon', 'Coming Soon')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-center py-8">
+                        <p className="text-muted-foreground text-sm">
+                          {tw('dashboard.description', 'Dashboard features will be available soon.')}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
                     rowData={filteredItems}

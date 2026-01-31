@@ -255,8 +255,7 @@ function Users() {
       email: tu('grid.columns.email', 'Email'),
       teams: tu('grid.columns.teams', 'Teams'),
       jobPosition: tu('grid.columns.jobPosition', 'Job Position'),
-      subscription: tu('grid.columns.subscription', 'Subscription'),
-      actions: tu('grid.columns.actions', 'Actions')
+      subscription: tu('grid.columns.subscription', 'Subscription')
     };
     const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
     const noJobPositionLabel = tu('grid.values.noJobPosition', 'No Job Position');
@@ -369,19 +368,9 @@ function Users() {
         minWidth: 150,
         cellRenderer: (params: ICellRendererParams) =>
           params.value ? <Badge variant="default" className="bg-green-500">{activeLabel}</Badge> : <Badge variant="destructive">{inactiveLabel}</Badge>
-      },
-      {
-        field: 'actions',
-        headerName: columnLabels.actions,
-        width: 220,
-        cellRenderer: createActionsCellRenderer({}),
-        sortable: false,
-        filter: false,
-        resizable: false,
-        pinned: 'right'
       }
     ];
-  }, [teams, jobPositions, userTeams, handleEdit, handleDelete, t]);
+  }, [teams, jobPositions, userTeams, t]);
 
   // Copy button component for table cells
   const CopyButton = ({ text }: { text: string }) => {

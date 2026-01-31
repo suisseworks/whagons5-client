@@ -183,6 +183,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskCustomFieldValues,
     taskNotes,
     taskAttachments,
+    roles,
   } = reduxState as any;
   const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
@@ -206,6 +207,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskCustomFieldValueMap,
     approvalMap,
     stableTaskApprovalInstances,
+    roleMap,
   } = useWorkspaceTableLookups({
     statuses: globalStatuses,
     priorities,
@@ -221,6 +223,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskCustomFieldValues,
     approvals,
     taskApprovalInstances,
+    roles,
     defaultCategoryId,
     workspaceNumericId,
     isAllWorkspaces,
@@ -438,13 +441,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     onDeleteTask: handleDeleteTask,
     onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
     slaMap,
+    roleMap,
   } as any), [
     statusMap, priorityMap, spotMap, userMap, tagMap, taskTags, taskUsers,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
     filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
-    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap,
+    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap, roleMap,
     visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
     getDoneStatusId,
   ]);

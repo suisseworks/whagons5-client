@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { actionsApi } from '@/api/whagonsActionsApi';
@@ -11,17 +11,25 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogClose } from '@/components/ui/dialog';
-import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck, Users, Shield, Cake, Phone, Sparkles, Heart, Plus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck, Users, Shield, Cake, Phone, Sparkles, Heart, Plus, Bell, BellOff, Check } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
 import { ImageCropper } from '@/components/ImageCropper';
-import { RootState } from '@/store/store';
+import { RootState, AppDispatch } from '@/store/store';
 import { UserTeam, Team } from '@/store/types';
+import { UrlTabs } from '@/components/ui/url-tabs';
+import { 
+  fetchNotificationPreferences, 
+  updateNotificationPreferences,
+  type NotificationPreferences 
+} from '@/store/reducers/notificationPreferencesSlice';
+import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
@@ -120,8 +128,22 @@ interface ExtendedUser {
     [key: string]: any;
 }
 
+const defaultPreferences: NotificationPreferences = {
+  broadcasts: true,
+  task_assignments: true,
+  task_mentions: true,
+  task_comments: true,
+  task_status_changes: true,
+  messages: true,
+  approval_requests: true,
+  approval_decisions: true,
+  sla_alerts: true,
+  workflow_notifications: true,
+};
+
 function Profile() {
     const { t } = useLanguage();
+    const dispatch = useDispatch<AppDispatch>();
     const { user: userData, userLoading, refetchUser } = useAuth();
     // Keep previous userData to prevent blank screen during refetch
     const [previousUserData, setPreviousUserData] = useState<ExtendedUser | null>(userData ? (userData as unknown as ExtendedUser) : null);
@@ -130,6 +152,12 @@ function Profile() {
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
+    
+    // Notification preferences state
+    const { preferences: notificationPreferences, loading: notificationLoading, saving: notificationSaving } = useSelector((state: RootState) => state.notificationPreferences);
+    const [localNotificationPreferences, setLocalNotificationPreferences] = useState<NotificationPreferences>(notificationPreferences);
+    const [hasNotificationChanges, setHasNotificationChanges] = useState(false);
+    const [fcmEnabled, setFcmEnabled] = useState(false);
     
     // Update previousUserData when userData changes, but keep it if userData becomes null during loading
     useEffect(() => {
@@ -161,6 +189,125 @@ function Profile() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // DataManager handles data loading, no need to call internal functions here
+
+    // Load notification preferences on mount
+    useEffect(() => {
+        dispatch(fetchNotificationPreferences());
+        checkFCMStatus();
+    }, [dispatch]);
+
+    // Sync local notification preferences with Redux state
+    useEffect(() => {
+        setLocalNotificationPreferences(notificationPreferences);
+        setHasNotificationChanges(false);
+    }, [notificationPreferences]);
+
+    const checkFCMStatus = async () => {
+        const isReady = await isFCMReady();
+        const isRegistered = isTokenRegistered();
+        setFcmEnabled(isReady && isRegistered);
+    };
+
+    const handleNotificationToggle = (key: keyof NotificationPreferences) => {
+        const updated = {
+            ...localNotificationPreferences,
+            [key]: !localNotificationPreferences[key]
+        };
+        setLocalNotificationPreferences(updated);
+        setHasNotificationChanges(true);
+    };
+
+    const handleEnableAllNotifications = () => {
+        const allEnabled = Object.keys(defaultPreferences).reduce((acc, key) => ({
+            ...acc,
+            [key]: true
+        }), {} as NotificationPreferences);
+        
+        setLocalNotificationPreferences(allEnabled);
+        setHasNotificationChanges(true);
+    };
+
+    const handleDisableAllNotifications = () => {
+        const allDisabled = Object.keys(defaultPreferences).reduce((acc, key) => ({
+            ...acc,
+            [key]: false
+        }), {} as NotificationPreferences);
+        
+        setLocalNotificationPreferences(allDisabled);
+        setHasNotificationChanges(true);
+    };
+
+    const handleSaveNotifications = () => {
+        dispatch(updateNotificationPreferences(localNotificationPreferences));
+    };
+
+    const handleCancelNotifications = () => {
+        setLocalNotificationPreferences(notificationPreferences);
+        setHasNotificationChanges(false);
+    };
+
+    const notificationTypes = [
+        {
+            key: 'broadcasts' as keyof NotificationPreferences,
+            label: t('notifications.broadcasts.label'),
+            description: t('notifications.broadcasts.description'),
+            icon: '📢'
+        },
+        {
+            key: 'task_assignments' as keyof NotificationPreferences,
+            label: t('notifications.task_assignments.label'),
+            description: t('notifications.task_assignments.description'),
+            icon: '📋'
+        },
+        {
+            key: 'task_mentions' as keyof NotificationPreferences,
+            label: t('notifications.task_mentions.label'),
+            description: t('notifications.task_mentions.description'),
+            icon: '@'
+        },
+        {
+            key: 'task_comments' as keyof NotificationPreferences,
+            label: t('notifications.task_comments.label'),
+            description: t('notifications.task_comments.description'),
+            icon: '💬'
+        },
+        {
+            key: 'task_status_changes' as keyof NotificationPreferences,
+            label: t('notifications.task_status_changes.label'),
+            description: t('notifications.task_status_changes.description'),
+            icon: '🔄'
+        },
+        {
+            key: 'messages' as keyof NotificationPreferences,
+            label: t('notifications.messages.label'),
+            description: t('notifications.messages.description'),
+            icon: '✉️'
+        },
+        {
+            key: 'approval_requests' as keyof NotificationPreferences,
+            label: t('notifications.approval_requests.label'),
+            description: t('notifications.approval_requests.description'),
+            icon: '✅'
+        },
+        {
+            key: 'approval_decisions' as keyof NotificationPreferences,
+            label: t('notifications.approval_decisions.label'),
+            description: t('notifications.approval_decisions.description'),
+            icon: '⚖️'
+        },
+        {
+            key: 'sla_alerts' as keyof NotificationPreferences,
+            label: t('notifications.sla_alerts.label'),
+            description: t('notifications.sla_alerts.description'),
+            icon: '⏰'
+        },
+        {
+            key: 'workflow_notifications' as keyof NotificationPreferences,
+            label: t('notifications.workflow_notifications.label'),
+            description: t('notifications.workflow_notifications.description'),
+            icon: '⚙️'
+        },
+    ];
 
     // Initialize form when user data is available
     useEffect(() => {
@@ -565,10 +712,14 @@ function Profile() {
         return null;
     }
 
-    return (
-        <div className="container mx-auto p-6 max-w-6xl space-y-6">
-            {/* Profile Header Card */}
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border-none shadow-lg">
+    const profileTabs = [
+        {
+            value: 'profile',
+            label: t('profile.tabs.profile', 'Profile'),
+            content: (
+                <div className="space-y-6">
+                    {/* Profile Header Card */}
+                    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border-none shadow-lg">
                 <CardContent className="p-8">
                     <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
                         <Avatar className="w-32 h-32 border-4 border-white dark:border-gray-700 shadow-xl">
@@ -1143,24 +1294,168 @@ function Profile() {
                 </DialogContent>
             </Dialog>
 
-            {/* Image Cropper Dialog */}
-            {imageToCrop && (
-                <ImageCropper
-                    image={imageToCrop}
-                    open={showCropper}
-                    onClose={() => {
-                        setShowCropper(false);
-                        setImageToCrop(null);
-                        setOriginalFile(null);
-                        if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                        }
-                    }}
-                    onCropComplete={handleCropComplete}
-                    aspect={1}
-                    circularCrop={true}
-                />
-            )}
+                    {/* Image Cropper Dialog */}
+                    {imageToCrop && (
+                        <ImageCropper
+                            image={imageToCrop}
+                            open={showCropper}
+                            onClose={() => {
+                                setShowCropper(false);
+                                setImageToCrop(null);
+                                setOriginalFile(null);
+                                if (fileInputRef.current) {
+                                    fileInputRef.current.value = '';
+                                }
+                            }}
+                            onCropComplete={handleCropComplete}
+                            aspect={1}
+                            circularCrop={true}
+                        />
+                    )}
+                </div>
+            )
+        },
+        {
+            value: 'notifications',
+            label: t('profile.tabs.notifications', 'Notifications'),
+            content: (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold">{t('profile.notificationPreferences', 'Notification Preferences')}</h2>
+                            <p className="text-muted-foreground mt-2">
+                                {t('profile.chooseNotifications', 'Choose which notifications you want to receive')}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {fcmEnabled ? (
+                                <Badge variant="default" className="gap-1">
+                                    <Bell className="w-3 h-3" />
+                                    {t('profile.enabled', 'Enabled')}
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="gap-1">
+                                    <BellOff className="w-3 h-3" />
+                                    {t('profile.disabled', 'Disabled')}
+                                </Badge>
+                            )}
+                        </div>
+                    </div>
+
+                    {!fcmEnabled && (
+                        <Card className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/10">
+                            <CardHeader>
+                                <CardTitle className="text-yellow-700 dark:text-yellow-500 flex items-center gap-2">
+                                    <BellOff className="w-5 h-5" />
+                                    {t('profile.pushNotificationsDisabled', 'Push Notifications Disabled')}
+                                </CardTitle>
+                                <CardDescription className="text-yellow-600 dark:text-yellow-400">
+                                    {t('profile.pushNotificationsDisabledDescription', "You haven't enabled push notifications. You can still configure your preferences, but you won't receive push notifications until you grant permission in your browser.")}
+                                </CardDescription>
+                            </CardHeader>
+                        </Card>
+                    )}
+
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle>{t('profile.notificationTypes', 'Notification Types')}</CardTitle>
+                                    <CardDescription>
+                                        {t('profile.enableDisableNotifications', 'Enable or disable specific types of notifications')}
+                                    </CardDescription>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleEnableAllNotifications}
+                                        disabled={notificationSaving}
+                                    >
+                                        {t('profile.enableAll', 'Enable All')}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleDisableAllNotifications}
+                                        disabled={notificationSaving}
+                                    >
+                                        {t('profile.disableAll', 'Disable All')}
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {notificationTypes.map((type) => (
+                                <div
+                                    key={type.key}
+                                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                                >
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <span className="text-2xl">{type.icon}</span>
+                                        <div className="flex-1">
+                                            <Label
+                                                htmlFor={type.key}
+                                                className="text-base font-medium cursor-pointer"
+                                            >
+                                                {type.label}
+                                            </Label>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                {type.description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        id={type.key}
+                                        checked={localNotificationPreferences[type.key]}
+                                        onCheckedChange={() => handleNotificationToggle(type.key)}
+                                        disabled={notificationSaving}
+                                    />
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+
+                    {hasNotificationChanges && (
+                        <div className="flex justify-end gap-2 sticky bottom-4">
+                            <Button
+                                variant="outline"
+                                onClick={handleCancelNotifications}
+                                disabled={notificationSaving}
+                            >
+                                {t('profile.cancel', 'Cancel')}
+                            </Button>
+                            <Button
+                                onClick={handleSaveNotifications}
+                                disabled={notificationSaving}
+                                className="gap-2"
+                            >
+                                {notificationSaving ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {t('profile.saving', 'Saving...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4" />
+                                        {t('profile.saveChanges', 'Save Changes')}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )
+        }
+    ];
+
+    return (
+        <div className="container mx-auto p-6 max-w-6xl space-y-6">
+            <UrlTabs
+                tabs={profileTabs}
+                defaultValue="profile"
+                basePath="/profile"
+            />
         </div>
     );
 }

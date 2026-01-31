@@ -21,6 +21,19 @@ export interface SchedulerEvent {
   priorityId?: number;
   statusId?: number;
   categoryId?: number;
+  spotId?: number;
+  // Resolved names for display
+  statusName?: string;
+  statusColor?: string;
+  priorityName?: string;
+  priorityColor?: string;
+  spotName?: string;
+  categoryName?: string;
+  description?: string;
+  // Recurrence info
+  recurrenceId?: number | null;
+  recurrenceInstanceNumber?: number | null;
+  isRecurring?: boolean;
 }
 
 export interface TimeScaleConfig {

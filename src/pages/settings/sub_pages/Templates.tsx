@@ -19,7 +19,6 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer,
   SelectField,
   CheckboxField
 } from "../components";
@@ -196,6 +195,14 @@ function Templates() {
 
   useEffect(() => {
     if (isEditDialogOpen && editingTemplate) {
+      // Safety check: ensure the template still exists in the list
+      const templateExists = templates.some((t: Template) => t.id === editingTemplate.id);
+      if (!templateExists) {
+        // Template was deleted, close the dialog
+        setIsEditDialogOpen(false);
+        return;
+      }
+      
       const ids = Array.isArray((editingTemplate as any).default_user_ids)
         ? (editingTemplate as any).default_user_ids.map((id: number) => String(id))
         : [];
@@ -231,9 +238,9 @@ function Templates() {
         is_private: (editingTemplate as any).is_private === true
       });
     }
-  }, [isEditDialogOpen, editingTemplate, priorities]);
+  }, [isEditDialogOpen, editingTemplate, priorities, templates, setIsEditDialogOpen]);
 
-  // Compliance Handlers
+  // Standards and Norms Handlers
   const [selectedRequirement, setSelectedRequirement] = useState('');
 
   const templateMappings = useMemo(() => {
@@ -452,12 +459,10 @@ function Templates() {
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteTemplate = (template: Template) => {
-    if (canDeleteTemplate(template)) {
-      deleteItem(template.id);
-    } else {
-      handleDelete(template);
-    }
+    // Always show confirmation dialog
+    handleDelete(template);
   };
+
 
   // Derived maps
   const priorityById = useMemo(() => {
@@ -760,18 +765,8 @@ function Templates() {
       },
       sortable: true,
       filter: true
-    },
-    {
-      field: 'actions',
-      headerName: tt('grid.columns.actions', 'Actions'),
-      width: 100,
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
     }
-  ], [categories, priorityById, slaById, approvalById, spotById, handleEdit, handleDeleteTemplate, availableCategoryIds]);
+  ], [categories, priorityById, slaById, approvalById, spotById, availableCategoryIds]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -1725,7 +1720,7 @@ function Templates() {
             <TabsTrigger value="general">{tt('dialogs.edit.tabs.general', 'General')}</TabsTrigger>
             <TabsTrigger value="defaults">{tt('dialogs.edit.tabs.defaults', 'Defaults')}</TabsTrigger>
             <TabsTrigger value="rules">{tt('dialogs.edit.tabs.rules', 'Rules')}</TabsTrigger>
-            <TabsTrigger value="compliance">{tt('dialogs.edit.tabs.compliance', 'Compliance')}</TabsTrigger>
+            <TabsTrigger value="compliance">{tt('dialogs.edit.tabs.compliance', 'Standards and Norms')}</TabsTrigger>
           </TabsList>
             <TabsContent value="general">
           <div className="grid gap-4 min-h-[320px]">
@@ -1834,7 +1829,7 @@ function Templates() {
                 <div className="flex justify-between items-center pb-2 border-b">
                   <div className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faShieldAlt} className="text-blue-600" />
-                    <h3 className="font-medium">{tt('dialogs.edit.compliance.title', 'Compliance & ISO')}</h3>
+                    <h3 className="font-medium">{tt('dialogs.edit.compliance.title', 'Standards and Norms & ISO')}</h3>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleDownloadSOP}>
                     <FontAwesomeIcon icon={faFilePdf} className="mr-2 text-red-500" />

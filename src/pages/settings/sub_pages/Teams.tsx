@@ -31,12 +31,12 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer,
   TextField,
   SelectField,
   CheckboxField,
   IconPicker
 } from "../components";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
@@ -142,8 +142,19 @@ function Teams() {
         parent_team_id: editingTeam.parent_team_id ?? null,
         team_lead_id: editingTeam.team_lead_id ?? null
       });
+      // Initialize user assignments for the users tab
+      const related = userTeams.filter((ut) => ut.team_id === editingTeam.id);
+      const assignments = related.map((ut) => ({
+        id: ut.id,
+        userId: String(ut.user_id),
+        roleId: getRoleId(ut) != null ? String(getRoleId(ut)) : '',
+        key: `existing-${ut.id}`
+      }));
+      setUserAssignments(assignments);
+      setUsersFormError(null);
+      setUserSearchTerm('');
     }
-  }, [editingTeam]);
+  }, [editingTeam, userTeams]);
 
   // Helper functions for counts
   const getTeamCategoryCount = (teamId: number) => {
@@ -187,34 +198,9 @@ function Teams() {
     return val == null ? null : Number(val);
   };
 
-  const [isUsersDialogOpen, setIsUsersDialogOpen] = useState(false);
-  const [usersDialogTeam, setUsersDialogTeam] = useState<Team | null>(null);
   const [userAssignments, setUserAssignments] = useState<Array<{ id?: number; userId: string; roleId: string; key: string }>>([]);
-  const [isSavingUsers, setIsSavingUsers] = useState(false);
   const [usersFormError, setUsersFormError] = useState<string | null>(null);
   const [userSearchTerm, setUserSearchTerm] = useState('');
-
-  const handleOpenUsersDialog = (team: Team) => {
-    setUsersDialogTeam(team);
-    const related = userTeams.filter((ut) => ut.team_id === team.id);
-    const assignments = related.map((ut) => ({
-      id: ut.id,
-      userId: String(ut.user_id),
-      roleId: getRoleId(ut) != null ? String(getRoleId(ut)) : '',
-      key: `existing-${ut.id}`
-    }));
-    setUserAssignments(assignments);
-    setUsersFormError(null);
-    setIsUsersDialogOpen(true);
-  };
-
-  const handleCloseUsersDialog = () => {
-    setIsUsersDialogOpen(false);
-    setUsersDialogTeam(null);
-    setUserAssignments([]);
-    setIsSavingUsers(false);
-    setUsersFormError(null);
-  };
 
   const addUserAssignment = () => {
     const used = new Set(userAssignments.map((a) => a.userId));
@@ -243,79 +229,66 @@ function Teams() {
     setUserAssignments((prev) => prev.filter((a) => a.key !== key));
   };
 
-  const handleSaveUsers = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!usersDialogTeam) return;
-    setIsSavingUsers(true);
+  const saveUserAssignments = async (teamId: number) => {
     setUsersFormError(null);
-    try {
-      const existing = userTeams.filter((ut) => ut.team_id === usersDialogTeam.id);
-      const isEmpty = userAssignments.length === 0;
-      const current = isEmpty
-        ? []
-        : userAssignments.map((a) => ({
-            ...a,
-            userIdNum: Number(a.userId),
-            roleIdNum: a.roleId ? Number(a.roleId) : null
-          }));
+    const existing = userTeams.filter((ut) => ut.team_id === teamId);
+    const isEmpty = userAssignments.length === 0;
+    const current = isEmpty
+      ? []
+      : userAssignments.map((a) => ({
+          ...a,
+          userIdNum: Number(a.userId),
+          roleIdNum: a.roleId ? Number(a.roleId) : null
+        }));
 
-      if (!isEmpty) {
-        if (current.some((c) => !c.userId || Number.isNaN(c.userIdNum))) {
-          setUsersFormError(tt('dialogs.manageUsers.errors.userRequired', 'Selecciona un usuario para cada fila.'));
-          setIsSavingUsers(false);
-          return;
-        }
-        if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
-          setUsersFormError(tt('dialogs.manageUsers.errors.roleRequired', 'Selecciona un rol para cada usuario.'));
-          setIsSavingUsers(false);
-          return;
-        }
-        const duplicate = current.find((c, idx) => current.findIndex((d) => d.userIdNum === c.userIdNum) !== idx);
-        if (duplicate) {
-          setUsersFormError(tt('dialogs.manageUsers.errors.duplicateUser', 'No puedes repetir el mismo usuario.'));
-          setIsSavingUsers(false);
-          return;
-        }
+    if (!isEmpty) {
+      if (current.some((c) => !c.userId || Number.isNaN(c.userIdNum))) {
+        setUsersFormError(tt('dialogs.manageUsers.errors.userRequired', 'Selecciona un usuario para cada fila.'));
+        throw new Error(tt('dialogs.manageUsers.errors.userRequired', 'Selecciona un usuario para cada fila.'));
       }
-
-      const toAdd = current.filter((c) => c.id == null);
-      const toUpdate = current.filter((c) => {
-        const match = existing.find((ex) => ex.id === c.id);
-        if (!match) return false;
-        return match.user_id !== c.userIdNum || getRoleId(match) !== c.roleIdNum;
-      });
-      const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
-
-      for (const add of toAdd) {
-        await dispatch((genericActions as any).userTeams.addAsync({
-          user_id: add.userIdNum,
-          team_id: usersDialogTeam.id,
-          role_id: add.roleIdNum
-        })).unwrap();
+      if (current.some((c) => c.roleId == null || c.roleId === '' || Number.isNaN(c.roleIdNum ?? NaN))) {
+        setUsersFormError(tt('dialogs.manageUsers.errors.roleRequired', 'Selecciona un rol para cada usuario.'));
+        throw new Error(tt('dialogs.manageUsers.errors.roleRequired', 'Selecciona un rol para cada usuario.'));
       }
-
-      for (const upd of toUpdate) {
-        await dispatch((genericActions as any).userTeams.updateAsync({
-          id: upd.id,
-          updates: {
-            user_id: upd.userIdNum,
-            team_id: usersDialogTeam.id,
-            role_id: upd.roleIdNum
-          }
-        })).unwrap();
+      const duplicate = current.find((c, idx) => current.findIndex((d) => d.userIdNum === c.userIdNum) !== idx);
+      if (duplicate) {
+        setUsersFormError(tt('dialogs.manageUsers.errors.duplicateUser', 'No puedes repetir el mismo usuario.'));
+        throw new Error(tt('dialogs.manageUsers.errors.duplicateUser', 'No puedes repetir el mismo usuario.'));
       }
-
-      for (const del of toRemove) {
-        await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
-      }
-
-      dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
-      handleCloseUsersDialog();
-    } catch (err: any) {
-      setUsersFormError(err?.message || tt('dialogs.manageUsers.errors.generic', 'Error updating team users'));
-    } finally {
-      setIsSavingUsers(false);
     }
+
+    const toAdd = current.filter((c) => c.id == null);
+    const toUpdate = current.filter((c) => {
+      const match = existing.find((ex) => ex.id === c.id);
+      if (!match) return false;
+      return match.user_id !== c.userIdNum || getRoleId(match) !== c.roleIdNum;
+    });
+    const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
+
+    for (const add of toAdd) {
+      await dispatch((genericActions as any).userTeams.addAsync({
+        user_id: add.userIdNum,
+        team_id: teamId,
+        role_id: add.roleIdNum
+      })).unwrap();
+    }
+
+    for (const upd of toUpdate) {
+      await dispatch((genericActions as any).userTeams.updateAsync({
+        id: upd.id,
+        updates: {
+          user_id: upd.userIdNum,
+          team_id: teamId,
+          role_id: upd.roleIdNum
+        }
+      })).unwrap();
+    }
+
+    for (const del of toRemove) {
+      await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+    }
+
+    dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
   };
 
   // Open edit with immediate form population to avoid flicker
@@ -392,45 +365,7 @@ function Teams() {
       cellRenderer: (p: ICellRendererParams) => (p?.data?.is_active ? tt('grid.values.yes', 'Yes') : tt('grid.values.no', 'No'))
     },
     // Tasks column removed per request; task counts still used in delete validation and stats
-    {
-      field: 'actions',
-      headerName: tt('grid.columns.actions', 'Actions'),
-      width: 170,
-      cellRenderer: (p: ICellRendererParams) => (
-        <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            data-grid-stop-row-click="true"
-            onPointerDown={(e) => {
-              // Prevent AG Grid from treating this as a row click (which would open Edit)
-              e.preventDefault();
-              e.stopPropagation();
-              // Radix/AG Grid can listen above React; stop the native event too
-              (e.nativeEvent as any)?.stopImmediatePropagation?.();
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              (e.nativeEvent as any)?.stopImmediatePropagation?.();
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              (e.nativeEvent as any)?.stopImmediatePropagation?.();
-              handleOpenUsersDialog(p.data);
-            }}
-          >
-            {tt('grid.actions.manageUsers', 'Users')}
-          </Button>
-        </div>
-      ),
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
-    }
-  ], [handleEdit, handleDeleteTeam, teamIdToName, userIdToName, t]);
+  ], [teamIdToName, userIdToName, t]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -486,6 +421,14 @@ function Teams() {
     };
 
     await updateItem(editingTeam.id, updates);
+    
+    // Also save user assignments if they were modified
+    try {
+      await saveUserAssignments(editingTeam.id);
+    } catch (err: any) {
+      // If user assignment save fails, show error but don't block the team update
+      setUsersFormError(err?.message || tt('dialogs.manageUsers.errors.generic', 'Error updating team users'));
+    }
   };
 
 
@@ -706,6 +649,10 @@ function Teams() {
               parent_team_id: null,
               team_lead_id: null
             });
+            // Reset user assignments and search
+            setUserAssignments([]);
+            setUserSearchTerm('');
+            setUsersFormError(null);
           }
         }}
         type="edit"
@@ -713,7 +660,7 @@ function Teams() {
         description={tt('dialogs.edit.description', 'Update the team information.')}
         onSubmit={handleEditSubmit}
         isSubmitting={isSubmitting}
-        error={formError}
+        error={formError || usersFormError || undefined}
         submitDisabled={isSubmitting || !editingTeam}
         footerActions={
           editingTeam ? (
@@ -735,208 +682,188 @@ function Teams() {
         }
       >
         {editingTeam && (
-          <div className="grid gap-4">
-            <TextField
-              id="edit-name"
-              label={tt('dialogs.edit.fields.name', 'Name')}
-              value={editFormData.name}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
-              required
-            />
-            <TextField
-              id="edit-description"
-              label={tt('dialogs.edit.fields.description', 'Description')}
-              value={editFormData.description}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
-            />
-            <TextField
-              id="edit-color"
-              label={tt('dialogs.edit.fields.color', 'Color')}
-              type="color"
-              value={editFormData.color}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
-            />
-            <IconPicker
-              id="edit-icon"
-              label={tt('dialogs.edit.fields.icon', 'Icon')}
-              value={editFormData.icon}
-              onChange={(icon) => setEditFormData(prev => ({ ...prev, icon }))}
-              color={editFormData.color}
-            />
-            <SelectField
-              id="edit-parent-team"
-              label={tt('dialogs.edit.fields.parentTeam', 'Parent Team')}
-              value={editFormData.parent_team_id ?? 'none'}
-              onChange={(val) => setEditFormData(prev => ({ ...prev, parent_team_id: val === 'none' ? null : Number(val) }))}
-              options={[{ value: 'none', label: noneOptionLabel }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
-            />
-            <SelectField
-              id="edit-team-lead"
-              label={tt('dialogs.edit.fields.teamLead', 'Team Lead')}
-              value={editFormData.team_lead_id ?? 'none'}
-              onChange={(val) => setEditFormData(prev => ({ ...prev, team_lead_id: val === 'none' ? null : Number(val) }))}
-              options={[{ value: 'none', label: unassignedOptionLabel }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
-            />
-            <CheckboxField
-              id="edit-is-active"
-              label={tt('dialogs.edit.fields.active', 'Active')}
-              checked={!!editFormData.is_active}
-              onChange={(checked) => setEditFormData(prev => ({ ...prev, is_active: checked }))}
-            />
-          </div>
-        )}
-      </SettingsDialog>
-
-      {/* Manage Team Users Dialog */}
-      <SettingsDialog
-        open={isUsersDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCloseUsersDialog();
-          } else {
-            setIsUsersDialogOpen(true);
-          }
-        }}
-        type="custom"
-        title={tt('dialogs.manageUsers.title', 'Manage team users')}
-        description={tt('dialogs.manageUsers.description', 'Assign or remove users and set their role for this team.')}
-        onSubmit={handleSaveUsers}
-        isSubmitting={isSavingUsers}
-        submitText={tt('dialogs.manageUsers.save', 'Save')}
-        submitDisabled={!usersDialogTeam || isSavingUsers}
-        cancelText={tt('dialogs.manageUsers.close', 'Close')}
-        contentClassName="max-w-3xl"
-        error={usersFormError || undefined}
-      >
-        {!usersDialogTeam ? (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            {tt('dialogs.manageUsers.noTeam', 'Select a team to manage users.')}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
-                  {usersDialogTeam.name?.charAt(0)?.toUpperCase?.() || 'T'}
-                </div>
-                <div className="flex flex-col leading-tight">
-                  <span className="font-semibold text-sm">{usersDialogTeam.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    <FontAwesomeIcon icon={faUser} className="w-3 h-3 mr-1" />
-                    {userAssignments.length} {tt('dialogs.manageUsers.count', 'users')}
-                  </span>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addUserAssignment}
-                disabled={!((users || []).some((u: any) => !userAssignments.find((a) => a.userId === String(u.id))))}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                {tt('dialogs.manageUsers.add', 'Add user')}
-              </Button>
-            </div>
-
-            {userAssignments.length === 0 ? (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                {tt('dialogs.manageUsers.empty', 'No users assigned. Add one to get started.')}
-              </div>
-            ) : (
-              <>
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList>
+              <TabsTrigger value="general">{tt('dialogs.edit.tabs.general', 'General')}</TabsTrigger>
+              <TabsTrigger value="users">{tt('dialogs.edit.tabs.users', 'Users')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="general">
+              <div className="grid gap-4">
                 <TextField
-                  id="user-search"
-                  label={tt('dialogs.manageUsers.search', 'Buscar usuario')}
-                  value={userSearchTerm}
-                  onChange={setUserSearchTerm}
-                  placeholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
+                  id="edit-name"
+                  label={tt('dialogs.edit.fields.name', 'Name')}
+                  value={editFormData.name}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
+                  required
                 />
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                {(() => {
-                  const q = userSearchTerm.trim().toLowerCase();
-                  const visibleAssignments = q
-                    ? userAssignments.filter((assignment) => {
-                        const user = (users || []).find((u: any) => String(u.id) === assignment.userId);
-                        if (user) {
-                          const nameMatch = (user.name || '').toLowerCase().includes(q);
-                          const emailMatch = (user.email || '').toLowerCase().includes(q);
-                          if (nameMatch || emailMatch) return true;
-                        }
-                        return false;
-                      })
-                    : userAssignments;
-
-                  if (userAssignments.length > 0 && visibleAssignments.length === 0) {
-                    return (
-                      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                        {tt('dialogs.manageUsers.noMatches', 'No hay usuarios que coincidan con la búsqueda.')}
-                      </div>
-                    );
-                  }
-
-                  return visibleAssignments.map((assignment) => {
-                  const usedUserIds = userAssignments
-                    .filter((a) => a.key !== assignment.key)
-                    .map((a) => a.userId);
-                  const userOptions = (users || [])
-                    .filter((u: any) => assignment.userId === String(u.id) || !usedUserIds.includes(String(u.id)))
-                    .filter((u: any) => {
-                      const q = userSearchTerm.trim().toLowerCase();
-                      if (!q) return true;
-                      return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
-                    })
-                    .map((u: any) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
-                  // Filter roles to only show TEAM scope roles when associating users to teams
-                  const teamRoles = roles.filter((r) => r.scope === 'TEAM');
-                  const roleOptions = teamRoles.map((r) => ({ value: String(r.id), label: r.name }));
-                  const hasCurrentUser = assignment.userId && userOptions.some((opt: { value: string }) => opt.value === assignment.userId);
-                  const hasCurrentRole = assignment.roleId && roleOptions.some((opt) => opt.value === assignment.roleId);
-                  return (
-                    <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
-                      <div className="col-span-5">
-                        <SelectField
-                          id={`user-${assignment.key}`}
-                          label={tt('dialogs.manageUsers.user', 'User')}
-                          value={assignment.userId}
-                          onChange={(value) => updateUserAssignment(assignment.key, { userId: value })}
-                          options={hasCurrentUser || !assignment.userId ? userOptions : [{ value: assignment.userId, label: tt('dialogs.manageUsers.unknownUser', `User ${assignment.userId}`) }, ...userOptions]}
-                          placeholder={tt('dialogs.manageUsers.selectUser', 'Select a user')}
-                          searchable
-                          searchPlaceholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
-                          required
-                        />
-                      </div>
-                      <div className="col-span-5">
-                        <SelectField
-                          id={`role-${assignment.key}`}
-                          label={tt('dialogs.manageUsers.role', 'Role')}
-                          value={assignment.roleId}
-                          onChange={(value) => updateUserAssignment(assignment.key, { roleId: value })}
-                          options={hasCurrentRole || !assignment.roleId ? roleOptions : [{ value: assignment.roleId, label: tt('dialogs.manageUsers.unknownRole', `Role ${assignment.roleId}`) }, ...roleOptions]}
-                          placeholder={tt('dialogs.manageUsers.selectRole', 'Select a role')}
-                          required
-                        />
-                      </div>
-                      <div className="col-span-2 flex justify-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeUserAssignment(assignment.key)}
-                          aria-label={tt('dialogs.manageUsers.remove', 'Remove')}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
+                <TextField
+                  id="edit-description"
+                  label={tt('dialogs.edit.fields.description', 'Description')}
+                  value={editFormData.description}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, description: value }))}
+                />
+                <TextField
+                  id="edit-color"
+                  label={tt('dialogs.edit.fields.color', 'Color')}
+                  type="color"
+                  value={editFormData.color}
+                  onChange={(value) => setEditFormData(prev => ({ ...prev, color: value }))}
+                />
+                <IconPicker
+                  id="edit-icon"
+                  label={tt('dialogs.edit.fields.icon', 'Icon')}
+                  value={editFormData.icon}
+                  onChange={(icon) => setEditFormData(prev => ({ ...prev, icon }))}
+                  color={editFormData.color}
+                />
+                <SelectField
+                  id="edit-parent-team"
+                  label={tt('dialogs.edit.fields.parentTeam', 'Parent Team')}
+                  value={editFormData.parent_team_id ?? 'none'}
+                  onChange={(val) => setEditFormData(prev => ({ ...prev, parent_team_id: val === 'none' ? null : Number(val) }))}
+                  options={[{ value: 'none', label: noneOptionLabel }, ...teams.map(t => ({ value: t.id, label: t.name }))]}
+                />
+                <SelectField
+                  id="edit-team-lead"
+                  label={tt('dialogs.edit.fields.teamLead', 'Team Lead')}
+                  value={editFormData.team_lead_id ?? 'none'}
+                  onChange={(val) => setEditFormData(prev => ({ ...prev, team_lead_id: val === 'none' ? null : Number(val) }))}
+                  options={[{ value: 'none', label: unassignedOptionLabel }, ...(users || []).map((u: any) => ({ value: u.id, label: u.name }))]}
+                />
+                <CheckboxField
+                  id="edit-is-active"
+                  label={tt('dialogs.edit.fields.active', 'Active')}
+                  checked={!!editFormData.is_active}
+                  onChange={(checked) => setEditFormData(prev => ({ ...prev, is_active: checked }))}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="users">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-muted/60 rounded-md px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">
+                      {editingTeam.name?.charAt(0)?.toUpperCase?.() || 'T'}
                     </div>
-                  );
-                  });
-                })()}
+                    <div className="flex flex-col leading-tight">
+                      <span className="font-semibold text-sm">{editingTeam.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        <FontAwesomeIcon icon={faUser} className="w-3 h-3 mr-1" />
+                        {userAssignments.length} {tt('dialogs.manageUsers.count', 'users')}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addUserAssignment}
+                    disabled={!((users || []).some((u: any) => !userAssignments.find((a) => a.userId === String(u.id))))}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    {tt('dialogs.manageUsers.add', 'Add user')}
+                  </Button>
                 </div>
-              </>
-            )}
-          </div>
+
+                {userAssignments.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    {tt('dialogs.manageUsers.empty', 'No users assigned. Add one to get started.')}
+                  </div>
+                ) : (
+                  <>
+                    <TextField
+                      id="user-search"
+                      label={tt('dialogs.manageUsers.search', 'Buscar usuario')}
+                      value={userSearchTerm}
+                      onChange={setUserSearchTerm}
+                      placeholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
+                    />
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                      {(() => {
+                        const q = userSearchTerm.trim().toLowerCase();
+                        const visibleAssignments = q
+                          ? userAssignments.filter((assignment) => {
+                              const user = (users || []).find((u: any) => String(u.id) === assignment.userId);
+                              if (user) {
+                                const nameMatch = (user.name || '').toLowerCase().includes(q);
+                                const emailMatch = (user.email || '').toLowerCase().includes(q);
+                                if (nameMatch || emailMatch) return true;
+                              }
+                              return false;
+                            })
+                          : userAssignments;
+
+                        if (userAssignments.length > 0 && visibleAssignments.length === 0) {
+                          return (
+                            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                              {tt('dialogs.manageUsers.noMatches', 'No hay usuarios que coincidan con la búsqueda.')}
+                            </div>
+                          );
+                        }
+
+                        return visibleAssignments.map((assignment) => {
+                          const usedUserIds = userAssignments
+                            .filter((a) => a.key !== assignment.key)
+                            .map((a) => a.userId);
+                          const userOptions = (users || [])
+                            .filter((u: any) => assignment.userId === String(u.id) || !usedUserIds.includes(String(u.id)))
+                            .filter((u: any) => {
+                              const q = userSearchTerm.trim().toLowerCase();
+                              if (!q) return true;
+                              return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+                            })
+                            .map((u: any) => ({ value: String(u.id), label: u.name || u.email || `User ${u.id}` }));
+                          const teamRoles = roles.filter((r) => r.scope === 'TEAM');
+                          const roleOptions = teamRoles.map((r) => ({ value: String(r.id), label: r.name }));
+                          const hasCurrentUser = assignment.userId && userOptions.some((opt: { value: string }) => opt.value === assignment.userId);
+                          const hasCurrentRole = assignment.roleId && roleOptions.some((opt) => opt.value === assignment.roleId);
+                          return (
+                            <div key={assignment.key} className="grid grid-cols-12 gap-3 items-end border rounded-md p-3">
+                              <div className="col-span-5">
+                                <SelectField
+                                  id={`user-${assignment.key}`}
+                                  label={tt('dialogs.manageUsers.user', 'User')}
+                                  value={assignment.userId}
+                                  onChange={(value) => updateUserAssignment(assignment.key, { userId: value })}
+                                  options={hasCurrentUser || !assignment.userId ? userOptions : [{ value: assignment.userId, label: tt('dialogs.manageUsers.unknownUser', `User ${assignment.userId}`) }, ...userOptions]}
+                                  placeholder={tt('dialogs.manageUsers.selectUser', 'Select a user')}
+                                  searchable
+                                  searchPlaceholder={tt('dialogs.manageUsers.searchPlaceholder', 'Escribe para filtrar...')}
+                                  required
+                                />
+                              </div>
+                              <div className="col-span-5">
+                                <SelectField
+                                  id={`role-${assignment.key}`}
+                                  label={tt('dialogs.manageUsers.role', 'Role')}
+                                  value={assignment.roleId}
+                                  onChange={(value) => updateUserAssignment(assignment.key, { roleId: value })}
+                                  options={hasCurrentRole || !assignment.roleId ? roleOptions : [{ value: assignment.roleId, label: tt('dialogs.manageUsers.unknownRole', `Role ${assignment.roleId}`) }, ...roleOptions]}
+                                  placeholder={tt('dialogs.manageUsers.selectRole', 'Select a role')}
+                                  required
+                                />
+                              </div>
+                              <div className="col-span-2 flex justify-end">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeUserAssignment(assignment.key)}
+                                  aria-label={tt('dialogs.manageUsers.remove', 'Remove')}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
       </SettingsDialog>
 

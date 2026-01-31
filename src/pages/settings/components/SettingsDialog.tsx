@@ -124,7 +124,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`overflow-visible ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-3xl"} ${contentClassName || ''}`}>
+      <DialogContent className={`overflow-visible ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-5xl"} ${contentClassName || ''}`}>
         <div className="flex flex-col max-h-[90vh] overflow-hidden">
           <DialogHeader className="flex-shrink-0 mb-6 space-y-2 pb-4 border-b border-border/40">
             <DialogTitle className={`${type === 'delete' ? "flex items-center space-x-2" : ""} text-2xl font-extrabold tracking-tight`}>

@@ -13,7 +13,6 @@ import {
   SettingsGrid,
   SettingsDialog,
   useSettingsState,
-  createActionsCellRenderer,
   ColorIndicatorCellRenderer,
   TextField,
   SelectField
@@ -139,19 +138,8 @@ function Priorities() {
       flex: 2,
       minWidth: 200,
       cellRenderer: PriorityNameCellRenderer
-    },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 100, // Fixed compact width for icons only
-      suppressSizeToFit: true, // Lock size, no auto-expansion
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: "right"
     }
-  ], [handleEdit, handleDelete]);
+  ], []);
 
   const categoryColumns = useMemo<ColDef[]>(() => [
     {
@@ -190,19 +178,8 @@ function Priorities() {
       comparator: (a: any, b: any) => String(a || '').localeCompare(String(b || '')),
       sortable: true,
       filter: true
-    },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 100, // Fixed compact width for icons only
-      suppressSizeToFit: true, // Lock size, no auto-expansion
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: "right"
     }
-  ], [handleEdit, handleDelete, categories]);
+  ], [categories]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

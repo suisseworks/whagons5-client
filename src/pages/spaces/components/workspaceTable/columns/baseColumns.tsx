@@ -66,7 +66,7 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
               <span className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
                 {id ?? ''}
               </span>
-              <div className="flex items-center justify-center w-6 h-6">
+              <div className="wh-task-checkbox flex items-center justify-center w-6 h-6">
                 <div className="w-5 h-5 rounded-full border-2 border-muted bg-background opacity-50" />
               </div>
             </div>
@@ -99,7 +99,7 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
             
             {/* Custom circular checkbox - prevents row click */}
             <div 
-              className="flex items-center justify-center w-6 h-6 cursor-pointer"
+              className="wh-task-checkbox flex items-center justify-center w-6 h-6 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 if (node) {

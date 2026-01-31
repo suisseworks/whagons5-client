@@ -170,6 +170,12 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
       await dispatch(actions.removeAsync(id)).unwrap();
       setIsDeleteDialogOpen(false);
       setDeletingItem(null);
+      
+      // If the deleted item was being edited, close the edit dialog and clear the editing item
+      if (editingItem && editingItem.id === id) {
+        setIsEditDialogOpen(false);
+        setEditingItem(null);
+      }
     } catch (err: any) {
       const errorMessage = err?.message || 'Failed to delete item';
       onError?.(errorMessage);
@@ -177,7 +183,7 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     } finally {
       setIsSubmitting(false);
     }
-  }, [dispatch, entityName, onError]);
+  }, [dispatch, entityName, onError, editingItem]);
   
   // Handlers
   const handleEdit = useCallback((item: T) => {

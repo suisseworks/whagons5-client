@@ -32,8 +32,8 @@ import {
   faChartBar,
   faChartLine,
   faStar as faStarSolid,
-  faBell,
-  faFileAlt
+  faFileAlt,
+  faLink
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
 import { RootState } from "@/store/store";
@@ -513,6 +513,14 @@ function Settings() {
       count: counts.workflows,
       description: t('settings.cards.workflows.description', 'Design and automate workflows'),
       color: 'text-cyan-500'
+    },
+    {
+      id: 'integrations',
+      title: t('settings.cards.integrations.title', 'Integrations'),
+      icon: faLink,
+      count: 0,
+      description: t('settings.cards.integrations.description', 'Manage webhooks, API keys, and external integrations'),
+      color: 'text-indigo-500'
     },
     {
       id: 'schedules',
@@ -1148,6 +1156,9 @@ function Settings() {
         break;
       case 'schedules':
         navigate('/settings/schedules');
+        break;
+      case 'integrations':
+        navigate('/integrations');
         break;
       default:
         console.log(`Unknown setting: ${settingId}`);

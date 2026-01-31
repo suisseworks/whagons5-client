@@ -16,7 +16,7 @@ export const ComplianceStandards = () => {
 
 
     return (
-        <PageContainer title="Compliance Standards">
+        <PageContainer title="Standards and Norms">
             <div className="flex justify-end mb-4">
                 <Button>Add Standard</Button>
             </div>

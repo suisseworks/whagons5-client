@@ -22,7 +22,7 @@ import { genericActions } from "@/store/genericSlices";
 import { SettingsDialog } from "@/pages/settings/components/SettingsDialog";
 import { TextField, CheckboxField, SelectField } from "@/pages/settings/components/FormFields";
 import { IconPicker } from "@/pages/settings/components/IconPicker";
-import { SettingsLayout, createActionsCellRenderer } from "@/pages/settings/components";
+import { SettingsLayout } from "@/pages/settings/components";
 import { StatusIcon } from "@/pages/settings/components/StatusIcon";
 import { VisualTransitions } from "@/pages/settings/components/VisualTransitions";
 import { getCurrentTenant } from "@/api/whagonsApi";
@@ -252,19 +252,6 @@ function Statuses() {
           />
         );
       }
-    },
-    
-    {
-      field: 'actions',
-      headerName: ts("grid.columns.actions", "Acciones"),
-      colId: 'actions',
-      width: 100,
-      suppressSizeToFit: true,
-      pinned: 'right',
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false
     }
   ], [dispatch, statuses, ts]);
 

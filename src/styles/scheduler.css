@@ -1,0 +1,788 @@
+/* Scheduler Styles - Modern Bryntum-inspired Design */
+
+/* ============================================
+   CSS Custom Properties for Scheduler
+   ============================================ */
+:root {
+  /* Scheduler-specific colors */
+  --scheduler-grid-line: rgba(0, 0, 0, 0.04);
+  --scheduler-grid-line-major: rgba(0, 0, 0, 0.08);
+  --scheduler-zebra-stripe: rgba(0, 0, 0, 0.012);
+  --scheduler-weekend-bg: rgba(0, 0, 0, 0.015);
+  --scheduler-today-bg: rgba(59, 130, 246, 0.04);
+  --scheduler-today-accent: rgba(59, 130, 246, 0.6);
+  --scheduler-hover-cell: rgba(59, 130, 246, 0.06);
+  --scheduler-hover-cell-border: rgba(59, 130, 246, 0.25);
+  --scheduler-current-time: hsl(var(--destructive));
+  
+  /* Event bar styling */
+  --scheduler-event-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --scheduler-event-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --scheduler-event-radius: 8px;
+  --scheduler-event-stripe-width: 4px;
+  
+  /* Resource list */
+  --scheduler-resource-width: 260px;
+  --scheduler-resource-avatar-size: 40px;
+  --scheduler-resource-hover: rgba(0, 0, 0, 0.03);
+  
+  /* Header */
+  --scheduler-header-height: 48px;
+  --scheduler-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 250, 250, 0.95) 100%);
+  --scheduler-header-border: rgba(0, 0, 0, 0.06);
+  
+  /* Transitions */
+  --scheduler-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --scheduler-transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --scheduler-transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --scheduler-grid-line: rgba(255, 255, 255, 0.04);
+  --scheduler-grid-line-major: rgba(255, 255, 255, 0.08);
+  --scheduler-zebra-stripe: rgba(255, 255, 255, 0.015);
+  --scheduler-weekend-bg: rgba(255, 255, 255, 0.02);
+  --scheduler-today-bg: rgba(59, 130, 246, 0.08);
+  --scheduler-hover-cell: rgba(59, 130, 246, 0.1);
+  --scheduler-hover-cell-border: rgba(59, 130, 246, 0.35);
+  --scheduler-resource-hover: rgba(255, 255, 255, 0.04);
+  --scheduler-header-bg: linear-gradient(180deg, rgba(26, 26, 26, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%);
+  --scheduler-header-border: rgba(255, 255, 255, 0.08);
+  --scheduler-event-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --scheduler-event-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* ============================================
+   Main Scheduler Container
+   ============================================ */
+.scheduler-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.scheduler-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ============================================
+   Toolbar / Controls
+   ============================================ */
+.scheduler-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--scheduler-header-bg);
+  border-bottom: 1px solid var(--scheduler-header-border);
+  backdrop-filter: blur(8px);
+  flex-wrap: wrap;
+}
+
+.scheduler-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem;
+  background: var(--muted);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--scheduler-header-border);
+}
+
+.scheduler-toolbar-divider {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--scheduler-header-border);
+  margin: 0 0.25rem;
+}
+
+/* ============================================
+   Resource List (Left Sidebar)
+   ============================================ */
+.scheduler-resource-list {
+  width: var(--scheduler-resource-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--background) 0%, var(--muted) 100%);
+  border-right: 1px solid var(--scheduler-header-border);
+}
+
+.scheduler-resource-header {
+  height: var(--scheduler-header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  background: var(--scheduler-header-bg);
+  border-bottom: 1px solid var(--scheduler-header-border);
+  backdrop-filter: blur(8px);
+}
+
+.scheduler-resource-header-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: 0.01em;
+}
+
+.scheduler-resource-header-count {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: hsl(var(--primary) / 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.scheduler-resource-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem;
+  height: 60px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all var(--scheduler-transition-fast);
+}
+
+.scheduler-resource-row:nth-child(even) {
+  background: var(--scheduler-zebra-stripe);
+}
+
+.scheduler-resource-row:hover {
+  background: var(--scheduler-resource-hover);
+}
+
+.scheduler-resource-row.selected {
+  background: hsl(var(--primary) / 0.08);
+  border-left-color: hsl(var(--primary));
+}
+
+.scheduler-resource-avatar {
+  width: var(--scheduler-resource-avatar-size);
+  height: var(--scheduler-resource-avatar-size);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform var(--scheduler-transition-fast), box-shadow var(--scheduler-transition-fast);
+}
+
+.scheduler-resource-row:hover .scheduler-resource-avatar {
+  transform: scale(1.05);
+}
+
+.scheduler-resource-row.selected .scheduler-resource-avatar {
+  ring: 2px solid hsl(var(--primary));
+  ring-offset: 2px;
+  ring-offset-color: var(--background);
+}
+
+.scheduler-resource-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scheduler-resource-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.scheduler-resource-team {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   Time Header
+   ============================================ */
+.scheduler-time-header {
+  height: var(--scheduler-header-height);
+  background: var(--scheduler-header-bg);
+  border-bottom: 1px solid var(--scheduler-header-border);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.scheduler-time-header-svg {
+  display: block;
+}
+
+/* Major tier styling */
+.scheduler-time-major {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  fill: var(--foreground);
+  opacity: 0.8;
+  letter-spacing: 0.02em;
+}
+
+/* Minor tier styling */
+.scheduler-time-minor {
+  font-size: 0.625rem;
+  font-weight: 500;
+  fill: var(--muted-foreground);
+  letter-spacing: 0.01em;
+}
+
+.scheduler-time-minor.today {
+  fill: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.scheduler-time-minor.weekend {
+  opacity: 0.5;
+}
+
+/* ============================================
+   Timeline Canvas
+   ============================================ */
+.scheduler-timeline {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scheduler-timeline-scroll {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.scheduler-timeline-canvas {
+  display: block;
+  background: var(--background);
+}
+
+/* Grid lines */
+.scheduler-grid-line-v {
+  stroke: var(--scheduler-grid-line);
+  stroke-width: 1;
+}
+
+.scheduler-grid-line-v.major {
+  stroke: var(--scheduler-grid-line-major);
+}
+
+.scheduler-grid-line-h {
+  stroke: var(--scheduler-grid-line);
+  stroke-width: 1;
+}
+
+/* Zebra rows */
+.scheduler-zebra-row {
+  fill: var(--scheduler-zebra-stripe);
+}
+
+/* Weekend background */
+.scheduler-weekend-bg {
+  fill: var(--scheduler-weekend-bg);
+}
+
+/* Today highlight */
+.scheduler-today-bg {
+  fill: var(--scheduler-today-bg);
+}
+
+.scheduler-today-accent {
+  stroke: var(--scheduler-today-accent);
+  stroke-width: 2;
+  opacity: 0.3;
+}
+
+/* ============================================
+   Hover Cells (for creating events)
+   ============================================ */
+.scheduler-hover-cell {
+  fill: transparent;
+  stroke: transparent;
+  rx: 6;
+  cursor: cell;
+  transition: all var(--scheduler-transition-fast);
+}
+
+.scheduler-hover-cell:hover {
+  fill: var(--scheduler-hover-cell);
+  stroke: var(--scheduler-hover-cell-border);
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+}
+
+.scheduler-hover-cell.selected {
+  fill: hsl(var(--primary) / 0.1);
+  stroke: hsl(var(--primary));
+  stroke-width: 1.5;
+  stroke-dasharray: none;
+}
+
+/* ============================================
+   Current Time Indicator
+   ============================================ */
+.scheduler-current-time-line {
+  stroke: var(--scheduler-current-time);
+  stroke-width: 1.5;
+  opacity: 0.8;
+}
+
+.scheduler-current-time-glow {
+  stroke: var(--scheduler-current-time);
+  stroke-width: 6;
+  opacity: 0.15;
+}
+
+.scheduler-current-time-marker {
+  fill: var(--scheduler-current-time);
+}
+
+.scheduler-current-time-label {
+  fill: var(--scheduler-current-time);
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/* ============================================
+   Event Bars (Modern Bryntum-inspired)
+   ============================================ */
+.scheduler-event-group {
+  cursor: grab;
+  transition: filter var(--scheduler-transition-fast);
+}
+
+.scheduler-event-group:active {
+  cursor: grabbing;
+}
+
+.scheduler-event-bar {
+  rx: var(--scheduler-event-radius);
+  ry: var(--scheduler-event-radius);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: filter var(--scheduler-transition-fast), transform var(--scheduler-transition-fast);
+}
+
+.scheduler-event-group:hover .scheduler-event-bar {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+/* Left accent stripe */
+.scheduler-event-stripe {
+  rx: var(--scheduler-event-radius);
+  ry: var(--scheduler-event-radius);
+  pointer-events: none;
+}
+
+/* Event label */
+.scheduler-event-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  fill: white;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.01em;
+}
+
+/* Recurrence icon */
+.scheduler-recurrence-icon {
+  fill: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+}
+
+/* Resize handles */
+.scheduler-resize-handle {
+  fill: white;
+  stroke-width: 1;
+  rx: 3;
+  opacity: 0;
+  cursor: ew-resize;
+  transition: opacity var(--scheduler-transition-fast);
+}
+
+.scheduler-event-group:hover .scheduler-resize-handle {
+  opacity: 1;
+}
+
+/* ============================================
+   Event Tooltip
+   ============================================ */
+.scheduler-tooltip {
+  position: fixed;
+  z-index: 100;
+  min-width: 260px;
+  max-width: 340px;
+  background: hsl(var(--popover) / 0.95);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: var(--radius-xl);
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: tooltip-appear 150ms ease-out;
+}
+
+@keyframes tooltip-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.scheduler-tooltip-header {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.3);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.scheduler-tooltip-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.4;
+}
+
+.scheduler-tooltip-description {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: 0.25rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.scheduler-tooltip-content {
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.scheduler-tooltip-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.scheduler-tooltip-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  margin-top: 0.0625rem;
+}
+
+.scheduler-tooltip-label {
+  font-size: 0.75rem;
+  color: var(--foreground);
+}
+
+.scheduler-tooltip-sublabel {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+}
+
+.scheduler-tooltip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1875rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  border-radius: var(--radius-full);
+}
+
+.scheduler-tooltip-footer {
+  padding: 0.5rem 1rem;
+  background: hsl(var(--muted) / 0.3);
+  border-top: 1px solid hsl(var(--border) / 0.3);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+.scheduler-tooltip-hint {
+  font-size: 0.625rem;
+  color: var(--muted-foreground);
+}
+
+/* ============================================
+   User Selector Popover
+   ============================================ */
+.scheduler-user-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--scheduler-transition-fast);
+}
+
+.scheduler-user-selector-trigger:hover {
+  background: var(--muted);
+  border-color: hsl(var(--border) / 0.8);
+}
+
+.scheduler-user-avatar-stack {
+  display: flex;
+  margin-left: 0.25rem;
+}
+
+.scheduler-user-avatar-stack > * {
+  margin-left: -0.5rem;
+  border: 2px solid var(--background);
+  border-radius: 50%;
+}
+
+.scheduler-user-avatar-stack > *:first-child {
+  margin-left: 0;
+}
+
+/* ============================================
+   View Preset Toggle
+   ============================================ */
+.scheduler-view-toggle {
+  display: inline-flex;
+  padding: 0.125rem;
+  background: var(--muted);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--scheduler-header-border);
+}
+
+.scheduler-view-toggle-btn {
+  padding: 0.375rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-lg) - 2px);
+  cursor: pointer;
+  transition: all var(--scheduler-transition-fast);
+}
+
+.scheduler-view-toggle-btn:hover {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.scheduler-view-toggle-btn.active {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   Loading State
+   ============================================ */
+.scheduler-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.scheduler-loading-spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spinner 0.8s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   Empty State
+   ============================================ */
+.scheduler-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+.scheduler-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--border);
+  margin-bottom: 1rem;
+}
+
+.scheduler-empty-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 0.25rem;
+}
+
+.scheduler-empty-description {
+  font-size: 0.8125rem;
+  max-width: 20rem;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes event-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  }
+  50% {
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+  }
+}
+
+.scheduler-event-new {
+  animation: event-pulse 1.5s ease-in-out;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.scheduler-resource-row-enter {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+@media (max-width: 768px) {
+  :root {
+    --scheduler-resource-width: 200px;
+    --scheduler-resource-avatar-size: 32px;
+  }
+  
+  .scheduler-toolbar {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  .scheduler-resource-header {
+    padding: 0 0.75rem;
+  }
+  
+  .scheduler-resource-row {
+    padding: 0 0.75rem;
+    gap: 0.5rem;
+  }
+  
+  .scheduler-resource-name {
+    font-size: 0.75rem;
+  }
+  
+  .scheduler-resource-team {
+    font-size: 0.5rem;
+  }
+}
+
+/* ============================================
+   Dark Mode Specific Adjustments
+   ============================================ */
+.dark .scheduler-event-bar {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+}
+
+.dark .scheduler-event-group:hover .scheduler-event-bar {
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.5));
+}
+
+.dark .scheduler-tooltip {
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Star Wars Theme Adjustments
+   ============================================ */
+.starwars .scheduler-container {
+  border: 1px solid rgba(74, 144, 226, 0.2);
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.1);
+}
+
+.starwars .scheduler-resource-list {
+  background: linear-gradient(180deg, #0a0a0a 0%, #141414 100%);
+  border-right-color: rgba(74, 144, 226, 0.2);
+}
+
+.starwars .scheduler-time-header,
+.starwars .scheduler-resource-header {
+  background: linear-gradient(180deg, #0a0a0a 0%, #141414 100%);
+  border-bottom-color: rgba(74, 144, 226, 0.3);
+}
+
+.starwars .scheduler-event-bar {
+  filter: drop-shadow(0 0 8px rgba(74, 144, 226, 0.3));
+}
+
+.starwars .scheduler-event-group:hover .scheduler-event-bar {
+  filter: drop-shadow(0 0 16px rgba(74, 144, 226, 0.5));
+}
+
+.starwars .scheduler-tooltip {
+  background: #141414;
+  border-color: rgba(74, 144, 226, 0.3);
+  box-shadow: 0 0 30px rgba(74, 144, 226, 0.2);
+}
+
+.starwars .scheduler-current-time-line {
+  stroke: #DC143C;
+}
+
+.starwars .scheduler-current-time-glow {
+  stroke: #DC143C;
+}

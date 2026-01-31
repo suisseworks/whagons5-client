@@ -40,8 +40,29 @@ export function useWorkspaceTaskDialog() {
     })();
   }, [taskIdFromUrl, location.pathname, location.search, navigate]);
 
-  const handleOpenTaskDialog = (task: any) => {
-    setSelectedTask(task);
+  const handleOpenTaskDialog = async (task: any) => {
+    // Fetch full task data from cache to ensure all fields are available
+    // AG Grid row data might be incomplete (missing some fields)
+    if (task?.id) {
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+        const fullTask = await TasksCache.getTask(String(task.id));
+        if (fullTask) {
+          setSelectedTask(fullTask);
+        } else {
+          // Fallback to provided task if cache doesn't have it
+          console.warn('[useWorkspaceTaskDialog] Task not found in cache, using provided task data:', task.id);
+          setSelectedTask(task);
+        }
+      } catch (error) {
+        console.error('[useWorkspaceTaskDialog] Failed to fetch task from cache:', error);
+        // Fallback to provided task on error
+        setSelectedTask(task);
+      }
+    } else {
+      // No task ID, use provided task as-is (shouldn't happen for edit mode)
+      setSelectedTask(task);
+    }
     (window as any).__taskDialogClickTime = performance.now();
     setOpenEditTask(true);
   };

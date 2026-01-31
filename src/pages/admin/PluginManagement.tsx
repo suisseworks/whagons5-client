@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store/store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { actionsApi } from '@/api/whagonsActionsApi';
+import { genericActions, genericInternalActions } from '@/store/genericSlices';
 
 interface Plugin {
 	id: number;
@@ -37,7 +39,25 @@ export default function PluginManagement() {
 	const { t } = useLanguage();
 	const dispatch = useDispatch();
 	const plugins = useSelector((state: RootState) => (state as any).plugins?.value || []) as Plugin[];
+	const loading = useSelector((state: RootState) => (state as any).plugins?.loading || false);
 	const [toggling, setToggling] = useState<Record<string, boolean>>({});
+
+	// Fetch plugins on mount
+	useEffect(() => {
+		fetchPlugins();
+	}, []);
+
+	const fetchPlugins = async () => {
+		try {
+			// First try to get from IndexedDB (fast)
+			dispatch(genericInternalActions.plugins.getFromIndexedDB());
+			// Then fetch from API to ensure we have latest data
+			dispatch(genericInternalActions.plugins.fetchFromAPI());
+		} catch (error) {
+			console.error('Error fetching plugins:', error);
+			toast.error('Failed to fetch plugins');
+		}
+	};
 
 	const handleToggle = async (plugin: Plugin) => {
 		setToggling(prev => ({ ...prev, [plugin.slug]: true }));

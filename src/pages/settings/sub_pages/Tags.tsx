@@ -20,7 +20,6 @@ import {
 	SettingsGrid,
 	SettingsDialog,
 	useSettingsState,
-	createActionsCellRenderer,
 	ColorIndicatorCellRenderer,
 	TextField,
 	SelectField,
@@ -178,19 +177,8 @@ function Tags() {
 			},
 			sortable: true,
 			filter: true
-		},
-		{
-			field: "actions",
-			headerName: tt('grid.columns.actions', 'Actions'),
-			width: 100,
-			suppressSizeToFit: true,
-			cellRenderer: () => null,
-			sortable: false,
-			filter: false,
-			resizable: false,
-			pinned: "right"
 		}
-	], [resolvedCategories, handleEdit, tt]);
+	], [resolvedCategories, tt]);
 
 	const handleCreateSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();

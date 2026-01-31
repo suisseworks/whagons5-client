@@ -6,7 +6,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTags,
   faPlus,
-  faCubes,
   faChartBar,
   faTrash,
   faPen,
@@ -14,7 +13,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions } from '@/store/genericSlices';
-import { Category, Task, Team, StatusTransitionGroup, Sla, Approval } from "@/store/types";
+import { Category, Task, Team, StatusTransitionGroup, Sla, Approval, DialogLayout } from "@/store/types";
+import { DialogLayoutEditorDialog } from "@/components/dialogLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,62 +117,6 @@ const EnabledCellRenderer = ({ value }: ICellRendererParams & { t: (key: string,
   );
 };
 
-type CategoryActionsRendererParams = {
-  onManageFields: (category: Category) => void;
-  getFieldCount: (categoryId: number) => number;
-};
-
-const CategoryActionsCellRenderer = (
-  props: ICellRendererParams & CategoryActionsRendererParams
-) => {
-  const { data, onManageFields, getFieldCount } = props;
-  const { t } = useLanguage();
-  const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
-  if (!data) return null;
-  const category = data as Category;
-  const id = Number(category.id);
-  const count = getFieldCount(id);
-  const label = count > 0 ? tc('grid.actions.fieldsWithCount', `Fields (${count})`).replace('{count}', String(count)) : tc('grid.actions.fields', 'Fields');
-
-  const handleClick = (
-    handler: (category: Category) => void,
-    event: React.MouseEvent
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    // Radix/AG Grid can listen above React; stop the native event too
-    (event.nativeEvent as any)?.stopImmediatePropagation?.();
-    handler(category);
-  };
-
-  return (
-    <div className="flex w-full justify-end">
-      <div className="flex items-center gap-2.5">
-        <button
-          type="button"
-          data-grid-stop-row-click="true"
-          onPointerDown={(e) => {
-            // Prevent AG Grid from treating this as a row click (which would open Edit)
-            e.preventDefault();
-            e.stopPropagation();
-            // Radix/AG Grid can listen above React; stop the native event too
-            (e.nativeEvent as any)?.stopImmediatePropagation?.();
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            (e.nativeEvent as any)?.stopImmediatePropagation?.();
-          }}
-          onClick={(event) => handleClick(onManageFields, event)}
-          className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-        >
-          <FontAwesomeIcon icon={faCubes} className="h-3 w-3 text-slate-500" />
-          {label}
-        </button>
-      </div>
-    </div>
-  );
-};
 
 function Categories() {
   const dispatch = useDispatch<AppDispatch>();
@@ -255,6 +199,9 @@ function Categories() {
   const [savingReportingTeams, setSavingReportingTeams] = useState(false);
   const [reportingTeamsError, setReportingTeamsError] = useState<string | null>(null);
 
+  // Dialog layout state for customizing task dialog per category
+  const [dialogLayout, setDialogLayout] = useState<DialogLayout | null>(null);
+
   // Load reporting teams from category directly
   const loadReportingTeamsForEdit = useCallback(() => {
     if (!editingCategory) return;
@@ -278,6 +225,8 @@ function Categories() {
         status_transition_group_id: editingCategory.status_transition_group_id?.toString() || '',
         celebration_effect: editingCategory.celebration_effect || ''
       });
+      // Load dialog layout when editing category changes
+      setDialogLayout(editingCategory.dialog_layout ?? null);
       // Load reporting teams when editing category changes - dispatch Redux action
       loadReportingTeamsForEdit();
     }
@@ -312,10 +261,6 @@ function Categories() {
     }
   };
 
-  // Manage Fields dialog state
-  const [isFieldsDialogOpen, setIsFieldsDialogOpen] = useState(false);
-  const [fieldsCategory, setFieldsCategory] = useState<Category | null>(null);
-
   // Manage Reporting Teams dialog state
   const [isReportingTeamsDialogOpen, setIsReportingTeamsDialogOpen] = useState(false);
   const [reportingTeamsCategory, setReportingTeamsCategory] = useState<Category | null>(null);
@@ -330,26 +275,6 @@ function Categories() {
       setReportingTeamsError(null);
     }
   }, [editingCategory]);
-
-  const assignmentCountByCategory = useMemo<Record<number, number>>(() => {
-    const map: Record<number, number> = {};
-    (categoryCustomFields as any[]).forEach((a) => {
-      const cid = Number((a as any)?.category_id ?? (a as any)?.categoryId);
-      if (!Number.isFinite(cid)) return;
-      map[cid] = (map[cid] || 0) + 1;
-    });
-    return map;
-  }, [categoryCustomFields]);
-
-  const openManageFields = (category: Category) => {
-    setFieldsCategory(category);
-    setIsFieldsDialogOpen(true);
-  };
-
-  const closeManageFields = () => {
-    setIsFieldsDialogOpen(false);
-    setFieldsCategory(null);
-  };
 
   const openManageReportingTeams = (category: Category) => {
     setReportingTeamsCategory(category);
@@ -544,22 +469,7 @@ function Categories() {
       sortable: true,
       filter: true
     },
-    {
-      headerName: tc('grid.columns.actions', 'Actions'),
-      colId: 'actions',
-      minWidth: 240,
-      suppressSizeToFit: true,
-      cellRenderer: CategoryActionsCellRenderer,
-      cellRendererParams: {
-        onManageFields: openManageFields,
-        getFieldCount: (id: number) => assignmentCountByCategory[Number(id)] || 0
-      },
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
-    }
-  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, assignmentCountByCategory, openManageFields, tc, t]);
+  ], [teams, slas, approvals, statusTransitionGroups, handleEdit, tc, t]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -644,7 +554,8 @@ function Categories() {
       approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
       status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined,
       reporting_team_ids: selectedReportingTeamIds,
-      celebration_effect: editFormData.celebration_effect || null
+      celebration_effect: editFormData.celebration_effect || null,
+      dialog_layout: dialogLayout
     };
     await updateItem(editingCategory.id, updates);
   };
@@ -1267,6 +1178,8 @@ function Categories() {
           <TabsList>
             <TabsTrigger value="general">{tc('dialogs.edit.tabs.general', 'General')}</TabsTrigger>
             <TabsTrigger value="rules">{tc('dialogs.edit.tabs.rules', 'Rules')}</TabsTrigger>
+            <TabsTrigger value="fields">{tc('dialogs.edit.tabs.fields', 'Fields')}</TabsTrigger>
+            <TabsTrigger value="dialog-layout">{tc('dialogs.edit.tabs.dialogLayout', 'Dialog Layout')}</TabsTrigger>
             <TabsTrigger value="reporting-teams">{tc('dialogs.edit.tabs.reportingTeams', 'Reporting Teams')}</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
@@ -1390,6 +1303,34 @@ function Categories() {
               />
             </div>
           </TabsContent>
+          <TabsContent value="fields">
+            <CategoryFieldsManager
+              variant="inline"
+              category={editingCategory}
+            />
+          </TabsContent>
+          <TabsContent value="dialog-layout">
+            <div className="min-h-[200px] space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Customize how the task create/edit dialog appears for tasks in this category.
+                You can rearrange fields, add custom tabs, and control which fields are shown.
+              </p>
+              {editingCategory && (
+                <DialogLayoutEditorDialog
+                  categoryId={editingCategory.id}
+                  categoryName={editingCategory.name}
+                  value={dialogLayout}
+                  onChange={setDialogLayout}
+                />
+              )}
+              {dialogLayout && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">Current layout:</span>{' '}
+                  {Object.keys(dialogLayout.tabs || {}).length} tabs configured
+                </div>
+              )}
+            </div>
+          </TabsContent>
           <TabsContent value="reporting-teams">
             <CategoryReportingTeamsManager
               variant="inline"
@@ -1444,12 +1385,6 @@ function Categories() {
         renderEntityPreview={renderCategoryPreview}
       />
 
-      {/* Manage Fields Dialog */}
-      <CategoryFieldsManager
-        open={isFieldsDialogOpen}
-        onOpenChange={(open) => { if (!open) closeManageFields(); }}
-        category={fieldsCategory}
-      />
       <CategoryReportingTeamsManager
         open={isReportingTeamsDialogOpen}
         onOpenChange={(open) => { if (!open) closeManageReportingTeams(); }}
