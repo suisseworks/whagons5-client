@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
@@ -27,6 +27,7 @@ export type WorkspaceHeaderCard = {
   accent: 'indigo' | 'amber' | 'emerald' | 'purple';
   sparkline?: ReactNode;
   helperText?: string;
+  filterModel?: any; // Filter model to apply when card is clicked
 };
 
 type TrendSparklineProps = {
@@ -68,6 +69,7 @@ export function useWorkspaceKpiCards(params: {
   workspaceIdNum: number | null;
   currentUserId: number;
   doneStatusId: number | undefined;
+  workingStatusIds: number[];
   stats: WorkspaceStats;
 }): {
   headerKpiCards: KpiCardEntity[];
@@ -75,7 +77,7 @@ export function useWorkspaceKpiCards(params: {
   headerCards: WorkspaceHeaderCard[];
   canReorderHeaderKpis: boolean;
 } {
-  const { workspaceIdNum, currentUserId, doneStatusId, stats } = params;
+  const { workspaceIdNum, currentUserId, doneStatusId, workingStatusIds, stats } = params;
   const { t } = useLanguage();
 
   const allKpiCardsFromRedux = useSelector((s: RootState) => ((s as any).kpiCards?.value ?? []) as KpiCardEntity[]);
@@ -157,6 +159,9 @@ export function useWorkspaceKpiCards(params: {
           value: formatStatValue(stats.inProgress),
           icon: <Activity className="h-5 w-5" />,
           accent: 'amber',
+          filterModel: workingStatusIds.length > 0 
+            ? { status_id: { filterType: 'set', values: workingStatusIds } }
+            : undefined,
         };
       case 'completedToday':
         return {
@@ -168,6 +173,9 @@ export function useWorkspaceKpiCards(params: {
             stats.completedToday === 0 && !statsArePending
               ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!')
               : undefined,
+          filterModel: doneStatusId != null
+            ? { status_id: { filterType: 'set', values: [doneStatusId] } }
+            : undefined,
         };
       case 'trend':
         return {
@@ -181,6 +189,9 @@ export function useWorkspaceKpiCards(params: {
             : completedLast7Days === 0
               ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
               : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`,
+          filterModel: doneStatusId != null
+            ? { status_id: { filterType: 'set', values: [doneStatusId] } }
+            : undefined,
         };
       case 'total':
       default:
@@ -189,6 +200,8 @@ export function useWorkspaceKpiCards(params: {
           value: formatStatValue(stats.total),
           icon: <BarChart3 className="h-5 w-5" />,
           accent: 'indigo',
+          // Total shows all tasks, so no filter
+          filterModel: undefined,
         };
     }
   };
@@ -233,6 +246,7 @@ export function useWorkspaceKpiCards(params: {
 
   useEffect(() => {
     let cancelled = false;
+    const cardsToProcess = headerKpiCardsRef.current;
 
     const toFirstId = (v: any) => {
       if (Array.isArray(v) && v.length > 0) return Number(v[0]);
@@ -264,7 +278,7 @@ export function useWorkspaceKpiCards(params: {
         if (!TasksCache.initialized) await TasksCache.init();
 
         const next = new Map<number, Omit<WorkspaceHeaderCard, 'id'>>();
-        for (const card of headerKpiCards) {
+        for (const card of cardsToProcess) {
           if (!card || card.is_enabled === false) continue;
           if (card.query_config?.is_default) continue;
 
@@ -276,12 +290,36 @@ export function useWorkspaceKpiCards(params: {
             const q = buildTaskQuery(card.query_config?.filters);
             const r = await TasksCache.queryTasks({ ...q, startRow: 0, endRow: 0 });
             const count = Number((r as any)?.rowCount ?? 0);
+            const filters = card.query_config?.filters ?? {};
+            const filterModel: any = {};
+            if (filters?.status_id != null) {
+              const sid = Array.isArray(filters.status_id) ? filters.status_id : [filters.status_id];
+              const statusIds = sid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (statusIds.length > 0) {
+                filterModel.status_id = { filterType: 'set', values: statusIds };
+              }
+            }
+            if (filters?.priority_id != null) {
+              const pid = Array.isArray(filters.priority_id) ? filters.priority_id : [filters.priority_id];
+              const priorityIds = pid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (priorityIds.length > 0) {
+                filterModel.priority_id = { filterType: 'set', values: priorityIds };
+              }
+            }
+            if (filters?.spot_id != null) {
+              const spid = Array.isArray(filters.spot_id) ? filters.spot_id : [filters.spot_id];
+              const spotIds = spid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (spotIds.length > 0) {
+                filterModel.spot_id = { filterType: 'set', values: spotIds };
+              }
+            }
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : count.toLocaleString(),
               icon: <BarChart3 className="h-5 w-5" />,
               accent,
               helperText,
+              filterModel: Object.keys(filterModel).length > 0 ? filterModel : undefined,
             });
           } else if (card.type === 'task_percentage') {
             const numQ = buildTaskQuery(card.query_config?.numerator_filters);
@@ -358,12 +396,36 @@ export function useWorkspaceKpiCards(params: {
             const q = buildTaskQuery(card.query_config);
             const r = await TasksCache.queryTasks({ ...q, startRow: 0, endRow: 0 });
             const count = Number((r as any)?.rowCount ?? 0);
+            const filters = card.query_config?.filters ?? card.query_config ?? {};
+            const filterModel: any = {};
+            if (filters?.status_id != null) {
+              const sid = Array.isArray(filters.status_id) ? filters.status_id : [filters.status_id];
+              const statusIds = sid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (statusIds.length > 0) {
+                filterModel.status_id = { filterType: 'set', values: statusIds };
+              }
+            }
+            if (filters?.priority_id != null) {
+              const pid = Array.isArray(filters.priority_id) ? filters.priority_id : [filters.priority_id];
+              const priorityIds = pid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (priorityIds.length > 0) {
+                filterModel.priority_id = { filterType: 'set', values: priorityIds };
+              }
+            }
+            if (filters?.spot_id != null) {
+              const spid = Array.isArray(filters.spot_id) ? filters.spot_id : [filters.spot_id];
+              const spotIds = spid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (spotIds.length > 0) {
+                filterModel.spot_id = { filterType: 'set', values: spotIds };
+              }
+            }
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : count.toLocaleString(),
               icon: <BarChart3 className="h-5 w-5" />,
               accent,
               helperText,
+              filterModel: Object.keys(filterModel).length > 0 ? filterModel : undefined,
             });
           } else {
             next.set(card.id, {

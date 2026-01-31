@@ -22,9 +22,10 @@ import { useTaskDialogComputed } from './hooks/useTaskDialogComputed';
 import { useFormInitialization } from './hooks/useFormInitialization';
 import { useCustomFieldSync } from './hooks/useCustomFieldSync';
 import { useShareHandlers } from './hooks/useShareHandlers';
+import { useDialogLayout } from './hooks/useDialogLayout';
 import { useIconDefinition } from '../workspaceTable/columnUtils/icon';
 
-import { BasicTab, CustomFieldsTab, AdditionalTab, ShareTab } from './components';
+import { BasicTab, CustomFieldsTab, DateTimingTab, AdditionalInfoTab, ShareTab, DynamicTabContent } from './components';
 
 import {
   deserializeCustomFieldValue,
@@ -35,6 +36,7 @@ import { normalizeDefaultUserIds } from './utils/fieldHelpers';
 import type { TaskDialogProps } from './types';
 import { celebrateTaskCompletion } from '@/utils/confetti';
 import { createStatusMap } from '../workspaceTable/utils/mappers';
+import { combineLocalDateAndTime, formatLocalDateTime } from '../scheduler/utils/dateTime';
 
 type Props = TaskDialogProps & {
   clickTime?: number;
@@ -80,6 +82,11 @@ export default function TaskDialogContent({
   const t3 = perfEnabled ? performance.now() : 0;
   markOnce('useTaskFormState', t2, t3);
   const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef, startTime, dueTime } = formState;
+
+  // Detect if task is being created from scheduler (has start_date/due_date in create mode)
+  const isFromScheduler = useMemo(() => {
+    return mode === 'create' && task && (task.start_date || task.due_date);
+  }, [mode, task]);
 
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
   const customFieldValuesRef = useRef<Record<number, any>>({});
@@ -187,6 +194,10 @@ export default function TaskDialogContent({
   const t17 = perfEnabled ? performance.now() : 0;
   markOnce('categoryFields-memo', t16, t17);
 
+  // Get dialog layout for the current category (for custom field/tab arrangement)
+  // When isFromScheduler is true, date fields are moved to basic tab automatically
+  const dialogLayout = useDialogLayout({ categoryId, isFromScheduler });
+
   const t18 = perfEnabled ? performance.now() : 0;
   const customFieldRequirementMissing = useMemo(() => {
     return categoryFields.some(({ assignment, field }: any) => {
@@ -285,15 +296,11 @@ export default function TaskDialogContent({
   const t27 = perfEnabled ? performance.now() : 0;
   markOnce('useShareHandlers', t26, t27);
 
-  // Helper to combine date and time into ISO format
+  // Helper to combine date and time into an ISO string with timezone offset
   const combineDateAndTime = (date: string, time: string): string | null => {
     if (!date) return null;
-    if (time) {
-      // Combine date and time
-      return `${date}T${time}:00`;
-    }
-    // If no time, use midnight
-    return `${date}T00:00:00`;
+    const combined = combineLocalDateAndTime(date, time || '00:00');
+    return formatLocalDateTime(combined);
   };
 
   const handleSubmit = async () => {
@@ -540,14 +547,16 @@ export default function TaskDialogContent({
     setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  if (mode === 'edit' && !task) return null;
-
+  // Performance logging effect - must be before early return to follow React hooks rules
   useEffect(() => {
     if (!perfEnabled || clickTime == null) return;
     const now = performance.now();
     // eslint-disable-next-line no-console
     console.log(`[PERF] TaskDialog: click→content-ready ${(now - clickTime).toFixed(2)}ms`, perfRef.current.marks);
   }, [perfEnabled, clickTime]);
+
+  // Early return MUST be after all hooks
+  if (mode === 'edit' && !task) return null;
 
   return (
     <>
@@ -597,6 +606,14 @@ export default function TaskDialogContent({
                   )}
                 </TabsTrigger>
               )}
+              {!isFromScheduler && (
+                <TabsTrigger
+                  value="dateTiming"
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
+                >
+                  {t('taskDialog.dateTiming', 'Date & Timing')}
+                </TabsTrigger>
+              )}
               <TabsTrigger
                 value="additional"
                 className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
@@ -613,7 +630,7 @@ export default function TaskDialogContent({
               )}
             </TabsList>
 
-            <TabsContent value="basic" className="mt-0 pt-4 sm:pt-6 pb-6 data-[state=inactive]:hidden">
+            <TabsContent value="basic" className="mt-0 pt-4 sm:pt-6 pb-8 data-[state=inactive]:hidden">
               <BasicTab
                 {...{
                   mode,
@@ -646,6 +663,23 @@ export default function TaskDialogContent({
                   categoryPriorities: computed.categoryPriorities,
                   priorityId,
                   setPriorityId: formState.setPriorityId,
+                  // Tags
+                  tags: data.tags,
+                  selectedTagIds: formState.selectedTagIds,
+                  setSelectedTagIds: formState.setSelectedTagIds,
+                  // Date and recurrence fields for scheduler
+                  isFromScheduler,
+                  startDate: formState.startDate,
+                  setStartDate: formState.setStartDate,
+                  startTime,
+                  setStartTime: formState.setStartTime,
+                  dueDate: formState.dueDate,
+                  setDueDate: formState.setDueDate,
+                  dueTime,
+                  setDueTime: formState.setDueTime,
+                  recurrenceSettings: formState.recurrenceSettings,
+                  setRecurrenceSettings: formState.setRecurrenceSettings,
+                  isExistingRecurringTask: mode === 'edit' && task?.recurrence_id != null,
                 }}
               />
             </TabsContent>
@@ -661,22 +695,34 @@ export default function TaskDialogContent({
               </TabsContent>
             )}
 
+            {!isFromScheduler && (
+              <TabsContent value="dateTiming" className="mt-0 pt-4 sm:pt-6 pb-6 data-[state=inactive]:hidden">
+                <DateTimingTab
+                  mode={mode}
+                  startDate={formState.startDate}
+                  setStartDate={formState.setStartDate}
+                  startTime={startTime}
+                  setStartTime={formState.setStartTime}
+                  dueDate={formState.dueDate}
+                  setDueDate={formState.setDueDate}
+                  dueTime={dueTime}
+                  setDueTime={formState.setDueTime}
+                  recurrenceSettings={formState.recurrenceSettings}
+                  setRecurrenceSettings={formState.setRecurrenceSettings}
+                  isExistingRecurringTask={mode === 'edit' && task?.recurrence_id != null}
+                  isFromScheduler={isFromScheduler}
+                />
+              </TabsContent>
+            )}
+
             <TabsContent value="additional" className="mt-0 pt-4 sm:pt-6 pb-6 data-[state=inactive]:hidden">
-              <AdditionalTab
-                mode={mode}
-                tags={data.tags}
-                selectedTagIds={formState.selectedTagIds}
-                setSelectedTagIds={formState.setSelectedTagIds}
+              <AdditionalInfoTab
                 slas={data.slas}
                 slaId={formState.slaId}
                 setSlaId={formState.setSlaId}
                 approvals={data.approvals}
                 approvalId={formState.approvalId}
                 setApprovalId={formState.setApprovalId}
-                startDate={formState.startDate}
-                setStartDate={formState.setStartDate}
-                dueDate={formState.dueDate}
-                setDueDate={formState.setDueDate}
               />
             </TabsContent>
 

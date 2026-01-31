@@ -7,7 +7,6 @@ import { faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { Template, Category } from "@/store/types";
 import { TemplateNameCellRenderer } from "../components/TemplateNameCell";
 import { CategoryIconRenderer } from "../components/CategoryIconRenderer";
-import { minutesToHHMM } from "../../../shared/utils/timeFormatters";
 
 interface ColumnDefsProps {
   categories: Category[];
@@ -34,7 +33,7 @@ export const useTemplateColumnDefs = ({
     {
       field: 'name',
       headerName: tt('grid.columns.name', 'Template Name'),
-      flex: 2,
+      flex: 3,
       minWidth: 250,
       cellRenderer: TemplateNameCellRenderer
     },
@@ -162,7 +161,13 @@ export const useTemplateColumnDefs = ({
         const s = slaById.get(sid);
         if (!s) return <span className="text-muted-foreground">—</span>;
         const label = s.name || `${s.response_time ?? '?'} / ${s.resolution_time ?? '?' } min`;
-        return <span>{label}</span>;
+        return (
+          <div className="flex items-center h-full">
+            <Badge variant="secondary" className="text-xs">
+              {label}
+            </Badge>
+          </div>
+        );
       },
       sortable: true,
       filter: true
@@ -176,35 +181,16 @@ export const useTemplateColumnDefs = ({
         const aid = Number(params.value);
         const a = approvalById.get(aid);
         if (!a) return <span className="text-muted-foreground">—</span>;
-        return <span>{a.name}</span>;
+        return (
+          <div className="flex items-center h-full">
+            <Badge variant="secondary" className="text-xs">
+              {a.name}
+            </Badge>
+          </div>
+        );
       },
       sortable: true,
       filter: true
-    },
-    {
-      field: 'expected_duration',
-      headerName: tt('grid.columns.expectedDuration', 'Expected Duration'),
-      flex: 0.8,
-      minWidth: 170,
-      valueFormatter: (params: any) => {
-        const v = params.value;
-        if (v == null || v === '' || v === 0) return '—';
-        const n = Number(v);
-        if (!Number.isFinite(n) || n <= 0) return '—';
-        return minutesToHHMM(n) || '—';
-      },
-      sortable: true,
-      filter: true
-    },
-    {
-      field: 'actions',
-      headerName: tt('grid.columns.actions', 'Actions'),
-      width: 100,
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
     }
   ], [categories, priorityById, slaById, approvalById, availableCategoryIds, handleEdit, openSummary, tt]);
 };

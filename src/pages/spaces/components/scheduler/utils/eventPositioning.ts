@@ -8,10 +8,12 @@ export function calculateEventPosition(
   rowHeight: number,
   barMargin: number = 4
 ): EventPosition {
-  const x = scale(event.startDate);
-  const width = Math.max(scale(event.endDate) - x, 4); // Minimum width of 4px
-  const y = resourceIndex * rowHeight + barMargin;
-  const height = rowHeight - barMargin * 2;
+  // Round all pixel positions to integers to avoid sub-pixel rendering issues
+  const x = Math.round(scale(event.startDate));
+  const endX = Math.round(scale(event.endDate));
+  const width = Math.max(endX - x, 4); // Minimum width of 4px
+  const y = Math.round(resourceIndex * rowHeight + barMargin);
+  const height = Math.round(rowHeight - barMargin * 2);
 
   return {
     x,

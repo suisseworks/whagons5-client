@@ -1,0 +1,1131 @@
+/* FullCalendar Custom Styles - Integrated with Jade/Dark/Star Wars Themes */
+/* Note: FullCalendar v6+ no longer ships CSS files, so we provide all styles here */
+
+/* FullCalendar Base Structural Styles */
+.fc {
+  display: flex;
+  flex-direction: column;
+  font-size: 1em;
+}
+
+.fc *,
+.fc *:before,
+.fc *:after {
+  box-sizing: border-box;
+}
+
+.fc table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 1em;
+}
+
+.fc th {
+  text-align: center;
+}
+
+.fc th,
+.fc td {
+  vertical-align: top;
+  padding: 0;
+}
+
+.fc a[data-navlink] {
+  cursor: pointer;
+}
+
+.fc a[data-navlink]:hover {
+  text-decoration: underline;
+}
+
+.fc .fc-button {
+  border: 1px solid transparent;
+  padding: 0.4em 0.65em;
+  font-size: 1em;
+  line-height: 1.5;
+  border-radius: 0.25em;
+  cursor: pointer;
+}
+
+.fc .fc-button::-moz-focus-inner {
+  margin: 0;
+  padding: 0;
+}
+
+.fc .fc-button:focus {
+  outline: 1px dotted;
+  outline: 5px auto -webkit-focus-ring-color;
+}
+
+.fc .fc-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.fc .fc-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.75em;
+  margin: 0;
+}
+
+.fc .fc-view-harness {
+  flex-grow: 1;
+  position: relative;
+}
+
+.fc .fc-view-harness-active > .fc-view {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.fc .fc-col-header-cell-cushion {
+  display: inline-block;
+  padding: 2px 4px;
+}
+
+.fc .fc-bg-event {
+  opacity: 0.3;
+}
+
+.fc .fc-h-event {
+  display: block;
+  border: 1px solid #3788d8;
+  background-color: #3788d8;
+}
+
+.fc .fc-h-event .fc-event-main {
+  color: #fff;
+}
+
+.fc .fc-event {
+  display: block;
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.fc .fc-event .fc-event-main {
+  position: relative;
+  z-index: 2;
+}
+
+.fc .fc-event-dragging:not(.fc-event-selected) {
+  opacity: 0.75;
+}
+
+.fc .fc-event-dragging.fc-event-selected {
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.3);
+}
+
+.fc .fc-daygrid {
+  position: relative;
+}
+
+.fc .fc-daygrid-body {
+  position: relative;
+  z-index: 1;
+}
+
+.fc .fc-daygrid-day-frame {
+  position: relative;
+  min-height: 100%;
+}
+
+.fc .fc-daygrid-day-top {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.fc .fc-daygrid-day-number {
+  position: relative;
+  z-index: 4;
+  padding: 4px;
+}
+
+.fc .fc-daygrid-event-harness {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.fc .fc-daygrid-event {
+  z-index: 6;
+  margin-top: 1px;
+}
+
+.fc .fc-timegrid {
+  position: relative;
+  z-index: 1;
+}
+
+.fc .fc-timegrid-axis {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+
+.fc .fc-timegrid-slot {
+  height: 1.5em;
+  border-bottom: 0;
+}
+
+.fc .fc-timegrid-slot-label {
+  vertical-align: middle;
+}
+
+.fc .fc-timegrid-event {
+  position: absolute;
+  z-index: 1;
+}
+
+.fc .fc-timegrid-now-indicator-line {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  border-style: solid;
+  border-color: red;
+  border-width: 1px 0 0;
+}
+
+.fc .fc-list {
+  direction: ltr;
+}
+
+.fc .fc-list-table {
+  width: 100%;
+  border-style: hidden;
+}
+
+.fc .fc-list-event {
+  cursor: pointer;
+}
+
+.fc .fc-list-event:hover td {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.fc .fc-list-event-time {
+  white-space: nowrap;
+}
+
+.fc .fc-list-event-graphic,
+.fc .fc-list-event-time {
+  width: 1px;
+}
+
+.fc .fc-list-day-cushion {
+  padding: 8px 14px;
+}
+
+.fc .fc-scrollgrid {
+  border-collapse: separate;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.fc .fc-scrollgrid-liquid {
+  height: 100%;
+}
+
+.fc .fc-scrollgrid-section > td {
+  border-left-width: 0;
+  border-top-width: 0;
+}
+
+.fc .fc-scroller-harness {
+  position: relative;
+  overflow: hidden;
+  flex-grow: 1;
+}
+
+.fc .fc-scroller {
+  overflow: auto;
+  position: relative;
+}
+
+.fc .fc-popover {
+  position: absolute;
+  z-index: 9999;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+
+.fc .fc-popover-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 4px;
+}
+
+.fc .fc-popover-close {
+  cursor: pointer;
+  opacity: 0.65;
+  font-size: 1.1em;
+}
+
+/* Theme Overrides - Bryntum-inspired Modern Design */
+.fc {
+  --fc-border-color: rgba(0, 0, 0, 0.08);
+  --fc-button-bg-color: hsl(var(--primary));
+  --fc-button-text-color: hsl(var(--primary-foreground));
+  --fc-button-hover-bg-color: hsl(var(--primary) / 0.9);
+  --fc-button-active-bg-color: hsl(var(--primary) / 0.8);
+  --fc-today-bg-color: hsl(var(--primary) / 0.05);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: #ffffff;
+  --fc-neutral-text-color: hsl(var(--foreground));
+  --fc-event-bg-color: hsl(var(--primary));
+  --fc-event-border-color: hsl(var(--primary));
+  --fc-event-text-color: hsl(var(--primary-foreground));
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+}
+
+/* Dark Mode Calendar Styles - Enhanced Professional Look */
+.dark .fc {
+  --fc-border-color: rgba(255, 255, 255, 0.08);
+  --fc-button-bg-color: hsl(var(--primary));
+  --fc-button-text-color: hsl(var(--primary-foreground));
+  --fc-button-hover-bg-color: hsl(var(--primary) / 0.9);
+  --fc-button-active-bg-color: hsl(var(--primary) / 0.8);
+  --fc-today-bg-color: hsl(var(--primary) / 0.12);
+  --fc-neutral-bg-color: #1a1a1a;
+  --fc-neutral-text-color: #e5e7eb;
+}
+
+/* Dark mode toolbar */
+.dark .fc .fc-toolbar {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Dark mode day headers */
+.dark .fc .fc-col-header-cell {
+  color: #94a3b8;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.015), transparent);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Dark mode day numbers */
+.dark .fc .fc-daygrid-day-number {
+  color: #cbd5e1;
+}
+
+/* Dark mode events */
+.dark .fc-event {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.1);
+  border-right-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .fc-event:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode time grid */
+.dark .fc .fc-timegrid-slot-label {
+  color: #94a3b8;
+}
+
+/* Dark mode weekend highlighting */
+.dark .fc .fc-day-sat,
+.dark .fc .fc-day-sun {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Dark mode toolbar title */
+.dark .fc .fc-toolbar-title {
+  color: #f1f5f9;
+}
+
+/* Star Wars Theme Calendar Styles */
+.starwars .fc {
+  --fc-border-color: rgba(74, 144, 226, 0.2);
+  --fc-button-bg-color: #4A90E2;
+  --fc-button-text-color: #ffffff;
+  --fc-button-hover-bg-color: #5BA0F2;
+  --fc-button-active-bg-color: #3A80D2;
+  --fc-today-bg-color: rgba(255, 232, 31, 0.1);
+  --fc-neutral-bg-color: #141414;
+  --fc-neutral-text-color: #E8E8E8;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+}
+
+/* Calendar Container - Modern Bryntum-style */
+.fc .fc-view-harness {
+  background-color: var(--fc-neutral-bg-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Toolbar Styling - Professional Header */
+.fc .fc-toolbar {
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.02), transparent);
+  border-bottom: 1px solid var(--fc-border-color);
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  letter-spacing: -0.02em;
+}
+
+.dark .fc .fc-toolbar-title {
+  color: hsl(var(--foreground));
+}
+
+.starwars .fc .fc-toolbar-title {
+  color: #FFE81F;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Buttons - Modern Bryntum-style */
+.fc .fc-button {
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: white;
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.fc .fc-button:hover:not(:disabled) {
+  background-color: hsl(var(--muted) / 0.8);
+  border-color: rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.fc .fc-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.25);
+}
+
+.dark .fc .fc-button {
+  background-color: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: hsl(var(--foreground));
+}
+
+.dark .fc .fc-button:hover:not(:disabled) {
+  background-color: #333333;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.starwars .fc .fc-button {
+  box-shadow: 0 0 10px rgba(74, 144, 226, 0.3);
+}
+
+.starwars .fc .fc-button:hover:not(:disabled) {
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.5);
+}
+
+/* Day Headers - Professional Typography */
+.fc .fc-col-header-cell {
+  padding: 1rem 0.5rem;
+  font-weight: 600;
+  font-size: 0.688rem;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  color: #64748b;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.01), transparent);
+  border-color: var(--fc-border-color);
+  border-bottom-width: 2px;
+}
+
+.dark .fc .fc-col-header-cell {
+  color: hsl(var(--muted-foreground));
+}
+
+.starwars .fc .fc-col-header-cell {
+  color: #FFE81F;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  border-color: rgba(74, 144, 226, 0.2);
+}
+
+/* Day Cells - Clean Professional Design */
+.fc .fc-daygrid-day {
+  background-color: transparent;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+}
+
+.fc .fc-daygrid-day:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+}
+
+.dark .fc .fc-daygrid-day:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.starwars .fc .fc-daygrid-day:hover {
+  background-color: rgba(74, 144, 226, 0.1);
+}
+
+/* Today Cell - Subtle Highlight */
+.fc .fc-day-today {
+  background-color: var(--fc-today-bg-color) !important;
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.2);
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  color: hsl(var(--primary));
+  font-weight: 700;
+  background-color: hsl(var(--primary));
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.starwars .fc .fc-day-today .fc-daygrid-day-number {
+  color: #FFE81F;
+}
+
+/* Day Numbers - Modern Typography */
+.fc .fc-daygrid-day-number {
+  padding: 0.625rem;
+  font-size: 0.938rem;
+  color: #1e293b;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.dark .fc .fc-daygrid-day-number {
+  color: hsl(var(--foreground));
+}
+
+.starwars .fc .fc-daygrid-day-number {
+  color: #E8E8E8;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+}
+
+/* Other Month Days */
+.fc .fc-day-other .fc-daygrid-day-number {
+  opacity: 0.3;
+}
+
+/* Events - Bryntum-style Professional Cards */
+.fc-event {
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0.375rem 0.625rem;
+  margin: 0.25rem 0.125rem;
+  border-left: 3px solid currentColor;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(4px);
+  font-weight: 500;
+}
+
+.fc-event:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+  z-index: 3;
+  border-left-width: 4px;
+}
+
+.dark .fc-event {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.dark .fc-event:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.starwars .fc-event {
+  box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  letter-spacing: 0.3px;
+}
+
+.starwars .fc-event:hover {
+  box-shadow: 0 0 12px rgba(74, 144, 226, 0.5);
+}
+
+/* Completed Tasks */
+.fc-event.opacity-50 {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* Event Title - Better Readability */
+.fc-event-title {
+  font-size: 0.813rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+/* All-Day Events - Distinct Styling */
+.fc .fc-daygrid-event {
+  padding: 0.375rem 0.625rem;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.fc .fc-daygrid-event .fc-event-title-container {
+  flex-grow: 1;
+}
+
+/* Event dot for all-day events */
+.fc .fc-daygrid-dot-event {
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.fc .fc-daygrid-dot-event .fc-event-title {
+  font-weight: 500;
+}
+
+/* Time Grid (Week/Day Views) - Enhanced Professional Design */
+.fc .fc-timegrid-slot {
+  height: 3.5rem;
+  border-color: var(--fc-border-color);
+}
+
+.fc .fc-timegrid-slot-label {
+  font-size: 0.688rem;
+  font-weight: 600;
+  color: #64748b;
+  padding: 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Business hours highlight */
+.fc .fc-timegrid-col.fc-day {
+  background-color: transparent;
+}
+
+/* Non-business hours subtle dimming */
+.fc .fc-non-business {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .fc .fc-non-business {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.dark .fc .fc-timegrid-slot-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.starwars .fc .fc-timegrid-slot-label {
+  color: #C5A572;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+}
+
+/* Time Grid Events - Premium Card Style */
+.fc .fc-timegrid-event {
+  border-radius: 4px;
+  border-left: 4px solid currentColor;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.fc .fc-timegrid-event .fc-event-main {
+  padding: 0.5rem 0.625rem;
+}
+
+.fc .fc-timegrid-event:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+  transform: translateX(-2px);
+}
+
+.fc .fc-timegrid-event .fc-event-time {
+  font-weight: 700;
+  font-size: 0.688rem;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Current Time Indicator */
+.fc .fc-timegrid-now-indicator-line {
+  border-color: hsl(var(--destructive));
+  border-width: 2px;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-color: hsl(var(--destructive));
+}
+
+.starwars .fc .fc-timegrid-now-indicator-line {
+  border-color: #DC143C;
+  box-shadow: 0 0 5px #DC143C;
+}
+
+/* List View - Clean Professional Table Style */
+.fc .fc-list-event {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.fc .fc-list-event:hover {
+  background-color: rgba(0, 0, 0, 0.02) !important;
+  border-left-color: hsl(var(--primary));
+  transform: translateX(2px);
+}
+
+.dark .fc .fc-list-event:hover {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.starwars .fc .fc-list-event:hover {
+  background-color: rgba(74, 144, 226, 0.1) !important;
+  border-left-color: #4A90E2;
+}
+
+.fc .fc-list-event-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+
+.fc .fc-list-event-time {
+  font-weight: 600;
+  font-size: 0.813rem;
+  color: #64748b;
+}
+
+.dark .fc .fc-list-event-title {
+  color: hsl(var(--foreground));
+}
+
+.starwars .fc .fc-list-event-title {
+  color: #E8E8E8;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+}
+
+.fc .fc-list-day-cushion {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.01));
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #475569;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.08);
+  letter-spacing: -0.01em;
+}
+
+.dark .fc .fc-list-day-cushion {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  color: #cbd5e1;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.starwars .fc .fc-list-day-cushion {
+  background-color: rgba(74, 144, 226, 0.15);
+  color: #FFE81F;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  font-weight: 600;
+  border-bottom-color: rgba(74, 144, 226, 0.3);
+}
+
+.fc .fc-list-empty {
+  padding: 3rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.938rem;
+}
+
+/* Popover - Premium Modal Style */
+.fc .fc-popover {
+  background-color: white;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.dark .fc .fc-popover {
+  background-color: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.starwars .fc .fc-popover {
+  background-color: #141414;
+  border-color: rgba(74, 144, 226, 0.3);
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.3);
+}
+
+.fc .fc-popover-header {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.02), transparent);
+  color: hsl(var(--foreground));
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .fc .fc-popover-header {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.03), transparent);
+  color: hsl(var(--foreground));
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.starwars .fc .fc-popover-header {
+  background-color: rgba(74, 144, 226, 0.2);
+  color: #FFE81F;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+  border-bottom-color: rgba(74, 144, 226, 0.3);
+}
+
+.fc .fc-popover-body {
+  padding: 0.5rem;
+}
+
+/* Scrollbars */
+.fc .fc-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.fc .fc-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: var(--radius-sm);
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.5);
+}
+
+.starwars .fc .fc-scroller::-webkit-scrollbar-thumb {
+  background-color: rgba(74, 144, 226, 0.5);
+  box-shadow: 0 0 5px rgba(74, 144, 226, 0.3);
+}
+
+/* More Link */
+.fc .fc-more-link {
+  color: hsl(var(--primary));
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.fc .fc-more-link:hover {
+  color: hsl(var(--primary) / 0.8);
+  text-decoration: underline;
+}
+
+.starwars .fc .fc-more-link {
+  color: #4A90E2;
+  font-family: 'Orbitron', 'SF Distant Galaxy', sans-serif !important;
+}
+
+.starwars .fc .fc-more-link:hover {
+  color: #5BA0F2;
+  text-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+}
+
+/* Grid Borders - Clean Professional Look */
+.fc .fc-scrollgrid {
+  border-color: var(--fc-border-color);
+  border-radius: 0;
+}
+
+.fc .fc-scrollgrid-section-body > td {
+  border-color: var(--fc-border-color);
+}
+
+/* Cleaner cell borders */
+.fc .fc-daygrid-day-frame {
+  border-color: var(--fc-border-color);
+}
+
+/* Week separator */
+.fc .fc-daygrid-body tr:first-child td {
+  border-top-width: 0;
+}
+
+/* Drag feedback - Professional Ghost Effect */
+.fc .fc-event-dragging {
+  opacity: 0.6;
+  cursor: move;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  transform: rotate(-2deg) scale(1.05);
+  z-index: 999 !important;
+}
+
+/* Resize feedback */
+.fc .fc-event-resizing {
+  opacity: 0.75;
+  cursor: ns-resize;
+}
+
+/* Event resizer - Professional Handle */
+.fc .fc-event-resizer {
+  display: none;
+  position: absolute;
+  z-index: 10;
+}
+
+.fc .fc-event:hover .fc-event-resizer {
+  display: block;
+}
+
+.fc .fc-timegrid-event-resizer {
+  height: 6px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.2));
+  border-radius: 0 0 4px 4px;
+  cursor: ns-resize;
+}
+
+.dark .fc .fc-timegrid-event-resizer {
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.15));
+}
+
+/* Star Wars event resizer */
+.starwars .fc .fc-event-resizer {
+  background-color: #FFE81F;
+}
+
+/* Event main content enhancement */
+.fc .fc-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.fc .fc-event-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selection highlight */
+.fc .fc-highlight {
+  background-color: hsl(var(--primary) / 0.08);
+  border: 1px dashed hsl(var(--primary) / 0.3);
+}
+
+.dark .fc .fc-highlight {
+  background-color: hsl(var(--primary) / 0.12);
+}
+
+/* Hover effects on calendar cells */
+.fc .fc-daygrid-day-top {
+  transition: background-color 0.2s ease;
+}
+
+.fc .fc-daygrid-day:hover .fc-daygrid-day-top {
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+.dark .fc .fc-daygrid-day:hover .fc-daygrid-day-top {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Micro-animation for new events */
+@keyframes eventAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.fc-event {
+  animation: eventAppear 0.25s ease-out;
+}
+
+/* Weekend Highlighting - Subtle Professional Touch */
+.fc .fc-day-sat,
+.fc .fc-day-sun {
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+.dark .fc .fc-day-sat,
+.dark .fc .fc-day-sun {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Weekend headers slightly different */
+.fc .fc-col-header-cell.fc-day-sat,
+.fc .fc-col-header-cell.fc-day-sun {
+  color: #94a3b8;
+}
+
+/* Alternating week rows for better readability */
+.fc .fc-scrollgrid-section:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.005);
+}
+
+/* More Events Link - Modern Styling */
+.fc .fc-daygrid-more-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #64748b;
+  transition: all 0.2s ease;
+  margin: 0.125rem;
+  display: inline-block;
+}
+
+.fc .fc-daygrid-more-link:hover {
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  transform: scale(1.05);
+}
+
+/* Empty day cells */
+.fc .fc-daygrid-day-frame:empty::after {
+  content: '';
+  display: block;
+  min-height: 80px;
+}
+
+/* Smooth animations for calendar changes */
+.fc .fc-view {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading state */
+.fc .fc-view.fc-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Improved slot lines */
+.fc .fc-timegrid-slot-minor {
+  border-top-style: dotted;
+  border-top-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Current time indicator enhancement */
+.fc .fc-timegrid-now-indicator-arrow {
+  border-width: 6px 0 6px 8px;
+  margin-top: -5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  
+  .fc .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  
+  .fc .fc-button {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.813rem;
+  }
+  
+  .fc .fc-toolbar-title {
+    font-size: 1.125rem;
+  }
+  
+  .fc .fc-daygrid-day-number {
+    font-size: 0.813rem;
+  }
+  
+  .fc-event {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Ensure calendar fills container and scrolls properly */
+.fc {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.fc .fc-view-harness {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+.fc .fc-scrollgrid {
+  height: 100% !important;
+}
+
+.fc .fc-scrollgrid-section-body {
+  flex: 1 1 auto !important;
+}
+
+.fc .fc-scrollgrid-section-body > td {
+  height: 100% !important;
+}
+
+.fc .fc-scroller-harness {
+  height: 100% !important;
+}
+
+.fc .fc-scroller {
+  height: 100% !important;
+  overflow-y: auto !important;
+}

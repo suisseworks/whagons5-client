@@ -87,7 +87,8 @@ function buildApproverDetails(
   taskApprovalInstances: any[],
   approvalApprovers: any[],
   userMap: Record<string | number, any>,
-  getUserDisplayName: (user: any) => string
+  getUserDisplayName: (user: any) => string,
+  roleMap: Record<number, any>
 ) {
   let approverDetails: Array<{
     id: number | string;
@@ -149,7 +150,7 @@ function buildApproverDetails(
           ? getUserDisplayName(userRecord)
           : (
             config.approver_type === 'role'
-              ? `Role #${config.approver_id}`
+              ? (roleMap[Number(config.approver_id)]?.name || `Role #${config.approver_id}`)
               : config.approver_label || `Approver ${idx + 1}`
           );
         const scopeLabel = config.scope && config.scope !== 'global'
@@ -404,6 +405,7 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
     getUserDisplayName,
     currentUserId,
     slaMap,
+    roleMap,
   } = opts;
 
   const row = p?.data || {};
@@ -438,7 +440,8 @@ function renderApprovalOrSLA(p: any, opts: ColumnBuilderOptions) {
     taskApprovalInstances,
     approvalApprovers,
     userMap,
-    getUserDisplayName
+    getUserDisplayName,
+    roleMap
   );
 
   const canAct = !!currentUserId && approverDetails.some((d) => {

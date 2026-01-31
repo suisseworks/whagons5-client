@@ -30,12 +30,13 @@ type CustomField = {
 };
 
 export interface CategoryFieldsManagerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   category: Category | null;
+  variant?: 'dialog' | 'inline';
 }
 
-export function CategoryFieldsManager({ open, onOpenChange, category }: CategoryFieldsManagerProps) {
+export function CategoryFieldsManager({ open, onOpenChange, category, variant = 'dialog' }: CategoryFieldsManagerProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.fieldsManager.${key}`, fallback);
@@ -71,12 +72,14 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
 
   // Data is hydrated on login; this dialog should not trigger ad-hoc IndexedDB/API loading.
   React.useEffect(() => {
-    if (open && category) {
-      setInlineError(null);
-      // Reset local overrides so we display the hydrated Redux data.
-      setLocalAssignments([]);
+    if ((variant === 'dialog' && open) || variant === 'inline') {
+      if (category) {
+        setInlineError(null);
+        // Reset local overrides so we display the hydrated Redux data.
+        setLocalAssignments([]);
+      }
     }
-  }, [open, category]);
+  }, [variant, open, category]);
 
   const addAssignment = async () => {
     if (!category || !newFieldId) return;
@@ -307,21 +310,14 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   };
 
   const closeDialog = () => {
-    onOpenChange(false);
+    if (onOpenChange) {
+      onOpenChange(false);
+    }
     setNewFieldId("");
   };
 
-  return (
-    <Dialog open={open} onOpenChange={closeDialog}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{tc('title', 'Manage Fields')}{category ? ` • ${category.name}` : ''}</DialogTitle>
-          <DialogDescription>
-            {tc('description', 'Assign custom fields to this category and configure their requirements, defaults, and order.')}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
+  const content = (
+    <div className="space-y-4">
           <div className="flex items-center gap-2">
             <select
               value={newFieldId}
@@ -398,6 +394,49 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
             </div>
           )}
         </div>
+  );
+
+  if (variant === 'inline') {
+    return (
+      <>
+        {content}
+        {/* Confirm delete assignment */}
+        <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{tc('deleteDialog.title', 'Remove field from category')}</DialogTitle>
+              <DialogDescription>
+                {(() => {
+                  const fid = deleteTarget ? getFieldId(deleteTarget) : null;
+                  const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
+                  const name = f?.name || (fid != null ? tc('deleteDialog.fieldNumber', 'Field #{id}').replace('{id}', String(fid)) : tc('deleteDialog.thisField', 'this field'));
+                  return tc('deleteDialog.confirm', 'Are you sure you want to remove "{name}" from {category}? This does not delete the custom field itself.')
+                    .replace('{name}', name)
+                    .replace('{category}', category?.name ?? tc('deleteDialog.thisCategory', 'this category'));
+                })()}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)}>{tc('deleteDialog.cancel', 'Cancel')}</Button>
+              <Button variant="destructive" onClick={async () => { if (deleteTarget) { await removeAssignment(deleteTarget); setDeleteTarget(null); } }}>{tc('deleteDialog.delete', 'Delete')}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  return (
+    <Dialog open={open ?? false} onOpenChange={closeDialog}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{tc('title', 'Manage Fields')}{category ? ` • ${category.name}` : ''}</DialogTitle>
+          <DialogDescription>
+            {tc('description', 'Assign custom fields to this category and configure their requirements, defaults, and order.')}
+          </DialogDescription>
+        </DialogHeader>
+
+        {content}
 
         <DialogFooter>
           <Button variant="outline" onClick={closeDialog}>{tc('closeButton', 'Close')}</Button>

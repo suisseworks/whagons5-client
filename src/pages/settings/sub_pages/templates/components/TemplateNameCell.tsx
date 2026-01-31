@@ -1,7 +1,6 @@
 import { ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileAlt, faLock } from "@fortawesome/free-solid-svg-icons";
-import { NameWithDescriptionCell } from "../../../shared/cellRenderers";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
 
 export const TemplateNameCellRenderer = (props: ICellRendererParams) => {
   const templateName = props.value;
@@ -9,14 +8,10 @@ export const TemplateNameCellRenderer = (props: ICellRendererParams) => {
   const isEnabled = (props.data as any)?.enabled !== false;
 
   return (
-    <div className="flex items-center h-full space-x-2">
-      <FontAwesomeIcon
-        icon={faFileAlt}
-        className="w-4 h-4 text-gray-300"
-      />
+    <div className="flex items-center h-full">
       <div className="flex flex-col justify-center flex-1">
         <div className="flex items-center gap-1.5">
-          <span className={`leading-tight ${!isEnabled ? 'line-through opacity-60' : ''}`}>
+          <span className={`text-sm font-medium leading-tight ${!isEnabled ? 'line-through opacity-60' : ''}`}>
             {templateName}
           </span>
           {isPrivate && (
@@ -28,7 +23,7 @@ export const TemplateNameCellRenderer = (props: ICellRendererParams) => {
           )}
         </div>
         {(props.data as any)?.description && (
-          <span className="text-xs text-muted-foreground leading-snug line-clamp-2">
+          <span className="text-xs text-muted-foreground/70 leading-snug line-clamp-2 mt-0.5">
             {(props.data as any).description}
           </span>
         )}

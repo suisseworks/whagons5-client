@@ -6,3 +6,4 @@ export { useFormInitialization } from './useFormInitialization';
 export { useCustomFieldSync } from './useCustomFieldSync';
 export { useShareHandlers } from './useShareHandlers';
 export { useTaskSubmit } from './useTaskSubmit';
+export { useDialogLayout, type UseDialogLayoutOptions, type DialogLayoutResult, type EnrichedFieldItem } from './useDialogLayout';

@@ -23,14 +23,16 @@ export function useWorkspaceDisplayOptions(workspaceKey: string) {
   });
 
   const [visibleTabs, setVisibleTabs] = useState<WorkspaceTabKey[]>(() => {
-    const defaultTabs: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board'];
+    const defaultTabs: WorkspaceTabKey[] = ['grid', 'calendar', 'scheduler', 'map', 'board', 'whiteboard'];
     try {
       const key = `wh_workspace_visible_tabs_${workspaceKey}`;
       const raw = localStorage.getItem(key);
       if (!raw) return defaultTabs;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        return Array.from(new Set(['grid', ...(parsed as WorkspaceTabKey[])]));
+        const parsedTabs = parsed as WorkspaceTabKey[];
+        // Always ensure grid is included
+        return Array.from(new Set(['grid', ...parsedTabs]));
       }
     } catch {}
     return defaultTabs;
@@ -54,10 +56,12 @@ export function useWorkspaceDisplayOptions(workspaceKey: string) {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-          setVisibleTabs(Array.from(new Set(['grid', ...(parsed as WorkspaceTabKey[])])));
+          const parsedTabs = parsed as WorkspaceTabKey[];
+          // Always ensure grid is included
+          setVisibleTabs(Array.from(new Set(['grid', ...parsedTabs])));
         }
       } else {
-        setVisibleTabs(['grid', 'calendar', 'scheduler', 'map', 'board']);
+        setVisibleTabs(['grid', 'calendar', 'scheduler', 'map', 'board', 'whiteboard']);
       }
     } catch {}
   }, [workspaceKey]);

@@ -40,6 +40,7 @@ export interface ColumnBuilderOptions {
   onDeleteTask?: (id: number) => void;
   onLogTask?: (id: number) => void;
   slaMap: Record<number, any>;
+  roleMap: Record<number, any>;
   getDoneStatusId: () => number | undefined;
   formatDueDate: (date: string | null) => string;
   t?: (key: string, fallback?: string) => string;

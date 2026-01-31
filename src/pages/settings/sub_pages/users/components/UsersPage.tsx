@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildInvitationLink } from "@/lib/invitationLink";
 import type { UserData } from "../types";
 import { getUserTeamRoleId } from "../utils/getUserTeamRoleId";
-import { useInvitationsColumnDefs, useUsersColumnDefs } from "../utils/columnDefs";
 import { UserStatistics } from "./UserStatistics";
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
 
 import {
   SettingsLayout,
@@ -29,7 +29,8 @@ import {
   useSettingsState,
   TextField,
   SelectField,
-  CheckboxField
+  CheckboxField,
+  AvatarCellRenderer
 } from "../../../components";
 
 function Users() {
@@ -215,21 +216,314 @@ function Users() {
     }
   };
 
-  const columnDefs = useUsersColumnDefs({
-    translate: tu,
-    teams,
-    jobPositions,
-    userTeams,
-  });
+  const columnDefs = useMemo<ColDef[]>(() => {
+    const columnLabels = {
+      id: tu('grid.columns.id', 'ID'),
+      name: tu('grid.columns.name', 'Name'),
+      email: tu('grid.columns.email', 'Email'),
+      teams: tu('grid.columns.teams', 'Teams'),
+      jobPosition: tu('grid.columns.jobPosition', 'Job Position'),
+      subscription: tu('grid.columns.subscription', 'Subscription')
+    };
+    const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
+    const noJobPositionLabel = tu('grid.values.noJobPosition', 'No Job Position');
+    const activeLabel = tu('grid.values.active', 'Active');
+    const inactiveLabel = tu('grid.values.inactive', 'Inactive');
 
-  const invitationColumnDefs = useInvitationsColumnDefs({
-    translate: tu,
-    teams,
-    onDeleteInvitation: (invitation) => {
-      setDeletingInvitation(invitation);
-      setIsDeleteInvitationDialogOpen(true);
-    },
-  });
+    return [
+      {
+        field: 'id',
+        headerName: columnLabels.id,
+        width: 90,
+        hide: true
+      },
+      {
+        field: 'name',
+        headerName: columnLabels.name,
+        flex: 2,
+        minWidth: 180,
+        cellRenderer: (params: ICellRendererParams) => (
+          <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
+        )
+      },
+      {
+        field: 'email',
+        headerName: columnLabels.email,
+        flex: 1.8,
+        minWidth: 180
+      },
+      {
+        field: 'teams',
+        headerName: columnLabels.teams,
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: ICellRendererParams) => {
+          const userId = params.data?.id;
+          if (!userId) return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+
+          const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userId);
+          
+          if (!userTeamRelationships || userTeamRelationships.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          const userTeamObjects = userTeamRelationships
+            .map((ut: UserTeam) => {
+              const team = teams.find((t: Team) => t.id === ut.team_id);
+              return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+            })
+            .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+          if (userTeamObjects.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          return (
+            <div className="flex flex-wrap gap-1 py-1 px-1 items-center">
+              {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
+                const initial = (team.name || '').charAt(0).toUpperCase();
+                const hex = String(team.color || '').trim();
+                let bg = hex;
+                let fg = '#fff';
+                try {
+                  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                    const h = hex.length === 4
+                      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                      : hex;
+                    const r = parseInt(h.slice(1, 3), 16);
+                    const g = parseInt(h.slice(3, 5), 16);
+                    const b = parseInt(h.slice(5, 7), 16);
+                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                    fg = brightness > 180 ? '#111827' : '#ffffff';
+                  } else if (!hex) {
+                    bg = '';
+                  }
+                } catch { /* ignore */ }
+                return (
+                  <div
+                    key={team.id}
+                    className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default leading-none ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        },
+        cellStyle: { overflow: 'visible', padding: '0' },
+        autoHeight: true
+      },
+      {
+        field: 'job_position_id',
+        headerName: columnLabels.jobPosition,
+        flex: 1.6,
+        minWidth: 160,
+        cellRenderer: (params: ICellRendererParams) => {
+          const idVal = params.value as number | string | undefined;
+          if (idVal == null || idVal === '') return <span className="text-muted-foreground">{noJobPositionLabel}</span>;
+          const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
+          const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
+          return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
+        }
+      },
+      {
+        field: 'has_active_subscription',
+        headerName: columnLabels.subscription,
+        flex: 1,
+        minWidth: 150,
+        cellRenderer: (params: ICellRendererParams) =>
+          params.value ? <Badge variant="default" className="bg-green-500">{activeLabel}</Badge> : <Badge variant="destructive">{inactiveLabel}</Badge>
+      }
+    ];
+  }, [teams, jobPositions, userTeams, t]);
+
+  // Copy button component for table cells
+  const CopyButton = ({ text }: { text: string }) => {
+    const [copied, setCopied] = useState(false);
+    const copyText = tu('copyButton.copy', 'Copy');
+    const copiedText = tu('copyButton.copied', 'Copied');
+
+    const handleCopy = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Radix/AG Grid can listen above React; stop the native event too
+      (e.nativeEvent as any)?.stopImmediatePropagation?.();
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 4000);
+    };
+
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        data-grid-stop-row-click="true"
+        onPointerDown={(e) => {
+          // Prevent AG Grid from treating this as a row click (which would open Edit)
+          e.preventDefault();
+          e.stopPropagation();
+          // Radix/AG Grid can listen above React; stop the native event too
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
+        onClick={handleCopy}
+        className="min-w-[80px]"
+      >
+        {copied ? (
+          <>
+            <Check className="h-4 w-4 mr-1" />
+            {copiedText}
+          </>
+        ) : (
+          <>
+            <CopyIcon className="h-4 w-4 mr-1" />
+            {copyText}
+          </>
+        )}
+      </Button>
+    );
+  };
+
+  // Invitation column definitions
+  const invitationColumnDefs: ColDef[] = useMemo(() => {
+    const columnLabels = {
+      id: tu('invitations.columns.id', 'ID'),
+      email: tu('invitations.columns.email', 'Email'),
+      teams: tu('invitations.columns.teams', 'Teams'),
+      link: tu('invitations.columns.link', 'Invitation Link'),
+      created: tu('invitations.columns.created', 'Created'),
+      actions: tu('invitations.columns.actions', 'Actions')
+    };
+    const noEmailLabel = tu('invitations.values.noEmail', 'No email');
+    const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
+
+    return [
+      {
+        field: 'id',
+        headerName: columnLabels.id,
+        width: 90,
+        hide: true
+      },
+      {
+        field: 'user_email',
+        headerName: columnLabels.email,
+        flex: 2,
+        minWidth: 220,
+        cellRenderer: (params: ICellRendererParams) => {
+          return params.value || <span className="text-muted-foreground">{noEmailLabel}</span>;
+        }
+      },
+      {
+        field: 'team_ids',
+        headerName: columnLabels.teams,
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: ICellRendererParams) => {
+          const teamIds = params.value as number[] | null | undefined;
+          if (!teamIds || teamIds.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          const invitationTeams = teamIds
+            .map((teamId: number) => {
+              const team = teams.find((t: Team) => t.id === teamId);
+              return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+            })
+            .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+          if (invitationTeams.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+        return (
+          <div className="flex flex-wrap gap-1 py-1 px-1 items-center">
+            {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <div
+                  key={team.id}
+                  className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                  style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                  title={team.name}
+                >
+                  {initial || 'T'}
+                </div>
+              );
+            })}
+          </div>
+        );
+      },
+      cellStyle: { overflow: 'visible', padding: '0' },
+      autoHeight: true
+      },
+    {
+      field: 'invitation_link',
+      headerName: 'Invitation Link',
+      flex: 3,
+      minWidth: 300,
+      cellRenderer: (params: ICellRendererParams) => {
+        const invitation = params.data as Invitation;
+        if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
+
+        const invitationLink = buildInvitationLink({
+          invitationToken: invitation.invitation_token,
+          tenantDomainPrefix: invitation.tenant_domain_prefix,
+        });
+        
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={invitationLink}
+              data-grid-stop-row-click="true"
+              className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                (e.target as HTMLInputElement).select();
+              }}
+            />
+            <CopyButton text={invitationLink} />
+          </div>
+        );
+      }
+    }
+  ];
+}, [teams, t]);
 
   // Handle invitation deletion
   const handleDeleteInvitation = async () => {

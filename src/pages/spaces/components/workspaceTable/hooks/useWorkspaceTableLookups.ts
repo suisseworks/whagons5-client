@@ -29,6 +29,7 @@ export interface WorkspaceTableLookupsParams {
   taskCustomFieldValues: any[];
   approvals: any[];
   taskApprovalInstances: any[];
+  roles: any[];
   defaultCategoryId: number | null;
   workspaceNumericId: number | null;
   isAllWorkspaces: boolean;
@@ -187,6 +188,15 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
 
   const stableTaskApprovalInstances = useMemo(() => p.taskApprovalInstances, [p.taskApprovalInstances]);
 
+  const roleMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const r of p.roles || []) {
+      const id = Number((r as any).id);
+      if (Number.isFinite(id)) m[id] = r;
+    }
+    return m;
+  }, [p.roles]);
+
   return {
     slaMap,
     statusMap,
@@ -207,6 +217,7 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     taskCustomFieldValueMap,
     approvalMap,
     stableTaskApprovalInstances,
+    roleMap,
   };
 };
 

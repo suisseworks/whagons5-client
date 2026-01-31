@@ -4,6 +4,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
+import { Switch } from '@/components/ui/switch';
+import { RecurrenceEditor } from '@/components/recurrence/RecurrenceEditor';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 import { ChevronUp, Plus, ShieldCheck, Clock } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons';
@@ -42,13 +46,30 @@ export function BasicTab(props: any) {
     categoryPriorities,
     priorityId,
     setPriorityId,
+    // Tags
+    tags,
+    selectedTagIds,
+    setSelectedTagIds,
+    // Date and recurrence fields (only shown when from scheduler)
+    isFromScheduler,
+    startDate,
+    setStartDate,
+    startTime,
+    setStartTime,
+    dueDate,
+    setDueDate,
+    dueTime,
+    setDueTime,
+    recurrenceSettings,
+    setRecurrenceSettings,
+    isExistingRecurringTask,
   } = props;
 
   const isAdHoc = currentWorkspace?.allow_ad_hoc_tasks === true;
   const isProjectWorkspace = currentWorkspace?.type === 'PROJECT';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-2">
       {/* Name - Only show for adhoc workspaces */}
       {isAdHoc && (
         <div className="flex flex-col gap-2">
@@ -153,6 +174,7 @@ export function BasicTab(props: any) {
                 searchPlaceholder={t('taskDialog.searchTemplates', 'Search templates...')}
                 emptyText={t('taskDialog.noTemplatesFound', 'No templates found.')}
                 className="w-full"
+                autoFocus={(mode === 'create' || mode === 'create-all') && !templateId}
               />
             </div>
           )}
@@ -299,25 +321,162 @@ export function BasicTab(props: any) {
         </div>
       </div>
 
-      {/* Priority */}
-      <div className="flex flex-col gap-2">
-        <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.priority', 'Priority')}</Label>
-        <Select value={priorityId ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
-          <SelectTrigger className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background">
-            <SelectValue placeholder={categoryPriorities.length ? t('taskDialog.selectPriority', 'Select priority') : t('taskDialog.noPriorities', 'No priorities')} />
-          </SelectTrigger>
-          <SelectContent>
-            {categoryPriorities.map((p: any) => (
-              <SelectItem key={p.id} value={String(p.id)}>
+      {/* Priority and Tags - Same line */}
+      {(mode === 'create' || mode === 'edit') && tags ? (
+        <div className="grid grid-cols-2 gap-4">
+          {/* Priority */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.priority', 'Priority')}</Label>
+            <Select value={priorityId ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
+              <SelectTrigger className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background">
+                <SelectValue placeholder={categoryPriorities.length ? t('taskDialog.selectPriority', 'Select priority') : t('taskDialog.noPriorities', 'No priorities')} />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryPriorities.map((p: any) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                      <span>{p.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tags */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm font-medium font-[500] text-foreground">Tags</Label>
+            <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
+              <TagMultiSelect
+                tags={tags}
+                value={selectedTagIds || []}
+                onValueChange={(values) => setSelectedTagIds?.(values)}
+                placeholder="Select tags..."
+                searchPlaceholder="Search tags..."
+                emptyText="No tags found."
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Priority only - full width when Tags not available */
+        <div className="flex flex-col gap-2">
+          <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.priority', 'Priority')}</Label>
+          <Select value={priorityId ? String(priorityId) : ""} onValueChange={(v) => setPriorityId(v ? parseInt(v, 10) : null)}>
+            <SelectTrigger className="h-10 px-4 border border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background">
+              <SelectValue placeholder={categoryPriorities.length ? t('taskDialog.selectPriority', 'Select priority') : t('taskDialog.noPriorities', 'No priorities')} />
+            </SelectTrigger>
+            <SelectContent>
+              {categoryPriorities.map((p: any) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                    <span>{p.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Date and Recurrence Fields - Only shown when creating from scheduler */}
+      {isFromScheduler && (
+        <>
+          {/* Start Date & Time */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="start" className="text-sm font-medium font-[500] text-foreground">
+              {t("taskDialog.startDate", "Start Date")}
+            </Label>
+            <div className="flex gap-2">
+              <Input 
+                id="start" 
+                type="date" 
+                value={startDate || ''} 
+                onChange={(e) => setStartDate?.(e.target.value)} 
+                className="flex-1 h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background" 
+              />
+              <Input 
+                id="start-time" 
+                type="time" 
+                value={startTime || ''} 
+                onChange={(e) => setStartTime?.(e.target.value)} 
+                className="w-32 h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background" 
+              />
+            </div>
+          </div>
+
+          {/* Due Date & Time */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="due" className="text-sm font-medium font-[500] text-foreground">
+              {t("taskDialog.dueDate", "Due Date")}
+            </Label>
+            <div className="flex gap-2">
+              <Input 
+                id="due" 
+                type="date" 
+                value={dueDate || ''} 
+                onChange={(e) => setDueDate?.(e.target.value)} 
+                className="flex-1 h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background" 
+              />
+              <Input 
+                id="due-time" 
+                type="time" 
+                value={dueTime || ''} 
+                onChange={(e) => setDueTime?.(e.target.value)} 
+                className="w-32 h-10 px-4 border-border bg-background rounded-[10px] text-sm text-foreground transition-all duration-150 hover:border-border/70 focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:bg-background" 
+              />
+            </div>
+          </div>
+
+          {/* Recurrence Section */}
+          {recurrenceSettings && setRecurrenceSettings && (
+            <div className="flex flex-col gap-3 pt-4 mt-3 border-t border-border/40 pb-3">
+              {/* Recurrence Toggle */}
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
-                  <span>{p.name}</span>
+                  <RefreshCw className="w-4 h-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium font-[500] text-foreground">
+                    {t("recurrence.repeatTask") || "Repeat Task"}
+                  </Label>
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+                <Switch
+                  checked={recurrenceSettings.enabled}
+                  onCheckedChange={(enabled) => {
+                    setRecurrenceSettings?.((prev: any) => ({
+                      ...prev,
+                      enabled,
+                    }));
+                  }}
+                />
+              </div>
+
+              {/* Recurrence Editor - shown when enabled */}
+              {recurrenceSettings.enabled && mode === 'create' && (
+                <div className="pl-6 pb-2">
+                  <RecurrenceEditor
+                    initialRRule={recurrenceSettings.rrule}
+                    dtstart={startDate && startTime 
+                      ? `${startDate}T${startTime}:00` 
+                      : startDate 
+                        ? `${startDate}T09:00:00`
+                        : undefined}
+                    onChange={(rrule: string, humanReadable: string) => {
+                      setRecurrenceSettings?.((prev: any) => ({
+                        ...prev,
+                        rrule,
+                        humanReadable,
+                      }));
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
