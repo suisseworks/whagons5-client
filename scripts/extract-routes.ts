@@ -123,8 +123,8 @@ function extractTabsFromFile(filePath: string): string[] {
     tabs.add(match[1]);
   }
   
-  // Also check for default tab values: searchParams.get('tab') || 'default'
-  const defaultTabRegex = /searchParams\.get\(['"]tab['"]\)\s*\|\|\s*['"]([^'"]+)['"]/g;
+  // Also check for default tab values: searchParams.get('tab') || 'default' (quote-agnostic)
+  const defaultTabRegex = /searchParams\.get\(["']tab["']\)\s*\|\|\s*["']([^"']+)["']/g;
   while ((match = defaultTabRegex.exec(content)) !== null) {
     tabs.add(match[1]);
   }
@@ -171,21 +171,27 @@ async function discoverTabPages(projectRoot: string): Promise<PageTabInfo[]> {
     try {
       const content = fs.readFileSync(file, 'utf-8');
       
-      // Check if file uses URL-based tabs
-      if (content.includes("searchParams.get('tab')")) {
+      // Check if file uses URL-based tabs (quote-agnostic)
+      if (content.match(/searchParams\.get\(["']tab["']\)/)) {
         const tabs = extractTabsFromFile(file);
         
         if (tabs.length > 0) {
           // Try to infer the route from the file path
-          const relativePath = path.relative(pagesDir, file);
+          // Normalize Windows backslashes to forward slashes
+          const relativePath = path.relative(pagesDir, file).replace(/\\/g, '/');
           let route = inferRouteFromPath(relativePath);
           
           pageTabInfo.push({
-            file: path.relative(projectRoot, file),
+            file: path.relative(projectRoot, file).replace(/\\/g, '/'),
             route,
             tabs,
           });
         }
+      }
+    } catch (error) {
+      // Skip files that can't be read
+    }
+  }
       }
     } catch (error) {
       // Skip files that can't be read

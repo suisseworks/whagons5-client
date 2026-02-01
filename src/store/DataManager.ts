@@ -192,6 +192,12 @@ export class DataManager {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60_000);
 
+    let syncTimer: ReturnType<typeof setTimeout> | null = null;
+    const taskUpserts: any[] = [];
+    const taskDeletes: Array<number | string> = [];
+    const TASK_BATCH_SIZE = 200;
+    let taskFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
     try {
       const resp = await fetch(url, {
         method: 'GET',
@@ -232,10 +238,6 @@ export class DataManager {
         'wh_user_team',
       ]);
       const cursorKey = this.getCursorKey();
-      let syncTimer: ReturnType<typeof setTimeout> | null = null;
-      const taskUpserts: any[] = [];
-      const taskDeletes: Array<number | string> = [];
-      const TASK_BATCH_SIZE = 200;
 
       const flushPendingSyncs = async () => {
         if (syncTimer) {
@@ -262,6 +264,10 @@ export class DataManager {
       };
 
       const flushTaskBatches = async () => {
+        if (taskFlushTimer) {
+          clearTimeout(taskFlushTimer);
+          taskFlushTimer = null;
+        }
         if (taskUpserts.length > 0) {
           const batch = taskUpserts.splice(0, taskUpserts.length);
           await TasksCache.addTasks(batch);
@@ -272,6 +278,13 @@ export class DataManager {
           await TasksCache.deleteTasksBulk(batch);
           touchedTables.add('wh_tasks');
         }
+      };
+
+      const scheduleTaskBatchFlush = () => {
+        if (taskFlushTimer) return;
+        taskFlushTimer = setTimeout(() => {
+          void flushTaskBatches();
+        }, 100);
       };
 
       const handleLine = async (line: string) => {
@@ -322,6 +335,8 @@ export class DataManager {
           }
           if (taskUpserts.length + taskDeletes.length >= TASK_BATCH_SIZE) {
             await flushTaskBatches();
+          } else {
+            scheduleTaskBatchFlush();
           }
           return;
         }
@@ -381,6 +396,7 @@ export class DataManager {
       await Promise.all(remaining.map((table) => syncReduxForTable(table)));
       return true;
     } finally {
+      if (taskFlushTimer) clearTimeout(taskFlushTimer);
       clearTimeout(timeout);
       try {
         controller.abort();

@@ -14,6 +14,9 @@ import { RpcRequestSchema, RpcResponseSchema, type RpcRequest, type RpcResponse 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyQuickJS = any;
 
+const MAX_CYCLES = 100_000_000;
+const MEMORY_LIMIT = 64 * 1024 * 1024;
+
 type MainToWorkerMessage =
   | { t: 'RUN'; rid: number; code: string }
   | { t: 'RPC_RESPONSE'; payload: RpcResponse };
@@ -180,9 +183,19 @@ function installApi(vm: AnyQuickJS): void {
 
 async function runInSandbox(code: string): Promise<unknown> {
   const QuickJS = await getQuickJS();
-  const vm = QuickJS.newContext();
+  const runtime = QuickJS.newRuntime();
+  let vm: any;
 
   try {
+    runtime.setMemoryLimit(MEMORY_LIMIT);
+
+    let cycles = 0;
+    runtime.setInterruptHandler(() => {
+      cycles++;
+      return cycles < MAX_CYCLES;
+    });
+
+    vm = runtime.newContext();
     installApi(vm);
 
     const wrapped = `
@@ -193,18 +206,19 @@ async function runInSandbox(code: string): Promise<unknown> {
 
     if (typeof vm.evalCodeAsync === 'function') {
       const res = await vm.evalCodeAsync(wrapped, { filename: 'sandbox.js' });
-      // evalCodeAsync often returns a handle; dump it and dispose it before disposing the VM.
       return unwrapResultToJs(vm, res);
     }
 
-    // Fallback: try sync eval, but warn that async code won't work without evalCodeAsync.
     const res = vm.evalCode(wrapped, { filename: 'sandbox.js' });
     return unwrapResultToJs(vm, res);
   } finally {
     try {
-      vm.dispose?.();
+      vm?.dispose?.();
     } catch {
-      // ignore
+    }
+    try {
+      runtime.dispose?.();
+    } catch {
     }
   }
 }
