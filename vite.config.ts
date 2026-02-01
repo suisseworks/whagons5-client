@@ -40,6 +40,9 @@ export default defineConfig(({ mode }) => {
   const shouldUseHttps = enableHttps && hasMkcertCerts;
 
   return {
+    worker: {
+      format: 'es',
+    },
     server: {
       host: true,  // Listen on all addresses (allows access via IP)
       // Allow tenant subdomains in local dev like `tenant.localhost`
