@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
@@ -240,13 +240,13 @@ export function useWorkspaceKpiCards(params: {
       TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, bump),
     ];
     return () => {
-      unsubscribers.forEach((u) => u());
+      unsubscribers.forEach((u) => { u(); });
     };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    const cardsToProcess = headerKpiCardsRef.current;
+    const cardsToProcess = headerKpiCards;
 
     const toFirstId = (v: any) => {
       if (Array.isArray(v) && v.length > 0) return Number(v[0]);

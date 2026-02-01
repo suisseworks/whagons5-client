@@ -15,6 +15,15 @@ import { genericActions } from '@/store/genericSlices';
 import { AppDispatch, RootState } from '@/store/store';
 import { Loader2 } from 'lucide-react';
 
+function safeJsonParse(text: string, fallback: any = {}) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('JSON parse error:', error);
+    return fallback;
+  }
+}
+
 export interface FormFillDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,8 +74,12 @@ export function FormFillDialog({
     }
     
     const fieldsData = typeof formVersion.fields === 'string' 
-      ? JSON.parse(formVersion.fields) 
+      ? safeJsonParse(formVersion.fields, { fields: [] })
       : formVersion.fields;
+    
+    if (typeof formVersion.fields === 'string' && !fieldsData.fields) {
+      setError('Failed to parse form schema. Please try again.');
+    }
     
     return {
       title: fieldsData?.title || form?.name || '',
@@ -84,11 +97,18 @@ export function FormFillDialog({
       
       // Load existing data or start fresh
       if (existingData) {
+        const existingDataStr = existingData as any;
+        
         // Parse if it's a string
-        const data = typeof existingData === 'string' 
-          ? JSON.parse(existingData) 
-          : existingData;
-        setValues(data || {});
+        if (typeof existingDataStr === 'string') {
+          const data = safeJsonParse(existingDataStr, {});
+          if (Object.keys(data).length === 0 && existingDataStr.trim() !== '') {
+            setError('Failed to parse existing form data. Starting with empty values.');
+          }
+          setValues(data);
+        } else {
+          setValues(existingData);
+        }
       } else {
         setValues({});
       }
